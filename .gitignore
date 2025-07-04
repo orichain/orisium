@@ -1,0 +1,5 @@
+obj/
+logs/
+test/
+/orisium
+database/*.key
