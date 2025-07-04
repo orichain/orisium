@@ -16,7 +16,6 @@
 #include <fcntl.h>       // for fcntl, F_GETFL, F_SETFL, O_NONBLOCK
 #include <sys/wait.h>    // for waitpid
 #include <bits/types/sig_atomic_t.h>
-#include <endian.h>
 #include <json-c/json_object.h>
 #include <json-c/json_tokener.h>
 #include <json-c/json_types.h>
@@ -25,53 +24,20 @@
 
 #include "log.h"
 #include "constants.h"
+#include "commons.h"
+#include "async.h"
+#include "ipc/protocol.h"
+#include "types.h"
 
-#define IPC_LENGTH_PREFIX_BYTES sizeof(uint32_t)
-// Definisi Makro (di src/include/common_defs.h atau di awal file .c jika hanya digunakan lokal)
-#define CHECK_BUFFER_BOUNDS(current_offset, bytes_to_write, total_buffer_size) \
-    do { \
-        if ((current_offset) + (bytes_to_write) > (total_buffer_size)) { \
-            fprintf(stderr, "[SER Error]: Buffer overflow check failed. Offset: %zu, Bytes to write: %zu, Total buffer size: %zu\n", \
-                    (size_t)(current_offset), (size_t)(bytes_to_write), (size_t)(total_buffer_size)); /* Explicit cast to size_t */ \
-            return FAILURE_OOBUF; /* Mengembalikan status_t */ \
-        } \
-    } while(0)
+volatile sig_atomic_t shutdown_requested = 0; // from global.h
 
-// Anda juga perlu memastikan `status_t` didefinisikan sebagai `int` atau `enum` yang sesuai.
-// Jika `FAILURE_OOBUF` adalah sebuah `int`, maka `return FAILURE_OOBUF;` di makro akan mengembalikan `int`.
-// Ini akan menyebabkan masalah di `ipc_serialize` yang mengharapkan `ssize_t_status_t`.
-
-// Mari kita ubah makro agar hanya melakukan pengecekan dan mencetak pesan,
-// lalu pemanggil yang menangani nilai kembalian.
-
-#define CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset, bytes_to_write, total_buffer_size) \
-    ((current_offset) + (bytes_to_write) > (total_buffer_size)) ? \
-    (fprintf(stderr, "[SER Error]: Buffer overflow check failed. Offset: %zu, Bytes to write: %zu, Total buffer size: %zu\n", \
-             (size_t)(current_offset), (size_t)(bytes_to_write), (size_t)(total_buffer_size)), 1) : 0
-// Makro ini akan mengembalikan 1 jika ada overflow, 0 jika tidak.
-// Ini bisa digunakan untuk pengecekan di dalam fungsi yang berbeda.
-
-
-// --- Message Types for IPC (Unix Domain Sockets) ---
-typedef enum {
-    IPC_CLIENT_REQUEST_TASK = (uint8_t)0x01,        // From SIO Worker to Master (new client request)
-    IPC_LOGIC_TASK = (uint8_t)0x02,                 // From Master to Logic Worker (forward client request)
-    IPC_LOGIC_RESPONSE_TO_SIO = (uint8_t)0x03,      // From Logic Worker to Master (response for original client)
-    IPC_OUTBOUND_TASK = (uint8_t)0x04,              // From Logic Worker to Master (request to contact another node)
-    IPC_OUTBOUND_RESPONSE = (uint8_t)0x05,          // From Client Outbound Worker to Master (response from another node)
-    IPC_MASTER_ACK = (uint8_t)0x06,                 // Generic ACK from Master
-    IPC_WORKER_ACK = (uint8_t)0x07,                 // Generic ACK from Worker
-    IPC_CLIENT_DISCONNECTED = (uint8_t)0x08         // From SIO Worker to Master (client disconnected)
-} message_type_t;
-
-// --- IPC Message Header ---
 typedef struct {
-    message_type_t type;
+    ipc_protocol_type_t type;
     size_t data_len;
 } ipc_msg_header_t;
 
 // Send message over UDS, with optional FD passing (from ipc.h/ipc.c)
-ssize_t send_ipc_message(int uds_fd, message_type_t type, const void *data, size_t data_len, int fd_to_pass) {
+ssize_t send_ipc_message(int uds_fd, ipc_protocol_type_t type, const void *data, size_t data_len, int fd_to_pass) {
     ipc_msg_header_t header = { .type = type, .data_len = data_len };
     struct iovec iov[2];
     iov[0].iov_base = &header;
@@ -149,623 +115,8 @@ ssize_t recv_ipc_message(int uds_fd, ipc_msg_header_t *header, void *data_buffer
     return bytes_read;
 }
 
-typedef enum {
-    SUCCESS = (uint8_t)0x00,
-    FAILURE_BAD_PROTOCOL = (uint8_t)0xfa,
-    FAILURE_NOMEM = (uint8_t)0xfb,
-    FAILURE_IPYLD = (uint8_t)0xfc,
-    FAILURE_OOBUF = (uint8_t)0xfd,
-    FAILURE_OOIDX = (uint8_t)0xfe,
-    FAILURE = (uint8_t)0xff
-} status_t;
-
-typedef struct {
-	size_t r_size_t;
-	status_t status;
-} size_t_status_t;
-
-typedef struct {
-	ssize_t r_ssize_t;
-	status_t status;
-} ssize_t_status_t;
-
 //============================================================================================================================
-#define VERSION_BYTES 2
 
-typedef struct {
-    uint64_t correlation_id;
-    uint16_t len;
-    uint8_t data[];
-} ipc_client_request_task_t;
-
-typedef struct {
-	uint8_t version[VERSION_BYTES];
-	message_type_t type;
-	union {
-		ipc_client_request_task_t *ipc_client_request_task;
-	} payload;
-} ipc_protocol_t;
-
-typedef struct {
-	ipc_protocol_t *r_ipc_protocol_t;
-	status_t status;
-} ipc_protocol_t_status_t;
-
-size_t_status_t calculate_ipc_payload_size(message_type_t type) {
-    size_t_status_t result;
-    result.r_size_t = 0;
-    result.status = FAILURE;
-    switch (type) {
-        case IPC_CLIENT_REQUEST_TASK: {
-            result.r_size_t = sizeof(uint64_t) + sizeof(uint16_t);
-            break;
-		}
-        default: {
-            result.status = FAILURE_OOIDX;
-            return result;
-		}
-    }
-
-    result.status = SUCCESS;
-    return result;
-}
-
-size_t_status_t calculate_ipc_payload_buffer(const uint8_t* buffer, size_t len) {
-	size_t_status_t result;
-    result.r_size_t = 0;
-    result.status = FAILURE;
-    
-    if (!buffer || len < VERSION_BYTES + sizeof(message_type_t)) {
-		return result;
-	}
-    size_t offset = VERSION_BYTES;
-    message_type_t type = (message_type_t)buffer[offset];
-    offset += sizeof(message_type_t);
-    switch (type) {
-        case IPC_CLIENT_REQUEST_TASK: {
-			if (len < offset + sizeof(uint64_t) + sizeof(uint16_t)) {
-				return result;
-			}
-            uint64_t correlation_id = 0;
-            uint16_t len = 0;
-            memcpy(&correlation_id, buffer + offset, sizeof(uint64_t));
-            correlation_id = be64toh(correlation_id);
-            offset += sizeof(uint64_t);
-            memcpy(&len, buffer + offset, sizeof(uint16_t));
-            len = be16toh(len);
-            offset += sizeof(uint16_t);
-            result.r_size_t = VERSION_BYTES + sizeof(message_type_t) + sizeof(uint64_t) + sizeof(uint16_t) + len;
-            result.status = SUCCESS;
-            return result;
-        }
-        default:
-            result.r_size_t = 0;
-			result.status = FAILURE;
-			return result;
-    }
-}
-
-#define SER_CHECK_SPACE(x) if (x > buffer_size) return FAILURE_OOBUF
-
-status_t ipc_serialize_client_request_task(const ipc_client_request_task_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
-    if (!payload || !current_buffer || !offset) {
-        return FAILURE;
-    }
-
-    size_t current_offset_local = *offset;
-
-    // Salin Correlation ID (big-endian)
-    if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, sizeof(uint64_t), buffer_size)) return FAILURE_OOBUF;
-    uint64_t correlation_id_be = htobe64(payload->correlation_id);
-    memcpy(current_buffer + current_offset_local, &correlation_id_be, sizeof(uint64_t));
-    current_offset_local += sizeof(uint64_t);
-
-    // Salin Len
-    if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, sizeof(uint16_t), buffer_size)) return FAILURE_OOBUF;
-    uint16_t len_be = htobe16(payload->len);
-    memcpy(current_buffer + current_offset_local, &len_be, sizeof(uint16_t));
-    current_offset_local += sizeof(uint16_t);
-
-    // Salin Data
-    if (payload->len > 0) {
-        if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, payload->len, buffer_size)) return FAILURE_OOBUF;
-        memcpy(current_buffer + current_offset_local, payload->data, payload->len);
-        current_offset_local += payload->len;
-    }
-
-    *offset = current_offset_local;
-    return SUCCESS;
-}
-
-ssize_t_status_t ipc_serialize(const ipc_protocol_t* p, uint8_t** ptr_buffer, size_t* buffer_size) {
-    ssize_t_status_t result;
-    result.r_ssize_t = 0;
-    result.status = FAILURE;
-
-    if (!p || !ptr_buffer || !buffer_size) {
-        return result;
-    }
-
-    size_t total_required_size = 0;
-    size_t payload_fixed_size = 0;
-    size_t payload_dynamic_size = 0;
-
-    // 1. Hitung total_required_size dengan aman
-    switch (p->type) {
-        case IPC_CLIENT_REQUEST_TASK: {
-            if (!p->payload.ipc_client_request_task) {
-                fprintf(stderr, "[ipc_serialize Error]: IPC_CLIENT_REQUEST_TASK payload is NULL.\n");
-                result.status = FAILURE; // Atur status hasil ke FAILURE
-                return result;
-            }
-            payload_fixed_size = sizeof(uint64_t) + sizeof(uint16_t);
-            payload_dynamic_size = p->payload.ipc_client_request_task->len;
-            break;
-        }
-        default:
-            fprintf(stderr, "[ipc_serialize Error]: Unknown message type for serialization: 0x%02x.\n", p->type);
-            result.status = FAILURE_IPYLD;
-            return result;
-    }
-
-    total_required_size = VERSION_BYTES + sizeof(message_type_t) + payload_fixed_size + payload_dynamic_size;
-
-    if (total_required_size == 0) {
-        fprintf(stderr, "[ipc_serialize Error]: Calculated required size is 0.\n");
-        result.status = FAILURE;
-        return result;
-    }
-
-    uint8_t* current_buffer = *ptr_buffer;
-    if (current_buffer == NULL || *buffer_size < total_required_size) {
-        printf("Allocating/resizing buffer. Old size: %zu, Required: %zu\n", *buffer_size, total_required_size);
-        uint8_t* new_buffer = realloc(current_buffer, total_required_size);
-        if (!new_buffer) {
-            perror("Error reallocating buffer for serialization");
-            result.status = FAILURE_NOMEM; // Set status NOMEM
-            return result;
-        }
-        *ptr_buffer = new_buffer;
-        current_buffer = new_buffer;
-        *buffer_size = total_required_size;
-    } else {
-        printf("Buffer size %zu is sufficient for %zu bytes. No reallocation needed.\n", *buffer_size, total_required_size);
-    }
-
-    size_t offset = 0;
-
-    // Gunakan CHECK_BUFFER_BOUNDS_NO_RETURN dan tangani nilai kembaliannya
-    if (CHECK_BUFFER_BOUNDS_NO_RETURN(offset, VERSION_BYTES, *buffer_size)) {
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-    memcpy(current_buffer + offset, p->version, VERSION_BYTES);
-    offset += VERSION_BYTES;
-
-    if (CHECK_BUFFER_BOUNDS_NO_RETURN(offset, sizeof(message_type_t), *buffer_size)) {
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-    current_buffer[offset] = (uint8_t)p->type;
-    offset += sizeof(message_type_t);
-
-    status_t result_pyld = FAILURE;
-    switch (p->type) {
-        case IPC_CLIENT_REQUEST_TASK:
-            // Panggil ipc_serialize_client_request_task tanpa required_size
-            result_pyld = ipc_serialize_client_request_task(p->payload.ipc_client_request_task, current_buffer, *buffer_size, &offset);
-            break;
-        default:
-            fprintf(stderr, "[ipc_serialize Error]: Unexpected message type in switch for serialization: 0x%02x.\n", p->type);
-            result.status = FAILURE_IPYLD;
-            return result;
-    }
-
-    if (result_pyld != SUCCESS) {
-        fprintf(stderr, "[ipc_serialize Error]: Payload serialization failed with status %d.\n", result_pyld);
-        result.status = FAILURE_IPYLD;
-        return result;
-    }
-
-    result.r_ssize_t = (ssize_t)offset;
-    result.status = SUCCESS;
-    return result;
-}
-
-
-ssize_t send_ipc_protocol_message(int uds_fd, const ipc_protocol_t* p, int fd_to_pass) {
-    uint8_t* serialized_ipc_data_buffer = NULL; // Ini akan berisi Version + Type + Payload
-    size_t serialized_ipc_data_len = 0; // Ini adalah panjang dari buffer di atas
-
-    // 1. Panggil ipc_serialize untuk mendapatkan data yang diserialisasi
-    // Hasil dari ipc_serialize adalah data mulai dari VERSION_BYTES + message_type_t + actual_payload
-    ssize_t_status_t serialize_result = ipc_serialize(p, &serialized_ipc_data_buffer, &serialized_ipc_data_len);
-
-    if (serialize_result.status != SUCCESS) {
-        fprintf(stderr, "[send_ipc_protocol_message Debug]: Error serializing IPC message: %d\n", serialize_result.status);
-        if (serialized_ipc_data_buffer) { // Penting: bebaskan buffer jika ada alokasi yang terjadi sebelum error
-            free(serialized_ipc_data_buffer);
-        }
-        return -1;
-    }
-
-    // `serialized_ipc_data_len` sekarang adalah panjang data IPC yang sebenarnya (versi + tipe + payload)
-    // `serialized_ipc_data_buffer` berisi data mentah tersebut
-
-    // 2. Hitung total panjang buffer yang akan DIKIRIMkan (Length Prefix + Serialized IPC Data)
-    size_t total_message_len_to_send = IPC_LENGTH_PREFIX_BYTES + serialized_ipc_data_len;
-
-    // 3. Alokasikan buffer baru untuk seluruh pesan, termasuk length prefix
-    uint8_t *final_send_buffer = (uint8_t *)malloc(total_message_len_to_send);
-    if (!final_send_buffer) {
-        perror("send_ipc_protocol_message: malloc failed for final_send_buffer");
-        // Jangan lupa bebaskan buffer dari ipc_serialize
-        if (serialized_ipc_data_buffer) {
-            free(serialized_ipc_data_buffer);
-        }
-        return -1;
-    }
-
-    size_t offset = 0;
-
-    // 4. Tulis Length Prefix (panjang data IPC, dalam big-endian)
-    uint32_t ipc_protocol_data_len_be = htobe32((uint32_t)serialized_ipc_data_len); // Cast ke uint32_t
-    memcpy(final_send_buffer + offset, &ipc_protocol_data_len_be, IPC_LENGTH_PREFIX_BYTES);
-    offset += IPC_LENGTH_PREFIX_BYTES;
-
-    // 5. Salin data IPC yang sudah diserialisasi ke buffer akhir
-    memcpy(final_send_buffer + offset, serialized_ipc_data_buffer, serialized_ipc_data_len);
-    // offset += serialized_ipc_data_len; // Tidak perlu karena ini adalah bagian terakhir
-
-    fprintf(stderr, "[send_ipc_protocol_message Debug]: Total pesan untuk dikirim: %zu byte (Prefix %zu + IPC Data %zu).\n",
-            total_message_len_to_send, IPC_LENGTH_PREFIX_BYTES, serialized_ipc_data_len);
-
-    // 6. Panggil send_ipc_message dengan buffer yang sudah lengkap dan panjangnya
-    // send_ipc_message asli Anda akan sangat sederhana, hanya menerima buffer dan panjang
-    // dan mengirimkannya. IPC_msg_header_t di send_ipc_message lama Anda tidak lagi diperlukan.
-    // Kita harus membuat versi baru send_ipc_message yang lebih sederhana untuk ini.
-    // Atau, kita bisa memanggil sendmsg langsung di sini. Mari kita panggil sendmsg langsung
-    // untuk menghindari kebingungan dengan send_ipc_message lama Anda.
-
-    // Mengkonfigurasi sendmsg
-    struct msghdr msg = {0};
-    struct iovec iov[1]; // Hanya satu iovec untuk seluruh buffer
-    iov[0].iov_base = final_send_buffer;
-    iov[0].iov_len = total_message_len_to_send;
-
-    msg.msg_iov = iov;
-    msg.msg_iovlen = 1;
-
-    // Handle FD passing (logika ini sama seperti sebelumnya)
-    char cmsgbuf[CMSG_SPACE(sizeof(int))];
-    if (fd_to_pass != -1) {
-        msg.msg_control = cmsgbuf;
-        msg.msg_controllen = sizeof(cmsgbuf);
-        struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
-        cmsg->cmsg_level = SOL_SOCKET;
-        cmsg->cmsg_type = SCM_RIGHTS;
-        cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-        *((int *) CMSG_DATA(cmsg)) = fd_to_pass;
-        fprintf(stderr, "[send_ipc_protocol_message Debug]: Mengirim FD: %d\n", fd_to_pass);
-    } else {
-        msg.msg_control = NULL;
-        msg.msg_controllen = 0;
-    }
-
-    // Kirim pesan
-    ssize_t bytes_sent = sendmsg(uds_fd, &msg, 0);
-    if (bytes_sent == -1) {
-        perror("send_ipc_protocol_message sendmsg");
-    } else if (bytes_sent != (ssize_t)total_message_len_to_send) {
-        fprintf(stderr, "[send_ipc_protocol_message Debug]: PERINGATAN: sendmsg hanya mengirim %zd dari %zu byte!\n",
-                bytes_sent, total_message_len_to_send);
-    } else {
-        fprintf(stderr, "[send_ipc_protocol_message Debug]: Berhasil mengirim %zd byte.\n", bytes_sent);
-    }
-
-    // 7. Bebaskan buffer yang dialokasikan
-    free(final_send_buffer);
-    free(serialized_ipc_data_buffer); // Juga bebaskan dari ipc_serialize
-
-    return bytes_sent;
-}
-
-#define DESER_CHECK_SPACE(x) if (len < x) return FAILURE_OOBUF
-
-status_t ipc_deserialize_client_request_task(ipc_protocol_t *p, const uint8_t *buffer, size_t total_buffer_len, size_t *offset_ptr) {
-    // Validasi Pointer Input
-    if (!p || !buffer || !offset_ptr || !p->payload.ipc_client_request_task) {
-        fprintf(stderr, "[ipc_deserialize_client_request_task Error]: Invalid input pointers.\n");
-        return FAILURE;
-    }
-
-    size_t current_offset = *offset_ptr; // Ambil offset dari pointer input
-    const uint8_t *cursor = buffer + current_offset;
-    ipc_client_request_task_t *payload = p->payload.ipc_client_request_task; // Payload spesifik yang akan diisi (STRUCT DENGAN FAM)
-
-    fprintf(stderr, "==========================================================Panjang offset_ptr AWAL: %ld\n", (long)(cursor - buffer));
-
-    // 1. Deserialisasi correlation_id (uint64_t)
-    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
-        fprintf(stderr, "[ipc_deserialize_client_request_task Error]: Out of bounds reading correlation_id.\n");
-        return FAILURE_OOBUF;
-    }
-    uint64_t correlation_id_be;
-    memcpy(&correlation_id_be, cursor, sizeof(uint64_t));
-    payload->correlation_id = be64toh(correlation_id_be);
-    cursor += sizeof(uint64_t);
-    current_offset += sizeof(uint64_t);
-
-    // 2. Deserialisasi len (uint16_t - panjang data aktual)
-    if (current_offset + sizeof(uint16_t) > total_buffer_len) {
-        fprintf(stderr, "[ipc_deserialize_client_request_task Error]: Out of bounds reading data length.\n");
-        return FAILURE_OOBUF;
-    }
-    uint16_t len_be;
-    memcpy(&len_be, cursor, sizeof(uint16_t));
-    payload->len = be16toh(len_be);
-    cursor += sizeof(uint16_t);
-    current_offset += sizeof(uint16_t);
-
-    // 3. Salin data aktual (variable length) ke FAM
-    if (payload->len > 0) {
-        // PERIKSA ruang yang tersisa di buffer input.
-        // TIDAK perlu `malloc` di sini karena `payload->data` adalah FAM
-        // dan memori untuknya sudah dialokasikan oleh `ipc_deserialize`.
-        if (current_offset + payload->len > total_buffer_len) {
-            fprintf(stderr, "[ipc_deserialize_client_request_task Error]: Insufficient buffer for actual data. Expected %hu, available %zu.\n",
-                    payload->len, total_buffer_len - current_offset);
-            // Karena ini FAM, tidak bisa di-NULL-kan. Cukup kembalikan error.
-            return FAILURE_OOBUF;
-        }
-
-        // Salin data aktual dari buffer input ke FAM `payload->data`
-        memcpy(payload->data, cursor, payload->len);
-        cursor += payload->len;
-        current_offset += payload->len;
-    } else {
-        // Jika payload->len adalah 0, tidak ada data untuk disalin.
-        // Tidak perlu mengatur `payload->data = NULL;` karena itu adalah FAM, bukan pointer.
-    }
-
-    *offset_ptr = current_offset; // Perbarui offset pointer untuk pemanggil (ipc_deserialize)
-
-    fprintf(stderr, "==========================================================Panjang offset_ptr AKHIR: %ld\n", (long)*offset_ptr);
-
-    return SUCCESS;
-}
-
-ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
-    ipc_protocol_t_status_t result;
-    result.r_ipc_protocol_t = NULL;
-    result.status = FAILURE;
-
-    // Pengecekan dasar buffer
-    if (!buffer || len < (VERSION_BYTES + sizeof(message_type_t))) {
-        fprintf(stderr, "[ipc_deserialize Error]: Buffer terlalu kecil untuk Version dan Type. Len: %zu\n", len);
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-
-    // Alokasikan hanya struktur ipc_protocol_t utama terlebih dahulu.
-    // Ini hanya mengalokasikan fixed size dari ipc_protocol_t, termasuk pointer di dalamnya.
-    ipc_protocol_t* p = (ipc_protocol_t*)calloc(1, sizeof(ipc_protocol_t));
-    if (!p) {
-        perror("ipc_deserialize: Failed to allocate ipc_protocol_t");
-        result.status = FAILURE_NOMEM;
-        return result;
-    }
-    fprintf(stderr, "Allocating ipc_protocol_t struct: %zu bytes\n", sizeof(ipc_protocol_t));
-
-    // Salin Version dan Type
-    memcpy(p->version, buffer, VERSION_BYTES);
-    p->type = (message_type_t)buffer[VERSION_BYTES];
-    size_t current_buffer_offset = VERSION_BYTES + sizeof(message_type_t); // Offset awal payload
-
-    fprintf(stderr, "[ipc_deserialize Debug]: Deserializing type 0x%02x. Current offset: %zu\n", p->type, current_buffer_offset);
-
-    status_t result_pyld = FAILURE;
-    switch (p->type) {
-        case IPC_CLIENT_REQUEST_TASK: {
-            // Untuk mendeserialisasi IPC_CLIENT_REQUEST_TASK, kita perlu tahu 'len' (panjang data aktual)
-            // yang ada di dalam payload itu sendiri. Kita harus membaca bagian fixed dari payload terlebih dahulu.
-
-            // Pastikan ada cukup byte di buffer untuk membaca correlation_id dan len
-            if (current_buffer_offset + sizeof(uint64_t) + sizeof(uint16_t) > len) {
-                fprintf(stderr, "[ipc_deserialize Error]: Buffer terlalu kecil untuk IPC_CLIENT_REQUEST_TASK fixed header.\n");
-                free(p);
-                result.status = FAILURE_OOBUF;
-                return result;
-            }
-
-            // Baca 'len' dari buffer untuk menentukan ukuran FAM
-            uint16_t raw_data_len_be;
-            memcpy(&raw_data_len_be, buffer + current_buffer_offset + sizeof(uint64_t), sizeof(uint16_t));
-            uint16_t actual_data_len = be16toh(raw_data_len_be);
-
-            // Alokasikan memori untuk ipc_client_request_task_t, termasuk ruang untuk FAM 'data[]'
-            // Inilah tempat alokasi untuk FAM terjadi!
-            ipc_client_request_task_t *task_payload = (ipc_client_request_task_t*)
-                calloc(1, sizeof(ipc_client_request_task_t) + actual_data_len);
-
-            if (!task_payload) {
-                perror("ipc_deserialize: Failed to allocate ipc_client_request_task_t with FAM");
-                free(p); // Bebaskan ipc_protocol_t jika alokasi payload gagal
-                result.status = FAILURE_NOMEM;
-                return result;
-            }
-            p->payload.ipc_client_request_task = task_payload; // Set pointer ke alokasi baru
-
-            // Panggil fungsi deserialisasi spesifik payload.
-            // Fungsi ini akan MENGISI 'task_payload' dari 'buffer'.
-            // Parameter 'required_size' tidak lagi relevan karena kita sudah mengalokasikan
-            // ukuran yang tepat dan 'len' adalah batas total buffer.
-            result_pyld = ipc_deserialize_client_request_task(p, buffer, len, &current_buffer_offset);
-            break;
-        }
-        // Tambahkan case lain untuk tipe pesan lainnya jika ada
-        default:
-            fprintf(stderr, "[ipc_deserialize Error]: Unknown message type 0x%02x.\n", p->type);
-            result.status = FAILURE_IPYLD;
-            free(p); // Bebaskan ipc_protocol_t yang sudah dialokasikan
-            return result;
-    }
-
-    // Cek hasil deserialisasi payload
-    if (result_pyld != SUCCESS) {
-        fprintf(stderr, "[ipc_deserialize Error]: Payload deserialization failed with status %d.\n", result_pyld);
-        // Penting: Bebaskan task_payload (termasuk FAM-nya) jika sudah dialokasikan sebelum membebaskan 'p'.
-        // Jika p->payload.ipc_client_request_task sudah dialokasikan:
-        if (p->payload.ipc_client_request_task) {
-            free(p->payload.ipc_client_request_task); // Ini membebaskan struct + FAM
-        }
-        free(p); // Kemudian bebaskan ipc_protocol_t
-        result.status = FAILURE_IPYLD;
-        return result;
-    }
-
-    result.r_ipc_protocol_t = p;
-    result.status = SUCCESS;
-    fprintf(stderr, "[ipc_deserialize Debug]: ipc_deserialize BERHASIL.\n");
-    return result;
-}
-
-#define INITIAL_RECV_BUFFER_SIZE 2048 
-#define MAX_IPC_MESSAGE_PAYLOAD_SIZE 1024
-
-ipc_protocol_t_status_t receive_and_deserialize_ipc_message(int uds_fd, int *actual_fd_received) {
-    ipc_protocol_t_status_t deserialized_result;
-    deserialized_result.r_ipc_protocol_t = NULL;
-    deserialized_result.status = FAILURE;
-
-    // Inisialisasi FD yang diterima
-    if (actual_fd_received) {
-        *actual_fd_received = -1;
-    }
-
-    // --- TAHAP 1: Baca SELURUH pesan (Length Prefix + Payload IPC) + FD dengan recvmsg ---
-    // Alokasikan buffer untuk panjang maksimum pesan yang Anda harapkan, atau secara dinamis setelah membaca length prefix.
-    // Untuk kesederhanaan, kita akan menggunakan pendekatan buffer dua tahap yang lebih aman:
-    // Tahap A: Baca 4 byte pertama untuk mendapatkan panjang total.
-    // Tahap B: Alokasikan buffer berdasarkan panjang total, lalu baca sisanya + FD.
-
-    uint32_t total_ipc_payload_len_be; // Panjang payload IPC dalam big-endian
-
-    // Buffer sementara untuk 4 byte length prefix
-    char temp_len_prefix_buf[IPC_LENGTH_PREFIX_BYTES];
-
-    // Konfigurasi msghdr untuk membaca length prefix dan ancillary data (FD)
-    struct msghdr msg_prefix = {0};
-    struct iovec iov_prefix[1];
-    iov_prefix[0].iov_base = temp_len_prefix_buf;
-    iov_prefix[0].iov_len = IPC_LENGTH_PREFIX_BYTES;
-
-    msg_prefix.msg_iov = iov_prefix;
-    msg_prefix.msg_iovlen = 1;
-
-    char cmsgbuf_prefix[CMSG_SPACE(sizeof(int))];
-    msg_prefix.msg_control = cmsgbuf_prefix;
-    msg_prefix.msg_controllen = sizeof(cmsgbuf_prefix);
-
-    fprintf(stderr, "[receive_and_deserialize_ipc_message Debug]: Tahap 1: Membaca length prefix dan potensi FD (%zu byte).\n", IPC_LENGTH_PREFIX_BYTES);
-    ssize_t bytes_read_prefix_and_fd = recvmsg(uds_fd, &msg_prefix, MSG_WAITALL);
-
-    if (bytes_read_prefix_and_fd == -1) {
-        if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            perror("receive_and_deserialize_ipc_message recvmsg (length prefix + FD)");
-        }
-        return deserialized_result;
-    }
-
-    if (bytes_read_prefix_and_fd != (ssize_t)IPC_LENGTH_PREFIX_BYTES) {
-        fprintf(stderr, "[receive_and_deserialize_ipc_message Debug]: ERROR: Gagal membaca length prefix sepenuhnya. Diharapkan %zu byte, diterima %zd.\n",
-                IPC_LENGTH_PREFIX_BYTES, bytes_read_prefix_and_fd);
-        deserialized_result.status = FAILURE_OOBUF;
-        return deserialized_result;
-    }
-
-    // Ekstrak FD jika ada dari tahap pertama ini
-    struct cmsghdr *cmsg_prefix = CMSG_FIRSTHDR(&msg_prefix);
-    if (cmsg_prefix && cmsg_prefix->cmsg_level == SOL_SOCKET && cmsg_prefix->cmsg_type == SCM_RIGHTS && cmsg_prefix->cmsg_len == CMSG_LEN(sizeof(int))) {
-        if (actual_fd_received) {
-            *actual_fd_received = *((int *) CMSG_DATA(cmsg_prefix));
-        }
-        fprintf(stderr, "[receive_and_deserialize_ipc_message Debug]: FD diterima: %d\n", *actual_fd_received);
-    } else {
-        fprintf(stderr, "[receive_and_deserialize_ipc_message Debug]: Tidak ada FD yang diterima dengan length prefix.\n");
-    }
-
-    // Konversi panjang dari big-endian ke host byte order
-    memcpy(&total_ipc_payload_len_be, temp_len_prefix_buf, IPC_LENGTH_PREFIX_BYTES);
-    uint32_t total_ipc_payload_len = be32toh(total_ipc_payload_len_be);
-    fprintf(stderr, "[receive_and_deserialize_ipc_message Debug]: Ditemukan panjang payload IPC: %u byte.\n", total_ipc_payload_len);
-
-    // --- TAHAP 2: Alokasikan buffer dinamis dan baca sisa payload IPC ---
-    if (total_ipc_payload_len == 0) {
-        fprintf(stderr, "[receive_and_deserialize_ipc_message Debug]: Peringatan: Panjang payload IPC adalah 0. Tidak ada data untuk dibaca.\n");
-        deserialized_result.status = FAILURE_BAD_PROTOCOL;
-        return deserialized_result;
-    }
-
-    uint8_t *full_ipc_payload_buffer = (uint8_t *)malloc(total_ipc_payload_len);
-    if (!full_ipc_payload_buffer) {
-        perror("receive_and_deserialize_ipc_message: malloc failed for full_ipc_payload_buffer");
-        deserialized_result.status = FAILURE_NOMEM;
-        return deserialized_result;
-    }
-
-    // Konfigurasi recvmsg untuk membaca SISA payload (tanpa FD, karena sudah diambil)
-    struct msghdr msg_payload = {0};
-    struct iovec iov_payload[1];
-    iov_payload[0].iov_base = full_ipc_payload_buffer;
-    iov_payload[0].iov_len = total_ipc_payload_len;
-
-    msg_payload.msg_iov = iov_payload;
-    msg_payload.msg_iovlen = 1;
-
-    // Untuk memastikan tidak ada ancillary data yang tersisa jika FD tidak dikirim dengan prefix
-    // Tapi karena sendmsg pengirim mengirimnya sebagai satu blok, seharusnya tidak ada.
-    msg_payload.msg_control = NULL;
-    msg_payload.msg_controllen = 0;
-
-
-    fprintf(stderr, "[receive_and_deserialize_ipc_message Debug]: Tahap 2: Membaca %u byte payload IPC.\n", total_ipc_payload_len);
-    ssize_t bytes_read_payload = recvmsg(uds_fd, &msg_payload, MSG_WAITALL);
-
-    if (bytes_read_payload == -1) {
-        if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            perror("receive_and_deserialize_ipc_message recvmsg (payload)");
-        }
-        free(full_ipc_payload_buffer);
-        deserialized_result.status = FAILURE;
-        return deserialized_result;
-    }
-
-    if (bytes_read_payload != (ssize_t)total_ipc_payload_len) {
-        fprintf(stderr, "[receive_and_deserialize_ipc_message Debug]: ERROR: Payload IPC tidak lengkap. Diharapkan %u byte, diterima %zd.\n",
-                total_ipc_payload_len, bytes_read_payload);
-        free(full_ipc_payload_buffer);
-        deserialized_result.status = FAILURE_OOBUF;
-        return deserialized_result;
-    }
-
-    // --- TAHAP 3: Deserialisasi payload IPC ---
-    fprintf(stderr, "[receive_and_deserialize_ipc_message Debug]: Memanggil ipc_deserialize dengan buffer %p dan panjang %u.\n",
-            (void*)full_ipc_payload_buffer, total_ipc_payload_len);
-
-    deserialized_result = ipc_deserialize((const uint8_t*)full_ipc_payload_buffer, total_ipc_payload_len);
-
-    if (deserialized_result.status != SUCCESS) {
-        fprintf(stderr, "[receive_and_deserialize_ipc_message Debug]: ipc_deserialize gagal dengan status %d.\n", deserialized_result.status);
-    } else {
-        fprintf(stderr, "[receive_and_deserialize_ipc_message Debug]: ipc_deserialize BERHASIL.\n");
-    }
-
-    // Bebaskan buffer yang dialokasikan dinamis
-    free(full_ipc_payload_buffer);
-
-    return deserialized_result;
-}
 //============================================================================================================================
 
 // --- Data Structures for Tasks/Messages (from ipc.h/types.h) ---
@@ -894,20 +245,6 @@ void run_server_io_workerx(int worker_idx, int master_uds_fd) {
 
             // Handle UDS from Master
             if (current_fd == master_uds_fd) {
-				/*
-                ipc_msg_header_t master_msg_header;
-                char master_msg_data[sizeof(client_request_task_t) > sizeof(logic_response_t) ?
-                                     sizeof(client_request_task_t) : sizeof(logic_response_t)]; // Max size of expected messages
-                int received_client_fd = -1;
-
-                ssize_t bytes_read = recv_ipc_message(master_uds_fd, &master_msg_header, master_msg_data, sizeof(master_msg_data), &received_client_fd);
-                if (bytes_read == -1) {
-                    if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                        perror("recv_ipc_message from master (SIO)");
-                    }
-                    continue;
-                }
-                */
                 int received_client_fd = -1;
                 ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(master_uds_fd, &received_client_fd);
                 if (deserialized_result.status != SUCCESS) {
@@ -924,21 +261,27 @@ void run_server_io_workerx(int worker_idx, int master_uds_fd) {
 
                     if (received_client_fd == -1) {
                         LOG_ERROR("[Server IO Worker %d]: Error: No client FD received with IPC_CLIENT_REQUEST_TASK for ID %ld. Skipping.", worker_idx, req->correlation_id);
-                        continue;
+                        CLOSE_PAYLOAD(received_protocol->payload.ipc_client_request_task);
+						CLOSE_PROTOCOL(received_protocol);
+						continue;
                     }
 
                     if (set_nonblocking("[SIO Worker]: ", received_client_fd) == -1) {
                         LOG_ERROR("[Server IO Worker %d]: Failed to set non-blocking for FD %d. Closing.", worker_idx, received_client_fd);
-                        close(received_client_fd);
-                        continue;
+                        CLOSE_FD(received_client_fd);
+                        CLOSE_PAYLOAD(received_protocol->payload.ipc_client_request_task);
+						CLOSE_PROTOCOL(received_protocol);
+						continue;
                     }
 
                     event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
                     event.data.fd = received_client_fd;
                     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, received_client_fd, &event) == -1) {
                         LOG_ERROR("epoll_ctl: add client FD to SIO worker %d epoll: %s", worker_idx, strerror(errno));
-                        close(received_client_fd);
-                        continue;
+                        CLOSE_FD(received_client_fd);
+                        CLOSE_PAYLOAD(received_protocol->payload.ipc_client_request_task);
+						CLOSE_PROTOCOL(received_protocol);
+						continue;
                     }
 
                     // Get client IP and store client state
@@ -972,7 +315,7 @@ void run_server_io_workerx(int worker_idx, int master_uds_fd) {
                                worker_idx, received_client_fd, req->correlation_id, client_ip_str, slot_found);
                     } else {
                         LOG_ERROR("[Server IO Worker %d]: No free slots for new client FD %d. Closing.", worker_idx, received_client_fd);
-                        close(received_client_fd);
+                        CLOSE_FD(received_client_fd);
                     }
 
                 }
@@ -1030,6 +373,8 @@ void run_server_io_workerx(int worker_idx, int master_uds_fd) {
                 else {
                      LOG_ERROR("[Server IO Worker %d]: Unknown message type %d from Master.", worker_idx, received_protocol->type);
                 }
+                CLOSE_PAYLOAD(received_protocol->payload.ipc_client_request_task);
+                CLOSE_PROTOCOL(received_protocol);
             }
             // Handle client TCP connections
             else {
@@ -1082,7 +427,7 @@ void run_server_io_workerx(int worker_idx, int master_uds_fd) {
 
                 client_buffer[bytes_read] = '\0';
 
-                long client_id_for_request = -1;
+                uint64_t client_id_for_request = 0xffffffff;
                 int client_idx = -1;
                 char client_ip_for_request[INET6_ADDRSTRLEN];
                 memset(client_ip_for_request, 0, sizeof(client_ip_for_request));
@@ -1097,24 +442,42 @@ void run_server_io_workerx(int worker_idx, int master_uds_fd) {
                     }
                 }
 
-                if (client_id_for_request == -1 || client_idx == -1) {
+                if (client_id_for_request == 0xffffffff || client_idx == -1) {
                     LOG_ERROR("[Server IO Worker %d]: Received data from unknown client FD %d. Ignoring.", worker_idx, current_fd);
                     continue;
                 }
-
-                message_type_t message_to_master_type = IPC_CLIENT_REQUEST_TASK;
-                LOG_INFO("[Server IO Worker %d]: Received data from client/peer FD %d (ID %ld, IP %s): '%.*s'",
-                       worker_idx, current_fd, client_id_for_request, client_ip_for_request, (int)bytes_read, client_buffer);
-
-                client_request_task_t client_req;
-                client_req.client_correlation_id = client_id_for_request;
-                strncpy(client_req.request_data, client_buffer, sizeof(client_req.request_data) - 1);
-                client_req.request_data[sizeof(client_req.request_data) - 1] = '\0';
-                client_req.request_data_len = bytes_read;
-
-                send_ipc_message(master_uds_fd, message_to_master_type, &client_req, sizeof(client_req), -1);
-                LOG_INFO("[Server IO Worker %d]: Sent client request (ID %ld) to Master for Logic Worker.",
+                
+                ipc_protocol_t *p = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
+                if (!p) {
+					perror("Failed to allocate ipc_protocol_t protocol");
+					//CLOSE_FD(client_sock);
+					continue;
+				}
+				memset(p, 0, sizeof(ipc_protocol_t)); // Inisialisasi dengan nol
+				p->version[0] = VERSION_MAJOR;
+				p->version[1] = VERSION_MINOR;
+				p->type = IPC_CLIENT_REQUEST_TASK;
+				ipc_client_request_task_t *ipc_req_payload = (ipc_client_request_task_t *)calloc(1, sizeof(ipc_client_request_task_t));
+				if (!ipc_req_payload) {
+					perror("Failed to allocate ipc_client_request_task_t payload");
+					//CLOSE_FD(client_sock);
+					CLOSE_PROTOCOL(p);
+					continue;
+				}
+				ipc_req_payload->correlation_id = (uint64_t)client_id_for_request; // Cast ke uint64_t
+				ipc_req_payload->len = (uint16_t)bytes_read;
+				memcpy(ipc_req_payload->data, &client_buffer, (uint16_t)bytes_read);
+				p->payload.ipc_client_request_task = ipc_req_payload;				
+				ssize_t_status_t send_result = send_ipc_protocol_message(master_uds_fd, p, -1);
+				if (send_result.status != SUCCESS) {
+					LOG_INFO("[Server IO Worker %d]: Failed to sent client request (ID %ld) to Master for Logic Worker.",
                        worker_idx, client_id_for_request);
+				} else {
+					LOG_INFO("[Server IO Worker %d]: Sent client request (ID %ld) to Master for Logic Worker.",
+                       worker_idx, client_id_for_request);
+				}
+				CLOSE_PAYLOAD(p->payload.ipc_client_request_task);
+				CLOSE_PROTOCOL(p);
             }
         }
     }
@@ -1164,20 +527,6 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 
             // Handle UDS from Master
             if (current_fd == master_uds_fd) {
-				/*
-                ipc_msg_header_t master_msg_header;
-                char master_msg_data[sizeof(client_request_task_t) > sizeof(logic_response_t) ?
-                                     sizeof(client_request_task_t) : sizeof(logic_response_t)]; // Max size of expected messages
-                int received_client_fd = -1;
-
-                ssize_t bytes_read = recv_ipc_message(master_uds_fd, &master_msg_header, master_msg_data, sizeof(master_msg_data), &received_client_fd);
-                if (bytes_read == -1) {
-                    if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                        perror("recv_ipc_message from master (SIO)");
-                    }
-                    continue;
-                }
-                */
                 int received_client_fd = -1;
                 ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(master_uds_fd, &received_client_fd);
                 if (deserialized_result.status != SUCCESS) {
@@ -1194,21 +543,28 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 
                     if (received_client_fd == -1) {
                         LOG_ERROR("[Server IO Worker %d]: Error: No client FD received with IPC_CLIENT_REQUEST_TASK for ID %ld. Skipping.", worker_idx, req->correlation_id);
-                        continue;
+                        CLOSE_FD(received_client_fd);
+                        CLOSE_PAYLOAD(received_protocol->payload.ipc_client_request_task);
+						CLOSE_PROTOCOL(received_protocol);
+						continue;
                     }
 
                     if (set_nonblocking("[SIO Worker]: ", received_client_fd) == -1) {
                         LOG_ERROR("[Server IO Worker %d]: Failed to set non-blocking for FD %d. Closing.", worker_idx, received_client_fd);
-                        close(received_client_fd);
-                        continue;
+                        CLOSE_FD(received_client_fd);
+                        CLOSE_PAYLOAD(received_protocol->payload.ipc_client_request_task);
+						CLOSE_PROTOCOL(received_protocol);
+						continue;
                     }
 
                     event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
                     event.data.fd = received_client_fd;
                     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, received_client_fd, &event) == -1) {
                         LOG_ERROR("epoll_ctl: add client FD to SIO worker %d epoll: %s", worker_idx, strerror(errno));
-                        close(received_client_fd);
-                        continue;
+                        CLOSE_FD(received_client_fd);
+                        CLOSE_PAYLOAD(received_protocol->payload.ipc_client_request_task);
+						CLOSE_PROTOCOL(received_protocol);
+						continue;
                     }
 
                     // Get client IP and store client state
@@ -1242,16 +598,19 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
                                worker_idx, received_client_fd, req->correlation_id, client_ip_str, slot_found);
                     } else {
                         LOG_ERROR("[Server IO Worker %d]: No free slots for new client FD %d. Closing.", worker_idx, received_client_fd);
-                        close(received_client_fd);
+                        CLOSE_FD(received_client_fd);
+                        CLOSE_PAYLOAD(received_protocol->payload.ipc_client_request_task);
+						CLOSE_PROTOCOL(received_protocol);
+						continue;
                     }
 
                 }
                 else {
                      LOG_ERROR("[Server IO Worker %d]: Unknown message type %d from Master.", worker_idx, received_protocol->type);
                 }
-            }
-            // Handle client TCP connections
-            else {
+                CLOSE_PAYLOAD(received_protocol->payload.ipc_client_request_task);
+				CLOSE_PROTOCOL(received_protocol);
+            } else { // Handle client TCP connections
                 char client_buffer[MAX_DATA_BUFFER_IN_STRUCT];
                 ssize_t bytes_read = read(current_fd, client_buffer, sizeof(client_buffer) - 1);
 
@@ -1301,7 +660,7 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 
                 client_buffer[bytes_read] = '\0';
 
-                long client_id_for_request = -1;
+                uint64_t client_id_for_request = 0xffffffff;
                 int client_idx = -1;
                 char client_ip_for_request[INET6_ADDRSTRLEN];
                 memset(client_ip_for_request, 0, sizeof(client_ip_for_request));
@@ -1316,24 +675,45 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
                     }
                 }
 
-                if (client_id_for_request == -1 || client_idx == -1) {
+                if (client_id_for_request == 0xffffffff || client_idx == -1) {
                     LOG_ERROR("[Server IO Worker %d]: Received data from unknown client FD %d. Ignoring.", worker_idx, current_fd);
                     continue;
                 }
-
-                message_type_t message_to_master_type = IPC_CLIENT_REQUEST_TASK;
-                LOG_INFO("[Server IO Worker %d]: Received data from client/peer FD %d (ID %ld, IP %s): '%.*s'",
-                       worker_idx, current_fd, client_id_for_request, client_ip_for_request, (int)bytes_read, client_buffer);
-
-                client_request_task_t client_req;
-                client_req.client_correlation_id = client_id_for_request;
-                strncpy(client_req.request_data, client_buffer, sizeof(client_req.request_data) - 1);
-                client_req.request_data[sizeof(client_req.request_data) - 1] = '\0';
-                client_req.request_data_len = bytes_read;
-
-                send_ipc_message(master_uds_fd, message_to_master_type, &client_req, sizeof(client_req), -1);
-                LOG_INFO("[Server IO Worker %d]: Sent client request (ID %ld) to Master for Logic Worker.",
+                
+                
+                
+                
+                ipc_protocol_t *p = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
+                if (!p) {
+					perror("Failed to allocate ipc_protocol_t protocol");
+					//CLOSE_FD(client_sock);
+					continue;
+				}
+				memset(p, 0, sizeof(ipc_protocol_t)); // Inisialisasi dengan nol
+				p->version[0] = VERSION_MAJOR;
+				p->version[1] = VERSION_MINOR;
+				p->type = IPC_CLIENT_REQUEST_TASK;
+				ipc_client_request_task_t *ipc_req_payload = (ipc_client_request_task_t *)calloc(1, sizeof(ipc_client_request_task_t));
+				if (!ipc_req_payload) {
+					perror("Failed to allocate ipc_client_request_task_t payload");
+					//CLOSE_FD(client_sock);
+					CLOSE_PROTOCOL(p);
+					continue;
+				}
+				ipc_req_payload->correlation_id = (uint64_t)client_id_for_request; // Cast ke uint64_t
+				ipc_req_payload->len = (uint16_t)bytes_read;
+				memcpy(ipc_req_payload->data, &client_buffer, (uint16_t)bytes_read);
+				p->payload.ipc_client_request_task = ipc_req_payload;				
+				ssize_t_status_t send_result = send_ipc_protocol_message(master_uds_fd, p, -1);
+				if (send_result.status != SUCCESS) {
+					LOG_INFO("[Server IO Worker %d]: Failed to sent client request (ID %ld) to Master for Logic Worker.",
                        worker_idx, client_id_for_request);
+				} else {
+					LOG_INFO("[Server IO Worker %d]: Sent client request (ID %ld) to Master for Logic Worker.",
+                       worker_idx, client_id_for_request);
+				}
+				CLOSE_PAYLOAD(p->payload.ipc_client_request_task);
+				CLOSE_PROTOCOL(p);
             }
         }
     }
@@ -1374,11 +754,22 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
             int current_fd = events[n].data.fd;
 
             if (current_fd == master_uds_fd) {
+				/*
                 ipc_msg_header_t master_msg_header;
                 char master_msg_data[sizeof(client_request_task_t) > sizeof(outbound_response_t) ?
                                      sizeof(client_request_task_t) : sizeof(outbound_response_t)];
                 int received_fd = -1;
-
+                */
+                int received_fd = -1;
+                ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(master_uds_fd, &received_fd);
+                if (deserialized_result.status != SUCCESS) {
+                    fprintf(stderr, "[Server IO Worker %d]: Error receiving or deserializing IPC message from Master: %d\n", worker_idx, deserialized_result.status);
+                    continue;
+                }
+                ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;
+                printf("[Server IO Worker %d]: Received message type: 0x%02x\n", worker_idx, received_protocol->type);
+                printf("[Server IO Worker %d]: Received FD: %d\n", worker_idx, received_fd);
+                /*
                 ssize_t bytes_read = recv_ipc_message(master_uds_fd, &master_msg_header, master_msg_data, sizeof(master_msg_data), &received_fd);
                 if (bytes_read == -1) {
                     if (errno != EAGAIN && errno != EWOULDBLOCK) {
@@ -1386,8 +777,10 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
                     }
                     continue;
                 }
-
-                if (master_msg_header.type == IPC_LOGIC_TASK) {
+                */
+                if (received_protocol->type == IPC_LOGIC_TASK) {
+					
+					/*
                     client_request_task_t *task = (client_request_task_t *)master_msg_data;
                     LOG_INFO("[Logic Worker %d]: Received client request (ID %ld) from Master. Data: '%.*s'",
                            worker_idx, task->client_correlation_id, (int)task->request_data_len, task->request_data);
@@ -1454,8 +847,9 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
                         LOG_INFO("[Logic Worker %d]: Sending echo response for client ID %ld to Master for SIO.",
                                worker_idx, task->client_correlation_id);
                     }
-                }
-                else if (master_msg_header.type == IPC_OUTBOUND_RESPONSE) {
+                    */
+                } else if (received_protocol->type == IPC_OUTBOUND_RESPONSE) {
+					/*
                     outbound_response_t *resp = (outbound_response_t *)master_msg_data;
                     LOG_INFO("[Logic Worker %d]: Received outbound response for client ID %ld. Success: %s, Data: '%.*s'",
                            worker_idx, resp->client_correlation_id, resp->success ? "true" : "false",
@@ -1474,9 +868,12 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
                     send_ipc_message(master_uds_fd, IPC_LOGIC_RESPONSE_TO_SIO, &response_to_sio, sizeof(response_to_sio), -1);
                     LOG_INFO("[Logic Worker %d]: Notifying original client ID %ld (via SIO) about outbound communication result.",
                            worker_idx, resp->client_correlation_id);
+                    */
                 } else {
-                    LOG_ERROR("[Logic Worker %d]: Unknown message type %d from Master.", worker_idx, master_msg_header.type);
+                    LOG_ERROR("[Logic Worker %d]: Unknown message type %d from Master.", worker_idx, received_protocol->type);
                 }
+                CLOSE_PAYLOAD(received_protocol->payload.ipc_client_request_task);
+				CLOSE_PROTOCOL(received_protocol);
             }
         }
     }
@@ -1787,8 +1184,6 @@ status_t setup_socket_listenner(int *listen_sock) {
     return SUCCESS;
 }
 
-// Placeholder for install_sigint_handler
-volatile sig_atomic_t shutdown_requested = 0; // from global.h
 void sigint_handler(int signum) {
     shutdown_requested = 1;
     LOG_INFO("SIGINT received. Initiating graceful shutdown...");
@@ -1913,25 +1308,6 @@ status_t read_network_config_from_json(const char* filename, node_config_t* conf
     }
 
     json_object_put(parsed_json);
-    return SUCCESS;
-}
-
-// --- Placeholder for async_type_t and async_create_incoming_event ---
-// This struct would typically be defined in async.h
-typedef struct {
-    int async_fd; // The epoll instance FD
-    // Add other async-related members if needed
-} async_type_t;
-
-// This function would typically be defined in async.c/async.h
-status_t async_create_incoming_event(const char* label, async_type_t *async, int *fd_to_add) {
-    struct epoll_event event;
-    event.events = EPOLLIN | EPOLLET;
-    event.data.fd = *fd_to_add;
-    if (epoll_ctl(async->async_fd, EPOLL_CTL_ADD, *fd_to_add, &event) == -1) {
-        LOG_ERROR("%sepoll_ctl: add UDS FD %d to epoll: %s", label, *fd_to_add, strerror(errno));
-        return FAILURE;
-    }
     return SUCCESS;
 }
 
@@ -2261,7 +1637,7 @@ int main() {
                 char client_ip_str[INET6_ADDRSTRLEN];
                 if (inet_ntop(AF_INET, &client_addr.sin_addr, client_ip_str, sizeof(client_ip_str)) == NULL) {
                     perror("inet_ntop");
-                    close(client_sock);
+                    CLOSE_FD(client_sock);
                     continue;
                 }
 
@@ -2277,7 +1653,7 @@ int main() {
 
                 if (ip_already_connected) {
                     LOG_WARN("[Master]: Koneksi ditolak dari IP %s. Sudah ada koneksi aktif dari IP ini.", client_ip_str);
-                    close(client_sock);
+                    CLOSE_FD(client_sock);
                     continue;
                 }
                 // --- End Filter ---
@@ -2302,57 +1678,40 @@ int main() {
                 }
                 if (slot_found == -1) {
                     LOG_ERROR("[Master]: WARNING: No free session slots in master_client_sessions. Rejecting client FD %d.", client_sock);
-                    close(client_sock);
+                    CLOSE_FD(client_sock);
                     continue;
                 }
-                
-                
-                
-                ipc_protocol_t p;
-				memset(&p, 0, sizeof(ipc_protocol_t)); // Inisialisasi dengan nol
-				p.version[0] = 0x01;
-				p.version[1] = 0x00;
-				p.type = IPC_CLIENT_REQUEST_TASK;
+                ipc_protocol_t *p = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
+                if (!p) {
+					perror("Failed to allocate ipc_protocol_t protocol");
+					CLOSE_FD(client_sock);
+					continue;
+				}
+				memset(p, 0, sizeof(ipc_protocol_t)); // Inisialisasi dengan nol
+				p->version[0] = VERSION_MAJOR;
+				p->version[1] = VERSION_MINOR;
+				p->type = IPC_CLIENT_REQUEST_TASK;
 				ipc_client_request_task_t *ipc_req_payload = (ipc_client_request_task_t *)calloc(1, sizeof(ipc_client_request_task_t));
 				if (!ipc_req_payload) {
 					perror("Failed to allocate ipc_client_request_task_t payload");
-					close(client_sock);
+					CLOSE_FD(client_sock);
+					CLOSE_PROTOCOL(p);
 					continue;
 				}
 				ipc_req_payload->correlation_id = (uint64_t)current_client_id; // Cast ke uint64_t
-				ipc_req_payload->len = 1; // Karena request_data_len 0
-				uint8_t b = 0x09;
-				memcpy(ipc_req_payload->data, &b, 1);
-				p.payload.ipc_client_request_task = ipc_req_payload;
-				ssize_t bytes_sent = send_ipc_protocol_message(sio_worker_uds_fd, &p, client_sock);
-				if (bytes_sent == -1) {
+				ipc_req_payload->len = (uint16_t)0; // Karena request_data_len 0
+				p->payload.ipc_client_request_task = ipc_req_payload;				
+				ssize_t_status_t send_result = send_ipc_protocol_message(sio_worker_uds_fd, p, client_sock);
+				if (send_result.status != SUCCESS) {
 					LOG_ERROR("[Master]: Failed to forward client FD %d (ID %ld) to Server IO Worker %d.",
 							  client_sock, current_client_id, sio_worker_idx);
 				} else {
 					LOG_INFO("[Master]: Forwarding client FD %d (ID %ld) from IP %s to Server IO Worker %d (UDS FD %d). Bytes sent: %zd.",
-							 client_sock, current_client_id, client_ip_str, sio_worker_idx, sio_worker_uds_fd, bytes_sent);
+							 client_sock, current_client_id, client_ip_str, sio_worker_idx, sio_worker_uds_fd, send_result.r_ssize_t);
+					CLOSE_FD(client_sock); // di close jika berhasil Forwarding
 				}
-				if (ipc_req_payload) {
-					free(ipc_req_payload);
-					p.payload.ipc_client_request_task = NULL;
-				}
-				if (bytes_sent != -1) {
-					close(client_sock);
-				}
-               
-/*                
-                
-                client_request_task_t new_client_req;
-                new_client_req.client_correlation_id = current_client_id;
-                new_client_req.request_data_len = 0;
-
-                send_ipc_message(sio_worker_uds_fd, IPC_CLIENT_REQUEST_TASK, &new_client_req, sizeof(new_client_req), client_sock);
-                LOG_INFO("[Master]: Forwarding client FD %d (ID %ld) from IP %s to Server IO Worker %d (UDS FD %d).",
-                       client_sock, current_client_id, client_ip_str, sio_worker_idx, sio_worker_uds_fd);
-                
-                close(client_sock); 
-*/
-
+				CLOSE_PAYLOAD(p->payload.ipc_client_request_task);
+				CLOSE_PROTOCOL(p);
             }
             else { 
                 ipc_msg_header_t msg_header;
