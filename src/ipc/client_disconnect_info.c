@@ -71,7 +71,7 @@ status_t ipc_serialize_client_disconnect_info(const ipc_client_disconnect_info_t
     return SUCCESS;
 }
 
-ipc_protocol_t_status_t ipc_prepare_cmd_client_disconnect_info(int *current_fd, uint64_t *correlation_id, uint8_t disconnected_client_ip[]) {
+ipc_protocol_t_status_t ipc_prepare_cmd_client_disconnect_info(int *fd_to_close, uint64_t *correlation_id, uint8_t disconnected_client_ip[]) {
 	ipc_protocol_t *p = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
 	ipc_protocol_t_status_t result;
 	result.status = FAILURE;
@@ -79,7 +79,7 @@ ipc_protocol_t_status_t ipc_prepare_cmd_client_disconnect_info(int *current_fd, 
 	if (!p) {
 		perror("Failed to allocate ipc_protocol_t protocol");
 		//CLOSE_FD(client_sock);
-		CLOSE_FD(*current_fd);
+		CLOSE_FD(*fd_to_close);
 		return result;
 	}
 	memset(p, 0, sizeof(ipc_protocol_t)); // Inisialisasi dengan nol
@@ -90,7 +90,7 @@ ipc_protocol_t_status_t ipc_prepare_cmd_client_disconnect_info(int *current_fd, 
 	if (!payload) {
 		perror("Failed to allocate ipc_client_disconnect_info_t payload");
 		//CLOSE_FD(client_sock);
-		CLOSE_FD(*current_fd);
+		CLOSE_FD(*fd_to_close);
 		CLOSE_IPC_PROTOCOL(p);
 		return result;
 	}
