@@ -5,21 +5,21 @@ src/orisium.c should add these lines:
 
 src/orisium.c should remove these lines:
 - #include <endian.h>  // lines 19-19
+- #include <fcntl.h>  // lines 16-16
 - #include "globals.h"  // lines 29-29
 
 The full include-list for src/orisium.c:
-#include <arpa/inet.h>                // for inet_ntop, htons, inet_pton
+#include <arpa/inet.h>                // for htons, inet_ntop, inet_pton
 #include <bits/types/sig_atomic_t.h>  // for sig_atomic_t
 #include <errno.h>                    // for errno, EAGAIN, EWOULDBLOCK, EIN...
-#include <fcntl.h>                    // for fcntl, F_GETFL, F_SETFL, O_NONB...
 #include <json-c/json_object.h>       // for json_object_is_type, json_objec...
 #include <json-c/json_tokener.h>      // for json_tokener_parse
 #include <json-c/json_types.h>        // for json_type
 #include <netinet/in.h>               // for sockaddr_in, INET6_ADDRSTRLEN
 #include <signal.h>                   // for size_t, sigaction, SIGINT, sa_h...
-#include <stdbool.h>                  // for false, bool, true
-#include <stdint.h>                   // for uint16_t, uint64_t
-#include <stdio.h>                    // for perror, NULL, snprintf, printf
+#include <stdbool.h>                  // for false, true, bool
+#include <stdint.h>                   // for uint64_t, uint16_t
+#include <stdio.h>                    // for perror, NULL, snprintf, fprintf
 #include <stdlib.h>                   // for exit, EXIT_FAILURE, calloc, malloc
 #include <string.h>                   // for strerror, memset, strncpy, strlen
 #include <sys/epoll.h>                // for epoll_event, epoll_ctl, EPOLLET
@@ -33,6 +33,8 @@ The full include-list for src/orisium.c:
 #include "constants.h"                // for MAX_LOGIC_WORKERS, MAX_COW_WORKERS
 #include "ipc/protocol.h"             // for (anonymous struct)::(anonymous)
 #include "log.h"                      // for LOG_INFO, LOG_ERROR, LOG_WARN
+#include "sessions.h"                 // for client_conn_state_t
 #include "types.h"                    // for SUCCESS, FAILURE, ssize_t_status_t
+#include "utilities.h"                // for set_nonblocking
 ---
 

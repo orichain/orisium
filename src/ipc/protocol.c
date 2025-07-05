@@ -1,4 +1,5 @@
 #include <errno.h>       // for errno, EAGAIN, EWOULDBLOCK
+#include <netinet/in.h>  // for sockaddr_in, INADDR_ANY, in_addr
 #include <stdio.h>       // for printf, perror, fprintf, NULL, stderr
 #include <stdlib.h>      // for exit, EXIT_FAILURE, atoi, EXIT_SUCCESS, malloc, free
 #include <string.h>      // for memset, strncpy
@@ -18,8 +19,12 @@ size_t_status_t calculate_ipc_payload_size(ipc_protocol_type_t type) {
     result.status = FAILURE;
     switch (type) {
         case IPC_CLIENT_REQUEST_TASK: {
-            result.r_size_t = sizeof(uint64_t) + sizeof(uint16_t);
+            result.r_size_t = sizeof(uint64_t) + INET6_ADDRSTRLEN + sizeof(uint16_t);
             break;
+		}
+		case IPC_CLIENT_DISCONNECTED: {
+			result.r_size_t = sizeof(uint64_t) + INET6_ADDRSTRLEN;
+			break;
 		}
         default: {
             result.status = FAILURE_OOIDX;
@@ -44,21 +49,29 @@ size_t_status_t calculate_ipc_payload_buffer(const uint8_t* buffer, size_t len) 
     offset += sizeof(ipc_protocol_type_t);
     switch (type) {
         case IPC_CLIENT_REQUEST_TASK: {
-			if (len < offset + sizeof(uint64_t) + sizeof(uint16_t)) {
+			if (len < offset + sizeof(uint64_t) + INET6_ADDRSTRLEN + sizeof(uint16_t)) {
 				return result;
 			}
-            uint64_t correlation_id = 0;
             uint16_t len = 0;
-            memcpy(&correlation_id, buffer + offset, sizeof(uint64_t));
-            correlation_id = be64toh(correlation_id);
             offset += sizeof(uint64_t);
+            offset += INET6_ADDRSTRLEN;
             memcpy(&len, buffer + offset, sizeof(uint16_t));
             len = be16toh(len);
             offset += sizeof(uint16_t);
-            result.r_size_t = VERSION_BYTES + sizeof(ipc_protocol_type_t) + sizeof(uint64_t) + sizeof(uint16_t) + len;
+            result.r_size_t = VERSION_BYTES + sizeof(ipc_protocol_type_t) + sizeof(uint64_t) + INET6_ADDRSTRLEN + sizeof(uint16_t) + len;
             result.status = SUCCESS;
             return result;
         }
+        case IPC_CLIENT_DISCONNECTED: {
+			if (len < offset + sizeof(uint64_t) + INET6_ADDRSTRLEN) {
+				return result;
+			}
+			offset += sizeof(uint64_t);
+			offset += INET6_ADDRSTRLEN;
+			result.r_size_t = VERSION_BYTES + sizeof(ipc_protocol_type_t) + sizeof(uint64_t) + INET6_ADDRSTRLEN;
+            result.status = SUCCESS;
+            return result;
+		}
         default:
             result.r_size_t = 0;
 			result.status = FAILURE;
@@ -78,6 +91,11 @@ status_t ipc_serialize_client_request_task(const ipc_client_request_task_t* payl
     uint64_t correlation_id_be = htobe64(payload->correlation_id);
     memcpy(current_buffer + current_offset_local, &correlation_id_be, sizeof(uint64_t));
     current_offset_local += sizeof(uint64_t);
+    
+    // Salin ip (INET6_ADDRSTRLEN)
+    if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, INET6_ADDRSTRLEN, buffer_size)) return FAILURE_OOBUF;
+    memcpy(current_buffer + current_offset_local, payload->ip, INET6_ADDRSTRLEN);
+    current_offset_local += INET6_ADDRSTRLEN;
 
     // Salin Len
     if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, sizeof(uint16_t), buffer_size)) return FAILURE_OOBUF;
@@ -91,6 +109,28 @@ status_t ipc_serialize_client_request_task(const ipc_client_request_task_t* payl
         memcpy(current_buffer + current_offset_local, payload->data, payload->len);
         current_offset_local += payload->len;
     }
+
+    *offset = current_offset_local;
+    return SUCCESS;
+}
+
+status_t ipc_serialize_client_disconnect_info(const ipc_client_disconnect_info_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
+    if (!payload || !current_buffer || !offset) {
+        return FAILURE;
+    }
+
+    size_t current_offset_local = *offset;
+
+    // Salin Correlation ID (big-endian)
+    if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, sizeof(uint64_t), buffer_size)) return FAILURE_OOBUF;
+    uint64_t correlation_id_be = htobe64(payload->correlation_id);
+    memcpy(current_buffer + current_offset_local, &correlation_id_be, sizeof(uint64_t));
+    current_offset_local += sizeof(uint64_t);
+    
+    // Salin ip (INET6_ADDRSTRLEN)
+    if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, INET6_ADDRSTRLEN, buffer_size)) return FAILURE_OOBUF;
+    memcpy(current_buffer + current_offset_local, payload->ip, INET6_ADDRSTRLEN);
+    current_offset_local += INET6_ADDRSTRLEN;
 
     *offset = current_offset_local;
     return SUCCESS;
@@ -117,10 +157,20 @@ ssize_t_status_t ipc_serialize(const ipc_protocol_t* p, uint8_t** ptr_buffer, si
                 result.status = FAILURE; // Atur status hasil ke FAILURE
                 return result;
             }
-            payload_fixed_size = sizeof(uint64_t) + sizeof(uint16_t);
+            payload_fixed_size = sizeof(uint64_t) + INET6_ADDRSTRLEN + sizeof(uint16_t);
             payload_dynamic_size = p->payload.ipc_client_request_task->len;
             break;
         }
+        case IPC_CLIENT_DISCONNECTED: {
+			if (!p->payload.ipc_client_disconnect_info) {
+                fprintf(stderr, "[ipc_serialize Error]: IPC_CLIENT_DISCONNECTED payload is NULL.\n");
+                result.status = FAILURE; // Atur status hasil ke FAILURE
+                return result;
+            }
+            payload_fixed_size = sizeof(uint64_t) + INET6_ADDRSTRLEN;
+            payload_dynamic_size = 0;
+            break;
+		}
         default:
             fprintf(stderr, "[ipc_serialize Error]: Unknown message type for serialization: 0x%02x.\n", p->type);
             result.status = FAILURE_IPYLD;
@@ -173,6 +223,10 @@ ssize_t_status_t ipc_serialize(const ipc_protocol_t* p, uint8_t** ptr_buffer, si
         case IPC_CLIENT_REQUEST_TASK:
             // Panggil ipc_serialize_client_request_task tanpa required_size
             result_pyld = ipc_serialize_client_request_task(p->payload.ipc_client_request_task, current_buffer, *buffer_size, &offset);
+            break;
+        case IPC_CLIENT_DISCONNECTED:
+            // Panggil ipc_serialize_client_disconnect_info tanpa required_size
+            result_pyld = ipc_serialize_client_disconnect_info(p->payload.ipc_client_disconnect_info, current_buffer, *buffer_size, &offset);
             break;
         default:
             fprintf(stderr, "[ipc_serialize Error]: Unexpected message type in switch for serialization: 0x%02x.\n", p->type);
@@ -317,8 +371,17 @@ status_t ipc_deserialize_client_request_task(ipc_protocol_t *p, const uint8_t *b
     payload->correlation_id = be64toh(correlation_id_be);
     cursor += sizeof(uint64_t);
     current_offset += sizeof(uint64_t);
+    
+    // 2. Deserialisasi ip (INET6_ADDRSTRLEN)
+    if (current_offset + INET6_ADDRSTRLEN > total_buffer_len) {
+        fprintf(stderr, "[ipc_deserialize_client_request_task Error]: Out of bounds reading correlation_id.\n");
+        return FAILURE_OOBUF;
+    }
+    memcpy(payload->ip, cursor, INET6_ADDRSTRLEN);
+    cursor += INET6_ADDRSTRLEN;
+    current_offset += INET6_ADDRSTRLEN;
 
-    // 2. Deserialisasi len (uint16_t - panjang data aktual)
+    // 3. Deserialisasi len (uint16_t - panjang data aktual)
     if (current_offset + sizeof(uint16_t) > total_buffer_len) {
         fprintf(stderr, "[ipc_deserialize_client_request_task Error]: Out of bounds reading data length.\n");
         return FAILURE_OOBUF;
@@ -329,7 +392,7 @@ status_t ipc_deserialize_client_request_task(ipc_protocol_t *p, const uint8_t *b
     cursor += sizeof(uint16_t);
     current_offset += sizeof(uint16_t);
 
-    // 3. Salin data aktual (variable length) ke FAM
+    // 4. Salin data aktual (variable length) ke FAM
     if (payload->len > 0) {
         // PERIKSA ruang yang tersisa di buffer input.
         // TIDAK perlu `malloc` di sini karena `payload->data` adalah FAM
@@ -354,6 +417,45 @@ status_t ipc_deserialize_client_request_task(ipc_protocol_t *p, const uint8_t *b
 
     fprintf(stderr, "==========================================================Panjang offset_ptr AKHIR: %ld\n", (long)*offset_ptr);
 
+    return SUCCESS;
+}
+
+status_t ipc_deserialize_client_disconnect_info(ipc_protocol_t *p, const uint8_t *buffer, size_t total_buffer_len, size_t *offset_ptr) {
+    // Validasi Pointer Input
+    if (!p || !buffer || !offset_ptr || !p->payload.ipc_client_request_task) {
+        fprintf(stderr, "[ipc_deserialize_client_disconnect_info Error]: Invalid input pointers.\n");
+        return FAILURE;
+    }
+
+    size_t current_offset = *offset_ptr; // Ambil offset dari pointer input
+    const uint8_t *cursor = buffer + current_offset;
+    ipc_client_disconnect_info_t *payload = p->payload.ipc_client_disconnect_info; // Payload spesifik yang akan diisi (STRUCT DENGAN FAM)
+
+    fprintf(stderr, "==========================================================Panjang offset_ptr AWAL: %ld\n", (long)(cursor - buffer));
+
+    // 1. Deserialisasi correlation_id (uint64_t)
+    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
+        fprintf(stderr, "[ipc_deserialize_client_disconnect_info Error]: Out of bounds reading correlation_id.\n");
+        return FAILURE_OOBUF;
+    }
+    uint64_t correlation_id_be;
+    memcpy(&correlation_id_be, cursor, sizeof(uint64_t));
+    payload->correlation_id = be64toh(correlation_id_be);
+    cursor += sizeof(uint64_t);
+    current_offset += sizeof(uint64_t);
+    
+    // 2. Deserialisasi ip (INET6_ADDRSTRLEN)
+    if (current_offset + INET6_ADDRSTRLEN > total_buffer_len) {
+        fprintf(stderr, "[ipc_deserialize_client_disconnect_info Error]: Out of bounds reading correlation_id.\n");
+        return FAILURE_OOBUF;
+    }
+    memcpy(payload->ip, cursor, INET6_ADDRSTRLEN);
+    cursor += INET6_ADDRSTRLEN;
+    current_offset += INET6_ADDRSTRLEN;
+    *offset_ptr = current_offset;
+
+    fprintf(stderr, "==========================================================Panjang offset_ptr AKHIR: %ld\n", (long)*offset_ptr);
+    
     return SUCCESS;
 }
 
@@ -389,63 +491,59 @@ ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
     status_t result_pyld = FAILURE;
     switch (p->type) {
         case IPC_CLIENT_REQUEST_TASK: {
-            // Untuk mendeserialisasi IPC_CLIENT_REQUEST_TASK, kita perlu tahu 'len' (panjang data aktual)
-            // yang ada di dalam payload itu sendiri. Kita harus membaca bagian fixed dari payload terlebih dahulu.
-
-            // Pastikan ada cukup byte di buffer untuk membaca correlation_id dan len
-            if (current_buffer_offset + sizeof(uint64_t) + sizeof(uint16_t) > len) {
+            if (current_buffer_offset + sizeof(uint64_t) + INET6_ADDRSTRLEN + sizeof(uint16_t) > len) {
                 fprintf(stderr, "[ipc_deserialize Error]: Buffer terlalu kecil untuk IPC_CLIENT_REQUEST_TASK fixed header.\n");
                 free(p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-
-            // Baca 'len' dari buffer untuk menentukan ukuran FAM
             uint16_t raw_data_len_be;
-            memcpy(&raw_data_len_be, buffer + current_buffer_offset + sizeof(uint64_t), sizeof(uint16_t));
+            memcpy(&raw_data_len_be, buffer + current_buffer_offset + sizeof(uint64_t) + INET6_ADDRSTRLEN, sizeof(uint16_t));
             uint16_t actual_data_len = be16toh(raw_data_len_be);
-
-            // Alokasikan memori untuk ipc_client_request_task_t, termasuk ruang untuk FAM 'data[]'
-            // Inilah tempat alokasi untuk FAM terjadi!
             ipc_client_request_task_t *task_payload = (ipc_client_request_task_t*)
                 calloc(1, sizeof(ipc_client_request_task_t) + actual_data_len);
-
             if (!task_payload) {
                 perror("ipc_deserialize: Failed to allocate ipc_client_request_task_t with FAM");
-                free(p); // Bebaskan ipc_protocol_t jika alokasi payload gagal
+                free(p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
-            p->payload.ipc_client_request_task = task_payload; // Set pointer ke alokasi baru
-
-            // Panggil fungsi deserialisasi spesifik payload.
-            // Fungsi ini akan MENGISI 'task_payload' dari 'buffer'.
-            // Parameter 'required_size' tidak lagi relevan karena kita sudah mengalokasikan
-            // ukuran yang tepat dan 'len' adalah batas total buffer.
+            p->payload.ipc_client_request_task = task_payload;
             result_pyld = ipc_deserialize_client_request_task(p, buffer, len, &current_buffer_offset);
             break;
         }
-        // Tambahkan case lain untuk tipe pesan lainnya jika ada
+        case IPC_CLIENT_DISCONNECTED: {
+			if (current_buffer_offset + sizeof(uint64_t) + INET6_ADDRSTRLEN > len) {
+                fprintf(stderr, "[ipc_deserialize Error]: Buffer terlalu kecil untuk IPC_CLIENT_DISCONNECTED fixed header.\n");
+                free(p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            ipc_client_disconnect_info_t *disconnect_info_payload = (ipc_client_disconnect_info_t*)
+                calloc(1, sizeof(ipc_client_disconnect_info_t));
+            if (!disconnect_info_payload) {
+                perror("ipc_deserialize: Failed to allocate ipc_client_disconnect_info_t without FAM");
+                free(p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.ipc_client_disconnect_info = disconnect_info_payload;
+            result_pyld = ipc_deserialize_client_disconnect_info(p, buffer, len, &current_buffer_offset);
+            break;
+		}
         default:
             fprintf(stderr, "[ipc_deserialize Error]: Unknown message type 0x%02x.\n", p->type);
             result.status = FAILURE_IPYLD;
-            free(p); // Bebaskan ipc_protocol_t yang sudah dialokasikan
+            free(p);
             return result;
     }
-
-    // Cek hasil deserialisasi payload
     if (result_pyld != SUCCESS) {
         fprintf(stderr, "[ipc_deserialize Error]: Payload deserialization failed with status %d.\n", result_pyld);
-        // Penting: Bebaskan task_payload (termasuk FAM-nya) jika sudah dialokasikan sebelum membebaskan 'p'.
-        // Jika p->payload.ipc_client_request_task sudah dialokasikan:
-        if (p->payload.ipc_client_request_task) {
-            free(p->payload.ipc_client_request_task); // Ini membebaskan struct + FAM
-        }
-        free(p); // Kemudian bebaskan ipc_protocol_t
+        if (p->type == IPC_CLIENT_REQUEST_TASK) if (p->payload.ipc_client_request_task) { free(p->payload.ipc_client_request_task); }
+        free(p);
         result.status = FAILURE_IPYLD;
         return result;
     }
-
     result.r_ipc_protocol_t = p;
     result.status = SUCCESS;
     fprintf(stderr, "[ipc_deserialize Debug]: ipc_deserialize BERHASIL.\n");

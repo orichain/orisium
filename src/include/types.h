@@ -1,6 +1,8 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include <stdint.h>
+
 typedef enum {
     SUCCESS = (uint8_t)0x00,
     FAILURE_EINTR = (uint8_t)0xf9,

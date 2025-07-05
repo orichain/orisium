@@ -20,15 +20,22 @@ typedef enum {
 
 typedef struct {
     uint64_t correlation_id;
+    uint8_t ip[INET6_ADDRSTRLEN];
     uint16_t len;
     uint8_t data[];
 } ipc_client_request_task_t;
+
+typedef struct {
+    uint64_t correlation_id;
+    uint8_t ip[INET6_ADDRSTRLEN];
+} ipc_client_disconnect_info_t;
 
 typedef struct {
 	uint8_t version[VERSION_BYTES];
 	ipc_protocol_type_t type;
 	union {
 		ipc_client_request_task_t *ipc_client_request_task;
+		ipc_client_disconnect_info_t *ipc_client_disconnect_info;
 	} payload;
 } ipc_protocol_t;
 

@@ -16,6 +16,7 @@
 #include <fcntl.h>       // for fcntl, F_GETFL, F_SETFL, O_NONBLOCK
 #include <sys/wait.h>    // for waitpid
 #include <bits/types/sig_atomic_t.h>
+#include <endian.h>
 #include <json-c/json_object.h>
 #include <json-c/json_tokener.h>
 #include <json-c/json_types.h>
@@ -25,9 +26,11 @@
 #include "log.h"
 #include "constants.h"
 #include "commons.h"
+#include "globals.h"
 #include "async.h"
 #include "ipc/protocol.h"
-#include "types.h"
+#include "utilities.h"
+#include "sessions.h"
 
 volatile sig_atomic_t shutdown_requested = 0; // from global.h
 
@@ -173,322 +176,17 @@ node_config_t node_config;
 
 // --- Utility Functions (from utility.h) ---
 // Changed set_nonblocking to take a label for consistent logging
-static int set_nonblocking(const char* label, int fd) {
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (flags == -1) {
-        LOG_ERROR("%sfcntl F_GETFL: %s", label, strerror(errno));
-        return -1;
-    }
-    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
-        LOG_ERROR("%sfcntl F_SETFL O_NONBLOCK: %s", label, strerror(errno));
-        return -1;
-    }
-    return 0;
-}
 
 // --- Worker Functions (from worker.h) ---
 // Re-implementing basic worker logic from previous working version
 
 // Client State for Server IO Worker
-typedef struct {
-    bool in_use;
-    int client_fd;
-    long correlation_id; // Unique ID for this client session
-    char client_ip[INET6_ADDRSTRLEN]; // Added to track client IP in SIO worker
-    // For challenge-response or other stateful interactions
-    bool awaiting_challenge_response;
-    // Buffer for partial reads, if needed
-} client_conn_state_t;
-
-client_conn_state_t client_connections[MAX_CLIENTS_PER_SIO_WORKER]; // For SIO workers
-
-
-// Server IO Worker (handles incoming client TCP connections)
-void run_server_io_workerx(int worker_idx, int master_uds_fd) {
-    LOG_INFO("[Server IO Worker %d, PID %d]: Started.", worker_idx, getpid());
-
-    for (int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
-        client_connections[i].in_use = false;
-        client_connections[i].client_fd = -1;
-        client_connections[i].correlation_id = -1;
-        memset(client_connections[i].client_ip, 0, sizeof(client_connections[i].client_ip));
-        client_connections[i].awaiting_challenge_response = false;
-    }
-
-    int epoll_fd = epoll_create1(0);
-    if (epoll_fd == -1) {
-        LOG_ERROR("epoll_create1 (SIO Worker %d): %s", worker_idx, strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-
-    struct epoll_event event;
-    event.events = EPOLLIN | EPOLLET; // Edge-triggered
-    event.data.fd = master_uds_fd;
-    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, master_uds_fd, &event) == -1) {
-        LOG_ERROR("epoll_ctl: add master_uds_fd (SIO Worker %d): %s", worker_idx, strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    LOG_INFO("[Server IO Worker %d]: Master UDS %d added to epoll.", worker_idx, master_uds_fd);
-    LOG_INFO("[Server IO Worker %d]: Entering event loop.", worker_idx);
-
-    struct epoll_event events[MAX_EVENTS];
-
-    while (1) {
-        int nfds = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
-        if (nfds == -1) {
-            perror("epoll_wait (SIO)");
-            exit(EXIT_FAILURE);
-        }
-
-        for (int n = 0; n < nfds; ++n) {
-            int current_fd = events[n].data.fd;
-
-            // Handle UDS from Master
-            if (current_fd == master_uds_fd) {
-                int received_client_fd = -1;
-                ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(master_uds_fd, &received_client_fd);
-                if (deserialized_result.status != SUCCESS) {
-                    fprintf(stderr, "[Server IO Worker %d]: Error receiving or deserializing IPC message from Master: %d\n", worker_idx, deserialized_result.status);
-                    continue;
-                }
-                ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;
-                printf("[Server IO Worker %d]: Received message type: 0x%02x\n", worker_idx, received_protocol->type);
-                printf("[Server IO Worker %d]: Received FD: %d\n", worker_idx, received_client_fd);
-                
-
-                if (received_protocol->type == IPC_CLIENT_REQUEST_TASK) {
-                    ipc_client_request_task_t *req = received_protocol->payload.ipc_client_request_task;
-
-                    if (received_client_fd == -1) {
-                        LOG_ERROR("[Server IO Worker %d]: Error: No client FD received with IPC_CLIENT_REQUEST_TASK for ID %ld. Skipping.", worker_idx, req->correlation_id);
-                        CLOSE_PAYLOAD(received_protocol->payload.ipc_client_request_task);
-						CLOSE_PROTOCOL(received_protocol);
-						continue;
-                    }
-
-                    if (set_nonblocking("[SIO Worker]: ", received_client_fd) == -1) {
-                        LOG_ERROR("[Server IO Worker %d]: Failed to set non-blocking for FD %d. Closing.", worker_idx, received_client_fd);
-                        CLOSE_FD(received_client_fd);
-                        CLOSE_PAYLOAD(received_protocol->payload.ipc_client_request_task);
-						CLOSE_PROTOCOL(received_protocol);
-						continue;
-                    }
-
-                    event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
-                    event.data.fd = received_client_fd;
-                    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, received_client_fd, &event) == -1) {
-                        LOG_ERROR("epoll_ctl: add client FD to SIO worker %d epoll: %s", worker_idx, strerror(errno));
-                        CLOSE_FD(received_client_fd);
-                        CLOSE_PAYLOAD(received_protocol->payload.ipc_client_request_task);
-						CLOSE_PROTOCOL(received_protocol);
-						continue;
-                    }
-
-                    // Get client IP and store client state
-                    struct sockaddr_in client_addr;
-                    socklen_t client_len = sizeof(client_addr);
-                    char client_ip_str[INET6_ADDRSTRLEN];
-                    if (getpeername(received_client_fd, (struct sockaddr*)&client_addr, &client_len) == 0) {
-                        inet_ntop(AF_INET, &client_addr.sin_addr, client_ip_str, sizeof(client_ip_str));
-                    } else {
-                        perror("getpeername (SIO Worker)");
-                        strncpy(client_ip_str, "UNKNOWN_IP", sizeof(client_ip_str) - 1);
-                        client_ip_str[sizeof(client_ip_str) - 1] = '\0';
-                    }
-
-                    int slot_found = -1;
-                    for (int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
-                        if (!client_connections[i].in_use) {
-                            client_connections[i].in_use = true;
-                            client_connections[i].client_fd = received_client_fd;
-                            client_connections[i].correlation_id = req->correlation_id;
-                            strncpy(client_connections[i].client_ip, client_ip_str, sizeof(client_connections[i].client_ip) - 1);
-                            client_connections[i].client_ip[sizeof(client_connections[i].client_ip) - 1] = '\0';
-                            client_connections[i].awaiting_challenge_response = false;
-                            slot_found = i;
-                            break;
-                        }
-                    }
-
-                    if (slot_found != -1) {
-                        LOG_INFO("[Server IO Worker %d]: Received client FD %d (ID %ld, IP %s) from Master and added to epoll. Slot %d.",
-                               worker_idx, received_client_fd, req->correlation_id, client_ip_str, slot_found);
-                    } else {
-                        LOG_ERROR("[Server IO Worker %d]: No free slots for new client FD %d. Closing.", worker_idx, received_client_fd);
-                        CLOSE_FD(received_client_fd);
-                    }
-
-                }
-                /*
-                 else if (master_msg_header.type == IPC_LOGIC_RESPONSE_TO_SIO) {
-                    logic_response_t *resp = (logic_response_t *)master_msg_data;
-                    int target_client_fd = -1;
-                    int client_slot_idx = -1;
-                    char client_ip_for_response[INET6_ADDRSTRLEN];
-                    memset(client_ip_for_response, 0, sizeof(client_ip_for_response));
-
-                    for (int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
-                        if (client_connections[i].in_use && client_connections[i].correlation_id == resp->client_correlation_id) {
-                            target_client_fd = client_connections[i].client_fd;
-                            client_slot_idx = i;
-                            strncpy(client_ip_for_response, client_connections[i].client_ip, sizeof(client_ip_for_response) - 1);
-                            client_ip_for_response[sizeof(client_ip_for_response) - 1] = '\0';
-                            break;
-                        }
-                    }
-
-                    if (target_client_fd != -1) {
-                        LOG_INFO("[Server IO Worker %d]: Received logic response for client ID %ld (IP %s, from SIO index %d). Data: '%.*s'",
-                               worker_idx, resp->client_correlation_id, client_ip_for_response, client_slot_idx,
-                               (int)resp->response_data_len, resp->response_data);
-
-                        ssize_t bytes_written = write(target_client_fd, resp->response_data, resp->response_data_len);
-                        if (bytes_written == -1) {
-                            perror("write to client (SIO)");
-                        } else {
-                            LOG_INFO("[Server IO Worker %d]: Sent %zd bytes to client FD %d (ID %ld, IP %s).",
-                                   worker_idx, bytes_written, target_client_fd, resp->client_correlation_id, client_ip_for_response);
-                        }
-                        // Close client connection after response for simple request/response
-                        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, target_client_fd, NULL);
-                        close(target_client_fd);
-                        client_connections[client_slot_idx].in_use = false;
-                        client_connections[client_slot_idx].client_fd = -1;
-                        client_connections[client_slot_idx].correlation_id = -1;
-                        memset(client_connections[client_slot_idx].client_ip, 0, sizeof(client_connections[client_slot_idx].client_ip));
-                        LOG_INFO("[Server IO Worker %d]: Closed client FD %d (ID %ld, IP %s) after response.",
-                               worker_idx, target_client_fd, resp->client_correlation_id, client_ip_for_response);
-
-                        // No need to send disconnect to Master here, Master already marks session as unused
-                        // when it forwards the response from Logic Worker to SIO Worker.
-                        // The Master's logic for IPC_LOGIC_RESPONSE_TO_SIO already handles marking session as not in use.
-                        // This prevents double-counting disconnects.
-
-                    } else {
-                        LOG_WARN("[Server IO Worker %d]: Logic response for unknown client ID %ld. Perhaps already disconnected?",
-                                worker_idx, resp->client_correlation_id);
-                    }
-                } 
-                */
-                else {
-                     LOG_ERROR("[Server IO Worker %d]: Unknown message type %d from Master.", worker_idx, received_protocol->type);
-                }
-                CLOSE_PAYLOAD(received_protocol->payload.ipc_client_request_task);
-                CLOSE_PROTOCOL(received_protocol);
-            }
-            // Handle client TCP connections
-            else {
-                char client_buffer[MAX_DATA_BUFFER_IN_STRUCT];
-                ssize_t bytes_read = read(current_fd, client_buffer, sizeof(client_buffer) - 1);
-
-                if (bytes_read <= 0) {
-                    if (bytes_read == 0 || (events[n].events & (EPOLLHUP | EPOLLERR))) {
-                        // Client disconnected or error
-                        long disconnected_client_id = -1;
-                        char disconnected_client_ip[INET6_ADDRSTRLEN];
-                        memset(disconnected_client_ip, 0, sizeof(disconnected_client_ip));
-
-                        int client_slot_idx = -1;
-                        for(int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
-                            if(client_connections[i].in_use && client_connections[i].client_fd == current_fd) {
-                                disconnected_client_id = client_connections[i].correlation_id;
-                                strncpy(disconnected_client_ip, client_connections[i].client_ip, sizeof(disconnected_client_ip) - 1);
-                                disconnected_client_ip[sizeof(disconnected_client_ip) - 1] = '\0';
-                                client_slot_idx = i;
-                                break;
-                            }
-                        }
-                        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, current_fd, NULL);
-                        close(current_fd);
-                        LOG_INFO("[Server IO Worker %d]: Client FD %d (ID %ld, IP %s) disconnected.", worker_idx, current_fd, disconnected_client_id, disconnected_client_ip);
-
-                        // Only send disconnect to Master if the session wasn't already completed by a response
-                        // (Master already handles marking session as unused on successful response)
-                        if (disconnected_client_id != -1 && client_connections[client_slot_idx].in_use) { // Check in_use before marking
-                             client_connections[client_slot_idx].in_use = false; // Mark as not in use here
-                             client_connections[client_slot_idx].client_fd = -1;
-                             client_connections[client_slot_idx].correlation_id = -1;
-                             memset(client_connections[client_slot_idx].client_ip, 0, sizeof(client_connections[client_slot_idx].client_ip));
-
-                            client_disconnect_info_t disconnect_msg;
-                            disconnect_msg.client_correlation_id = disconnected_client_id;
-                            strncpy(disconnect_msg.client_ip, disconnected_client_ip, sizeof(disconnect_msg.client_ip) - 1);
-                            disconnect_msg.client_ip[sizeof(disconnect_msg.client_ip) - 1] = '\0';
-                            send_ipc_message(master_uds_fd, IPC_CLIENT_DISCONNECTED, &disconnect_msg, sizeof(disconnect_msg), -1);
-                            LOG_INFO("[Server IO Worker %d]: Sent client disconnect signal for ID %ld (IP %s) to Master.", worker_idx, disconnected_client_id, disconnected_client_ip);
-                        }
-
-
-                    } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                        perror("read from client (SIO)");
-                    }
-                    continue;
-                }
-
-                client_buffer[bytes_read] = '\0';
-
-                uint64_t client_id_for_request = 0xffffffff;
-                int client_idx = -1;
-                char client_ip_for_request[INET6_ADDRSTRLEN];
-                memset(client_ip_for_request, 0, sizeof(client_ip_for_request));
-
-                for(int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
-                    if(client_connections[i].in_use && client_connections[i].client_fd == current_fd) {
-                        client_id_for_request = client_connections[i].correlation_id;
-                        client_idx = i;
-                        strncpy(client_ip_for_request, client_connections[i].client_ip, sizeof(client_ip_for_request) - 1);
-                        client_ip_for_request[sizeof(client_ip_for_request) - 1] = '\0';
-                        break;
-                    }
-                }
-
-                if (client_id_for_request == 0xffffffff || client_idx == -1) {
-                    LOG_ERROR("[Server IO Worker %d]: Received data from unknown client FD %d. Ignoring.", worker_idx, current_fd);
-                    continue;
-                }
-                
-                ipc_protocol_t *p = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
-                if (!p) {
-					perror("Failed to allocate ipc_protocol_t protocol");
-					//CLOSE_FD(client_sock);
-					continue;
-				}
-				memset(p, 0, sizeof(ipc_protocol_t)); // Inisialisasi dengan nol
-				p->version[0] = VERSION_MAJOR;
-				p->version[1] = VERSION_MINOR;
-				p->type = IPC_CLIENT_REQUEST_TASK;
-				ipc_client_request_task_t *ipc_req_payload = (ipc_client_request_task_t *)calloc(1, sizeof(ipc_client_request_task_t));
-				if (!ipc_req_payload) {
-					perror("Failed to allocate ipc_client_request_task_t payload");
-					//CLOSE_FD(client_sock);
-					CLOSE_PROTOCOL(p);
-					continue;
-				}
-				ipc_req_payload->correlation_id = (uint64_t)client_id_for_request; // Cast ke uint64_t
-				ipc_req_payload->len = (uint16_t)bytes_read;
-				memcpy(ipc_req_payload->data, &client_buffer, (uint16_t)bytes_read);
-				p->payload.ipc_client_request_task = ipc_req_payload;				
-				ssize_t_status_t send_result = send_ipc_protocol_message(master_uds_fd, p, -1);
-				if (send_result.status != SUCCESS) {
-					LOG_INFO("[Server IO Worker %d]: Failed to sent client request (ID %ld) to Master for Logic Worker.",
-                       worker_idx, client_id_for_request);
-				} else {
-					LOG_INFO("[Server IO Worker %d]: Sent client request (ID %ld) to Master for Logic Worker.",
-                       worker_idx, client_id_for_request);
-				}
-				CLOSE_PAYLOAD(p->payload.ipc_client_request_task);
-				CLOSE_PROTOCOL(p);
-            }
-        }
-    }
-    close(epoll_fd);
-    close(master_uds_fd);
-}
-
 
 void run_server_io_worker(int worker_idx, int master_uds_fd) {
     LOG_INFO("[Server IO Worker %d, PID %d]: Started.", worker_idx, getpid());
-
+    
+    client_conn_state_t client_connections[MAX_CLIENTS_PER_SIO_WORKER];
+    
     for (int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
         client_connections[i].in_use = false;
         client_connections[i].client_fd = -1;
@@ -549,7 +247,7 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 						continue;
                     }
 
-                    if (set_nonblocking("[SIO Worker]: ", received_client_fd) == -1) {
+                    if (set_nonblocking("[SIO Worker]: ", received_client_fd) != SUCCESS) {
                         LOG_ERROR("[Server IO Worker %d]: Failed to set non-blocking for FD %d. Closing.", worker_idx, received_client_fd);
                         CLOSE_FD(received_client_fd);
                         CLOSE_PAYLOAD(received_protocol->payload.ipc_client_request_task);
@@ -617,7 +315,7 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
                 if (bytes_read <= 0) {
                     if (bytes_read == 0 || (events[n].events & (EPOLLHUP | EPOLLERR))) {
                         // Client disconnected or error
-                        long disconnected_client_id = -1;
+                        uint64_t disconnected_client_id = 0xffffffff;
                         char disconnected_client_ip[INET6_ADDRSTRLEN];
                         memset(disconnected_client_ip, 0, sizeof(disconnected_client_ip));
 
@@ -637,18 +335,40 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 
                         // Only send disconnect to Master if the session wasn't already completed by a response
                         // (Master already handles marking session as unused on successful response)
-                        if (disconnected_client_id != -1 && client_connections[client_slot_idx].in_use) { // Check in_use before marking
-                             client_connections[client_slot_idx].in_use = false; // Mark as not in use here
-                             client_connections[client_slot_idx].client_fd = -1;
-                             client_connections[client_slot_idx].correlation_id = -1;
-                             memset(client_connections[client_slot_idx].client_ip, 0, sizeof(client_connections[client_slot_idx].client_ip));
+                        if (disconnected_client_id != 0xffffffff && client_connections[client_slot_idx].in_use) { // Check in_use before marking
+							client_connections[client_slot_idx].in_use = false; // Mark as not in use here
+							client_connections[client_slot_idx].client_fd = -1;
+							client_connections[client_slot_idx].correlation_id = -1;
+							memset(client_connections[client_slot_idx].client_ip, 0, sizeof(client_connections[client_slot_idx].client_ip));
 
-                            client_disconnect_info_t disconnect_msg;
-                            disconnect_msg.client_correlation_id = disconnected_client_id;
-                            strncpy(disconnect_msg.client_ip, disconnected_client_ip, sizeof(disconnect_msg.client_ip) - 1);
-                            disconnect_msg.client_ip[sizeof(disconnect_msg.client_ip) - 1] = '\0';
-                            send_ipc_message(master_uds_fd, IPC_CLIENT_DISCONNECTED, &disconnect_msg, sizeof(disconnect_msg), -1);
-                            LOG_INFO("[Server IO Worker %d]: Sent client disconnect signal for ID %ld (IP %s) to Master.", worker_idx, disconnected_client_id, disconnected_client_ip);
+							ipc_protocol_t *p = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
+							if (!p) {
+								perror("Failed to allocate ipc_protocol_t protocol");
+								//CLOSE_FD(client_sock);
+								continue;
+							}
+							memset(p, 0, sizeof(ipc_protocol_t)); // Inisialisasi dengan nol
+							p->version[0] = VERSION_MAJOR;
+							p->version[1] = VERSION_MINOR;
+							p->type = IPC_CLIENT_DISCONNECTED;
+							ipc_client_disconnect_info_t *payload = (ipc_client_disconnect_info_t *)calloc(1, sizeof(ipc_client_disconnect_info_t));
+							if (!payload) {
+								perror("Failed to allocate ipc_client_disconnect_info_t payload");
+								//CLOSE_FD(client_sock);
+								CLOSE_PROTOCOL(p);
+								continue;
+							}
+							payload->correlation_id = (uint64_t)disconnected_client_id; // Cast ke uint64_t
+							memcpy(payload->ip, disconnected_client_ip, INET6_ADDRSTRLEN);				
+							p->payload.ipc_client_disconnect_info = payload;				
+							ssize_t_status_t send_result = send_ipc_protocol_message(master_uds_fd, p, -1);
+							if (send_result.status != SUCCESS) {
+								LOG_INFO("[Server IO Worker %d]: Failed to sent client disconnect signal for ID %ld (IP %s) to Master.", worker_idx, disconnected_client_id, disconnected_client_ip);
+							} else {
+								LOG_INFO("[Server IO Worker %d]: Sent client disconnect signal for ID %ld (IP %s) to Master.", worker_idx, disconnected_client_id, disconnected_client_ip);
+							}
+							//CLOSE_PAYLOAD(p->payload.ipc_client_disconnect_info); bukan FAM
+							CLOSE_PROTOCOL(p);
                         }
 
 
@@ -693,17 +413,18 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 				p->version[0] = VERSION_MAJOR;
 				p->version[1] = VERSION_MINOR;
 				p->type = IPC_CLIENT_REQUEST_TASK;
-				ipc_client_request_task_t *ipc_req_payload = (ipc_client_request_task_t *)calloc(1, sizeof(ipc_client_request_task_t));
-				if (!ipc_req_payload) {
+				ipc_client_request_task_t *payload = (ipc_client_request_task_t *)calloc(1, sizeof(ipc_client_request_task_t));
+				if (!payload) {
 					perror("Failed to allocate ipc_client_request_task_t payload");
 					//CLOSE_FD(client_sock);
 					CLOSE_PROTOCOL(p);
 					continue;
 				}
-				ipc_req_payload->correlation_id = (uint64_t)client_id_for_request; // Cast ke uint64_t
-				ipc_req_payload->len = (uint16_t)bytes_read;
-				memcpy(ipc_req_payload->data, &client_buffer, (uint16_t)bytes_read);
-				p->payload.ipc_client_request_task = ipc_req_payload;				
+				payload->correlation_id = (uint64_t)client_id_for_request; // Cast ke uint64_t				
+				memcpy(payload->ip, client_ip_for_request, INET6_ADDRSTRLEN);
+				payload->len = (uint16_t)bytes_read;
+				memcpy(payload->data, &client_buffer, (uint16_t)bytes_read);
+				p->payload.ipc_client_request_task = payload;				
 				ssize_t_status_t send_result = send_ipc_protocol_message(master_uds_fd, p, -1);
 				if (send_result.status != SUCCESS) {
 					LOG_INFO("[Server IO Worker %d]: Failed to sent client request (ID %ld) to Master for Logic Worker.",
@@ -1691,16 +1412,17 @@ int main() {
 				p->version[0] = VERSION_MAJOR;
 				p->version[1] = VERSION_MINOR;
 				p->type = IPC_CLIENT_REQUEST_TASK;
-				ipc_client_request_task_t *ipc_req_payload = (ipc_client_request_task_t *)calloc(1, sizeof(ipc_client_request_task_t));
-				if (!ipc_req_payload) {
+				ipc_client_request_task_t *payload = (ipc_client_request_task_t *)calloc(1, sizeof(ipc_client_request_task_t));
+				if (!payload) {
 					perror("Failed to allocate ipc_client_request_task_t payload");
 					CLOSE_FD(client_sock);
 					CLOSE_PROTOCOL(p);
 					continue;
 				}
-				ipc_req_payload->correlation_id = (uint64_t)current_client_id; // Cast ke uint64_t
-				ipc_req_payload->len = (uint16_t)0; // Karena request_data_len 0
-				p->payload.ipc_client_request_task = ipc_req_payload;				
+				payload->correlation_id = (uint64_t)current_client_id; // Cast ke uint64_t
+				memcpy(payload->ip, client_ip_str, INET6_ADDRSTRLEN);
+				payload->len = (uint16_t)0; // Karena request_data_len 0
+				p->payload.ipc_client_request_task = payload;				
 				ssize_t_status_t send_result = send_ipc_protocol_message(sio_worker_uds_fd, p, client_sock);
 				if (send_result.status != SUCCESS) {
 					LOG_ERROR("[Master]: Failed to forward client FD %d (ID %ld) to Server IO Worker %d.",
@@ -1714,6 +1436,7 @@ int main() {
 				CLOSE_PROTOCOL(p);
             }
             else { 
+				/*
                 ipc_msg_header_t msg_header;
                 char master_rcv_buffer[MASTER_RECEIVE_BUFFER_SIZE]; 
                 int received_fd = -1;
@@ -1725,8 +1448,18 @@ int main() {
                     }
                     continue;
                 }
-
-                switch (msg_header.type) {
+                */
+                int received_fd = -1;
+                ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(current_fd, &received_fd);
+                if (deserialized_result.status != SUCCESS) {
+                    perror("recv_ipc_message from worker (Master)");
+                    continue;
+                }
+                ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;
+                printf("[Server IO Worker %d]: Received message type: 0x%02x\n", worker_idx, received_protocol->type);
+                printf("[Server IO Worker %d]: Received FD: %d\n", worker_idx, received_client_fd);
+//////////////////////////////////////siniiiiiii========================
+                switch (received_protocol->type) {
                     case IPC_CLIENT_REQUEST_TASK: {
                         client_request_task_t *req = (client_request_task_t *)master_rcv_buffer;
                         LOG_INFO("[Master]: Received Client Request Task (ID %ld) from Server IO Worker (UDS FD %d).", req->client_correlation_id, current_fd);
