@@ -19,9 +19,9 @@ ifeq ($(BUILD_MODE), PRODUCTION)
     FINAL_CFLAGS = $(COMMON_CFLAGS) -O3 -DNDEBUG -DPRODUCTION
 else
 	ifeq ($(LOG_TO), FILE)
-		FINAL_CFLAGS = $(COMMON_CFLAGS) -fsanitize=address -fsanitize=leak -g -O0 -Werror -DDEVELOPMENT -DTOFILE
+		FINAL_CFLAGS = $(COMMON_CFLAGS) -fsanitize=address -fsanitize=leak -g -O3 -Werror -DDEVELOPMENT -DTOFILE
 	else
-		FINAL_CFLAGS = $(COMMON_CFLAGS) -fsanitize=address -fsanitize=leak -g -O0 -Werror -DDEVELOPMENT -DTOSCREEN
+		FINAL_CFLAGS = $(COMMON_CFLAGS) -fsanitize=address -fsanitize=leak -g -O3 -Werror -DDEVELOPMENT -DTOSCREEN
 	endif
 endif
 LDFLAGS =
@@ -74,7 +74,7 @@ CFILES := $(shell find . $(EXCLUDE_PATHS) -name '*.c' -print)
 .PHONY: all dev prod clean run debug check_iwyu
 
 # Target default
-all: dev
+all: prod
 
 dev-libraries:
 	@echo "📥 Menginstall library yang di butuhkan orisium dengan sudo dnf..."

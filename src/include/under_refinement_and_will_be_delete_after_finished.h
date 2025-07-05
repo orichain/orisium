@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include "node.h"
+#include "ipc/protocol.h"
 
 typedef struct {
     ipc_protocol_type_t type;

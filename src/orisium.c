@@ -463,9 +463,9 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
     // State for the single active outbound connection this worker manages at a time
     int active_outbound_fd = -1;
     long active_outbound_correlation_id = -1;
-    char active_outbound_target_ip[INET6_ADDRSTRLEN];
-    int active_outbound_target_port;
-    char active_outbound_request_data[MAX_DATA_BUFFER_IN_STRUCT];
+    uint8_t active_outbound_target_ip[INET6_ADDRSTRLEN];
+    int active_outbound_target_port = 1182;
+    uint8_t active_outbound_request_data[MAX_DATA_BUFFER_IN_STRUCT];
     size_t active_outbound_request_data_len = 0;
 
     while (1) {
@@ -508,11 +508,9 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
                     outbound_task_t *outbound_task = (outbound_task_t *)master_msg_data;
                     
                     active_outbound_correlation_id = outbound_task->client_correlation_id;
-                    strncpy(active_outbound_target_ip, outbound_task->node_ip, sizeof(active_outbound_target_ip) - 1);
-                    active_outbound_target_ip[sizeof(active_outbound_target_ip) - 1] = '\0';
+                    memcpy(active_outbound_target_ip, outbound_task->node_ip, INET6_ADDRSTRLEN);
                     active_outbound_target_port = outbound_task->node_port;
-                    strncpy(active_outbound_request_data, outbound_task->request_data, sizeof(active_outbound_request_data) - 1);
-                    active_outbound_request_data[sizeof(active_outbound_request_data) - 1] = '\0';
+                    memcpy(active_outbound_request_data, outbound_task->request_data, MAX_DATA_BUFFER_IN_STRUCT);
                     active_outbound_request_data_len = outbound_task->request_data_len;
 
                     LOG_INFO("[Client Outbound Worker %d]: Received outbound task (ID %ld): Connect to %s:%d, Send: '%.*s'",
@@ -538,7 +536,7 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
                     memset(&server_addr, 0, sizeof(server_addr));
                     server_addr.sin_family = AF_INET;
                     server_addr.sin_port = htons(active_outbound_target_port);
-                    if (inet_pton(AF_INET, active_outbound_target_ip, &server_addr.sin_addr) <= 0) {
+                    if (inet_pton(AF_INET, (char *)active_outbound_target_ip, &server_addr.sin_addr) <= 0) {
                         perror("inet_pton (COW)");
                         close(new_fd);
                         outbound_response_t fail_resp;
@@ -657,7 +655,7 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
                     }
                 }
                 if (events[n].events & EPOLLIN) {
-                    char response_buffer[MAX_DATA_BUFFER_IN_STRUCT];
+                    uint8_t response_buffer[MAX_DATA_BUFFER_IN_STRUCT];
                     ssize_t bytes_read = read(current_fd, response_buffer, sizeof(response_buffer) - 1);
 
                     outbound_response_t outbound_resp;
@@ -679,8 +677,7 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
                     } else {
                         response_buffer[bytes_read] = '\0';
                         outbound_resp.success = true;
-                        strncpy(outbound_resp.response_data, response_buffer, sizeof(outbound_resp.response_data) - 1);
-                        outbound_resp.response_data[sizeof(outbound_resp.response_data) - 1] = '\0';
+                        memcpy(outbound_resp.response_data, response_buffer, MAX_DATA_BUFFER_IN_STRUCT);
                         outbound_resp.response_data_len = bytes_read;
                         LOG_INFO("[Client Outbound Worker %d]: Received %zd bytes from node FD %d (ID %ld): '%.*s'",
                                worker_idx, bytes_read, current_fd, active_outbound_correlation_id,

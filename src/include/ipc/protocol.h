@@ -1,6 +1,7 @@
 #ifndef IPC_PROTOCOL_H
 #define IPC_PROTOCOL_H
 
+#include <arpa/inet.h>
 #include "types.h"
 
 #define VERSION_BYTES 2
@@ -31,11 +32,35 @@ typedef struct {
 } ipc_client_disconnect_info_t;
 
 typedef struct {
+    uint64_t correlation_id;
+    uint16_t len;
+    uint8_t data[];
+} ipc_logic_response_t;
+
+typedef struct {
+    uint64_t correlation_id;
+    uint8_t ip[INET6_ADDRSTRLEN];
+    uint16_t port;
+    uint16_t len;
+    uint8_t data[];
+} ipc_outbound_task_t;
+
+typedef struct {
+    uint64_t correlation_id;
+    uint8_t success;
+    uint16_t len;
+    uint8_t data[];
+} ipc_outbound_response_t;
+
+typedef struct {
 	uint8_t version[VERSION_BYTES];
 	ipc_protocol_type_t type;
 	union {
 		ipc_client_request_task_t *ipc_client_request_task;
 		ipc_client_disconnect_info_t *ipc_client_disconnect_info;
+		ipc_logic_response_t *ipc_logic_response;
+		ipc_outbound_task_t *ipc_outbound_task;
+		ipc_outbound_response_t *ipc_outbound_response;
 	} payload;
 } ipc_protocol_t;
 
@@ -44,14 +69,14 @@ typedef struct {
 	status_t status;
 } ipc_protocol_t_status_t;
 
+#include "client_request_task.h"
+#include "client_disconnect_info.h"
+
 size_t_status_t calculate_ipc_payload_size(ipc_protocol_type_t type);
 size_t_status_t calculate_ipc_payload_buffer(const uint8_t* buffer, size_t len);
-status_t ipc_serialize_client_request_task(const ipc_client_request_task_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset);
 ssize_t_status_t ipc_serialize(const ipc_protocol_t* p, uint8_t** ptr_buffer, size_t* buffer_size);
-status_t ipc_deserialize_client_request_task(ipc_protocol_t *p, const uint8_t *buffer, size_t total_buffer_len, size_t *offset_ptr);
 ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len);
 ssize_t_status_t send_ipc_protocol_message(int *uds_fd, const ipc_protocol_t* p, int *fd_to_pass);
 ipc_protocol_t_status_t receive_and_deserialize_ipc_message(int *uds_fd, int *actual_fd_received);
-
 
 #endif

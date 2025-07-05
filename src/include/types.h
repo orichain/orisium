@@ -34,4 +34,9 @@ typedef struct {
 	status_t status;
 } int_status_t;
 
+typedef struct {
+	uint64_t r_uint64_t;
+	status_t status;
+} uint64_t_status_t;
+
 #endif
