@@ -3,5 +3,3 @@ logs/
 test/
 /orisium
 database/*.key
-iwyu_applied.log
-iwyu_failed.log
