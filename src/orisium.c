@@ -13,174 +13,24 @@
 #include <unistd.h>      // for close, fork, getpid
 #include <signal.h>      // for sig_atomic_t, sigaction, SIGINT
 #include <arpa/inet.h>   // for inet_ntop, inet_pton
-#include <fcntl.h>       // for fcntl, F_GETFL, F_SETFL, O_NONBLOCK
 #include <sys/wait.h>    // for waitpid
 #include <bits/types/sig_atomic_t.h>
-#include <endian.h>
-#include <json-c/json_object.h>
-#include <json-c/json_tokener.h>
-#include <json-c/json_types.h>
 #include <stdint.h>
-#include <sys/uio.h>
 
 #include "log.h"
 #include "constants.h"
 #include "commons.h"
-#include "globals.h"
+#include "node.h"
 #include "async.h"
 #include "ipc/protocol.h"
 #include "utilities.h"
 #include "sessions.h"
+#include "under_refinement_and_will_be_delete_after_finished.h"
+#include "types.h"
 
-volatile sig_atomic_t shutdown_requested = 0; // from global.h
-
-typedef struct {
-    ipc_protocol_type_t type;
-    size_t data_len;
-} ipc_msg_header_t;
-
-// Send message over UDS, with optional FD passing (from ipc.h/ipc.c)
-ssize_t send_ipc_message(int uds_fd, ipc_protocol_type_t type, const void *data, size_t data_len, int fd_to_pass) {
-    ipc_msg_header_t header = { .type = type, .data_len = data_len };
-    struct iovec iov[2];
-    iov[0].iov_base = &header;
-    iov[0].iov_len = sizeof(header);
-    iov[1].iov_base = (void *)data;
-    iov[1].iov_len = data_len;
-
-    char cmsgbuf[CMSG_SPACE(sizeof(int))]; // Buffer for control message (for FD)
-
-    struct msghdr msg = {0};
-    msg.msg_iov = iov;
-    msg.msg_iovlen = 2;
-
-    if (fd_to_pass != -1) { // If an FD needs to be passed
-        msg.msg_control = cmsgbuf;
-        msg.msg_controllen = sizeof(cmsgbuf);
-        struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
-        cmsg->cmsg_level = SOL_SOCKET;
-        cmsg->cmsg_type = SCM_RIGHTS;
-        cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-        *((int *) CMSG_DATA(cmsg)) = fd_to_pass;
-    } else {
-        msg.msg_control = NULL;
-        msg.msg_controllen = 0;
-    }
-
-    ssize_t bytes_sent = sendmsg(uds_fd, &msg, 0);
-    if (bytes_sent == -1) {
-        perror("send_ipc_message sendmsg"); // Using perror as LOG_ERROR might not be available in all contexts
-    }
-    return bytes_sent;
-}
-
-// Receive message over UDS, with optional FD reception (from ipc.h/ipc.c)
-ssize_t recv_ipc_message(int uds_fd, ipc_msg_header_t *header, void *data_buffer, size_t buffer_size, int *actual_fd_received) {
-    struct iovec iov[2];
-    iov[0].iov_base = header;
-    iov[0].iov_len = sizeof(ipc_msg_header_t);
-    iov[1].iov_base = data_buffer;
-    iov[1].iov_len = buffer_size;
-
-    char cmsgbuf[CMSG_SPACE(sizeof(int))]; // Buffer for control message (for FD)
-
-    struct msghdr msg = {0};
-    msg.msg_iov = iov;
-    msg.msg_iovlen = 2;
-    msg.msg_control = cmsgbuf;
-    msg.msg_controllen = sizeof(cmsgbuf);
-
-    *actual_fd_received = -1; // Initialize to -1
-
-    ssize_t bytes_read = recvmsg(uds_fd, &msg, 0);
-    if (bytes_read == -1) {
-        if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            perror("recv_ipc_message recvmsg");
-        }
-        return -1;
-    }
-
-    if (bytes_read < (ssize_t)sizeof(ipc_msg_header_t)) {
-        fprintf(stderr, "recv_ipc_message: Incomplete header received (%zd bytes)\n", bytes_read);
-        return -1;
-    }
-
-    if (header->data_len > buffer_size) {
-        fprintf(stderr, "recv_ipc_message: Data too large for buffer (expected %zu, got %zu). Truncating.\n",
-                header->data_len, buffer_size);
-    }
-
-    struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
-    if (cmsg && cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS && cmsg->cmsg_len == CMSG_LEN(sizeof(int))) {
-        *actual_fd_received = *((int *) CMSG_DATA(cmsg));
-    }
-
-    return bytes_read;
-}
-
-//============================================================================================================================
-
-//============================================================================================================================
-
-// --- Data Structures for Tasks/Messages (from ipc.h/types.h) ---
-typedef struct {
-    long client_correlation_id;
-    char request_data[MAX_DATA_BUFFER_IN_STRUCT];
-    size_t request_data_len;
-} client_request_task_t;
-
-typedef struct {
-    long client_correlation_id;
-    char response_data[MAX_DATA_BUFFER_IN_STRUCT];
-    size_t response_data_len;
-} logic_response_t;
-
-typedef struct {
-    long client_correlation_id;
-    char peer_ip[INET6_ADDRSTRLEN];
-    int peer_port;
-    char request_data[MAX_DATA_BUFFER_IN_STRUCT];
-    size_t request_data_len;
-} outbound_task_t;
-
-typedef struct {
-    long client_correlation_id;
-    bool success;
-    char response_data[MAX_DATA_BUFFER_IN_STRUCT];
-    size_t response_data_len;
-} outbound_response_t;
-
-typedef struct {
-    long client_correlation_id;
-    char client_ip[INET6_ADDRSTRLEN]; // IP dari klien yang terputus
-} client_disconnect_info_t;
-
-
-// --- Struktur Data untuk Konfigurasi Jaringan (Biasanya dari config.h atau global.h) ---
-typedef struct {
-    char ip[IP_STRLEN];
-    int port;
-} peer_info_t;
-
-typedef struct {
-    char node_id[20]; // ID node ini
-    int listen_port;  // Port untuk node ini mendengarkan koneksi masuk
-
-    peer_info_t bootstrap_peers[MAX_PEERS];
-    int num_bootstrap_peers;
-} node_config_t;
-
-// Global instance of node configuration
+volatile sig_atomic_t shutdown_requested = 0;
 node_config_t node_config;
-
-
-// --- Utility Functions (from utility.h) ---
-// Changed set_nonblocking to take a label for consistent logging
-
-// --- Worker Functions (from worker.h) ---
-// Re-implementing basic worker logic from previous working version
-
-// Client State for Server IO Worker
+master_client_session_t master_client_sessions[MAX_MASTER_CONCURRENT_SESSIONS];
 
 void run_server_io_worker(int worker_idx, int master_uds_fd) {
     LOG_INFO("[Server IO Worker %d, PID %d]: Started.", worker_idx, getpid());
@@ -191,7 +41,7 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
         client_connections[i].in_use = false;
         client_connections[i].client_fd = -1;
         client_connections[i].correlation_id = -1;
-        memset(client_connections[i].client_ip, 0, sizeof(client_connections[i].client_ip));
+        memset(client_connections[i].ip, 0, INET6_ADDRSTRLEN);
         client_connections[i].awaiting_challenge_response = false;
     }
 
@@ -265,26 +115,13 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 						continue;
                     }
 
-                    // Get client IP and store client state
-                    struct sockaddr_in client_addr;
-                    socklen_t client_len = sizeof(client_addr);
-                    char client_ip_str[INET6_ADDRSTRLEN];
-                    if (getpeername(received_client_fd, (struct sockaddr*)&client_addr, &client_len) == 0) {
-                        inet_ntop(AF_INET, &client_addr.sin_addr, client_ip_str, sizeof(client_ip_str));
-                    } else {
-                        perror("getpeername (SIO Worker)");
-                        strncpy(client_ip_str, "UNKNOWN_IP", sizeof(client_ip_str) - 1);
-                        client_ip_str[sizeof(client_ip_str) - 1] = '\0';
-                    }
-
                     int slot_found = -1;
                     for (int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
                         if (!client_connections[i].in_use) {
                             client_connections[i].in_use = true;
                             client_connections[i].client_fd = received_client_fd;
                             client_connections[i].correlation_id = req->correlation_id;
-                            strncpy(client_connections[i].client_ip, client_ip_str, sizeof(client_connections[i].client_ip) - 1);
-                            client_connections[i].client_ip[sizeof(client_connections[i].client_ip) - 1] = '\0';
+                            memcpy(client_connections[i].ip, req->ip, INET6_ADDRSTRLEN);
                             client_connections[i].awaiting_challenge_response = false;
                             slot_found = i;
                             break;
@@ -293,7 +130,7 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 
                     if (slot_found != -1) {
                         LOG_INFO("[Server IO Worker %d]: Received client FD %d (ID %ld, IP %s) from Master and added to epoll. Slot %d.",
-                               worker_idx, received_client_fd, req->correlation_id, client_ip_str, slot_found);
+                               worker_idx, received_client_fd, req->correlation_id, req->ip, slot_found);
                     } else {
                         LOG_ERROR("[Server IO Worker %d]: No free slots for new client FD %d. Closing.", worker_idx, received_client_fd);
                         CLOSE_FD(received_client_fd);
@@ -316,15 +153,14 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
                     if (bytes_read == 0 || (events[n].events & (EPOLLHUP | EPOLLERR))) {
                         // Client disconnected or error
                         uint64_t disconnected_client_id = 0xffffffff;
-                        char disconnected_client_ip[INET6_ADDRSTRLEN];
-                        memset(disconnected_client_ip, 0, sizeof(disconnected_client_ip));
+                        uint8_t disconnected_client_ip[INET6_ADDRSTRLEN];
+                        memset(disconnected_client_ip, 0, INET6_ADDRSTRLEN);
 
                         int client_slot_idx = -1;
                         for(int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
                             if(client_connections[i].in_use && client_connections[i].client_fd == current_fd) {
                                 disconnected_client_id = client_connections[i].correlation_id;
-                                strncpy(disconnected_client_ip, client_connections[i].client_ip, sizeof(disconnected_client_ip) - 1);
-                                disconnected_client_ip[sizeof(disconnected_client_ip) - 1] = '\0';
+                                memcpy(disconnected_client_ip, client_connections[i].ip, INET6_ADDRSTRLEN);
                                 client_slot_idx = i;
                                 break;
                             }
@@ -339,12 +175,13 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 							client_connections[client_slot_idx].in_use = false; // Mark as not in use here
 							client_connections[client_slot_idx].client_fd = -1;
 							client_connections[client_slot_idx].correlation_id = -1;
-							memset(client_connections[client_slot_idx].client_ip, 0, sizeof(client_connections[client_slot_idx].client_ip));
+							memset(client_connections[client_slot_idx].ip, 0, INET6_ADDRSTRLEN);
 
 							ipc_protocol_t *p = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
 							if (!p) {
 								perror("Failed to allocate ipc_protocol_t protocol");
 								//CLOSE_FD(client_sock);
+								CLOSE_FD(current_fd);
 								continue;
 							}
 							memset(p, 0, sizeof(ipc_protocol_t)); // Inisialisasi dengan nol
@@ -355,6 +192,8 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 							if (!payload) {
 								perror("Failed to allocate ipc_client_disconnect_info_t payload");
 								//CLOSE_FD(client_sock);
+								CLOSE_FD(current_fd);
+								CLOSE_PAYLOAD(p->payload.ipc_client_disconnect_info);
 								CLOSE_PROTOCOL(p);
 								continue;
 							}
@@ -367,7 +206,8 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 							} else {
 								LOG_INFO("[Server IO Worker %d]: Sent client disconnect signal for ID %ld (IP %s) to Master.", worker_idx, disconnected_client_id, disconnected_client_ip);
 							}
-							//CLOSE_PAYLOAD(p->payload.ipc_client_disconnect_info); bukan FAM
+							CLOSE_FD(current_fd);
+							CLOSE_PAYLOAD(p->payload.ipc_client_disconnect_info);
 							CLOSE_PROTOCOL(p);
                         }
 
@@ -382,15 +222,14 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 
                 uint64_t client_id_for_request = 0xffffffff;
                 int client_idx = -1;
-                char client_ip_for_request[INET6_ADDRSTRLEN];
-                memset(client_ip_for_request, 0, sizeof(client_ip_for_request));
+                uint8_t client_ip_for_request[INET6_ADDRSTRLEN];
+                memset(client_ip_for_request, 0, INET6_ADDRSTRLEN);
 
                 for(int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
                     if(client_connections[i].in_use && client_connections[i].client_fd == current_fd) {
                         client_id_for_request = client_connections[i].correlation_id;
                         client_idx = i;
-                        strncpy(client_ip_for_request, client_connections[i].client_ip, sizeof(client_ip_for_request) - 1);
-                        client_ip_for_request[sizeof(client_ip_for_request) - 1] = '\0';
+                        memcpy(client_ip_for_request, client_connections[i].ip, INET6_ADDRSTRLEN);
                         break;
                     }
                 }
@@ -399,9 +238,6 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
                     LOG_ERROR("[Server IO Worker %d]: Received data from unknown client FD %d. Ignoring.", worker_idx, current_fd);
                     continue;
                 }
-                
-                
-                
                 
                 ipc_protocol_t *p = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
                 if (!p) {
@@ -525,16 +361,16 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
                                worker_idx, task->client_correlation_id);
                     }
                     else if (strstr(task->request_data, "Kirim pesan ke node lain") != NULL) {
-                        LOG_INFO("[Logic Worker %d]: Client ID %ld requested sending message to peer node. Preparing outbound task.",
+                        LOG_INFO("[Logic Worker %d]: Client ID %ld requested sending message to node node. Preparing outbound task.",
                                worker_idx, task->client_correlation_id);
 
-                        char peer_message[MAX_DATA_BUFFER_IN_STRUCT];
-                        snprintf(peer_message, sizeof(peer_message), "Halo ini dari Node1 ke %s:%d\n",
-                                 node_config.bootstrap_peers[0].ip, node_config.bootstrap_peers[0].port); // Use first bootstrap peer
+                        char node_message[MAX_DATA_BUFFER_IN_STRUCT];
+                        snprintf(node_message, sizeof(node_message), "Halo ini dari Node1 ke %s:%d\n",
+                                 node_config.bootstrap_nodes[0].ip, node_config.bootstrap_nodes[0].port); // Use first bootstrap node
                         
-                        peer_message[sizeof(peer_message) - 1] = '\0';
+                        node_message[sizeof(node_message) - 1] = '\0';
 
-                        LOG_INFO("[Logic Worker %d]: Prepared peer message: '%s'", worker_idx, peer_message);
+                        LOG_INFO("[Logic Worker %d]: Prepared node message: '%s'", worker_idx, node_message);
 
                         outbound_task_t *outbound_task = malloc(sizeof(outbound_task_t));
                         if (!outbound_task) {
@@ -546,10 +382,10 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
                             continue;
                         }
                         outbound_task->client_correlation_id = task->client_correlation_id;
-                        strncpy(outbound_task->peer_ip, node_config.bootstrap_peers[0].ip, sizeof(outbound_task->peer_ip) - 1);
-                        outbound_task->peer_ip[sizeof(outbound_task->peer_ip) - 1] = '\0';
-                        outbound_task->peer_port = node_config.bootstrap_peers[0].port;
-                        strncpy(outbound_task->request_data, peer_message, sizeof(outbound_task->request_data) - 1);
+                        strncpy(outbound_task->node_ip, node_config.bootstrap_nodes[0].ip, sizeof(outbound_task->node_ip) - 1);
+                        outbound_task->node_ip[sizeof(outbound_task->node_ip) - 1] = '\0';
+                        outbound_task->node_port = node_config.bootstrap_nodes[0].port;
+                        strncpy(outbound_task->request_data, node_message, sizeof(outbound_task->request_data) - 1);
                         outbound_task->request_data[sizeof(outbound_task->request_data) - 1] = '\0';
                         outbound_task->request_data_len = strlen(outbound_task->request_data);
 
@@ -580,10 +416,10 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
                     response_to_sio.client_correlation_id = resp->client_correlation_id;
                     if (resp->success) {
                         snprintf(response_to_sio.response_data, sizeof(response_to_sio.response_data),
-                                 "Peer responded: '%.*s'", (int)resp->response_data_len, resp->response_data);
+                                 "Node responded: '%.*s'", (int)resp->response_data_len, resp->response_data);
                     } else {
                         snprintf(response_to_sio.response_data, sizeof(response_to_sio.response_data),
-                                 "Peer communication failed: '%.*s'", (int)resp->response_data_len, resp->response_data);
+                                 "Node communication failed: '%.*s'", (int)resp->response_data_len, resp->response_data);
                     }
                     response_to_sio.response_data_len = strlen(response_to_sio.response_data);
                     send_ipc_message(master_uds_fd, IPC_LOGIC_RESPONSE_TO_SIO, &response_to_sio, sizeof(response_to_sio), -1);
@@ -672,9 +508,9 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
                     outbound_task_t *outbound_task = (outbound_task_t *)master_msg_data;
                     
                     active_outbound_correlation_id = outbound_task->client_correlation_id;
-                    strncpy(active_outbound_target_ip, outbound_task->peer_ip, sizeof(active_outbound_target_ip) - 1);
+                    strncpy(active_outbound_target_ip, outbound_task->node_ip, sizeof(active_outbound_target_ip) - 1);
                     active_outbound_target_ip[sizeof(active_outbound_target_ip) - 1] = '\0';
-                    active_outbound_target_port = outbound_task->peer_port;
+                    active_outbound_target_port = outbound_task->node_port;
                     strncpy(active_outbound_request_data, outbound_task->request_data, sizeof(active_outbound_request_data) - 1);
                     active_outbound_request_data[sizeof(active_outbound_request_data) - 1] = '\0';
                     active_outbound_request_data_len = outbound_task->request_data_len;
@@ -708,7 +544,7 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
                         outbound_response_t fail_resp;
                         fail_resp.client_correlation_id = active_outbound_correlation_id;
                         fail_resp.success = false;
-                        snprintf(fail_resp.response_data, sizeof(fail_resp.response_data), "Invalid peer IP.");
+                        snprintf(fail_resp.response_data, sizeof(fail_resp.response_data), "Invalid node IP.");
                         fail_resp.response_data_len = strlen(fail_resp.response_data);
                         send_ipc_message(master_uds_fd, IPC_OUTBOUND_RESPONSE, &fail_resp, sizeof(fail_resp), -1);
                         active_outbound_fd = -1;
@@ -741,22 +577,22 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
                         LOG_INFO("[Client Outbound Worker %d]: Connected immediately to %s:%d for ID %ld. Sending data.",
                                worker_idx, active_outbound_target_ip, active_outbound_target_port, active_outbound_correlation_id);
                         active_outbound_fd = new_fd;
-                        LOG_INFO("[Client Outbound Worker %d]: Attempting to send '%.*s' to peer %s:%d for ID %ld.",
+                        LOG_INFO("[Client Outbound Worker %d]: Attempting to send '%.*s' to node %s:%d for ID %ld.",
                                worker_idx, (int)active_outbound_request_data_len, active_outbound_request_data,
                                active_outbound_target_ip, active_outbound_target_port, active_outbound_correlation_id);
                         ssize_t bytes_sent_immediate = write(active_outbound_fd, active_outbound_request_data, active_outbound_request_data_len);
                         if (bytes_sent_immediate == -1) {
-                            perror("write to peer (COW)");
+                            perror("write to node (COW)");
                             close(active_outbound_fd);
                             outbound_response_t fail_resp;
                             fail_resp.client_correlation_id = active_outbound_correlation_id;
                             fail_resp.success = false;
-                            snprintf(fail_resp.response_data, sizeof(fail_resp.response_data), "Write to peer failed: %s", strerror(errno));
+                            snprintf(fail_resp.response_data, sizeof(fail_resp.response_data), "Write to node failed: %s", strerror(errno));
                             fail_resp.response_data_len = strlen(fail_resp.response_data);
                             send_ipc_message(master_uds_fd, IPC_OUTBOUND_RESPONSE, &fail_resp, sizeof(fail_resp), -1);
                             active_outbound_fd = -1;
                         } else {
-                            LOG_INFO("[Client Outbound Worker %d]: Sent %zd bytes to peer %s:%d for ID %ld. Waiting for response.",
+                            LOG_INFO("[Client Outbound Worker %d]: Sent %zd bytes to node %s:%d for ID %ld. Waiting for response.",
                                    worker_idx, bytes_sent_immediate, active_outbound_target_ip, active_outbound_target_port, active_outbound_correlation_id);
                             event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
                             event.data.fd = active_outbound_fd;
@@ -783,21 +619,21 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
                         LOG_INFO("[Client Outbound Worker %d]: Connection to %s:%d established. Sending data for ID %ld.",
                                worker_idx, active_outbound_target_ip, active_outbound_target_port, active_outbound_correlation_id);
 
-                        LOG_INFO("[Client Outbound Worker %d]: Attempting to send '%.*s' to peer %s:%d for ID %ld.",
+                        LOG_INFO("[Client Outbound Worker %d]: Attempting to send '%.*s' to node %s:%d for ID %ld.",
                                worker_idx, (int)active_outbound_request_data_len, active_outbound_request_data,
                                active_outbound_target_ip, active_outbound_target_port, active_outbound_correlation_id);
 
                         bytes_sent = write(current_fd, active_outbound_request_data, active_outbound_request_data_len);
                         if (bytes_sent == -1) {
-                            perror("write to peer (COW)");
+                            perror("write to node (COW)");
                             outbound_response_t fail_resp;
                             fail_resp.client_correlation_id = active_outbound_correlation_id;
                             fail_resp.success = false;
-                            snprintf(fail_resp.response_data, sizeof(fail_resp.response_data), "Write to peer failed after connect: %s", strerror(errno));
+                            snprintf(fail_resp.response_data, sizeof(fail_resp.response_data), "Write to node failed after connect: %s", strerror(errno));
                             fail_resp.response_data_len = strlen(fail_resp.response_data);
                             send_ipc_message(master_uds_fd, IPC_OUTBOUND_RESPONSE, &fail_resp, sizeof(fail_resp), -1);
                         } else {
-                            LOG_INFO("[Client Outbound Worker %d]: Sent %zd bytes to peer %s:%d for ID %ld. Waiting for response.",
+                            LOG_INFO("[Client Outbound Worker %d]: Sent %zd bytes to node %s:%d for ID %ld. Waiting for response.",
                                    worker_idx, bytes_sent, active_outbound_target_ip, active_outbound_target_port, active_outbound_correlation_id);
                             event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
                             event.data.fd = current_fd;
@@ -829,14 +665,14 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
 
                     if (bytes_read <= 0) {
                         if (bytes_read == 0 || (events[n].events & (EPOLLHUP | EPOLLERR))) {
-                            LOG_INFO("[Client Outbound Worker %d]: Peer %s:%d disconnected or error (FD %d).",
+                            LOG_INFO("[Client Outbound Worker %d]: Node %s:%d disconnected or error (FD %d).",
                                    worker_idx, active_outbound_target_ip, active_outbound_target_port, current_fd);
                             outbound_resp.success = false;
-                            snprintf(outbound_resp.response_data, sizeof(outbound_resp.response_data), "Peer disconnected prematurely.");
+                            snprintf(outbound_resp.response_data, sizeof(outbound_resp.response_data), "Node disconnected prematurely.");
                         } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                            perror("read from peer (COW)");
+                            perror("read from node (COW)");
                             outbound_resp.success = false;
-                            snprintf(outbound_resp.response_data, sizeof(outbound_resp.response_data), "Read error from peer: %s", strerror(errno));
+                            snprintf(outbound_resp.response_data, sizeof(outbound_resp.response_data), "Read error from node: %s", strerror(errno));
                         } else {
                             continue;
                         }
@@ -846,7 +682,7 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
                         strncpy(outbound_resp.response_data, response_buffer, sizeof(outbound_resp.response_data) - 1);
                         outbound_resp.response_data[sizeof(outbound_resp.response_data) - 1] = '\0';
                         outbound_resp.response_data_len = bytes_read;
-                        LOG_INFO("[Client Outbound Worker %d]: Received %zd bytes from peer FD %d (ID %ld): '%.*s'",
+                        LOG_INFO("[Client Outbound Worker %d]: Received %zd bytes from node FD %d (ID %ld): '%.*s'",
                                worker_idx, bytes_read, current_fd, active_outbound_correlation_id,
                                (int)outbound_resp.response_data_len, outbound_resp.response_data);
                     }
@@ -858,7 +694,7 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
                     epoll_ctl(epoll_fd, EPOLL_CTL_DEL, current_fd, NULL);
                     close(current_fd);
                     active_outbound_fd = -1;
-                    LOG_INFO("[Client Outbound Worker %d]: Closed peer FD %d (ID %ld) after response.",
+                    LOG_INFO("[Client Outbound Worker %d]: Closed node FD %d (ID %ld) after response.",
                            worker_idx, current_fd, outbound_resp.client_correlation_id);
                 }
             } else {
@@ -948,88 +784,6 @@ void orisium_cleanup(void *cleaner_thread_ptr, int *listen_sock_ptr, int *async_
     }
     #endif
     LOG_INFO("Cleanup complete.");
-}
-
-
-// --- Fungsi Pembaca JSON Konfigurasi Jaringan (dari config.c/config.h) ---
-status_t read_network_config_from_json(const char* filename, node_config_t* config_out) {
-    FILE *fp = NULL;
-    char buffer[MAX_FILE_SIZE];
-    struct json_object *parsed_json = NULL;
-    struct json_object *listen_port_obj = NULL;
-    struct json_object *bootstrap_peers_array = NULL;
-
-    fp = fopen(filename, "r");
-    if (fp == NULL) {
-        LOG_ERROR("Gagal membuka file konfigurasi: %s", strerror(errno));
-        return FAILURE;
-    }
-
-    size_t bytes_read = fread(buffer, 1, sizeof(buffer) - 1, fp);
-    if (bytes_read == 0 && !feof(fp)) {
-        LOG_ERROR("Gagal membaca file atau file kosong: %s", filename);
-        fclose(fp);
-        return FAILURE;
-    }
-    buffer[bytes_read] = '\0';
-    fclose(fp);
-
-    parsed_json = json_tokener_parse(buffer);
-    if (parsed_json == NULL) {
-        LOG_ERROR("Gagal mem-parsing JSON dari file: %s", filename);
-        return FAILURE;
-    }
-
-    if (!json_object_object_get_ex(parsed_json, "listen_port", &listen_port_obj) || !json_object_is_type(listen_port_obj, json_type_int)) {
-        LOG_ERROR("Kunci 'listen_port' tidak ditemukan atau tidak valid.");
-        json_object_put(parsed_json);
-        return FAILURE;
-    }
-    config_out->listen_port = json_object_get_int(listen_port_obj);
-
-    if (!json_object_object_get_ex(parsed_json, "bootstrap_peers", &bootstrap_peers_array) || !json_object_is_type(bootstrap_peers_array, json_type_array)) {
-        LOG_ERROR("Kunci 'bootstrap_peers' tidak ditemukan atau tidak valid.");
-        json_object_put(parsed_json);
-        return FAILURE;
-    }
-
-    int array_len = json_object_array_length(bootstrap_peers_array);
-    if (array_len > MAX_PEERS) {
-        LOG_WARN("Jumlah bootstrap peers (%d) melebihi MAX_PEERS (%d). Hanya %d yang akan dibaca.",
-                array_len, MAX_PEERS, MAX_PEERS);
-        array_len = MAX_PEERS;
-    }
-
-    config_out->num_bootstrap_peers = 0;
-    for (int i = 0; i < array_len; i++) {
-        struct json_object *peer_obj = json_object_array_get_idx(bootstrap_peers_array, i);
-        if (!json_object_is_type(peer_obj, json_type_object)) {
-            LOG_WARN("Elemen array bootstrap_peers bukan objek pada indeks %d. Melewatkan.", i);
-            continue;
-        }
-
-        struct json_object *ip_obj = NULL;
-        struct json_object *port_obj = NULL;
-
-        if (!json_object_object_get_ex(peer_obj, "ip", &ip_obj) || !json_object_is_type(ip_obj, json_type_string)) {
-            LOG_WARN("Kunci 'ip' tidak ditemukan atau bukan string pada peer indeks %d. Melewatkan.", i);
-            continue;
-        }
-        strncpy(config_out->bootstrap_peers[config_out->num_bootstrap_peers].ip,
-                json_object_get_string(ip_obj), IP_STRLEN - 1);
-        config_out->bootstrap_peers[config_out->num_bootstrap_peers].ip[IP_STRLEN - 1] = '\0';
-
-        if (!json_object_object_get_ex(peer_obj, "port", &port_obj) || !json_object_is_type(port_obj, json_type_int)) {
-            LOG_WARN("Kunci 'port' tidak ditemukan atau bukan integer pada peer indeks %d. Melewatkan.", i);
-            continue;
-        }
-        config_out->bootstrap_peers[config_out->num_bootstrap_peers].port = json_object_get_int(port_obj);
-
-        config_out->num_bootstrap_peers++;
-    }
-
-    json_object_put(parsed_json);
-    return SUCCESS;
 }
 
 
@@ -1152,20 +906,6 @@ status_t setup_fork_workers(
     return SUCCESS;
 }
 
-
-// --- Fungsi Main (master process) ---
-// master_client_session_t didefinisikan di sini karena terhubung dengan MAX_MASTER_CONCURRENT_SESSIONS
-typedef struct {
-    bool in_use;
-    long correlation_id;
-    int sio_uds_fd; // UDS FD of the SIO worker handling this client
-    char client_ip[INET6_ADDRSTRLEN]; // Tambahkan ini untuk melacak IP klien
-} master_client_session_t;
-
-// Global instance of master client sessions
-master_client_session_t master_client_sessions[MAX_MASTER_CONCURRENT_SESSIONS];
-
-
 int main() {
     memset(&node_config, 0, sizeof(node_config_t));
     strncpy(node_config.node_id, "Node1", sizeof(node_config.node_id) - 1);
@@ -1211,10 +951,10 @@ int main() {
     LOG_INFO("[Master]: --- Node Configuration ---");
     LOG_INFO("[Master]: Node ID: %s", node_config.node_id);
     LOG_INFO("[Master]: Listen Port: %d", node_config.listen_port);
-    LOG_INFO("[Master]: Bootstrap Peers (%d):", node_config.num_bootstrap_peers);
-    for (int i = 0; i < node_config.num_bootstrap_peers; i++) {
-        LOG_INFO("[Master]:   - Peer %d: IP %s, Port %d",
-                 i + 1, node_config.bootstrap_peers[i].ip, node_config.bootstrap_peers[i].port);
+    LOG_INFO("[Master]: Bootstrap Nodes (%d):", node_config.num_bootstrap_nodes);
+    for (int i = 0; i < node_config.num_bootstrap_nodes; i++) {
+        LOG_INFO("[Master]:   - Node %d: IP %s, Port %d",
+                 i + 1, node_config.bootstrap_nodes[i].ip, node_config.bootstrap_nodes[i].port);
     }
     LOG_INFO("[Master]: -------------------------");
 
@@ -1328,7 +1068,7 @@ int main() {
     // Initialize master_client_sessions
     for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
         master_client_sessions[i].in_use = false;
-        memset(master_client_sessions[i].client_ip, 0, sizeof(master_client_sessions[i].client_ip));
+        memset(master_client_sessions[i].ip, 0, INET6_ADDRSTRLEN);
     }
 
     while (!shutdown_requested) {
@@ -1355,8 +1095,8 @@ int main() {
                     continue;
                 }
                 
-                char client_ip_str[INET6_ADDRSTRLEN];
-                if (inet_ntop(AF_INET, &client_addr.sin_addr, client_ip_str, sizeof(client_ip_str)) == NULL) {
+                uint8_t client_ip_str[INET6_ADDRSTRLEN];
+                if (inet_ntop(AF_INET, &client_addr.sin_addr, (char *)client_ip_str, INET6_ADDRSTRLEN) == NULL) {
                     perror("inet_ntop");
                     CLOSE_FD(client_sock);
                     continue;
@@ -1366,7 +1106,7 @@ int main() {
                 bool ip_already_connected = false;
                 for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
                     if (master_client_sessions[i].in_use &&
-                        strcmp(master_client_sessions[i].client_ip, client_ip_str) == 0) {
+                        memcmp(master_client_sessions[i].ip, client_ip_str, INET6_ADDRSTRLEN) == 0) {
                         ip_already_connected = true;
                         break;
                     }
@@ -1391,8 +1131,7 @@ int main() {
                         master_client_sessions[i].in_use = true;
                         master_client_sessions[i].correlation_id = current_client_id;
                         master_client_sessions[i].sio_uds_fd = sio_worker_uds_fd;
-                        strncpy(master_client_sessions[i].client_ip, client_ip_str, sizeof(master_client_sessions[i].client_ip) - 1);
-                        master_client_sessions[i].client_ip[sizeof(master_client_sessions[i].client_ip) - 1] = '\0';
+                        memcpy(master_client_sessions[i].ip, client_ip_str, INET6_ADDRSTRLEN);
                         slot_found = i;
                         break;
                     }
@@ -1435,43 +1174,28 @@ int main() {
 				CLOSE_PAYLOAD(p->payload.ipc_client_request_task);
 				CLOSE_PROTOCOL(p);
             }
-            else { 
-				/*
-                ipc_msg_header_t msg_header;
-                char master_rcv_buffer[MASTER_RECEIVE_BUFFER_SIZE]; 
-                int received_fd = -1;
-
-                ssize_t bytes_read = recv_ipc_message(current_fd, &msg_header, master_rcv_buffer, sizeof(master_rcv_buffer), &received_fd);
-                if (bytes_read == -1) {
-                    if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                        perror("recv_ipc_message from worker (Master)");
-                    }
-                    continue;
-                }
-                */
+            else {
                 int received_fd = -1;
                 ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(current_fd, &received_fd);
                 if (deserialized_result.status != SUCCESS) {
                     perror("recv_ipc_message from worker (Master)");
                     continue;
                 }
-                ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;
-                printf("[Server IO Worker %d]: Received message type: 0x%02x\n", worker_idx, received_protocol->type);
-                printf("[Server IO Worker %d]: Received FD: %d\n", worker_idx, received_client_fd);
-//////////////////////////////////////siniiiiiii========================
+                ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;                
                 switch (received_protocol->type) {
                     case IPC_CLIENT_REQUEST_TASK: {
-                        client_request_task_t *req = (client_request_task_t *)master_rcv_buffer;
-                        LOG_INFO("[Master]: Received Client Request Task (ID %ld) from Server IO Worker (UDS FD %d).", req->client_correlation_id, current_fd);
+                        ipc_client_request_task_t *req = received_protocol->payload.ipc_client_request_task;
+                        LOG_INFO("[Master]: Received Client Request Task (ID %ld) from Server IO Worker (UDS FD %d).", req->correlation_id, current_fd);
 
-                        int logic_worker_idx = (int)(req->client_correlation_id % MAX_LOGIC_WORKERS);
+                        int logic_worker_idx = (int)(req->correlation_id % MAX_LOGIC_WORKERS);
                         int logic_worker_uds_fd = master_uds_logic_fds[logic_worker_idx]; // Master uses its side of UDS
 
                         send_ipc_message(logic_worker_uds_fd, IPC_LOGIC_TASK, req, sizeof(client_request_task_t), -1);
                         LOG_INFO("[Master]: Forwarding client request (ID %ld) to Logic Worker %d (UDS FD %d).",
-                               req->client_correlation_id, logic_worker_idx, logic_worker_uds_fd);
+                               req->correlation_id, logic_worker_idx, logic_worker_uds_fd);
                         break;
                     }
+                    /*
                     case IPC_LOGIC_RESPONSE_TO_SIO: {
                         logic_response_t *resp = (logic_response_t *)master_rcv_buffer;
                         LOG_INFO("[Master]: Received Client Response (ID %ld) from Logic Worker (UDS FD %d).", resp->client_correlation_id, current_fd);
@@ -1499,8 +1223,8 @@ int main() {
                     }
                     case IPC_OUTBOUND_TASK: {
                         outbound_task_t *task = (outbound_task_t *)master_rcv_buffer;
-                        LOG_INFO("[Master]: Received Outbound Task (ID %ld) from Logic Worker (UDS FD %d) for peer %s:%d.",
-                               task->client_correlation_id, current_fd, task->peer_ip, task->peer_port);
+                        LOG_INFO("[Master]: Received Outbound Task (ID %ld) from Logic Worker (UDS FD %d) for node %s:%d.",
+                               task->client_correlation_id, current_fd, task->node_ip, task->node_port);
 
                         int cow_worker_idx = (int)(task->client_correlation_id % MAX_COW_WORKERS);
                         int cow_uds_fd = master_uds_cow_fds[cow_worker_idx]; // Master uses its side of UDS
@@ -1524,30 +1248,39 @@ int main() {
                                resp->client_correlation_id, logic_worker_idx_for_response, logic_worker_uds_fd);
                         break;
                     }
+                    */
                     case IPC_CLIENT_DISCONNECTED: {
-                        client_disconnect_info_t *disconnect_info = (client_disconnect_info_t *)master_rcv_buffer;
+                        ipc_client_disconnect_info_t *disconnect_info = received_protocol->payload.ipc_client_disconnect_info;
                         LOG_INFO("[Master]: Received Client Disconnected signal for ID %ld from IP %s (from SIO Worker UDS FD %d).",
-                                 disconnect_info->client_correlation_id, disconnect_info->client_ip, current_fd);
+                                 disconnect_info->correlation_id, disconnect_info->ip, current_fd);
 
                         for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
+							
+							LOG_INFO("Searching(%d) IP %s ?? %s|CI %llu ?? %llu",
+                                 INET6_ADDRSTRLEN, master_client_sessions[i].ip, disconnect_info->ip,
+                                 master_client_sessions[i].correlation_id, disconnect_info->correlation_id
+                                 );
+                                 
                             if (master_client_sessions[i].in_use &&
-                                master_client_sessions[i].correlation_id == disconnect_info->client_correlation_id &&
-                                strcmp(master_client_sessions[i].client_ip, disconnect_info->client_ip) == 0) {
+                                master_client_sessions[i].correlation_id == disconnect_info->correlation_id &&
+                                memcmp(master_client_sessions[i].ip, disconnect_info->ip, INET6_ADDRSTRLEN) == 0) {
                                 master_client_sessions[i].in_use = false;
                                 master_client_sessions[i].correlation_id = -1;
                                 master_client_sessions[i].sio_uds_fd = -1;
-                                memset(master_client_sessions[i].client_ip, 0, sizeof(master_client_sessions[i].client_ip));
+                                memset(master_client_sessions[i].ip, 0, INET6_ADDRSTRLEN);
                                 LOG_INFO("[Master]: IP %s (ID %ld) dihapus dari daftar koneksi aktif.",
-                                         disconnect_info->client_ip, disconnect_info->client_correlation_id);
+                                         disconnect_info->ip, disconnect_info->correlation_id);
                                 break;
                             }
                         }
                         break;
                     }
                     default:
-                        LOG_ERROR("[Master]: Unknown message type %d from UDS FD %d. Ignoring.", msg_header.type, current_fd);
+                        LOG_ERROR("[Master]: Unknown message type %d from UDS FD %d. Ignoring.", received_protocol->type, current_fd);
                         break;
                 }
+                CLOSE_PAYLOAD(received_protocol->payload.ipc_client_disconnect_info);
+				CLOSE_PROTOCOL(received_protocol);
             }
         }
     }
