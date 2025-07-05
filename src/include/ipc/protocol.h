@@ -64,6 +64,23 @@ typedef struct {
 	} payload;
 } ipc_protocol_t;
 
+#define CLOSE_IPC_PAYLOAD(x) do { if ((x)) { free(x); (x) = NULL; } } while(0)    
+
+#define CLOSE_IPC_PROTOCOL(x) \
+    do { \
+        if (x) { \
+			if (x->type == IPC_CLIENT_REQUEST_TASK) { \
+                CLOSE_IPC_PAYLOAD(x->payload.ipc_client_request_task); \
+            } else if (x->type == IPC_CLIENT_DISCONNECTED) { \
+                CLOSE_IPC_PAYLOAD(x->payload.ipc_client_disconnect_info); \
+            } else if (x->type == IPC_LOGIC_RESPONSE_TO_SIO) { \
+                CLOSE_IPC_PAYLOAD(x->payload.ipc_logic_response); \
+            } \
+            free(x); \
+            x = NULL; \
+        } \
+    } while(0)
+
 typedef struct {
 	ipc_protocol_t *r_ipc_protocol_t;
 	status_t status;
@@ -71,6 +88,7 @@ typedef struct {
 
 #include "client_request_task.h"
 #include "client_disconnect_info.h"
+#include "logic_response.h"
 
 size_t_status_t calculate_ipc_payload_size(ipc_protocol_type_t type);
 size_t_status_t calculate_ipc_payload_buffer(const uint8_t* buffer, size_t len);

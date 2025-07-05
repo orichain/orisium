@@ -1,6 +1,8 @@
 #ifndef COMMONS_H
 #define COMMONS_H
 
+#include <unistd.h>
+
 #define IPC_LENGTH_PREFIX_BYTES sizeof(uint32_t)
 
 #define CHECK_BUFFER_BOUNDS(current_offset, bytes_to_write, total_buffer_size) \
@@ -26,21 +28,6 @@
         if (x != -1) { \
             close(x); \
             x = -1; \
-        } \
-    } while(0)
-    
-#define CLOSE_PAYLOAD(x) do { if ((x)) { free(x); (x) = NULL; } } while(0)    
-
-#define CLOSE_PROTOCOL(x) \
-    do { \
-        if (x) { \
-			if (x->type == IPC_CLIENT_REQUEST_TASK) { \
-                CLOSE_PAYLOAD(x->payload.ipc_client_request_task); \
-            } else if (x->type == IPC_CLIENT_DISCONNECTED) { \
-                CLOSE_PAYLOAD(x->payload.ipc_client_disconnect_info); \
-            } \
-            free(x); \
-            x = NULL; \
         } \
     } while(0)
              

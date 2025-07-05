@@ -27,6 +27,7 @@
 #include "sessions.h"
 #include "under_refinement_and_will_be_delete_after_finished.h"
 #include "types.h"
+#include "ipc/client_disconnect_info.h"
 
 volatile sig_atomic_t shutdown_requested = 0;
 node_config_t node_config;
@@ -92,14 +93,14 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
                     if (received_client_fd == -1) {
                         LOG_ERROR("[Server IO Worker %d]: Error: No client FD received with IPC_CLIENT_REQUEST_TASK for ID %ld. Skipping.", worker_idx, req->correlation_id);
                         CLOSE_FD(received_client_fd);
-                        CLOSE_PROTOCOL(received_protocol);
+                        CLOSE_IPC_PROTOCOL(received_protocol);
 						continue;
                     }
 
                     if (set_nonblocking("[SIO Worker]: ", received_client_fd) != SUCCESS) {
                         LOG_ERROR("[Server IO Worker %d]: Failed to set non-blocking for FD %d. Closing.", worker_idx, received_client_fd);
                         CLOSE_FD(received_client_fd);
-                        CLOSE_PROTOCOL(received_protocol);
+                        CLOSE_IPC_PROTOCOL(received_protocol);
 						continue;
                     }
 
@@ -108,7 +109,7 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
                     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, received_client_fd, &event) == -1) {
                         LOG_ERROR("epoll_ctl: add client FD to SIO worker %d epoll: %s", worker_idx, strerror(errno));
                         CLOSE_FD(received_client_fd);
-                        CLOSE_PROTOCOL(received_protocol);
+                        CLOSE_IPC_PROTOCOL(received_protocol);
 						continue;
                     }
 
@@ -131,7 +132,7 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
                     } else {
                         LOG_ERROR("[Server IO Worker %d]: No free slots for new client FD %d. Closing.", worker_idx, received_client_fd);
                         CLOSE_FD(received_client_fd);
-                        CLOSE_PROTOCOL(received_protocol);
+                        CLOSE_IPC_PROTOCOL(received_protocol);
 						continue;
                     }
 
@@ -139,7 +140,7 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
                 else {
                      LOG_ERROR("[Server IO Worker %d]: Unknown message type %d from Master.", worker_idx, received_protocol->type);
                 }
-                CLOSE_PROTOCOL(received_protocol);
+                CLOSE_IPC_PROTOCOL(received_protocol);
             } else { // Handle client TCP connections
                 char client_buffer[MAX_DATA_BUFFER_IN_STRUCT];
                 ssize_t bytes_read = read(current_fd, client_buffer, sizeof(client_buffer) - 1);
@@ -171,38 +172,20 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 							client_connections[client_slot_idx].client_fd = -1;
 							client_connections[client_slot_idx].correlation_id = -1;
 							memset(client_connections[client_slot_idx].ip, 0, INET6_ADDRSTRLEN);
-
-							ipc_protocol_t *p = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
-							if (!p) {
-								perror("Failed to allocate ipc_protocol_t protocol");
-								//CLOSE_FD(client_sock);
-								CLOSE_FD(current_fd);
+							
+							ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_client_disconnect_info(&current_fd, &disconnected_client_id, disconnected_client_ip);
+							if (cmd_result.status != SUCCESS) {
 								continue;
 							}
-							memset(p, 0, sizeof(ipc_protocol_t)); // Inisialisasi dengan nol
-							p->version[0] = VERSION_MAJOR;
-							p->version[1] = VERSION_MINOR;
-							p->type = IPC_CLIENT_DISCONNECTED;
-							ipc_client_disconnect_info_t *payload = (ipc_client_disconnect_info_t *)calloc(1, sizeof(ipc_client_disconnect_info_t));
-							if (!payload) {
-								perror("Failed to allocate ipc_client_disconnect_info_t payload");
-								//CLOSE_FD(client_sock);
-								CLOSE_FD(current_fd);
-								CLOSE_PROTOCOL(p);
-								continue;
-							}
-							payload->correlation_id = (uint64_t)disconnected_client_id; // Cast ke uint64_t
-							memcpy(payload->ip, disconnected_client_ip, INET6_ADDRSTRLEN);				
-							p->payload.ipc_client_disconnect_info = payload;
 							int not_used_fd = -1;				
-							ssize_t_status_t send_result = send_ipc_protocol_message(&master_uds_fd, p, &not_used_fd);
+							ssize_t_status_t send_result = send_ipc_protocol_message(&master_uds_fd, cmd_result.r_ipc_protocol_t, &not_used_fd);
 							if (send_result.status != SUCCESS) {
 								LOG_INFO("[Server IO Worker %d]: Failed to sent client disconnect signal for ID %ld (IP %s) to Master.", worker_idx, disconnected_client_id, disconnected_client_ip);
 							} else {
 								LOG_INFO("[Server IO Worker %d]: Sent client disconnect signal for ID %ld (IP %s) to Master.", worker_idx, disconnected_client_id, disconnected_client_ip);
 							}
 							CLOSE_FD(current_fd);
-							CLOSE_PROTOCOL(p);
+							CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);
                         }
 
 
@@ -248,7 +231,7 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 				if (!payload) {
 					perror("Failed to allocate ipc_client_request_task_t payload");
 					//CLOSE_FD(client_sock);
-					CLOSE_PROTOCOL(p);
+					CLOSE_IPC_PROTOCOL(p);
 					continue;
 				}
 				payload->correlation_id = (uint64_t)client_id_for_request; // Cast ke uint64_t				
@@ -268,7 +251,7 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 					LOG_INFO("[Server IO Worker %d]: Sent client request (ID %ld) to Master for Logic Worker.",
                        worker_idx, client_id_for_request);
 				}
-				CLOSE_PROTOCOL(p);
+				CLOSE_IPC_PROTOCOL(p);
             }
         }
     }
@@ -430,7 +413,7 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
                 } else {
                     LOG_ERROR("[Logic Worker %d]: Unknown message type %d from Master.", worker_idx, received_protocol->type);
                 }
-                CLOSE_PROTOCOL(received_protocol);
+                CLOSE_IPC_PROTOCOL(received_protocol);
             }
         }
     }
@@ -1153,7 +1136,7 @@ int main() {
 				if (!payload) {
 					perror("Failed to allocate ipc_client_request_task_t payload");
 					CLOSE_FD(client_sock);
-					CLOSE_PROTOCOL(p);
+					CLOSE_IPC_PROTOCOL(p);
 					continue;
 				}
 				payload->correlation_id = (uint64_t)current_client_id; // Cast ke uint64_t
@@ -1169,7 +1152,7 @@ int main() {
 							 client_sock, current_client_id, client_ip_str, sio_worker_idx, sio_worker_uds_fd, send_result.r_ssize_t);
 					CLOSE_FD(client_sock); // di close jika berhasil Forwarding
 				}
-				CLOSE_PROTOCOL(p);
+				CLOSE_IPC_PROTOCOL(p);
             }
             else {
                 int received_fd = -1;
@@ -1279,7 +1262,7 @@ int main() {
                         LOG_ERROR("[Master]: Unknown message type %d from UDS FD %d. Ignoring.", received_protocol->type, current_fd);
                         break;
                 }
-                CLOSE_PROTOCOL(received_protocol);
+                CLOSE_IPC_PROTOCOL(received_protocol);
             }
         }
     }

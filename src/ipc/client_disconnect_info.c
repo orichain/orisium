@@ -3,6 +3,7 @@
 #include <string.h>      // for memset, strncpy
 #include <endian.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "commons.h"
 #include "ipc/protocol.h"
@@ -68,4 +69,34 @@ status_t ipc_serialize_client_disconnect_info(const ipc_client_disconnect_info_t
 
     *offset = current_offset_local;
     return SUCCESS;
+}
+
+ipc_protocol_t_status_t ipc_prepare_cmd_client_disconnect_info(int *current_fd, uint64_t *correlation_id, uint8_t disconnected_client_ip[]) {
+	ipc_protocol_t *p = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
+	ipc_protocol_t_status_t result;
+	result.status = FAILURE;
+	result.r_ipc_protocol_t = p;
+	if (!p) {
+		perror("Failed to allocate ipc_protocol_t protocol");
+		//CLOSE_FD(client_sock);
+		CLOSE_FD(*current_fd);
+		return result;
+	}
+	memset(p, 0, sizeof(ipc_protocol_t)); // Inisialisasi dengan nol
+	p->version[0] = VERSION_MAJOR;
+	p->version[1] = VERSION_MINOR;
+	p->type = IPC_CLIENT_DISCONNECTED;
+	ipc_client_disconnect_info_t *payload = (ipc_client_disconnect_info_t *)calloc(1, sizeof(ipc_client_disconnect_info_t));
+	if (!payload) {
+		perror("Failed to allocate ipc_client_disconnect_info_t payload");
+		//CLOSE_FD(client_sock);
+		CLOSE_FD(*current_fd);
+		CLOSE_IPC_PROTOCOL(p);
+		return result;
+	}
+	payload->correlation_id = *correlation_id; // Cast ke uint64_t
+	memcpy(payload->ip, disconnected_client_ip, INET6_ADDRSTRLEN);				
+	p->payload.ipc_client_disconnect_info = payload;
+	result.status = SUCCESS;
+	return result;
 }
