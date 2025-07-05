@@ -2,12 +2,12 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "sessions.h"
+#include "sessions/master_client_session.h"
 #include "log.h"
 #include "types.h"
 
-void add_closed_correlation_id(const char *label, closed_correlation_id_t **head, uint64_t id) {
-    closed_correlation_id_t *new_node = (closed_correlation_id_t *)malloc(sizeof(closed_correlation_id_t));
+void add_master_client_session(const char *label, master_client_session_t **head, uint64_t id) {
+    master_client_session_t *new_node = (master_client_session_t *)malloc(sizeof(master_client_session_t));
     if (new_node == NULL) {
         LOG_ERROR("%sGagal mengalokasikan memori untuk node baru", label);
         return;
@@ -18,9 +18,9 @@ void add_closed_correlation_id(const char *label, closed_correlation_id_t **head
     LOG_ERROR("%sCorrelation ID %llu berhasil ditambahkan.", label, (unsigned long long)id);
 }
 
-status_t delete_closed_correlation_id(const char *label, closed_correlation_id_t **head, uint64_t id) {
-    closed_correlation_id_t *current = *head;
-    closed_correlation_id_t *prev = NULL;
+status_t delete_master_client_session(const char *label, master_client_session_t **head, uint64_t id) {
+    master_client_session_t *current = *head;
+    master_client_session_t *prev = NULL;
 
     // Jika node yang akan dihapus adalah head
     if (current != NULL && current->correlation_id == id) {
@@ -49,10 +49,10 @@ status_t delete_closed_correlation_id(const char *label, closed_correlation_id_t
     return SUCCESS;
 }
 
-closed_correlation_id_t_status_t find_closed_correlation_id(const char *label, closed_correlation_id_t *head, uint64_t id) {
-    closed_correlation_id_t *current = head;
-    closed_correlation_id_t_status_t result;
-    result.r_closed_correlation_id_t = current;
+master_client_session_t_status_t find_master_client_session(const char *label, master_client_session_t *head, uint64_t id) {
+    master_client_session_t *current = head;
+    master_client_session_t_status_t result;
+    result.r_master_client_session_t = current;
     result.status = FAILURE;
     while (current != NULL) {
         if (current->correlation_id == id) {
@@ -66,10 +66,10 @@ closed_correlation_id_t_status_t find_closed_correlation_id(const char *label, c
     return result;
 }
 
-closed_correlation_id_t_status_t find_first_closed_correlation_id(const char *label, closed_correlation_id_t *head) {
-    closed_correlation_id_t *current = head;
-    closed_correlation_id_t_status_t result;
-    result.r_closed_correlation_id_t = current;
+master_client_session_t_status_t find_first_master_client_session(const char *label, master_client_session_t *head) {
+    master_client_session_t *current = head;
+    master_client_session_t_status_t result;
+    result.r_master_client_session_t = current;
     result.status = FAILURE;
     while (current != NULL) {
 		LOG_INFO("%sCorrelation ID %llu ditemukan.", label, (unsigned long long)current->correlation_id);
@@ -80,11 +80,11 @@ closed_correlation_id_t_status_t find_first_closed_correlation_id(const char *la
     return result;
 }
 
-int_status_t count_closed_correlation_ids(const char *label, closed_correlation_id_t *head) {
+int_status_t count_master_client_sessions(const char *label, master_client_session_t *head) {
 	int_status_t result;
 	result.r_int = 0;
 	result.status = FAILURE;
-    closed_correlation_id_t *current = head;
+    master_client_session_t *current = head;
     while (current != NULL) {
         result.r_int++;
         current = current->next;
@@ -94,8 +94,8 @@ int_status_t count_closed_correlation_ids(const char *label, closed_correlation_
     return result;
 }
 
-void display_closed_correlation_ids(const char *label, closed_correlation_id_t *head) {
-    closed_correlation_id_t *current = head;
+void display_master_client_sessions(const char *label, master_client_session_t *head) {
+    master_client_session_t *current = head;
     if (current == NULL) {
         LOG_WARN("%sList kosong.", label);
         return;
@@ -108,14 +108,14 @@ void display_closed_correlation_ids(const char *label, closed_correlation_id_t *
     LOG_INFO("%sNULL", label);
 }
 
-void free_closed_correlation_ids(const char *label, closed_correlation_id_t **head) {
-    closed_correlation_id_t *current = *head;
-    closed_correlation_id_t *next;
+void free_master_client_sessions(const char *label, master_client_session_t **head) {
+    master_client_session_t *current = *head;
+    master_client_session_t *next;
     while (current != NULL) {
         next = current->next;
         free(current);
         current = next;
     }
     *head = NULL; // Pastikan head menjadi NULL setelah semua node dibebaskan
-    printf("Semua node dalam list telah dibebaskan.\n");
+    LOG_INFO("%sSemua node dalam list telah dibebaskan.", label);
 }

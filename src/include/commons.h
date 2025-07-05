@@ -19,9 +19,19 @@
     (fprintf(stderr, "[SER Error]: Buffer overflow check failed. Offset: %zu, Bytes to write: %zu, Total buffer size: %zu\n", \
              (size_t)(current_offset), (size_t)(bytes_to_write), (size_t)(total_buffer_size)), 1) : 0
              
-#define SER_CHECK_SPACE(x) if (x > buffer_size) return FAILURE_OOBUF
-
-#define DESER_CHECK_SPACE(x) if (len < x) return FAILURE_OOBUF
+#define SER_CHECK_SPACE(x) \
+	do { \
+		if (x > buffer_size) { \
+			return FAILURE_OOBUF; \
+		} \
+    } while(0)
+    
+#define DESER_CHECK_SPACE(x) \
+	do { \
+		if (len < x) { \
+			return FAILURE_OOBUF; \
+		} \
+    } while(0)
 
 #define CLOSE_FD(x) \
     do { \

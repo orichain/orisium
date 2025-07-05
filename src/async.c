@@ -9,10 +9,30 @@
 #include "constants.h"  // for MAX_EVENTS
 #include "log.h"        // for LOG_ERROR
 #include "types.h"      // for FAILURE, SUCCESS, fd_events_status_t, int_sta...
-#include "globals.h"
+#include "commons.h"
 
-bool async_event_is_EPOLLHUP_or_EPOLLERR_od_EPOLLRDHUP(uint32_t events) {
-	return events & (EPOLLHUP | EPOLLERR | EPOLLRDHUP);
+bool async_event_is_EPOLLHUP(uint32_t events) {
+	return events & EPOLLHUP;
+}
+
+bool async_event_is_EPOLLERR(uint32_t events) {
+	return events & EPOLLERR;
+}
+
+bool async_event_is_EPOLLRDHUP(uint32_t events) {
+	return events & EPOLLRDHUP;
+}
+
+bool async_event_is_EPOLLIN(uint32_t events) {
+	return events & EPOLLIN;
+}
+
+bool async_event_is_EPOLLOUT(uint32_t events) {
+	return events & EPOLLOUT;
+}
+
+bool async_event_is_EPOLLET(uint32_t events) {
+	return events & EPOLLET;
 }
 
 int_status_t async_getfd(const char* label, async_type_t *async, int n) {
@@ -51,9 +71,6 @@ int_status_t async_wait(const char* label, async_type_t *async) {
     result.r_int = epoll_wait(async->async_fd, async->events, MAX_EVENTS, 100);
     if (result.r_int == -1) {
         if (errno == EINTR) {
-            if (!shutdown_requested) {
-                LOG_ERROR("%s%s", label, strerror(errno));
-            }
             result.status = FAILURE_EINTR;
             return result;
         }
@@ -103,4 +120,15 @@ status_t async_create_incoming_event_with_disconnect(const char* label, async_ty
         return FAILURE;
     }
     return SUCCESS;
+}
+
+status_t async_delete_event(const char* label, async_type_t *async, int *fd_to_delete) {
+	if (*fd_to_delete != -1) {
+		if (epoll_ctl(async->async_fd, EPOLL_CTL_DEL, *fd_to_delete, NULL) == -1) {
+			LOG_ERROR("%s%s", label, strerror(errno));
+			return FAILURE;
+		}
+	}
+	CLOSE_FD(*fd_to_delete);
+	return SUCCESS;
 }
