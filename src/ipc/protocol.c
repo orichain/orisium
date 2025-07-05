@@ -246,7 +246,7 @@ ssize_t_status_t ipc_serialize(const ipc_protocol_t* p, uint8_t** ptr_buffer, si
 }
 
 
-ssize_t_status_t send_ipc_protocol_message(int uds_fd, const ipc_protocol_t* p, int fd_to_pass) {
+ssize_t_status_t send_ipc_protocol_message(int *uds_fd, const ipc_protocol_t* p, int *fd_to_pass) {
 	ssize_t_status_t result;
     result.r_ssize_t = 0;
     result.status = FAILURE;
@@ -315,22 +315,22 @@ ssize_t_status_t send_ipc_protocol_message(int uds_fd, const ipc_protocol_t* p, 
 
     // Handle FD passing (logika ini sama seperti sebelumnya)
     char cmsgbuf[CMSG_SPACE(sizeof(int))];
-    if (fd_to_pass != -1) {
+    if (*fd_to_pass != -1) {
         msg.msg_control = cmsgbuf;
         msg.msg_controllen = sizeof(cmsgbuf);
         struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
         cmsg->cmsg_level = SOL_SOCKET;
         cmsg->cmsg_type = SCM_RIGHTS;
         cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-        *((int *) CMSG_DATA(cmsg)) = fd_to_pass;
-        fprintf(stderr, "[send_ipc_protocol_message Debug]: Mengirim FD: %d\n", fd_to_pass);
+        *((int *) CMSG_DATA(cmsg)) = *fd_to_pass;
+        fprintf(stderr, "[send_ipc_protocol_message Debug]: Mengirim FD: %d\n", *fd_to_pass);
     } else {
         msg.msg_control = NULL;
         msg.msg_controllen = 0;
     }
 
     // Kirim pesan
-    result.r_ssize_t = sendmsg(uds_fd, &msg, 0);
+    result.r_ssize_t = sendmsg(*uds_fd, &msg, 0);
     if (result.r_ssize_t == -1) {
         perror("send_ipc_protocol_message sendmsg");
     } else if (result.r_ssize_t != (ssize_t)total_message_len_to_send) {
@@ -494,17 +494,18 @@ ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
             if (current_buffer_offset + sizeof(uint64_t) + INET6_ADDRSTRLEN + sizeof(uint16_t) > len) {
                 fprintf(stderr, "[ipc_deserialize Error]: Buffer terlalu kecil untuk IPC_CLIENT_REQUEST_TASK fixed header.\n");
                 free(p);
+                p = NULL;
                 result.status = FAILURE_OOBUF;
                 return result;
             }
             uint16_t raw_data_len_be;
             memcpy(&raw_data_len_be, buffer + current_buffer_offset + sizeof(uint64_t) + INET6_ADDRSTRLEN, sizeof(uint16_t));
             uint16_t actual_data_len = be16toh(raw_data_len_be);
-            ipc_client_request_task_t *task_payload = (ipc_client_request_task_t*)
-                calloc(1, sizeof(ipc_client_request_task_t) + actual_data_len);
+            ipc_client_request_task_t *task_payload = (ipc_client_request_task_t*) calloc(1, sizeof(ipc_client_request_task_t) + actual_data_len);
             if (!task_payload) {
                 perror("ipc_deserialize: Failed to allocate ipc_client_request_task_t with FAM");
                 free(p);
+                p = NULL;
                 result.status = FAILURE_NOMEM;
                 return result;
             }
@@ -516,6 +517,7 @@ ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
 			if (current_buffer_offset + sizeof(uint64_t) + INET6_ADDRSTRLEN > len) {
                 fprintf(stderr, "[ipc_deserialize Error]: Buffer terlalu kecil untuk IPC_CLIENT_DISCONNECTED fixed header.\n");
                 free(p);
+                p = NULL;
                 result.status = FAILURE_OOBUF;
                 return result;
             }
@@ -524,6 +526,7 @@ ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
             if (!disconnect_info_payload) {
                 perror("ipc_deserialize: Failed to allocate ipc_client_disconnect_info_t without FAM");
                 free(p);
+                p = NULL;
                 result.status = FAILURE_NOMEM;
                 return result;
             }
@@ -535,12 +538,12 @@ ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
             fprintf(stderr, "[ipc_deserialize Error]: Unknown message type 0x%02x.\n", p->type);
             result.status = FAILURE_IPYLD;
             free(p);
+            p = NULL;
             return result;
     }
     if (result_pyld != SUCCESS) {
-        fprintf(stderr, "[ipc_deserialize Error]: Payload deserialization failed with status %d.\n", result_pyld);
-        if (p->type == IPC_CLIENT_REQUEST_TASK) if (p->payload.ipc_client_request_task) { free(p->payload.ipc_client_request_task); }
-        free(p);
+        fprintf(stderr, "[ipc_deserialize Error]: Payload deserialization failed with status %d.\n", result_pyld);        
+        CLOSE_PROTOCOL(p);
         result.status = FAILURE_IPYLD;
         return result;
     }
@@ -550,7 +553,7 @@ ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
     return result;
 }
 
-ipc_protocol_t_status_t receive_and_deserialize_ipc_message(int uds_fd, int *actual_fd_received) {
+ipc_protocol_t_status_t receive_and_deserialize_ipc_message(int *uds_fd, int *actual_fd_received) {
     ipc_protocol_t_status_t deserialized_result;
     deserialized_result.r_ipc_protocol_t = NULL;
     deserialized_result.status = FAILURE;
@@ -585,7 +588,7 @@ ipc_protocol_t_status_t receive_and_deserialize_ipc_message(int uds_fd, int *act
     msg_prefix.msg_controllen = sizeof(cmsgbuf_prefix);
 
     fprintf(stderr, "[receive_and_deserialize_ipc_message Debug]: Tahap 1: Membaca length prefix dan potensi FD (%zu byte).\n", IPC_LENGTH_PREFIX_BYTES);
-    ssize_t bytes_read_prefix_and_fd = recvmsg(uds_fd, &msg_prefix, MSG_WAITALL);
+    ssize_t bytes_read_prefix_and_fd = recvmsg(*uds_fd, &msg_prefix, MSG_WAITALL);
 
     if (bytes_read_prefix_and_fd == -1) {
         if (errno != EAGAIN && errno != EWOULDBLOCK) {
@@ -647,7 +650,7 @@ ipc_protocol_t_status_t receive_and_deserialize_ipc_message(int uds_fd, int *act
 
 
     fprintf(stderr, "[receive_and_deserialize_ipc_message Debug]: Tahap 2: Membaca %u byte payload IPC.\n", total_ipc_payload_len);
-    ssize_t bytes_read_payload = recvmsg(uds_fd, &msg_payload, MSG_WAITALL);
+    ssize_t bytes_read_payload = recvmsg(*uds_fd, &msg_payload, MSG_WAITALL);
 
     if (bytes_read_payload == -1) {
         if (errno != EAGAIN && errno != EWOULDBLOCK) {

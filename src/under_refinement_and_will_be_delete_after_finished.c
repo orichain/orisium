@@ -2,12 +2,10 @@
 #include <netinet/in.h>  // for sockaddr_in, INADDR_ANY, in_addr
 #include <stdio.h>       // for printf, perror, fprintf, NULL, stderr
 #include <string.h>      // for memset, strncpy
-#include <sys/socket.h>  // for socketpair, SOCK_STREAM, AF_UNIX, AF_INET, accept
 #include <sys/types.h>   // for pid_t, ssize_t
 #include <json-c/json_object.h>
 #include <json-c/json_tokener.h>
 #include <json-c/json_types.h>
-#include <sys/uio.h>
 
 #include "log.h"
 #include "constants.h"
@@ -18,6 +16,7 @@
 
 // Send message over UDS, with optional FD passing (from ipc.h/ipc.c)
 ssize_t send_ipc_message(int uds_fd, ipc_protocol_type_t type, const void *data, size_t data_len, int fd_to_pass) {
+	/*
     ipc_msg_header_t header = { .type = type, .data_len = data_len };
     struct iovec iov[2];
     iov[0].iov_base = &header;
@@ -49,10 +48,13 @@ ssize_t send_ipc_message(int uds_fd, ipc_protocol_type_t type, const void *data,
         perror("send_ipc_message sendmsg"); // Using perror as LOG_ERROR might not be available in all contexts
     }
     return bytes_sent;
+    */
+    return -1;
 }
 
 // Receive message over UDS, with optional FD reception (from ipc.h/ipc.c)
 ssize_t recv_ipc_message(int uds_fd, ipc_msg_header_t *header, void *data_buffer, size_t buffer_size, int *actual_fd_received) {
+	/*
     struct iovec iov[2];
     iov[0].iov_base = header;
     iov[0].iov_len = sizeof(ipc_msg_header_t);
@@ -93,6 +95,8 @@ ssize_t recv_ipc_message(int uds_fd, ipc_msg_header_t *header, void *data_buffer
     }
 
     return bytes_read;
+    */
+    return -1;
 }
 
 // --- Fungsi Pembaca JSON Konfigurasi Jaringan (dari config.c/config.h) ---

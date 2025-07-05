@@ -50,9 +50,8 @@ status_t ipc_serialize_client_request_task(const ipc_client_request_task_t* payl
 ssize_t_status_t ipc_serialize(const ipc_protocol_t* p, uint8_t** ptr_buffer, size_t* buffer_size);
 status_t ipc_deserialize_client_request_task(ipc_protocol_t *p, const uint8_t *buffer, size_t total_buffer_len, size_t *offset_ptr);
 ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len);
-ipc_protocol_t_status_t receive_and_deserialize_ipc_message(int uds_fd, int *actual_fd_received);
-ssize_t_status_t send_ipc_protocol_message(int uds_fd, const ipc_protocol_t* p, int fd_to_pass);
-ipc_protocol_t_status_t receive_and_deserialize_ipc_message(int uds_fd, int *actual_fd_received);
+ssize_t_status_t send_ipc_protocol_message(int *uds_fd, const ipc_protocol_t* p, int *fd_to_pass);
+ipc_protocol_t_status_t receive_and_deserialize_ipc_message(int *uds_fd, int *actual_fd_received);
 
 
 #endif

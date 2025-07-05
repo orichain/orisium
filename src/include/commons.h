@@ -21,8 +21,27 @@
 
 #define DESER_CHECK_SPACE(x) if (len < x) return FAILURE_OOBUF
 
-#define CLOSE_FD(x) if (x != -1) { close(x); x = -1; }
-#define CLOSE_PAYLOAD(x) if (x) { free(x); x = NULL; }
-#define CLOSE_PROTOCOL(x) if (x) { free(x); x = NULL; }
+#define CLOSE_FD(x) \
+    do { \
+        if (x != -1) { \
+            close(x); \
+            x = -1; \
+        } \
+    } while(0)
+    
+#define CLOSE_PAYLOAD(x) do { if ((x)) { free(x); (x) = NULL; } } while(0)    
+
+#define CLOSE_PROTOCOL(x) \
+    do { \
+        if (x) { \
+			if (x->type == IPC_CLIENT_REQUEST_TASK) { \
+                CLOSE_PAYLOAD(x->payload.ipc_client_request_task); \
+            } else if (x->type == IPC_CLIENT_DISCONNECTED) { \
+                CLOSE_PAYLOAD(x->payload.ipc_client_disconnect_info); \
+            } \
+            free(x); \
+            x = NULL; \
+        } \
+    } while(0)
              
 #endif
