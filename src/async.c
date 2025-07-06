@@ -10,6 +10,7 @@
 #include "log.h"        // for LOG_ERROR
 #include "types.h"      // for FAILURE, SUCCESS, fd_events_status_t, int_sta...
 #include "commons.h"
+#include "globals.h"
 
 bool async_event_is_EPOLLHUP(uint32_t events) {
 	return events & EPOLLHUP;
@@ -71,6 +72,9 @@ int_status_t async_wait(const char* label, async_type_t *async) {
     result.r_int = epoll_wait(async->async_fd, async->events, MAX_EVENTS, 100);
     if (result.r_int == -1) {
         if (errno == EINTR) {
+            if (!shutdown_requested) {
+                LOG_ERROR("%s%s", label, strerror(errno));
+            }
             result.status = FAILURE_EINTR;
             return result;
         }

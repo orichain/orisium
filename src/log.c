@@ -125,9 +125,10 @@
 				} else {
 					fprintf(stderr, "[LOG]: Log cleaner failed to get current_time.\n");
 				}
-			}	
+			}
+		} else {
+			fprintf(stderr, "[LOG]: Log cleaner failed to start %s\n", strerror(errno));
 		}
-		fprintf(stderr, "[LOG]: Log cleaner failed to start %s\n", strerror(errno));
         return NULL;
     }
 #endif

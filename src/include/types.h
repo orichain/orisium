@@ -5,6 +5,13 @@
 
 typedef enum {
     SUCCESS = (uint8_t)0x00,
+    FAILURE_RATELIMIT = (uint8_t)0xf3,
+    FAILURE_IVLDPORT = (uint8_t)0xf3,
+    FAILURE_IVLDIP = (uint8_t)0xf4,
+    FAILURE_NOSLOT = (uint8_t)0xf5,
+    FAILURE_MAXREACHD = (uint8_t)0xf6,
+    FAILURE_ALRDYCONTD = (uint8_t)0xf7,
+    FAILURE_EAGNEWBLK = (uint8_t)0xf8,
     FAILURE_EINTR = (uint8_t)0xf9,
     FAILURE_BAD_PROTOCOL = (uint8_t)0xfa,
     FAILURE_NOMEM = (uint8_t)0xfb,

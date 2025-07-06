@@ -6,189 +6,34 @@
 #include <netinet/in.h>  // for sockaddr_in, INADDR_ANY, in_addr
 #include <stdbool.h>     // for false, bool, true
 #include <stdio.h>       // for printf, perror, fprintf, NULL, stderr
-#include <stdlib.h>      // for exit, EXIT_FAILURE, atoi, EXIT_SUCCESS, malloc, free
 #include <string.h>      // for memset, strncpy
 #include <sys/socket.h>  // for socketpair, SOCK_STREAM, AF_UNIX, AF_INET, accept
 #include <sys/types.h>   // for pid_t, ssize_t
 #include <unistd.h>      // for close, fork, getpid
 #include <signal.h>      // for sig_atomic_t, sigaction, SIGINT
-#include <arpa/inet.h>   // for inet_ntop, inet_pton
-#include <sys/wait.h>    // for waitpid
 #include <bits/types/sig_atomic_t.h>
 #include <stdint.h>
 
 #include "log.h"
 #include "constants.h"
-#include "commons.h"
 #include "node.h"
 #include "async.h"
-#include "ipc/protocol.h"
-#include "workers/sio.h"
-#include "workers/logic.h"
-#include "workers/cow.h"
 #include "utilities.h"
 #include "sessions/closed_correlation_id.h"
 #include "sessions/master_client_session.h"
 #include "under_refinement_and_will_be_delete_after_finished.h"
 #include "types.h"
-#include "ipc/client_request_task.h"
 #include "master/socket_listenner.h"
+#include "master/ipc.h"
 
 volatile sig_atomic_t shutdown_requested = 0;
 node_config_t node_config;
-master_client_session_t master_client_sessions[MAX_MASTER_CONCURRENT_SESSIONS];
-
 master_client_session_t *master_client_session_head = NULL;
 closed_correlation_id_t *closed_correlation_id_head = NULL;
 
 void sigint_handler(int signum) {
     shutdown_requested = 1;
     LOG_INFO("SIGINT received. Initiating graceful shutdown...");
-}
-
-// Placeholder for orisium_cleanup
-void orisium_cleanup(int *listen_sock_ptr, async_type_t *async_fd_ptr,
-                     int uds_sio_fds_master_side[], int uds_logic_fds_master_side[], int uds_cow_fds_master_side[],
-                     int uds_sio_fds_worker_side[], int uds_logic_fds_worker_side[], int uds_cow_fds_worker_side[],
-                     pid_t sio_pids[], pid_t logic_pids[], pid_t cow_pids[]) {
-    LOG_INFO("Performing cleanup...");
-    if (*listen_sock_ptr != -1) close(*listen_sock_ptr);
-    if (async_fd_ptr->async_fd != -1) close(async_fd_ptr->async_fd);
-
-    for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-        if (uds_sio_fds_master_side[i] != 0) close(uds_sio_fds_master_side[i]);
-        if (uds_sio_fds_worker_side[i] != 0) close(uds_sio_fds_worker_side[i]); // Close worker side in Master too
-        if (sio_pids[i] > 0) waitpid(sio_pids[i], NULL, 0);
-    }
-    for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-        if (uds_logic_fds_master_side[i] != 0) close(uds_logic_fds_master_side[i]);
-        if (uds_logic_fds_worker_side[i] != 0) close(uds_logic_fds_worker_side[i]); // Close worker side in Master too
-        if (logic_pids[i] > 0) waitpid(logic_pids[i], NULL, 0);
-    }
-    for (int i = 0; i < MAX_COW_WORKERS; ++i) {
-        if (uds_cow_fds_master_side[i] != 0) close(uds_cow_fds_master_side[i]);
-        if (uds_cow_fds_worker_side[i] != 0) close(uds_cow_fds_worker_side[i]); // Close worker side in Master too
-        if (cow_pids[i] > 0) waitpid(cow_pids[i], NULL, 0);
-    }
-    LOG_INFO("Cleanup complete.");
-}
-
-status_t setup_fork_workers(
-    const char* label,
-    int listen_sock, // listen_sock passed by value, as it's closed in child
-    async_type_t *async,
-    int master_uds_sio_fds[], // Arrays for Master's side of UDS
-    int master_uds_logic_fds[],
-    int master_uds_cow_fds[],
-    int worker_uds_sio_fds[], // Arrays for Worker's side of UDS
-    int worker_uds_logic_fds[],
-    int worker_uds_cow_fds[],
-    pid_t sio_pids[],
-    pid_t logic_pids[],
-    pid_t cow_pids[]
-) {
-    // Create and fork SIO workers
-    for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-        sio_pids[i] = fork();
-        if (sio_pids[i] == -1) {
-            LOG_ERROR("%sfork (SIO): %s", label, strerror(errno));
-            return FAILURE;
-        } else if (sio_pids[i] == 0) {
-            // Child (SIO Worker)
-            // Close all FDs inherited from Master that this child does NOT need
-            close(listen_sock); // Master's TCP listening socket
-            close(async->async_fd); // Master's epoll instance
-
-            // Close all Master's side UDS FDs (this child doesn't use them)
-            for (int j = 0; j < MAX_SIO_WORKERS; ++j) { if (master_uds_sio_fds[j] != 0) close(master_uds_sio_fds[j]); }
-            for (int j = 0; j < MAX_LOGIC_WORKERS; ++j) { if (master_uds_logic_fds[j] != 0) close(master_uds_logic_fds[j]); }
-            for (int j = 0; j < MAX_COW_WORKERS; ++j) { if (master_uds_cow_fds[j] != 0) close(master_uds_cow_fds[j]); }
-            
-            // Close all Worker's side UDS FDs that are NOT for this specific worker
-            for (int j = 0; j < MAX_SIO_WORKERS; ++j) {
-                if (j != i && worker_uds_sio_fds[j] != 0) close(worker_uds_sio_fds[j]);
-            }
-            for (int j = 0; j < MAX_LOGIC_WORKERS; ++j) { if (worker_uds_logic_fds[j] != 0) close(worker_uds_logic_fds[j]); }
-            for (int j = 0; j < MAX_COW_WORKERS; ++j) { if (worker_uds_cow_fds[j] != 0) close(worker_uds_cow_fds[j]); }
-            
-            run_server_io_worker(i, worker_uds_sio_fds[i]);
-            exit(EXIT_SUCCESS); // Child exits after running worker function
-        } else {
-            // Parent (Master)
-            // Close the worker's side of the UDS for this worker, as Master only uses its own side
-            if (worker_uds_sio_fds[i] != 0) close(worker_uds_sio_fds[i]);
-            LOG_INFO("%sForked Server IO Worker %d (PID %d).", label, i, sio_pids[i]);
-        }
-    }
-
-    // Create and fork Logic workers
-    for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-        logic_pids[i] = fork();
-        if (logic_pids[i] == -1) {
-            LOG_ERROR("%sfork (Logic): %s", label, strerror(errno));
-            return FAILURE;
-        } else if (logic_pids[i] == 0) {
-            // Child (Logic Worker)
-            // Close all FDs inherited from Master that this child does NOT need
-            close(listen_sock); // Master's TCP listening socket
-            close(async->async_fd); // Master's epoll instance
-
-            // Close all Master's side UDS FDs (this child doesn't use them)
-            for (int j = 0; j < MAX_SIO_WORKERS; ++j) { if (master_uds_sio_fds[j] != 0) close(master_uds_sio_fds[j]); }
-            for (int j = 0; j < MAX_LOGIC_WORKERS; ++j) { if (master_uds_logic_fds[j] != 0) close(master_uds_logic_fds[j]); }
-            for (int j = 0; j < MAX_COW_WORKERS; ++j) { if (master_uds_cow_fds[j] != 0) close(master_uds_cow_fds[j]); }
-            
-            // Close all Worker's side UDS FDs that are NOT for this specific worker
-            for (int j = 0; j < MAX_SIO_WORKERS; ++j) { if (worker_uds_sio_fds[j] != 0) close(worker_uds_sio_fds[j]); }
-            for (int j = 0; j < MAX_LOGIC_WORKERS; ++j) {
-                if (j != i && worker_uds_logic_fds[j] != 0) close(worker_uds_logic_fds[j]);
-            }
-            for (int j = 0; j < MAX_COW_WORKERS; ++j) { if (worker_uds_cow_fds[j] != 0) close(worker_uds_cow_fds[j]); }
-            
-            run_logic_worker(i, worker_uds_logic_fds[i]);
-            exit(EXIT_SUCCESS); // Child exits
-        } else {
-            // Parent (Master)
-            // Close the worker's side of the UDS for this worker, as Master only uses its own side
-            if (worker_uds_logic_fds[i] != 0) close(worker_uds_logic_fds[i]);
-            LOG_INFO("%sForked Logic Worker %d (PID %d).", label, i, logic_pids[i]);
-        }
-    }
-
-    // Create and fork Client Outbound workers
-    for (int i = 0; i < MAX_COW_WORKERS; ++i) {
-        cow_pids[i] = fork();
-        if (cow_pids[i] == -1) {
-            LOG_ERROR("%sfork (COW): %s", label, strerror(errno));
-            return FAILURE;        
-        } else if (cow_pids[i] == 0) {
-            // Child (Client Outbound Worker)
-            // Close all FDs inherited from Master that this child does NOT need
-            close(listen_sock); // Master's TCP listening socket
-            close(async->async_fd); // Master's epoll instance
-
-            // Close all Master's side UDS FDs (this child doesn't use them)
-            for (int j = 0; j < MAX_SIO_WORKERS; ++j) { if (master_uds_sio_fds[j] != 0) close(master_uds_sio_fds[j]); }
-            for (int j = 0; j < MAX_LOGIC_WORKERS; ++j) { if (master_uds_logic_fds[j] != 0) close(master_uds_logic_fds[j]); }
-            for (int j = 0; j < MAX_COW_WORKERS; ++j) { if (master_uds_cow_fds[j] != 0) close(master_uds_cow_fds[j]); }
-            
-            // Close all Worker's side UDS FDs that are NOT for this specific worker
-            for (int j = 0; j < MAX_SIO_WORKERS; ++j) { if (worker_uds_sio_fds[j] != 0) close(worker_uds_sio_fds[j]); }
-            for (int j = 0; j < MAX_LOGIC_WORKERS; ++j) { if (worker_uds_logic_fds[j] != 0) close(worker_uds_logic_fds[j]); }
-            for (int j = 0; j < MAX_COW_WORKERS; ++j) {
-                if (j != i && worker_uds_cow_fds[j] != 0) close(worker_uds_cow_fds[j]);
-            }
-            
-            run_client_outbound_worker(i, worker_uds_cow_fds[i]);
-            exit(EXIT_SUCCESS); // Child exits
-        } else {
-            // Parent (Master)
-            // Close the worker's side of the UDS for this worker, as Master only uses its own side
-            if (worker_uds_cow_fds[i] != 0) close(worker_uds_cow_fds[i]);
-            LOG_INFO("%sForked Client Outbound Worker %d (PID %d).", label, i, cow_pids[i]);
-        }
-    }
-    return SUCCESS;
 }
 
 void run_master_process() {
@@ -332,6 +177,7 @@ void run_master_process() {
 
     LOG_INFO("[Master]: Starting main event loop. Waiting for clients and worker communications...");
 
+	master_client_session_t master_client_sessions[MAX_MASTER_CONCURRENT_SESSIONS];
     uint64_t next_client_id = 1ULL; // Global unique client ID
     //double_t avg_connection = 0.0;
     //double_t cnt_connection = 0.0;
@@ -352,213 +198,13 @@ void run_master_process() {
 			if (fd_status.status != SUCCESS) continue;
 			int current_fd = fd_status.r_int;
             if (current_fd == listen_sock) {
-                struct sockaddr_in client_addr;
-                socklen_t client_len = sizeof(client_addr);
-                int client_sock = accept(listen_sock, (struct sockaddr*)&client_addr, &client_len);
-                if (client_sock == -1) {
-                    if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                        perror("accept (Master)");
-                    }
-                    continue;
-                }
-                
-                uint8_t client_ip_str[INET6_ADDRSTRLEN];
-                if (inet_ntop(AF_INET, &client_addr.sin_addr, (char *)client_ip_str, INET6_ADDRSTRLEN) == NULL) {
-                    perror("inet_ntop");
-                    CLOSE_FD(client_sock);
-                    continue;
-                }
-
-                // --- Filter: Check if IP is already connected ---
-                bool ip_already_connected = false;
-                for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
-                    if (master_client_sessions[i].in_use &&
-                        memcmp(master_client_sessions[i].ip, client_ip_str, INET6_ADDRSTRLEN) == 0) {
-                        ip_already_connected = true;
-                        break;
-                    }
-                }
-
-                if (ip_already_connected) {
-                    LOG_WARN("[Master]: Koneksi ditolak dari IP %s. Sudah ada koneksi aktif dari IP ini.", client_ip_str);
-                    CLOSE_FD(client_sock);
-                    continue;
-                }
-                // --- End Filter ---
-
-                LOG_INFO("[Master]: New client connected from IP %s on FD %d.", client_ip_str, client_sock);
-
-				uint64_t current_client_id = 0ULL;
-				closed_correlation_id_t_status_t ccid_result = find_first_closed_correlation_id("[Master]: ", closed_correlation_id_head);
-				if (ccid_result.status == SUCCESS) {
-					current_client_id = ccid_result.r_closed_correlation_id_t->correlation_id;
-					status_t ccid_del_result = delete_closed_correlation_id("[Master]: ", &closed_correlation_id_head, current_client_id);
-					if (ccid_del_result != SUCCESS) {
-						current_client_id = next_client_id++;
-					}
-				} else {
-					current_client_id = next_client_id++;
-				}
-				
-				if (current_client_id > MAX_MASTER_CONCURRENT_SESSIONS) {
-					next_client_id--;
-					LOG_ERROR("[Master]: WARNING: MAX_MASTER_CONCURRENT_SESSIONS reached. Rejecting client FD %d.", client_sock);
-                    CLOSE_FD(client_sock);
-                    continue;
-				}
-				
-				//cnt_connection += (double_t)1;
-				//avg_connection = cnt_connection / sio_worker;
-				
-                int sio_worker_idx = (int)(current_client_id % MAX_SIO_WORKERS);
-                int sio_worker_uds_fd = master_uds_sio_fds[sio_worker_idx]; // Master uses its side of UDS
-
-                int slot_found = -1;
-                for(int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
-                    if(!master_client_sessions[i].in_use) {
-                        master_client_sessions[i].in_use = true;
-                        master_client_sessions[i].correlation_id = current_client_id;
-                        master_client_sessions[i].sio_uds_fd = sio_worker_uds_fd;
-                        memcpy(master_client_sessions[i].ip, client_ip_str, INET6_ADDRSTRLEN);
-                        slot_found = i;
-                        break;
-                    }
-                }
-                if (slot_found == -1) {
-                    LOG_ERROR("[Master]: WARNING: No free session slots in master_client_sessions. Rejecting client FD %d.", client_sock);
-                    CLOSE_FD(client_sock);
-                    continue;
-                }
-                
-                ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_client_request_task(&client_sock, &current_client_id, client_ip_str, (uint16_t)0, NULL);
-                if (cmd_result.status != SUCCESS) {
+                if (handle_listen_sock_event("[Master]: ", master_client_sessions, master_uds_sio_fds, &next_client_id, &listen_sock) != SUCCESS) {
 					continue;
-				}	
-				ssize_t_status_t send_result = send_ipc_protocol_message(&sio_worker_uds_fd, cmd_result.r_ipc_protocol_t, &client_sock);
-				if (send_result.status != SUCCESS) {
-					LOG_ERROR("[Master]: Failed to forward client FD %d (ID %ld) to Server IO Worker %d.",
-							  client_sock, current_client_id, sio_worker_idx);
-				} else {
-					LOG_INFO("[Master]: Forwarding client FD %d (ID %ld) from IP %s to Server IO Worker %d (UDS FD %d). Bytes sent: %zd.",
-							 client_sock, current_client_id, client_ip_str, sio_worker_idx, sio_worker_uds_fd, send_result.r_ssize_t);
-					CLOSE_FD(client_sock); // di close jika berhasil Forwarding
 				}
-				CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);
-            }
-            else {
-                int received_fd = -1;
-                ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(&current_fd, &received_fd);
-                if (deserialized_result.status != SUCCESS) {
-                    perror("recv_ipc_message from worker (Master)");
-                    continue;
-                }
-                ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;                
-                switch (received_protocol->type) {
-                    case IPC_CLIENT_REQUEST_TASK: {
-						
-						printf("=========================================Sini 2==================================\n");
-						
-                        ipc_client_request_task_t *req = received_protocol->payload.ipc_client_request_task;
-                        LOG_INFO("[Master]: Received Client Request Task (ID %ld) from Server IO Worker (UDS FD %d).", req->correlation_id, current_fd);
-
-                        int logic_worker_idx = (int)(req->correlation_id % MAX_LOGIC_WORKERS);
-                        int logic_worker_uds_fd = master_uds_logic_fds[logic_worker_idx]; // Master uses its side of UDS
-
-                        send_ipc_message(logic_worker_uds_fd, IPC_LOGIC_TASK, req, sizeof(client_request_task_t), -1);
-                        LOG_INFO("[Master]: Forwarding client request (ID %ld) to Logic Worker %d (UDS FD %d).",
-                               req->correlation_id, logic_worker_idx, logic_worker_uds_fd);
-                        break;
-                    }
-                    /*
-                    case IPC_LOGIC_RESPONSE_TO_SIO: {
-                        logic_response_t *resp = (logic_response_t *)master_rcv_buffer;
-                        LOG_INFO("[Master]: Received Client Response (ID %ld) from Logic Worker (UDS FD %d).", resp->client_correlation_id, current_fd);
-
-                        int target_sio_uds_fd = -1;
-                        for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
-                            if (master_client_sessions[i].in_use && master_client_sessions[i].correlation_id == resp->client_correlation_id) {
-                                target_sio_uds_fd = master_client_sessions[i].sio_uds_fd;
-                                master_client_sessions[i].in_use = false;
-                                master_client_sessions[i].correlation_id = -1;
-                                master_client_sessions[i].sio_uds_fd = -1;
-                                memset(master_client_sessions[i].client_ip, 0, sizeof(master_client_sessions[i].client_ip));
-                                break;
-                            }
-                        }
-
-                        if (target_sio_uds_fd != -1) {
-                            send_ipc_message(target_sio_uds_fd, IPC_LOGIC_RESPONSE_TO_SIO, resp, sizeof(logic_response_t), -1);
-                            LOG_INFO("[Master]: Forwarding client response (ID %ld) to Server IO Worker (UDS FD %d).",
-                                   resp->client_correlation_id, target_sio_uds_fd);
-                        } else {
-                            LOG_ERROR("[Master]: No SIO worker found for client ID %ld for response. Ignoring.", resp->client_correlation_id);
-                        }
-                        break;
-                    }
-                    case IPC_OUTBOUND_TASK: {
-                        outbound_task_t *task = (outbound_task_t *)master_rcv_buffer;
-                        LOG_INFO("[Master]: Received Outbound Task (ID %ld) from Logic Worker (UDS FD %d) for node %s:%d.",
-                               task->client_correlation_id, current_fd, task->node_ip, task->node_port);
-
-                        int cow_worker_idx = (int)(task->client_correlation_id % MAX_COW_WORKERS);
-                        int cow_uds_fd = master_uds_cow_fds[cow_worker_idx]; // Master uses its side of UDS
-
-                        send_ipc_message(cow_uds_fd, IPC_OUTBOUND_TASK, task, sizeof(outbound_task_t), -1);
-                        LOG_INFO("[Master]: Forwarding outbound task (ID %ld) to Client Outbound Worker %d (UDS FD %d).",
-                               task->client_correlation_id, cow_worker_idx, cow_uds_fd);
-                        break;
-                    }
-                    case IPC_OUTBOUND_RESPONSE: {
-                        outbound_response_t *resp = (outbound_response_t *)master_rcv_buffer;
-                        LOG_INFO("[Master]: Received Outbound Response (ID %ld) from Client Outbound Worker (UDS FD %d). Success: %s, Data: '%.*s'",
-                               resp->client_correlation_id, current_fd, resp->success ? "true" : "false",
-                               (int)resp->response_data_len, resp->response_data);
-
-                        int logic_worker_idx_for_response = (int)(resp->client_correlation_id % MAX_LOGIC_WORKERS);
-                        int logic_worker_uds_fd = master_uds_logic_fds[logic_worker_idx_for_response]; // Master uses its side of UDS
-
-                        send_ipc_message(logic_worker_uds_fd, IPC_OUTBOUND_RESPONSE, resp, sizeof(outbound_response_t), -1);
-                        LOG_INFO("[Master]: Forwarding outbound response (ID %ld) to Logic Worker %d (UDS FD %d).",
-                               resp->client_correlation_id, logic_worker_idx_for_response, logic_worker_uds_fd);
-                        break;
-                    }
-                    */
-                    case IPC_CLIENT_DISCONNECTED: {
-                        ipc_client_disconnect_info_t *disconnect_info = received_protocol->payload.ipc_client_disconnect_info;
-                        add_closed_correlation_id("[Master]: ", &closed_correlation_id_head, disconnect_info->correlation_id); 
-                        //cnt_connection -= (double_t)1;
-						//avg_connection = cnt_connection / sio_worker;
-                        
-                        
-                        LOG_INFO("[Master]: Received Client Disconnected signal for ID %ld from IP %s (from SIO Worker UDS FD %d).",
-                                 disconnect_info->correlation_id, disconnect_info->ip, current_fd);
-
-                        for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
-							
-							LOG_INFO("Searching(%d) IP %s ?? %s|CI %llu ?? %llu",
-                                 INET6_ADDRSTRLEN, master_client_sessions[i].ip, disconnect_info->ip,
-                                 master_client_sessions[i].correlation_id, disconnect_info->correlation_id
-                                 );
-                                 
-                            if (master_client_sessions[i].in_use &&
-                                master_client_sessions[i].correlation_id == disconnect_info->correlation_id &&
-                                memcmp(master_client_sessions[i].ip, disconnect_info->ip, INET6_ADDRSTRLEN) == 0) {
-                                master_client_sessions[i].in_use = false;
-                                master_client_sessions[i].correlation_id = -1;
-                                master_client_sessions[i].sio_uds_fd = -1;
-                                memset(master_client_sessions[i].ip, 0, INET6_ADDRSTRLEN);
-                                LOG_INFO("[Master]: IP %s (ID %ld) dihapus dari daftar koneksi aktif.",
-                                         disconnect_info->ip, disconnect_info->correlation_id);
-                                break;
-                            }
-                        }
-                        break;
-                    }
-                    default:
-                        LOG_ERROR("[Master]: Unknown message type %d from UDS FD %d. Ignoring.", received_protocol->type, current_fd);
-                        break;
-                }
-                CLOSE_IPC_PROTOCOL(received_protocol);
+            } else {
+                if (handle_ipc_event("[Master]: ", master_client_sessions, master_uds_logic_fds, master_uds_cow_fds, &current_fd) != SUCCESS) {
+					continue;
+				}
             }
         }
     }
@@ -566,19 +212,18 @@ void run_master_process() {
 exit:
     orisium_cleanup(
         &listen_sock,
-        &master_async, // Pass address of the FD
+        &master_async,
         master_uds_sio_fds,
         master_uds_logic_fds,
         master_uds_cow_fds,
-        worker_uds_sio_fds, // Pass worker sides for cleanup
+        worker_uds_sio_fds,
         worker_uds_logic_fds,
         worker_uds_cow_fds,
         sio_pids,
         logic_pids,
         cow_pids
     );
-    free_closed_correlation_ids("[Master]: ", &closed_correlation_id_head);
-    
+    free_closed_correlation_ids("[Master]: ", &closed_correlation_id_head);    
     memset(&node_config, 0, sizeof(node_config_t));
 #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))    
 	pthread_join(cleaner_thread, NULL);

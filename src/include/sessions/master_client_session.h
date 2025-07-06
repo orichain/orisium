@@ -30,8 +30,6 @@ int_status_t count_master_client_sessions(const char *label, master_client_sessi
 void display_master_client_sessions(const char *label, master_client_session_t *head);
 void free_master_client_sessions(const char *label, master_client_session_t **head);
 
-extern master_client_session_t master_client_sessions[MAX_MASTER_CONCURRENT_SESSIONS];
-
 extern master_client_session_t *master_client_session_head;
 
 #endif
