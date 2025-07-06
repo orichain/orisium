@@ -55,9 +55,12 @@ Arsitektur Orisium mengintegrasikan berbagai komponen dan level node untuk menci
 
 ```
 master --> sio (server IO) <--> logic <--> cow (client outbound)
-        ^                             ^
-        |                             |
-        ------------------------------- (Laporan/Status ke Master)
+  ^                               ^
+  |                               |
+  v                               v 
+  ---------------------------------  (Laporan/Status ke Master)
+Komunikasi internal / IPC:
+Protocol IPC lewat Unix Domain Socket
 ```
 
 ### **1. Master**
