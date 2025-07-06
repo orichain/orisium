@@ -14,21 +14,26 @@ Orisium adalah jaringan *peer-to-peer* (P2P) berkinerja tinggi yang dirancang un
 
 ### **1. Arsitektur Jaringan Hierarkis Dinamis**
 
-Orisium mengadopsi struktur jaringan berlapis yang unik untuk skalabilitas dan ketahanan. Ini didasarkan pada perkiraan sekitar **38-40 *timezone* unik** di seluruh dunia, yang menjadi dasar *sharding*.
+Orisium mengadopsi struktur jaringan berlapis yang unik untuk skalabilitas dan ketahanan. Jaringan Root didasarkan pada sekitar **40 *timezone* unik** di seluruh dunia, yang secara langsung memetakan ke *shard* data.
 
-  * **Node Root Bootstrap (3 Node)**: Ini adalah **fondasi awal jaringan** yang paling stabil. Mereka memiliki konektivitas horizontal terluas (hingga 312 node Root), dan **harus menyimpan database lengkap setiap *shard* *timezone***. Peran mereka penting dalam konsensus dan validasi *Root node* baru. Meskipun awalnya krusial, node Bootstrap ini **dapat turun level di kemudian hari** namun tetap dapat **menyediakan daftar IP** untuk membantu node baru menemukan jaringan.
-  * **Node Root (Maks. 313 Node)**: Ini adalah **tulang punggung utama sharding *timezone***. Setiap *Root node* bertanggung jawab atas satu atau beberapa *shard timezone*. Mereka **menyimpan database lengkap** untuk *shard* tersebut dan mengelola sub-jaringan di bawahnya. Root node memiliki hak untuk menjatuhkan level *Horizontalstream* yang melanggar syarat.
-  * **Node Level-1 (Maks. 3130 Node)**: Berperan sebagai perantara penting di dalam *shard timezone* mereka. Mereka memiliki **satu koneksi Upstream ke sebuah Root node** dan **sembilan koneksi Horizontalstream yang semuanya harus menuju ke Root node yang sama** (Root yang menjadi pusat *shard* mereka). Node Level-1 sangat vital karena mereka dapat **berpindah Upstream Root** jika tidak memenuhi syarat, dan bahkan **mempromosikan diri menjadi Root baru** untuk mengisi slot kosong atau menggantikan Root yang bermasalah.
-  * **Node Level-2 (Maks. 31300 Node)**: Terhubung ke **satu Upstream Level-1 node** dan memiliki **sembilan koneksi Horizontalstream yang juga harus menuju ke Root node yang sama** dengan *shard*-nya. Node ini berfungsi memperluas jangkauan jaringan.
-  * **Node Level-3 (Maks. 313000 Node)**: Lapisan terluar jaringan, terhubung ke **satu Upstream Level-2 node** dan **sembilan koneksi Horizontalstream yang juga harus menuju ke Root node yang sama** dengan *shard*-nya. Node Level-3 bertanggung jawab untuk jangkauan massal ke pengguna akhir.
+  * **Node Root Bootstrap (3 Node)**: Ini adalah **fondasi awal jaringan** yang stabil, yang di-*hardcode* untuk mewakili 3 *timezone* spesifik yang berdekatan. Mereka adalah bagian dari total 40 Node Root, memiliki konektivitas horizontal terluas (terhubung ke semua 39 Node Root lainnya), dan **harus menyimpan database lengkap setiap *shard* *timezone***. Meskipun krusial di awal, node Bootstrap ini **dapat turun level** jika tidak mampu, namun akan tetap **menyediakan daftar IP** untuk membantu node baru menemukan jaringan.
+  * **Node Root (Maks. 40 Node)**: Ini adalah **tulang punggung utama sharding *timezone***. Setiap Node Root secara eksklusif **mewakili satu dari sekitar 40 *timezone* unik** dan **harus menyimpan database lengkap** untuk *shard* tersebut. Setiap Node Root **terhubung ke semua 39 Node Root lainnya** untuk konsensus yang cepat dan penyebaran informasi global. Root node mengelola sub-jaringan di bawahnya dan dapat menjatuhkan level *Horizontalstream* yang melanggar syarat.
+  * **Node Level-1 (Maks. 400 Node)**: Berperan sebagai perantara penting di dalam *shard timezone* mereka. Node Level-1 memiliki **satu koneksi Upstream ke sebuah Node Root** dan **39 koneksi Horizontalstream ke Node Level-1 lainnya yang memiliki Root Upstream yang sama**. Node Level-1 sangat vital karena mereka dapat **berpindah Upstream Root** jika tidak memenuhi syarat, dan bahkan **mempromosikan diri menjadi Root baru** untuk mengisi slot kosong atau menggantikan Root yang bermasalah.
+  * **Node Level-2 (Maks. 4000 Node)**: Terhubung ke **satu Upstream Node Level-1** dan memiliki **39 koneksi Horizontalstream ke Node Level-2 lainnya yang memiliki Root Upstream yang sama**. Node ini berfungsi memperluas jangkauan jaringan.
+  * **Node Level-3 (Maks. 40000 Node)**: Terhubung ke **satu Upstream Node Level-2** dan memiliki **39 koneksi Horizontalstream ke Node Level-3 lainnya yang memiliki Root Upstream yang sama**. Node ini lebih lanjut memperluas jangkauan jaringan.
+  * **Node Level-4 (Maks. 400000 Node)**: Lapisan terluar jaringan, terhubung ke **satu Upstream Node Level-3** dan memiliki **39 koneksi Horizontalstream ke Node Level-4 lainnya yang memiliki Root Upstream yang sama**. Node Level-4 bertanggung jawab untuk jangkauan massal ke pengguna akhir.
+
+-----
 
 ### **2. Sharding Berbasis Timezone pada Public Key**
 
 Orisium memanfaatkan konsep *sharding* inovatif untuk distribusi data dan optimasi kinerja global:
 
   * **Identitas Tersemat Timezone**: Setiap Alamat/Public Key pengirim transaksi secara eksplisit **menyematkan kode *timezone*** saat dibuat. Kode ini berfungsi sebagai **shard key** yang deterministik, memastikan alamat tersebut terkait dengan *shard timezone* tertentu.
-  * **Optimalisasi Latensi Regional**: Transaksi dan data yang terkait dengan alamat dari *timezone* tertentu secara otomatis diarahkan ke *shard* yang relevan (dikelola oleh *Root node* dalam *timezone* tersebut), secara signifikan mengurangi latensi bagi pengguna di wilayah yang sama.
-  * **Penanganan Perubahan Timezone**: Jika pengguna bertransaksi dari *timezone* yang berbeda dari *timezone* yang disematkan pada alamat mereka, sistem akan mendeteksi dan memberi **peringatan, merekomendasikan pembuatan alamat baru** untuk kinerja optimal. Transaksi tetap dapat diproses menggunakan alamat lama, namun dengan potensi latensi yang lebih tinggi karena memerlukan komunikasi antar-shard yang melibatkan *Root node*.
+  * **Optimalisasi Latensi Regional**: Transaksi dan data yang terkait dengan alamat dari *timezone* tertentu secara otomatis diarahkan ke *shard* yang relevan (dikelola oleh Node Root dalam *timezone* tersebut), secara signifikan mengurangi latensi bagi pengguna di wilayah yang sama.
+  * **Penanganan Perubahan Timezone**: Jika pengguna bertransaksi dari *timezone* yang berbeda dari *timezone* yang disematkan pada alamat mereka, sistem akan mendeteksi dan memberi **peringatan, merekomendasikan pembuatan alamat baru** untuk kinerja optimal. Transaksi tetap dapat diproses menggunakan alamat lama, namun dengan potensi latensi yang lebih tinggi karena memerlukan komunikasi antar-shard yang melibatkan Node Root.
+
+-----
 
 ### **3. Mekanisme Keamanan dan Ketahanan Canggih**
 
@@ -39,6 +44,8 @@ Orisium mengimplementasikan pertahanan berlapis terhadap serangan dan beban berl
   * ***Inactivity Timeout***: Secara proaktif membersihkan koneksi yang tidak aktif atau mati, mencegah *resource exhaustion* dan serangan *slowloris*.
   * **Pencegahan Koneksi Ganda**: Menolak koneksi dari IP yang sudah memiliki sesi aktif, membatasi *resource* yang dapat dihabiskan oleh satu sumber.
   * **Batas Sesi Global**: Menjaga jumlah sesi aktif maksimum untuk melindungi stabilitas server.
+
+-----
 
 ### **4. Distribusi Beban Cerdas**
 
@@ -54,8 +61,8 @@ Arsitektur Orisium mengintegrasikan berbagai komponen dan level node untuk menci
 
   * **Master Node**: Bertanggung jawab untuk menerima koneksi baru, menerapkan *rate limiting*, menentukan *shard* berdasarkan *timezone* dari alamat, memilih *worker* yang tepat, dan meneruskan *file descriptor* klien ke *worker* yang dipilih melalui Unix Domain Sockets (UDS). Juga mengelola daftar `closed_correlation_id_t` untuk *rate limiting* dan `sio_worker_stats` untuk *load balancing* *worker*.
   * **Server IO Workers**: Menerima *file descriptor* klien dari *master* melalui UDS dan bertanggung jawab untuk menangani komunikasi P2P yang sebenarnya dengan klien/peer. Setelah menyelesaikan tugas, mereka melaporkan status kembali ke *master* untuk pembaruan *load balancing*.
-  * **Shard Databases (di Node Root)**: Setiap *Root node* menyimpan database lengkap untuk *shard* *timezone* yang diwakilinya, termasuk informasi alamat, saldo, tanda tangan transaksi, dan badan transaksi. Node-node ini adalah sumber otoritatif untuk *shard* mereka.
-  * **Node Downstream (Level-1, Level-2, Level-3)**: Bertindak sebagai perpanjangan tangan dari jaringan *Root*, memperluas jangkauan dan mendistribusikan beban. Mereka memelihara koneksi `Upstream` dan `Horizontalstream` yang ketat sesuai definisi levelnya, serta memiliki hak untuk berpindah `Upstream` atau bahkan naik level menjadi `Root` jika memenuhi syarat.
+  * **Shard Databases (di Node Root)**: Setiap Node Root menyimpan database lengkap untuk *shard* *timezone* yang diwakilinya, termasuk informasi alamat, saldo, tanda tangan transaksi, dan badan transaksi. Node-node ini adalah sumber otoritatif untuk *shard* mereka.
+  * **Node Downstream (Level-1, Level-2, Level-3, Level-4)**: Bertindak sebagai perpanjangan tangan dari jaringan *Root*, memperluas jangkauan dan mendistribusikan beban. Mereka memelihara koneksi `Upstream` dan `Horizontalstream` yang ketat sesuai definisi levelnya, memastikan komunikasi yang efisien dalam *shard* mereka sendiri. Mereka juga memiliki hak untuk berpindah `Upstream` atau bahkan naik level menjadi `Root` jika memenuhi syarat.
 
 -----
 
@@ -95,5 +102,3 @@ Kami menyambut kontribusi\! Silakan baca panduan kontribusi kami dan ajukan *pul
 ## Lisensi
 
 Proyek ini dilisensikan di bawah [Nama Lisensi Anda] - lihat file [LICENSE.md] untuk detailnya.
-
------
