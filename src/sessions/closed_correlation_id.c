@@ -90,7 +90,8 @@ closed_correlation_id_t_status_t find_first_ratelimited_closed_correlation_id(co
 				uint64_t ratelimit_ns = (uint64_t)RATELIMITSEC * 1000000000ULL;
 				if ((grtns_result.r_uint64_t - current->closed_time) <= ratelimit_ns) {
 					result.status = FAILURE_RATELIMIT;
-					LOG_ERROR("%sIP %s mencoba melakukan koneksi diatas ratelimit.", label, host_ip);
+					LOG_ERROR("%sIP %s mencoba melakukan koneksi diatas ratelimit.", label, host_ip);					
+					current->closed_time = grtns_result.r_uint64_t;	// <==== tambahan				
 					return result;
 				}
 			} else {

@@ -2,204 +2,100 @@
 <img src="assets/images/orisium.png" alt="Orisium Logo" width="200">
 </p>
 
-# Orisium Network: Arsitektur Jaringan Terdesentralisasi
+Tentu\! Dengan semua detail terbaru tentang arsitektur hierarkis dinamis dan kemampuan promosi Level-1, `README.md` ini akan menjadi gambaran yang sangat komprehensif dari proyek **Orisium** Anda.
 
-## ✨ Pendahuluan
+-----
 
-**Orisium** adalah jaringan **terdesentralisasi** yang dirancang untuk operasi **multiproses** yang aman, efektif, dan cepat. Arsitekturnya mengadopsi model **hierarkis** dengan tingkatan node yang memiliki peran dan tanggung jawab spesifik.
+# Orisium
 
-Tujuan utama Orisium adalah membangun **ekosistem yang skalabel, tahan manipulasi, dan berbasis kriptografi pasca-kuantum (PQC)**, lengkap dengan **mekanisme konsensus cerdas**.
+Orisium adalah jaringan *peer-to-peer* (P2P) berkinerja tinggi yang dirancang untuk skalabilitas global, ketahanan terhadap serangan, dan desentralisasi yang kuat. Menggabungkan arsitektur hierarkis yang dinamis dengan mekanisme keamanan berlapis, Orisium menciptakan fondasi yang tangguh untuk aplikasi terdesentralisasi masa depan.
 
----
+-----
 
-## 🔺 Struktur Jaringan Hierarkis
+## Fitur Utama
 
-Orisium menggunakan struktur **berlapis (layered)** untuk memudahkan distribusi beban dan skalabilitas:
+### **1. Arsitektur Jaringan Hierarkis Dinamis**
 
-- **Node Root Bootstrap**: Titik masuk jaringan.
-- **Node Root**: Penjaga integritas database global.
-- **Node Level-1 hingga Level-7**: Perantara dan pemroses transaksi.
+Orisium mengadopsi struktur jaringan berlapis yang unik untuk skalabilitas dan ketahanan:
 
-### Batas Maksimal Node per Level
+  * **Node Root Bootstrap (3 Node)**: Fondasi jaringan, memiliki konektivitas horizontal luas dan menyimpan database lengkap setiap *shard* *timezone*. Berperan penting dalam konsensus dan validasi *Root node* baru.
+  * **Node Root (Maks. 313 Node)**: Tulang punggung sharding *timezone*, menyimpan database lengkap dan mengelola sub-jaringan di bawahnya. Memiliki kemampuan untuk menjatuhkan level *Horizontalstream* yang melanggar syarat.
+  * **Node Level-1 (Maks. 3130 Node)**: Berperan sebagai perantara utama, dengan **satu koneksi Upstream ke sebuah Root node** dan **sembilan koneksi Horizontalstream yang juga harus menuju ke Root node yang sama**. Node Level-1 sangat penting dalam menjaga kesehatan jaringan karena mereka dapat **berpindah Upstream Root** jika tidak memenuhi syarat dan bahkan **mempromosikan diri menjadi Root baru** mengisi slot kosong atau menggantikan Root yang bermasalah.
+  * **Node Level-2 (Maks. 31300 Node)**: Terhubung ke **satu Upstream Level-1 node** dan memiliki **sembilan koneksi Horizontalstream ke Root node yang sama** dengan *shard*-nya. Memperluas jangkauan jaringan.
+  * **Node Level-3 (Maks. 313000 Node)**: Lapisan terluar jaringan, terhubung ke **satu Upstream Level-2 node** dan **sembilan koneksi Horizontalstream ke Root node yang sama** dengan *shard*-nya. Bertanggung jawab untuk jangkauan massal ke pengguna akhir.
 
-| Level           | Maksimal Node     |
-|-----------------|-------------------|
-| Root Bootstrap  | 3                 |
-| Root            | 313               |
-| Level-1         | 3.130             |
-| Level-2         | 31.300            |
-| Level-3         | 313.000           |
-| Level-4         | 3.130.000         |
-| Level-5         | 31.300.000        |
-| Level-6         | 313.000.000       |
-| Level-7         | 3.130.000.000     |
+### **2. Sharding Berbasis Timezone pada Public Key**
 
-### Jenis Koneksi Node
+Orisium memanfaatkan konsep *sharding* inovatif untuk distribusi data dan optimasi kinerja global:
 
-- **Downstream**: Node di level bawah.
-- **Horizontalstream**: Node di level sama.
-- **Upstream**: Node di level atas.
+  * **Identitas Tersemat Timezone**: Alamat/Public Key pengirim transaksi secara eksplisit menyematkan **kode *timezone*** saat dibuat. Kode ini berfungsi sebagai **shard key** deterministik.
+  * **Optimalisasi Latensi Regional**: Transaksi dan data yang terkait dengan alamat dari *timezone* tertentu secara otomatis diarahkan ke *shard* yang relevan (dikelola oleh *Root node* dalam *timezone* tersebut), mengurangi latensi bagi pengguna di wilayah yang sama.
+  * **Penanganan Perubahan Timezone**: Jika pengguna bertransaksi dari *timezone* yang berbeda dari alamat mereka, sistem akan mendeteksi dan memberi **peringatan, merekomendasikan pembuatan alamat baru** untuk kinerja optimal. Transaksi tetap dapat diproses, namun dengan potensi latensi yang lebih tinggi karena memerlukan komunikasi antar-shard yang melibatkan *Root node*.
 
----
+### **3. Mekanisme Keamanan dan Ketahanan Canggih**
 
-## 📄 Jenis Node & Tanggung Jawab
+Orisium mengimplementasikan pertahanan berlapis terhadap serangan dan beban berlebih:
 
-### 1. Node Root Bootstrap
+  * **Manajemen Koneksi Efisien (epoll)**: Menggunakan `epoll` untuk I/O *non-blocking* yang efisien, memungkinkan penanganan ribuan koneksi secara bersamaan dengan *overhead* minimal.
+  * ***Rate Limiting* Agresif (5 Detik)**: Mencegah klien membanjiri server dengan permintaan koneksi berulang. Klien yang melanggar akan dikenai penalti perpanjangan waktu, membuat penyerang atau *bot* sederhana sulit untuk terhubung. Klien P2P yang terprogram dengan baik mengimplementasikan strategi *backoff* yang selaras dengan waktu *rate limit* ini untuk pengalaman yang mulus.
+  * ***Inactivity Timeout***: Secara proaktif membersihkan koneksi yang tidak aktif atau mati, mencegah *resource exhaustion* dan serangan *slowloris*.
+  * **Pencegahan Koneksi Ganda**: Menolak koneksi dari IP yang sudah memiliki sesi aktif, membatasi *resource* yang dapat dihabiskan oleh satu sumber.
+  * **Batas Sesi Global**: Menjaga jumlah sesi aktif maksimum untuk melindungi stabilitas server.
 
-**Definisi**:
-- Minimal Downstream: 0
-- Maksimal Downstream: 10
-- Minimal Horizontalstream: 2
-- Maksimal Horizontalstream: 312
+### **4. Distribusi Beban Cerdas**
 
-**Kewajiban & Hak**:
-- Nama domain tidak berubah (immutability, DNSSEC, PQC)
-- Menyimpan **Global Database** sharded + verifikasi Merkle Tree
-- Database Memori untuk node downstream (IP, performa)
-- **Jawaban Rolling** menggunakan VRF/hash dengan nonce
-- **Voting VRF** untuk pemilihan validator
+Orisium memastikan alokasi beban kerja yang efisien untuk kinerja optimal:
 
-### 2. Node Root (Non-Bootstrap)
+  * ***Load Balancing* Adaptif**: Pemilihan *worker* IO untuk koneksi baru tidak hanya berdasarkan *Round-Robin*, tetapi memprioritaskan *worker* yang **terakhir kali menyelesaikan tugas terlama**. Ini memastikan distribusi beban yang lebih adaptif dan efisien.
 
-- Hampir sama dengan Root Bootstrap
-- Wajib memberi pengumuman penurunan level ke Downstream Horizontalstream
+-----
 
-### 3. Node Level-1
+## Arsitektur
 
-**Definisi**:
-- Fixed Horizontalstream: 9
-- Pertanyaan Jumlah Horizontalstream: 2
-- Fixed Upstream: 1
+Arsitektur Orisium mengintegrasikan berbagai komponen dan level node untuk menciptakan jaringan yang kuat:
 
-**Tugas**:
-- Evaluasi dan pindah Upstream jika perlu
-- Umumkan kehilangan Upstream
-- Dapat **naik level** jika memenuhi syarat dan sinkronisasi database shard
+  * **Master Node**: Menerima koneksi baru, menerapkan *rate limiting*, menentukan *shard*, memilih *worker* yang tepat, dan meneruskan *file descriptor* klien ke *worker* yang dipilih melalui Unix Domain Sockets (UDS). Juga mengelola daftar `closed_correlation_id_t` untuk *rate limiting* dan `sio_worker_stats` untuk *load balancing* *worker*.
+  * **Server IO Workers**: Menerima *file descriptor* klien dari *master* melalui UDS dan bertanggung jawab untuk menangani komunikasi P2P yang sebenarnya dengan klien/peer. Setelah menyelesaikan tugas, mereka melaporkan status kembali ke *master* untuk pembaruan *load balancing*.
+  * **Shard Databases (di Node Root)**: Setiap *Root node* menyimpan database lengkap untuk *shard* *timezone* yang diwakilinya, termasuk informasi alamat, saldo, tanda tangan transaksi, dan badan transaksi. Node-node ini adalah sumber otoritatif untuk *shard* mereka.
+  * **Node Downstream (Level-1, Level-2, Level-3)**: Bertindak sebagai perpanjangan tangan dari jaringan *Root*, memperluas jangkauan dan mendistribusikan beban. Mereka memelihara koneksi `Upstream` dan `Horizontalstream` yang ketat sesuai definisi levelnya, serta memiliki hak untuk berpindah `Upstream` atau bahkan naik level menjadi `Root` jika memenuhi syarat.
 
-### 4. Node Level-2 hingga Level-7
+-----
 
-- Sama seperti Node Level-1
-- Menyederhanakan implementasi dan pemeliharaan
+## Instalasi
 
----
+(Bagian ini akan berisi petunjuk instalasi proyek Anda. Contoh: mengkompilasi dari sumber, dependensi.)
 
-## 📊 Manajemen Data
+```bash
+# Contoh langkah-langkah instalasi
+git clone https://github.com/yourusername/orisium.git
+cd orisium
+make
+./orisium_server
+```
 
-### Global Database File Transaksi (Sharded)
+-----
 
-- Sharding berdasarkan address/hash
-- Merkle Root per shard → digabung menjadi **Global State Root**
-- Digunakan untuk verifikasi dan finalisasi transaksi lintas node
+## Penggunaan
 
-### Database Memori Node Downstream
+(Bagian ini akan berisi contoh cara menjalankan dan berinteraksi dengan proyek Anda, baik sebagai *master*, *worker*, atau *node* P2P lainnya.)
 
-- Menyimpan IP, level, jumlah downstream, performa secara real-time
-- Hanya untuk Node Root & Level-1 ke atas
+```bash
+# Contoh perintah penggunaan
+./orisium_server --role master --config master_config.json
+./orisium_worker --id 1 --config worker_config.json
+./orisium_p2p_client --address <your_public_key> --connect <root_ip>
+```
 
----
+-----
 
-## 🧠 Komunikasi Antar Proses (IPC)
+## Kontribusi
 
-### Arsitektur Multiproses (menggunakan `fork()` di C)
+Kami menyambut kontribusi\! Silakan baca panduan kontribusi kami dan ajukan *pull request*.
 
-- **Master Process**: Menginisialisasi dan memantau
-- **SIO (Socket I/O)**: I/O non-blokir (epoll/kqueue)
-- **Logic**: Verifikasi, routing, decision making
-- **COW (Database)**: Akses baca/tulis terpisah
+-----
 
-**IPC yang digunakan**:
-- Message Queues
-- Shared Memory (plus semaphore/mutex)
-- Pipes
+## Lisensi
 
----
+Proyek ini dilisensikan di bawah [Nama Lisensi Anda] - lihat file [LICENSE.md] untuk detailnya.
 
-## 🔐 Mekanisme Keamanan
-
-- Tanda tangan & autentikasi berbasis **kriptografi PQC**
-- Enkripsi TLS untuk komunikasi antar node
-- Nonce & timestamp untuk mencegah replay attack
-- **Rolling Answer** dengan VRF untuk mencegah kartel
-- Handshake kriptografis untuk verifikasi node baru
-- Sistem reputasi dan voting untuk kontrol level
-
----
-
-## ⏱ Efisiensi & Kecepatan
-
-- **Non-blocking I/O** dengan epoll/kqueue
-- Struktur data optimal: Hash table, balanced tree
-- Caching agresif
-- Load balancing berdasarkan performa
-- Optimasi kode C dan profiling
-
----
-
-## ⚡ Ketahanan & Toleransi Kesalahan
-
-- Redundansi pada Node Root Bootstrap
-- Penemuan otomatis Upstream jika gagal
-- Pemantauan proses anak oleh Master
-- Logging dan debugging komprehensif
-
----
-
-## ⚖️ Strategi Menghindari Bottleneck
-
-### A. Optimalisasi Database
-
-- Sharding global database
-- Query lintas shard
-- Batch processing
-- Indeks tepat & pustaka database efisien (RocksDB, LevelDB)
-
-### B. Optimalisasi SIO
-
-- I/O Multiplexing (epoll/kqueue)
-- Pool buffer jaringan
-- Rate limiting + deteksi anomali
-
-### C. Optimalisasi Logic
-
-- Message Queue async
-- Parallelisasi tugas berat (VRF, hashing, PQC)
-- Shared memory untuk data yang sering diakses
-
-### D. Optimalisasi COW
-
-- Antrean request
-- Batch write
-- Indeks + snapshot
-
-### E. Sinkronisasi Promosi Node
-
-- Pre-synchronization untuk kandidat Node Root
-- Verifikasi shard melalui Merkle Proof
-- Challenge-response
-- Konsensus voting untuk promosi
-
----
-
-## 🌐 Validasi Kepemilikan Shard & Global State
-
-- Merkle Proof: Verifikasi shard
-- Global State Root: Verifikasi seluruh jaringan
-- Konsensus promosi Node Level-1 ke Root
-
----
-
-## ✅ Kesimpulan
-
-Orisium Network dirancang untuk menjadi:
-
-- **Desentralisasi yang kuat**
-- **Skalabilitas besar** (hingga miliaran node)
-- **Tangguh terhadap manipulasi dan kartel**
-- **Efisien secara IPC dan multiproses**
-- **Aman untuk masa depan** dengan PQC
-
-Dengan pendekatan **sharding, rolling-answer, dan validasi promosi node**, Orisium siap menjadi fondasi untuk ekosistem blockchain masa depan yang adil dan skalabel.
-
----
-
-> 🔧 Untuk pertanyaan teknis dan kontribusi, buka [Issues](https://github.com/your-repo/issues) atau kirim PR.
+-----
