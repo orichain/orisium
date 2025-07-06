@@ -95,8 +95,7 @@ void run_master_process(master_context *master_ctx) {
     }
     while (!shutdown_requested) {
 		int_status_t snfds = async_wait("[Master]: ", &master_ctx->master_async);
-		if (snfds.status == FAILURE_EINTR) continue;
-		if (snfds.status == FAILURE) break;
+		if (snfds.status != SUCCESS) continue;
 		for (int n = 0; n < snfds.r_int; ++n) {
 			int_status_t fd_status = async_getfd("[Master]: ", &master_ctx->master_async, n);
 			if (fd_status.status != SUCCESS) continue;

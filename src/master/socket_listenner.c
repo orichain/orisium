@@ -185,8 +185,8 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 	} else {
 		LOG_INFO("%sForwarding client FD %d (ID %ld) from IP %s to Server IO Worker %d (UDS FD %d). Bytes sent: %zd.",
 				 label, client_sock, current_client_id, host_ip, sio_worker_idx, sio_worker_uds_fd, send_result.r_ssize_t);
-		CLOSE_FD(client_sock); // di close jika berhasil Forwarding
 	}
+	CLOSE_FD(client_sock); // Menghindari kebocoran FD jika send_ipc gagal => biarkan client reconnect
 	CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);
 	return SUCCESS;
 }
