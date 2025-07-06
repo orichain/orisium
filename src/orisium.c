@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <signal.h>
-#include <bits/types/sig_atomic_t.h>
 
 #include "log.h"
 #include "node.h"

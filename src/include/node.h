@@ -6,7 +6,7 @@
 #include "constants.h"
 
 typedef struct {
-    char ip[INET6_ADDRSTRLEN];
+    uint8_t ip[INET6_ADDRSTRLEN];
     int port;
 } node_info_t;
 

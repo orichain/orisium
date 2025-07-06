@@ -121,7 +121,7 @@ ipc_protocol_t_status_t ipc_prepare_cmd_client_request_task(int *fd_to_close, ui
 	ipc_protocol_t *p = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
 	ipc_protocol_t_status_t result;
 	result.status = FAILURE;
-	result.r_ipc_protocol_t = p;
+	result.r_ipc_protocol_t = NULL;
 	if (!p) {
 		perror("Failed to allocate ipc_protocol_t protocol");
 		if (*fd_to_close != -1) {
@@ -147,6 +147,7 @@ ipc_protocol_t_status_t ipc_prepare_cmd_client_request_task(int *fd_to_close, ui
 	payload->len = data_len;
 	if (data_len > 0 && data) memcpy(payload->data, data, data_len);
 	p->payload.ipc_client_request_task = payload;
+	result.r_ipc_protocol_t = p;
 	result.status = SUCCESS;
 	return result;
 }

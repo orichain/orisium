@@ -74,8 +74,13 @@ status_t read_network_config_from_json(const char* filename, node_config_t* conf
             LOG_WARN("Kunci 'ip' tidak ditemukan atau bukan string pada node indeks %d. Melewatkan.", i);
             continue;
         }
-        memcpy(config_out->bootstrap_nodes[config_out->num_bootstrap_nodes].ip,
-                json_object_get_string(ip_obj), INET6_ADDRSTRLEN);
+        
+        char iptmp[INET6_ADDRSTRLEN];
+        strncpy(iptmp, json_object_get_string(ip_obj), INET6_ADDRSTRLEN - 1);
+        iptmp[INET6_ADDRSTRLEN - 1] = '\0';
+        
+        memset(config_out->bootstrap_nodes[config_out->num_bootstrap_nodes].ip, 0, INET6_ADDRSTRLEN);
+        memcpy(config_out->bootstrap_nodes[config_out->num_bootstrap_nodes].ip, iptmp, strlen(iptmp));
                 
         if (!json_object_object_get_ex(node_obj, "port", &port_obj) || !json_object_is_type(port_obj, json_type_int)) {
             LOG_WARN("Kunci 'port' tidak ditemukan atau bukan integer pada node indeks %d. Melewatkan.", i);
