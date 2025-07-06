@@ -14,26 +14,22 @@ Orisium adalah jaringan *peer-to-peer* (P2P) berperforma tinggi yang dirancang u
 
 ### **1. Arsitektur Jaringan Hierarkis Dinamis**
 
-Orisium mengadopsi struktur jaringan berlapis yang unik untuk skalabilitas dan ketahanan. Jaringan Root didasarkan pada sekitar **40 *zona waktu unik*** di seluruh dunia, yang secara langsung memetakan ke *shard* data.
+Orisium mengadopsi struktur jaringan berlapis yang unik untuk skalabilitas dan ketahanan. Jaringan Root didasarkan pada sekitar **40 *zona waktu* unik** di seluruh dunia, yang secara langsung memetakan ke *shard* data.
 
-  * **Node Root Bootstrap (3 Node)**: Ini adalah **fondasi awal jaringan** yang stabil, yang di-*hardcode* untuk mewakili 3 *zona waktu* spesifik yang berdekatan. Mereka adalah bagian dari total 40 Node Root, memiliki konektivitas horizontal terluas (terhubung ke semua 39 Node Root lainnya), dan **harus menyimpan basis data lengkap setiap *shard* *zona waktu***. Meskipun krusial di awal, node Bootstrap ini **dapat turun level** jika tidak mampu, namun akan tetap **menyediakan daftar IP** untuk membantu node baru menemukan jaringan.
-  * **Node Root (Maks. 40 Node)**: Ini adalah **tulang punggung utama *sharding* *zona waktu***. Setiap Node Root secara eksklusif **mewakili satu dari sekitar 40 *zona waktu* unik** dan **harus menyimpan basis data lengkap** untuk *shard* tersebut. Setiap Node Root **terhubung ke semua 39 Node Root lainnya** untuk konsensus yang cepat dan penyebaran informasi global. Node Root mengelola sub-jaringan di bawahnya dan dapat menjatuhkan level *horizontalstream* yang melanggar syarat.
-  * **Node Level-1 (Maks. 400 Node)**: Berperan sebagai perantara penting di dalam *shard* *zona waktu* mereka. Node Level-1 memiliki **satu koneksi Upstream ke sebuah Node Root** dan **39 koneksi Horizontalstream ke Node Level-1 lainnya yang memiliki Root Upstream yang sama**. Node Level-1 sangat vital karena mereka dapat **berpindah Upstream Root** jika tidak memenuhi syarat, dan bahkan **mempromosikan diri menjadi Root baru** untuk mengisi slot kosong atau menggantikan Root yang bermasalah.
-  * **Node Level-2 (Maks. 4000 Node)**: Terhubung ke **satu Upstream Node Level-1** dan memiliki **39 koneksi Horizontalstream ke Node Level-2 lainnya yang memiliki Root Upstream yang sama**. Node ini berfungsi memperluas jangkauan jaringan.
-  * **Node Level-3 (Maks. 40000 Node)**: Terhubung ke **satu Upstream Node Level-2** dan memiliki **39 koneksi Horizontalstream ke Node Level-3 lainnya yang memiliki Root Upstream yang sama**. Node ini lebih lanjut memperluas jangkauan jaringan.
-  * **Node Level-4 (Maks. 400000 Node)**: Lapisan terluar jaringan, terhubung ke **satu Upstream Node Level-3** dan memiliki **39 koneksi Horizontalstream ke Node Level-4 lainnya yang memiliki Root Upstream yang sama**. Node Level-4 bertanggung jawab untuk jangkauan massal ke pengguna akhir.
-
------
+  * **Node Root Bootstrap (3 Node)**: Ini adalah **fondasi awal jaringan** yang stabil, di-*hardcode* untuk mewakili 3 *zona waktu* spesifik yang berdekatan. Mereka adalah bagian dari total 40 Node Root, memiliki konektivitas horizontal terluas (terhubung ke semua 39 Node Root lainnya), dan **harus menyimpan basis data lengkap setiap *shard* *zona waktu***. Meskipun krusial di awal, node Bootstrap ini **dapat turun level** jika tidak mampu, namun akan tetap **menyediakan daftar IP** untuk membantu node baru menemukan jaringan.
+  * **Node Root (Maks. 40 Node)**: Ini adalah **tulang punggung utama *sharding* *zona waktu***. Setiap Node Root secara eksklusif **mewakili satu dari sekitar 40 *zona waktu* unik** dan **harus menyimpan basis data lengkap** untuk *shard* tersebut. Setiap Node Root **terhubung ke semua 39 Node Root lainnya** untuk konsensus yang cepat dan penyebaran informasi global. Setiap Node Root dapat mengelola hingga **10 koneksi *Downstream* ke Node Level-1**. Node Root mengelola sub-jaringan di bawahnya dan dapat menjatuhkan level *horizontalstream* yang melanggar syarat.
+  * **Node Level-1 (Maks. 400 Node)**: Berperan sebagai perantara penting di dalam *shard* *zona waktu* mereka. Node Level-1 memiliki **satu koneksi *Upstream* ke sebuah Node Root** dan **39 koneksi *Horizontalstream* ke Node Level-1 lainnya yang memiliki Root *Upstream* yang sama**. Node Level-1 dapat mengelola hingga **10 koneksi *Downstream* ke Node Level-2**. Node Level-1 sangat vital karena mereka dapat **berpindah *Upstream* Root** jika tidak memenuhi syarat, dan bahkan **mempromosikan diri menjadi Root baru** untuk mengisi slot kosong atau menggantikan Root yang bermasalah.
+  * **Node Level-2 (Maks. 4000 Node)**: Terhubung ke **satu *Upstream* Node Level-1** dan memiliki **39 koneksi *Horizontalstream* ke Node Level-2 lainnya yang memiliki Root *Upstream* yang sama**. Setiap Node Level-2 dapat mengelola hingga **10 koneksi *Downstream* ke Node Level-3**. Node ini berfungsi memperluas jangkauan jaringan.
+  * **Node Level-3 (Maks. 40000 Node)**: Terhubung ke **satu *Upstream* Node Level-2** dan memiliki **39 koneksi *Horizontalstream* ke Node Level-3 lainnya yang memiliki Root *Upstream* yang sama**. Setiap Node Level-3 dapat mengelola hingga **10 koneksi *Downstream* ke Node Level-4**. Node ini lebih lanjut memperluas jangkauan jaringan.
+  * **Node Level-4 (Maks. 400000 Node)**: Lapisan terluar jaringan, terhubung ke **satu *Upstream* Node Level-3** dan memiliki **39 koneksi *Horizontalstream* ke Node Level-4 lainnya yang memiliki Root *Upstream* yang sama**. Node Level-4 bertanggung jawab untuk jangkauan massal ke pengguna akhir dan **tidak memiliki koneksi *Downstream***.
 
 ### **2. *Sharding* Berbasis *Zona Waktu* pada *Public Key***
 
 Orisium memanfaatkan konsep *sharding* inovatif untuk distribusi data dan optimasi kinerja global:
 
-  * **Identitas Tersemat *Zona Waktu***: Setiap Alamat/Public Key pengirim transaksi secara eksplisit **menyematkan kode *zona waktu*** saat dibuat. Kode ini berfungsi sebagai ***shard key*** yang deterministik, memastikan alamat tersebut terkait dengan *shard* *zona waktu* tertentu.
+  * **Identitas Tersemat *Zona Waktu***: Setiap Alamat/*Public Key* pengirim transaksi secara eksplisit **menyematkan kode *zona waktu*** saat dibuat. Kode ini berfungsi sebagai ***shard key*** yang deterministik, memastikan alamat tersebut terkait dengan *shard* *zona waktu* tertentu.
   * **Optimalisasi Latensi Regional**: Transaksi dan data yang terkait dengan alamat dari *zona waktu* tertentu secara otomatis diarahkan ke *shard* yang relevan (dikelola oleh Node Root dalam *zona waktu* tersebut), secara signifikan mengurangi latensi bagi pengguna di wilayah yang sama.
   * **Penanganan Perubahan *Zona Waktu***: Jika pengguna bertransaksi dari *zona waktu* yang berbeda dari *zona waktu* yang disematkan pada alamat mereka, sistem akan mendeteksi dan memberi **peringatan, merekomendasikan pembuatan alamat baru** untuk kinerja optimal. Transaksi tetap dapat diproses menggunakan alamat lama, namun dengan potensi latensi yang lebih tinggi karena memerlukan komunikasi antar-*shard* yang melibatkan Node Root.
-
------
 
 ### **3. Mekanisme Keamanan dan Ketahanan Canggih**
 
@@ -44,8 +40,6 @@ Orisium mengimplementasikan pertahanan berlapis terhadap serangan dan beban berl
   * ***Inactivity Timeout***: Secara proaktif membersihkan koneksi yang tidak aktif atau mati, mencegah *resource exhaustion* dan serangan *slowloris*.
   * **Pencegahan Koneksi Ganda**: Menolak koneksi dari IP yang sudah memiliki sesi aktif, membatasi *resource* yang dapat dihabiskan oleh satu sumber.
   * **Batas Sesi Global**: Menjaga jumlah sesi aktif maksimum untuk melindungi stabilitas server.
-
------
 
 ### **4. Distribusi Beban Cerdas**
 
@@ -96,9 +90,19 @@ master --> sio (server IO) <--> logic <--> cow (client outbound)
 
 **Cow** didedikasikan khusus untuk mengelola dan mengeksekusi semua **koneksi jaringan keluar** serta transmisi data dari node Orisium ke *peer* lain dalam jaringan.
 
-  * **Mengelola Koneksi Keluar**: Cow membangun dan memelihara semua koneksi keluar yang diperlukan, seperti 39 koneksi horizontal ke Node Root lainnya, atau koneksi ke node Upstream.
+  * **Mengelola Koneksi Keluar**: Cow membangun dan memelihara semua koneksi keluar yang diperlukan, seperti 39 koneksi horizontal ke Node Root lainnya, atau koneksi ke node *Upstream*.
   * **Mengirim Data Keluar**: Cow menerima data dan perintah dari **Logic** dan secara efisien mengirimkannya melalui koneksi keluar yang relevan.
   * **Melapor via Logic**: Mirip dengan Sio, setiap pembaruan status, kesalahan, atau pemutusan koneksi yang terkait dengan koneksi keluar dilaporkan dari Cow ke **Logic**. Cow tidak berkomunikasi langsung dengan Master.
+
+### **5. Mekanisme Penyimpanan Data Otomatis (Semua Level)**
+
+Setiap node Orisium (kecuali mungkin Level-4 yang bisa hanya menjadi klien murni) dirancang untuk secara cerdas mengelola penyimpanan data *shard* berdasarkan kapasitas sumber daya yang tersedia. Fitur ini sangat penting untuk efisiensi dan keandalan jaringan, terutama bagi node yang bercita-cita untuk promosi:
+
+  * **Pendeteksian Ruang Disk**: Node akan secara otomatis **mendeteksi ketersediaan ruang hard disk** saat beroperasi atau memulai ulang.
+  * **Penyimpanan Kondisional**:
+      * Jika node mendeteksi ada **ruang hard disk yang mencukupi** (sesuai ambang batas yang ditentukan sistem), node tersebut akan **mulai atau melanjutkan proses penyimpanan data *shard*** yang relevan dengan *zona waktu*-nya.
+      * Namun, jika ruang hard disk **tidak memenuhi syarat** atau mencapai batas minimum, node akan **menghentikan proses penyimpanan data *shard***. Ini mencegah *resource exhaustion* dan memastikan node tetap stabil untuk tugas-tugas vital lainnya.
+  * **Prasyarat Promosi**: Kemampuan untuk menyimpan data *shard* adalah **syarat penting** bagi node di Level-1, Level-2, Level-3, dan Level-4 yang ingin memenuhi syarat untuk dipromosikan ke level yang lebih tinggi. Ini memastikan node yang naik level sudah memiliki data yang diperlukan.
 
 -----
 
