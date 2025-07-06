@@ -2,9 +2,9 @@
 	#include <pthread.h>
 #endif
 
-#include <stdio.h>       // for printf, perror, fprintf, NULL, stderr
-#include <string.h>      // for memset, strncpy
-#include <signal.h>      // for sig_atomic_t, sigaction, SIGINT
+#include <stdio.h>
+#include <string.h>
+#include <signal.h>
 #include <bits/types/sig_atomic_t.h>
 
 #include "log.h"

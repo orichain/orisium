@@ -1,11 +1,7 @@
-#if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
-	#include <pthread.h>
-#endif
-
-#include <netinet/in.h>  // for sockaddr_in, INADDR_ANY, in_addr
-#include <stdbool.h>     // for false, bool, true
-#include <string.h>      // for memset, strncpy
-#include <unistd.h>      // for close, fork, getpid
+#include <netinet/in.h>
+#include <stdbool.h>
+#include <string.h>
+#include <unistd.h>
 #include <stdint.h>
 
 #include "log.h"
@@ -30,7 +26,7 @@ status_t setup_master(master_context *master_ctx) {
 //======================================================================
 // Master setup socket listenner
 //======================================================================
-    if (setup_socket_listenner("[Master]: ", &master_ctx->listen_sock) != SUCCESS) {
+    if (setup_socket_listenner("[Master]: ", master_ctx) != SUCCESS) {
 		return FAILURE; 
 	}
     if (async_create("[Master]: ", &master_ctx->master_async) != SUCCESS) {
@@ -110,7 +106,7 @@ void run_master_process(master_context *master_ctx) {
 			uint32_t current_events = events_status.r_uint32_t;
             if (current_fd == master_ctx->listen_sock) {
 				if (async_event_is_EPOLLIN(current_events)) {
-					if (handle_listen_sock_event("[Master]: ", master_client_sessions, master_ctx->master_uds_sio_fds, &next_client_id, &master_ctx->listen_sock) != SUCCESS) {
+					if (handle_listen_sock_event("[Master]: ", master_ctx, master_client_sessions, &next_client_id) != SUCCESS) {
 						continue;
 					}
 				} else {
@@ -121,7 +117,7 @@ void run_master_process(master_context *master_ctx) {
 					async_event_is_EPOLLERR(current_events) ||
 					async_event_is_EPOLLRDHUP(current_events))
 				{
-					worker_type_t_status_t worker_closed = handle_ipc_closed_event("[Master]: ", master_ctx->master_uds_sio_fds, master_ctx->master_uds_logic_fds, master_ctx->master_uds_cow_fds, &master_ctx->master_async, &current_fd);
+					worker_type_t_status_t worker_closed = handle_ipc_closed_event("[Master]: ", master_ctx, &current_fd);
 					if (worker_closed.status != SUCCESS) {
 						continue;
 					}
@@ -139,7 +135,7 @@ void run_master_process(master_context *master_ctx) {
 					}
 //======================================================================
 				} else {
-					if (handle_ipc_event("[Master]: ", master_client_sessions, master_ctx->master_uds_logic_fds, master_ctx->master_uds_cow_fds, &current_fd) != SUCCESS) {
+					if (handle_ipc_event("[Master]: ", master_ctx, master_client_sessions, &current_fd) != SUCCESS) {
 						continue;
 					}
 				}

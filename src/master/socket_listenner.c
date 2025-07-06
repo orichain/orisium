@@ -21,34 +21,35 @@
 #include "ipc/client_request_task.h"
 #include "master/socket_listenner.h"
 #include "stdbool.h"
+#include "master/process.h"
 
-status_t setup_socket_listenner(const char *label, int *listen_sock) {
+status_t setup_socket_listenner(const char *label, master_context *master_ctx) {
     struct sockaddr_in6 addr;
     int opt = 1;
     int v6only = 0;
     
-    *listen_sock = socket(AF_INET6, SOCK_STREAM, 0);
-    if (*listen_sock == -1) {
+    master_ctx->listen_sock = socket(AF_INET6, SOCK_STREAM, 0);
+    if (master_ctx->listen_sock == -1) {
 		LOG_ERROR("%s%s", label, strerror(errno));
         return FAILURE;
     }
-    status_t r_snbkg = set_nonblocking(label, *listen_sock);
+    status_t r_snbkg = set_nonblocking(label, master_ctx->listen_sock);
     if (r_snbkg != SUCCESS) {
         LOG_ERROR("%s%s", label, strerror(errno));
         return r_snbkg;
     }
-    if (setsockopt(*listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
+    if (setsockopt(master_ctx->listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
         LOG_ERROR("%s%s", label, strerror(errno));
         return FAILURE;
     }
     //di FreeBSD tidak bisa reuseport. sudah pernah coba
     /*
-    if (setsockopt(*listen_sock, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) == -1) {
+    if (setsockopt(master_ctx->listen_sock, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) == -1) {
         LOG_ERROR("%s%s", label, strerror(errno));
         return FAILURE;
     }
     */
-    if (setsockopt(*listen_sock, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) == -1) {
+    if (setsockopt(master_ctx->listen_sock, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) == -1) {
 		LOG_ERROR("%s%s", label, strerror(errno));
         return FAILURE;
     }
@@ -56,24 +57,24 @@ status_t setup_socket_listenner(const char *label, int *listen_sock) {
     addr.sin6_family = AF_INET6;
     addr.sin6_port = htons(node_config.listen_port);
     addr.sin6_addr = in6addr_any;
-    if (bind(*listen_sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+    if (bind(master_ctx->listen_sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         LOG_ERROR("%s%s", label, strerror(errno));
         return FAILURE;
     }
-    if (listen(*listen_sock, 128) < 0) {
+    if (listen(master_ctx->listen_sock, 128) < 0) {
         LOG_ERROR("%s%s", label, strerror(errno));
         return FAILURE;
     }
     return SUCCESS;
 }
 
-status_t handle_listen_sock_event(const char *label, master_client_session_t master_client_sessions[], int master_uds_sio_fds[], uint64_t *next_client_id, int *listen_sock) {
+status_t handle_listen_sock_event(const char *label, master_context *master_ctx, master_client_session_t master_client_sessions[], uint64_t *next_client_id) {
 	struct sockaddr_storage client_addr;
 	socklen_t client_addr_len = sizeof(client_addr);
 	char host_str[NI_MAXHOST];
     char port_str[NI_MAXSERV];
 	
-	int client_sock = accept(*listen_sock, (struct sockaddr*)&client_addr, &client_addr_len);
+	int client_sock = accept(master_ctx->listen_sock, (struct sockaddr*)&client_addr, &client_addr_len);
 	if (client_sock == -1) {
 		if (errno != EAGAIN && errno != EWOULDBLOCK) {
 			LOG_ERROR("%s%s", label, strerror(errno));
@@ -154,7 +155,7 @@ status_t handle_listen_sock_event(const char *label, master_client_session_t mas
 	//avg_connection = cnt_connection / sio_worker;
 	
 	int sio_worker_idx = (int)(current_client_id % MAX_SIO_WORKERS);
-	int sio_worker_uds_fd = master_uds_sio_fds[sio_worker_idx]; // Master uses its side of UDS
+	int sio_worker_uds_fd = master_ctx->master_uds_sio_fds[sio_worker_idx]; // Master uses its side of UDS
 
 	int slot_found = -1;
 	for(int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {

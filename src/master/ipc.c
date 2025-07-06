@@ -11,8 +11,10 @@
 #include "under_refinement_and_will_be_delete_after_finished.h"
 #include "types.h"
 #include "async.h"
+#include "master/ipc.h"
+#include "master/process.h"
 
-worker_type_t_status_t handle_ipc_closed_event(const char *label, int master_uds_sio_fds[], int master_uds_logic_fds[], int master_uds_cow_fds[], async_type_t *async, int *current_fd) {
+worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context *master_ctx, int *current_fd) {
 	worker_type_t_status_t result;
 	result.r_worker_type_t = UNKNOWN;
 	result.status = FAILURE;
@@ -21,7 +23,7 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, int master_uds
     bool is_worker_uds = false;
 
     for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-        if (*current_fd == master_uds_sio_fds[i]) {
+        if (*current_fd == master_ctx->master_uds_sio_fds[i]) {
             is_worker_uds = true;
             result.r_worker_type_t = SIO;
             worker_name = "SIO";
@@ -31,7 +33,7 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, int master_uds
     }
     if (!is_worker_uds) {
         for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-            if (*current_fd == master_uds_logic_fds[i]) {
+            if (*current_fd == master_ctx->master_uds_logic_fds[i]) {
                 is_worker_uds = true;
                 result.r_worker_type_t = LOGIC;
                 worker_name = "Logic";
@@ -42,7 +44,7 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, int master_uds
     }
     if (!is_worker_uds) {
         for (int i = 0; i < MAX_COW_WORKERS; ++i) {
-            if (*current_fd == master_uds_cow_fds[i]) {
+            if (*current_fd == master_ctx->master_uds_cow_fds[i]) {
                 is_worker_uds = true;
                 result.r_worker_type_t = COW;
                 worker_name = "COW";
@@ -53,7 +55,7 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, int master_uds
     }
     if (is_worker_uds) {
 		LOG_INFO("%sWorker UDS FD %d (%s Worker %d) terputus.", label, *current_fd, worker_name, result.index);
-		if (async_delete_event(label, async, current_fd) != SUCCESS) {
+		if (async_delete_event(label, &master_ctx->master_async, current_fd) != SUCCESS) {
 			result.status = FAILURE;			
 			return result;
 		}
@@ -63,7 +65,7 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, int master_uds
 	return result;
 }
 
-status_t handle_ipc_event(const char *label, master_client_session_t master_client_sessions[], int master_uds_logic_fds[], int master_uds_cow_fds[], int *current_fd) {	
+status_t handle_ipc_event(const char *label, master_context *master_ctx, master_client_session_t master_client_sessions[], int *current_fd) {	
 	int received_fd = -1;
 	ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(current_fd, &received_fd);
 	if (deserialized_result.status != SUCCESS) {
@@ -80,7 +82,7 @@ status_t handle_ipc_event(const char *label, master_client_session_t master_clie
 			LOG_INFO("[Master]: Received Client Request Task (ID %ld) from Server IO Worker (UDS FD %d).", req->correlation_id, *current_fd);
 
 			int logic_worker_idx = (int)(req->correlation_id % MAX_LOGIC_WORKERS);
-			int logic_worker_uds_fd = master_uds_logic_fds[logic_worker_idx]; // Master uses its side of UDS
+			int logic_worker_uds_fd = master_ctx->master_uds_logic_fds[logic_worker_idx]; // Master uses its side of UDS
 
 			send_ipc_message(logic_worker_uds_fd, IPC_LOGIC_TASK, req, sizeof(client_request_task_t), -1);
 			LOG_INFO("[Master]: Forwarding client request (ID %ld) to Logic Worker %d (UDS FD %d).",
@@ -119,7 +121,7 @@ status_t handle_ipc_event(const char *label, master_client_session_t master_clie
 				   task->client_correlation_id, *current_fd, task->node_ip, task->node_port);
 
 			int cow_worker_idx = (int)(task->client_correlation_id % MAX_COW_WORKERS);
-			int cow_uds_fd = master_uds_cow_fds[cow_worker_idx]; // Master uses its side of UDS
+			int cow_uds_fd = master_ctx->master_uds_cow_fds[cow_worker_idx]; // Master uses its side of UDS
 
 			send_ipc_message(cow_uds_fd, IPC_OUTBOUND_TASK, task, sizeof(outbound_task_t), -1);
 			LOG_INFO("[Master]: Forwarding outbound task (ID %ld) to Client Outbound Worker %d (UDS FD %d).",
@@ -133,7 +135,7 @@ status_t handle_ipc_event(const char *label, master_client_session_t master_clie
 				   (int)resp->response_data_len, resp->response_data);
 
 			int logic_worker_idx_for_response = (int)(resp->client_correlation_id % MAX_LOGIC_WORKERS);
-			int logic_worker_uds_fd = master_uds_logic_fds[logic_worker_idx_for_response]; // Master uses its side of UDS
+			int logic_worker_uds_fd = master_ctx->master_uds_logic_fds[logic_worker_idx_for_response]; // Master uses its side of UDS
 
 			send_ipc_message(logic_worker_uds_fd, IPC_OUTBOUND_RESPONSE, resp, sizeof(outbound_response_t), -1);
 			LOG_INFO("[Master]: Forwarding outbound response (ID %ld) to Logic Worker %d (UDS FD %d).",
