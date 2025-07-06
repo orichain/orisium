@@ -21,6 +21,19 @@ typedef enum {
     FAILURE = (uint8_t)0xff
 } status_t;
 
+typedef enum {
+	UNKNOWN = (uint8_t)0x00,
+    SIO = (uint8_t)0x01,
+    LOGIC = (uint8_t)0x02,
+    COW = (uint8_t)0x03
+} worker_type_t;
+
+typedef struct {
+	int index;
+	worker_type_t r_worker_type_t;
+	status_t status;
+} worker_type_t_status_t;
+
 typedef struct {
 	size_t r_size_t;
 	status_t status;

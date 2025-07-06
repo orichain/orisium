@@ -61,37 +61,35 @@ status_t delete_closed_correlation_id(const char *label, closed_correlation_id_t
 }
 
 closed_correlation_id_t_status_t find_closed_correlation_id(const char *label, closed_correlation_id_t *head, uint64_t id) {
-    closed_correlation_id_t *current = head;
     closed_correlation_id_t_status_t result;
-    result.r_closed_correlation_id_t = current;
+    result.r_closed_correlation_id_t = head;
     result.status = FAILURE;
-    while (current != NULL) {
-        if (current->correlation_id == id) {
+    while (result.r_closed_correlation_id_t != NULL) {
+        if (result.r_closed_correlation_id_t->correlation_id == id) {
             LOG_INFO("%sCorrelation ID %llu ditemukan.", label, (unsigned long long)id);
             result.status = SUCCESS;
             return result;
         }
-        current = current->next;
+        result.r_closed_correlation_id_t = result.r_closed_correlation_id_t->next;
     }
     LOG_WARN("%sCorrelation ID %llu tidak ditemukan.", label, (unsigned long long)id);
     return result;
 }
 
 closed_correlation_id_t_status_t find_first_ratelimited_closed_correlation_id(const char *label, closed_correlation_id_t *head, uint8_t host_ip[]) {
-	closed_correlation_id_t *current = head;
     closed_correlation_id_t_status_t result;
-    result.r_closed_correlation_id_t = current;
+    result.r_closed_correlation_id_t = head;
     result.status = FAILURE;
     //==========FILTER RATELIMIT========================================
-    while (current != NULL) {
-        if (memcmp(current->ip, host_ip, INET6_ADDRSTRLEN) == 0) {
+    while (result.r_closed_correlation_id_t != NULL) {
+        if (memcmp(result.r_closed_correlation_id_t->ip, host_ip, INET6_ADDRSTRLEN) == 0) {
 			uint64_t_status_t grtns_result = get_realtime_time_ns(label);    
 			if (grtns_result.status == SUCCESS) {
 				uint64_t ratelimit_ns = (uint64_t)RATELIMITSEC * 1000000000ULL;
-				if ((grtns_result.r_uint64_t - current->closed_time) <= ratelimit_ns) {
+				if ((grtns_result.r_uint64_t - result.r_closed_correlation_id_t->closed_time) <= ratelimit_ns) {
 					result.status = FAILURE_RATELIMIT;
 					LOG_ERROR("%sIP %s mencoba melakukan koneksi diatas ratelimit.", label, host_ip);					
-					current->closed_time = grtns_result.r_uint64_t;	// <==== tambahan				
+					result.r_closed_correlation_id_t->closed_time = grtns_result.r_uint64_t;	// <==== tambahan				
 					return result;
 				}
 			} else {
@@ -100,18 +98,18 @@ closed_correlation_id_t_status_t find_first_ratelimited_closed_correlation_id(co
 				return result;
 			}
         }
-        current = current->next;
+        result.r_closed_correlation_id_t = result.r_closed_correlation_id_t->next;
     }
     LOG_INFO("%sIP %s tidak ditemukan di tabel ratelimit.", label, host_ip);
     //==================================================================
-    current = head;
-    while (current != NULL) {
+    result.r_closed_correlation_id_t = head;
+    while (result.r_closed_correlation_id_t != NULL) {
 		uint64_t_status_t grtns_result = get_realtime_time_ns(label);
 		if (grtns_result.status == SUCCESS) {
 			uint64_t ratelimit_ns = (uint64_t)RATELIMITSEC * 1000000000ULL;
-			if ((grtns_result.r_uint64_t - current->closed_time) > ratelimit_ns) {
+			if ((grtns_result.r_uint64_t - result.r_closed_correlation_id_t->closed_time) > ratelimit_ns) {
 				result.status = grtns_result.status;
-				LOG_INFO("%sIP %s berhasil mendapatkan reusable correlation id %llu.", label, host_ip, (unsigned long long)current->correlation_id);
+				LOG_INFO("%sIP %s berhasil mendapatkan reusable correlation id %llu.", label, host_ip, (unsigned long long)result.r_closed_correlation_id_t->correlation_id);
 				return result;
 			}
 		} else {
@@ -119,7 +117,7 @@ closed_correlation_id_t_status_t find_first_ratelimited_closed_correlation_id(co
 			LOG_WARN("%sIP %s gagal mencari reusable correlation id yang bebas ratelimit -> dianggap gagal mencari reusable correlation id.", label, host_ip);
 			return result;
 		}
-        current = current->next;
+        result.r_closed_correlation_id_t = result.r_closed_correlation_id_t->next;
     }
     LOG_WARN("%sIP %s tidak menemukan reusable correlation ID.", label, host_ip);
     return result;

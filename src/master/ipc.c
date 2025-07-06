@@ -10,8 +10,60 @@
 #include "sessions/master_client_session.h"
 #include "under_refinement_and_will_be_delete_after_finished.h"
 #include "types.h"
+#include "async.h"
 
-status_t handle_ipc_event(const char *label, master_client_session_t master_client_sessions[], int master_uds_logic_fds[], int master_uds_cow_fds[], int *current_fd) {
+worker_type_t_status_t handle_ipc_closed_event(const char *label, int master_uds_sio_fds[], int master_uds_logic_fds[], int master_uds_cow_fds[], async_type_t *async, int *current_fd) {
+	worker_type_t_status_t result;
+	result.r_worker_type_t = UNKNOWN;
+	result.status = FAILURE;
+	result.index = -1;
+    const char* worker_name = "Unknown";
+    bool is_worker_uds = false;
+
+    for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
+        if (*current_fd == master_uds_sio_fds[i]) {
+            is_worker_uds = true;
+            result.r_worker_type_t = SIO;
+            worker_name = "SIO";
+            result.index = i;
+            break;
+        }
+    }
+    if (!is_worker_uds) {
+        for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
+            if (*current_fd == master_uds_logic_fds[i]) {
+                is_worker_uds = true;
+                result.r_worker_type_t = LOGIC;
+                worker_name = "Logic";
+                result.index = i;
+                break;
+            }
+        }
+    }
+    if (!is_worker_uds) {
+        for (int i = 0; i < MAX_COW_WORKERS; ++i) {
+            if (*current_fd == master_uds_cow_fds[i]) {
+                is_worker_uds = true;
+                result.r_worker_type_t = COW;
+                worker_name = "COW";
+                result.index = i;
+                break;
+            }
+        }
+    }
+    if (is_worker_uds) {
+		LOG_INFO("%sWorker UDS FD %d (%s Worker %d) terputus.", label, *current_fd, worker_name, result.index);
+		if (async_delete_event(label, async, current_fd) != SUCCESS) {
+			result.status = FAILURE;			
+			return result;
+		}
+        result.status = SUCCESS;			
+		return result;
+	}
+	return result;
+}
+
+status_t handle_ipc_event(const char *label, master_client_session_t master_client_sessions[], int master_uds_logic_fds[], int master_uds_cow_fds[], int *current_fd) {	
 	int received_fd = -1;
 	ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(current_fd, &received_fd);
 	if (deserialized_result.status != SUCCESS) {
