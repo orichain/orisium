@@ -16,7 +16,7 @@ COMMON_CFLAGS = -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-de
 BUILD_MODE ?= DEVELOPMENT
 LOG_TO ?= SCREEN
 ifeq ($(BUILD_MODE), PRODUCTION)
-	FINAL_CFLAGS = $(COMMON_CFLAGS) -O3 -DNDEBUG -DPRODUCTION
+    FINAL_CFLAGS = $(COMMON_CFLAGS) -O3 -DNDEBUG -DPRODUCTION
 else
 	ifeq ($(LOG_TO), FILE)
 		FINAL_CFLAGS = $(COMMON_CFLAGS) -fsanitize=address -fsanitize=leak -g -O3 -Werror -DDEVELOPMENT -DTOFILE
@@ -25,6 +25,24 @@ else
 	endif
 endif
 LDFLAGS =
+
+# =============================
+# Deteksi Distribusi Linux dan Package Manager
+# =============================
+DISTRO_ID := $(shell . /etc/os-release 2>/dev/null && echo $$ID || echo unknown)
+
+PKG_MANAGER := $(shell \
+	if [ "$(DISTRO_ID)" = "rocky" ] || [ "$(DISTRO_ID)" = "fedora" ]; then echo "dnf"; \
+	elif [ "$(DISTRO_ID)" = "centos" ]; then \
+		if command -v dnf >/dev/null 2>&1; then echo "dnf"; else echo "yum"; fi; \
+	elif [ "$(DISTRO_ID)" = "rhel" ]; then \
+		if command -v dnf >/dev/null 2>&1; then echo "dnf"; else echo "yum"; fi; \
+	elif [ "$(DISTRO_ID)" = "debian" ] || [ "$(DISTRO_ID)" = "ubuntu" ]; then echo "apt"; \
+	elif [ "$(DISTRO_ID)" = "arch" ]; then echo "pacman"; \
+	elif [ "$(DISTRO_ID)" = "opensuse" ]; then echo "zypper"; \
+	else echo "unsupported"; fi)
+
+USE_SUDO := $(shell command -v sudo >/dev/null 2>&1 && echo sudo || echo "")
 
 # =============================
 # Source & Object Files
@@ -52,11 +70,6 @@ PQCLEAN_KEM_LIB_NAME = libml-kem-1024_clean.a
 PQCLEAN_KEM_LIB_PATH = $(PQCLEAN_KEM_DIR)/$(PQCLEAN_KEM_LIB_NAME)
 
 # =============================
-# JSON-C Configuration
-# =============================
-JSON_C_H_PATH := /usr/include/json-c/json.h
-
-# =============================
 # IWYU Configuration
 # =============================
 IWYU_DIR := iwyu
@@ -69,87 +82,56 @@ EXCLUDE_PATHS := $(foreach dir,$(EXCLUDED_DIRS),-path ./$(dir) -prune -o)
 CFILES := $(shell find . $(EXCLUDE_PATHS) -name '*.c' -print)
 
 # =============================
-# Package Manager Detection
-# =============================
-# Deteksi manajer paket
-ifeq ($(shell command -v yum 2>/dev/null),) # Coba yum dulu
-	ifeq ($(shell command -v dnf 2>/dev/null),)
-		ifeq ($(shell command -v apt-get 2>/dev/null),)
-			ifeq ($(shell command -v pacman 2>/dev/null),)
-				ifeq ($(shell command -v zypper 2>/dev/null),)
-					$(error "Tidak ada manajer paket (yum, dnf, apt, pacman, zypper) yang ditemukan.")
-				else
-					PACKAGE_MANAGER = zypper
-					INSTALL_CMD = sudo zypper install -y
-					QUERY_CMD = zypper search --installed
-				endif
-			else
-				PACKAGE_MANAGER = pacman
-				INSTALL_CMD = sudo pacman -S --noconfirm
-				QUERY_CMD = pacman -Q
-			endif
-		else
-			PACKAGE_MANAGER = apt
-			INSTALL_CMD = sudo apt-get install -y
-			QUERY_CMD = dpkg -s
-		endif
-	else
-		PACKAGE_MANAGER = dnf
-		INSTALL_CMD = sudo dnf install -y
-		QUERY_CMD = dnf list installed
-	endif
-else
-	PACKAGE_MANAGER = yum
-	INSTALL_CMD = sudo yum install -y
-	QUERY_CMD = yum list installed
-endif
-
-# Fungsi untuk memeriksa dan menginstal paket
-define install_package
-	@echo "🔧 Memeriksa dan menginstal $(1) menggunakan $(PACKAGE_MANAGER)..."
-	@if [ "$(PACKAGE_MANAGER)" = "dnf" ] || [ "$(PACKAGE_MANAGER)" = "yum" ] || [ "$(PACKAGE_MANAGER)" = "zypper" ]; then \
-		$(QUERY_CMD) $(1) >/dev/null 2>&1 || $(INSTALL_CMD) $(1) || true; \
-	elif [ "$(PACKAGE_MANAGER)" = "apt" ]; then \
-		$(QUERY_CMD) $(1) >/dev/null 2>&1 || $(INSTALL_CMD) $(1) || true; \
-	elif [ "$(PACKAGE_MANAGER)" = "pacman" ]; then \
-		$(QUERY_CMD) $(1) >/dev/null 2>&1 || $(INSTALL_CMD) $(1) || true; \
-	fi
-endef
-
-# =============================
 # Build Targets
 # =============================
-.PHONY: all dev prod clean run debug check_iwyu install_dev_libraries install_prod_libraries
+.PHONY: all dev prod clean run debug check_iwyu
 
 # Target default
 all: prod
+	
+define install_pkg
+	@echo "🔧 Menginstall $(1)..."
+	@if [ "$(PKG_MANAGER)" = "unsupported" ]; then \
+		echo "❌ Distribusi tidak didukung. Install $(1) secara manual."; \
+	elif [ "$(PKG_MANAGER)" = "apt" ]; then \
+		$(USE_SUDO) apt update && $(USE_SUDO) apt install -y $(1) || true; \
+	elif [ "$(PKG_MANAGER)" = "dnf" ] || [ "$(PKG_MANAGER)" = "yum" ]; then \
+		$(USE_SUDO) $(PKG_MANAGER) install -y $(1) || true; \
+	elif [ "$(PKG_MANAGER)" = "pacman" ]; then \
+		$(USE_SUDO) pacman -S --noconfirm $(1) || true; \
+	elif [ "$(PKG_MANAGER)" = "zypper" ]; then \
+		$(USE_SUDO) zypper install -y $(1) || true; \
+	else \
+		echo "⚠️ Tidak bisa menginstall $(1)."; \
+	fi
+endef
 
-install_dev_libraries:
-	@echo "📥 Menginstal library yang dibutuhkan Orisium dengan $(PACKAGE_MANAGER)..."
-	$(call install_package,json-c)
-	$(call install_package,json-c-devel)
-	$(call install_package,libasan)
-	$(call install_package,python3)
+dev-libraries:
+	@echo "📥 Menginstall library development Orisium untuk $(DISTRO_ID) menggunakan $(PKG_MANAGER)..."
+	$(call install_pkg,json-c)
+	$(call install_pkg,json-c-devel)
+	$(call install_pkg,libasan)
+	$(call install_pkg,python3)
 
-install_prod_libraries:
-	@echo "📥 Menginstal library yang dibutuhkan Orisium dengan $(PACKAGE_MANAGER)..."
-	$(call install_package,json-c)
-	$(call install_package,json-c-devel)
+prod-libraries:
+	@echo "📥 Menginstall library production Orisium untuk $(DISTRO_ID) menggunakan $(PKG_MANAGER)..."
+	$(call install_pkg,json-c)
+	$(call install_pkg,json-c-devel)	
 
 dev:
-	$(MAKE) install_dev_libraries check_iwyu $(TARGET)
+	$(MAKE) dev-libraries check_iwyu $(TARGET)
 	@echo "-------------------------------------"
 	@echo "orisium dikompilasi dalam mode DEVELOPMENT!"
 	@echo "Executable: $(TARGET)"
 	@echo "-------------------------------------"
 
 prod:
-	$(MAKE) install_prod_libraries $(TARGET) BUILD_MODE=PRODUCTION
+	$(MAKE) prod-libraries $(TARGET) BUILD_MODE=PRODUCTION
 	@echo "-------------------------------------"
 	@echo "orisium dikompilasi dalam mode PRODUCTION!"
 	@echo "Executable: $(TARGET)"
 	@echo "-------------------------------------"
-
+	
 $(TARGET): $(OBJS) $(PQCLEAN_COMMON_OBJS) \
 		$(PQCLEAN_SIGN_MLDSA87_LIB_PATH) \
 		$(PQCLEAN_SIGN_FALCONPADDED512_LIB_PATH) \
@@ -232,46 +214,33 @@ $(IWYU_BIN_PATH):
 	@echo "🔧 Membangun IWYU..."
 	@if [ ! -f "$(IWYU_BIN_PATH)" ]; then \
 		echo "📥 Membangun dari sumber..."; \
-		echo "📥 Menginstal library yang dibutuhkan IWYU dengan $(PACKAGE_MANAGER)..."; \
-		$(call install_package,cmake); \
-		$(call install_package,clang); \
-		if [ "$(PACKAGE_MANAGER)" = "dnf" ] || [ "$(PACKAGE_MANAGER)" = "yum" ] || [ "$(PACKAGE_MANAGER)" = "zypper" ]; then \
-			$(call install_package,llvm-devel); \
-			$(call install_package,clang-devel); \
-		elif [ "$(PACKAGE_MANAGER)" = "apt" ]; then \
-			$(call install_package,libllvm-$(shell clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/')-dev); \
-			$(call install_package,libclang-$(shell clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/')-dev); \
-		elif [ "$(PACKAGE_MANAGER)" = "pacman" ]; then \
-			$(call install_package,llvm); \
-			$(call install_package,clang); \
-		fi; \
+		echo "📥 Memeriksa dan menginstall dependensi IWYU untuk distro $(DISTRO_ID) menggunakan $(PKG_MANAGER)..."; \
+		PKGS="cmake clang llvm clang-devel llvm-devel"; \
+		for pkg in $$PKGS; do \
+			if [ "$(PKG_MANAGER)" = "unsupported" ]; then \
+				echo "❌ Tidak bisa install $$pkg. Distribusi tidak didukung."; \
+				exit 1; \
+			elif [ "$(PKG_MANAGER)" = "apt" ]; then \
+				$(USE_SUDO) apt update && $(USE_SUDO) apt install -y cmake clang llvm || true; \
+				break; \
+			elif [ "$(PKG_MANAGER)" = "dnf" ] || [ "$(PKG_MANAGER)" = "yum" ]; then \
+				$(USE_SUDO) $(PKG_MANAGER) install -y cmake clang llvm clang-devel llvm-devel || true; \
+				break; \
+			elif [ "$(PKG_MANAGER)" = "pacman" ]; then \
+				$(USE_SUDO) pacman -Syu --noconfirm cmake clang llvm || true; \
+				break; \
+			elif [ "$(PKG_MANAGER)" = "zypper" ]; then \
+				$(USE_SUDO) zypper install -y cmake clang llvm || true; \
+				break; \
+			fi; \
+		done; \
 		CLANG_MAJOR_VER=$$(clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \
 		echo "📌 Deteksi Clang versi $$CLANG_MAJOR_VER"; \
 		cd $(IWYU_DIR) && \
-		if [ "$$CLANG_MAJOR_VER" = "10" ]; then \
-			git checkout clang_10; \
-		elif [ "$$CLANG_MAJOR_VER" = "11" ]; then \
-			git checkout clang_11; \
-		elif [ "$$CLANG_MAJOR_VER" = "12" ]; then \
-			git checkout clang_12; \
-		elif [ "$$CLANG_MAJOR_VER" = "13" ]; then \
-			git checkout clang_13; \
-		elif [ "$$CLANG_MAJOR_VER" = "14" ]; then \
-			git checkout clang_14; \
-		elif [ "$$CLANG_MAJOR_VER" = "15" ]; then \
-			git checkout clang_15; \
-		elif [ "$$CLANG_MAJOR_VER" = "16" ]; then \
-			git checkout clang_16; \
-		elif [ "$$CLANG_MAJOR_VER" = "17" ]; then \
-			git checkout clang_17; \
-		elif [ "$$CLANG_MAJOR_VER" = "18" ]; then \
-			git checkout clang_18; \
-		elif [ "$$CLANG_MAJOR_VER" = "19" ]; then \
-			git checkout clang_19; \
-		elif [ "$$CLANG_MAJOR_VER" = "20" ]; then \
-			git checkout clang_20; \
+		if [ "$$CLANG_MAJOR_VER" -ge 10 ] && [ "$$CLANG_MAJOR_VER" -le 20 ]; then \
+			git checkout clang_$$CLANG_MAJOR_VER || echo "⚠️ Branch clang_$$CLANG_MAJOR_VER tidak ditemukan"; \
 		else \
-			echo "⚠️ Versi clang tidak dikenali: $$CLANG_MAJOR_VER. Lewati checkout branch."; \
+			echo "⚠️ Versi clang tidak dikenali. Lewati checkout branch."; \
 		fi && \
 		mkdir -p $(IWYU_BUILD) && \
 		cd $(IWYU_BUILD) && \
@@ -291,7 +260,7 @@ clean:
 run: $(TARGET)
 	@echo "Menjalankan Orisium..."
 	./$(TARGET)
-
+	
 debug: dev
 	@echo "🚀 Menjalankan Orisium dengan AddressSanitizer (ASAN)..."
 	ASAN_OPTIONS=detect_leaks=1 ./$(TARGET)
