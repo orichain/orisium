@@ -94,15 +94,17 @@ master --> sio (server IO) <--> logic <--> cow (client outbound)
   * **Mengirim Data Keluar**: Cow menerima data dan perintah dari **Logic** dan secara efisien mengirimkannya melalui koneksi keluar yang relevan.
   * **Melapor via Logic**: Mirip dengan Sio, setiap pembaruan status, kesalahan, atau pemutusan koneksi yang terkait dengan koneksi keluar dilaporkan dari Cow ke **Logic**. Cow tidak berkomunikasi langsung dengan Master.
 
-### **5. Mekanisme Penyimpanan Data Otomatis (Semua Level)**
+### **5. Mekanisme Penyimpanan Data Otomatis & Validasi Shard (Semua Level)**
 
-Setiap node Orisium (kecuali mungkin Level-4 yang bisa hanya menjadi klien murni) dirancang untuk secara cerdas mengelola penyimpanan data *shard* berdasarkan kapasitas sumber daya yang tersedia. Fitur ini sangat penting untuk efisiensi dan keandalan jaringan, terutama bagi node yang bercita-cita untuk promosi:
+Setiap node Orisium (kecuali mungkin Level-4 yang bisa hanya menjadi klien murni) dirancang untuk secara cerdas mengelola penyimpanan data *shard* berdasarkan kapasitas sumber daya yang tersedia, serta memvalidasi dan melaporkan integritas data tersebut. Fitur ini sangat penting untuk efisiensi, keandalan, dan desentralisasi jaringan, terutama bagi node yang bercita-cita untuk promosi:
 
   * **Pendeteksian Ruang Disk**: Node akan secara otomatis **mendeteksi ketersediaan ruang hard disk** saat beroperasi atau memulai ulang.
   * **Penyimpanan Kondisional**:
       * Jika node mendeteksi ada **ruang hard disk yang mencukupi** (sesuai ambang batas yang ditentukan sistem), node tersebut akan **mulai atau melanjutkan proses penyimpanan data *shard*** yang relevan dengan *zona waktu*-nya.
       * Namun, jika ruang hard disk **tidak memenuhi syarat** atau mencapai batas minimum, node akan **menghentikan proses penyimpanan data *shard***. Ini mencegah *resource exhaustion* dan memastikan node tetap stabil untuk tugas-tugas vital lainnya.
-  * **Prasyarat Promosi**: Kemampuan untuk menyimpan data *shard* adalah **syarat penting** bagi node di Level-1, Level-2, Level-3, dan Level-4 yang ingin memenuhi syarat untuk dipromosikan ke level yang lebih tinggi. Ini memastikan node yang naik level sudah memiliki data yang diperlukan.
+  * **Validasi Data Shard Lokal**: Saat node level bawah berhasil menyimpan atau memperbarui data *shard* secara lokal (misalnya, setelah menerima blok baru atau *snapshot* dari *Upstream* mereka), mereka akan melakukan **validasi internal** terhadap data tersebut. Ini mengurangi kebutuhan untuk selalu bertanya ke Root untuk data yang sudah dimiliki.
+  * **Pelaporan dan *Signature* Root**: Setelah validasi lokal sukses, node level bawah akan **memberi laporan ke Root *Upstream*** mereka. Root node, setelah memverifikasi keabsahan laporan tersebut, akan memberikan **tanda tangan digital (*signature*)** yang berfungsi sebagai "sertifikat kelengkapan data". *Signature* ini mengonfirmasi bahwa node level bawah memiliki salinan data *shard* yang otentik dan terkini dari Root.
+  * **Prasyarat Promosi**: Kemampuan untuk menyimpan data *shard* yang valid dan memiliki *signature* dari Root adalah **syarat penting** bagi node di Level-1, Level-2, Level-3, dan Level-4 yang ingin memenuhi syarat untuk dipromosikan ke level yang lebih tinggi. Ini memastikan node yang naik level sudah memiliki data yang diperlukan dan terverifikasi.
 
 -----
 
