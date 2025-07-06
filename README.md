@@ -35,7 +35,7 @@ Orisium memanfaatkan konsep *sharding* inovatif untuk distribusi data dan optima
 
 Orisium mengimplementasikan pertahanan berlapis terhadap serangan dan beban berlebih:
 
-  * **Manajemen Koneksi Efisien (`epoll`)**: Menggunakan `epoll` untuk I/O *non-blocking* yang efisien, memungkinkan penanganan ribuan koneksi secara bersamaan dengan *overhead* minimal.
+  * **Manajemen Koneksi Efisien (`epoll`/`kqueue`)**: Menggunakan `epoll`\`kqueue` untuk I/O *non-blocking* yang efisien, memungkinkan penanganan ribuan koneksi secara bersamaan dengan *overhead* minimal.
   * ***Rate Limiting* Agresif (5 Detik)**: Mencegah klien membanjiri server dengan permintaan koneksi berulang. Klien yang melanggar akan dikenai penalti perpanjangan waktu, membuat penyerang atau *bot* sederhana sulit untuk terhubung. Klien P2P yang terprogram dengan baik mengimplementasikan strategi *backoff* yang selaras dengan waktu *rate limit* ini untuk pengalaman yang mulus.
   * ***Inactivity Timeout***: Secara proaktif membersihkan koneksi yang tidak aktif atau mati, mencegah *resource exhaustion* dan serangan *slowloris*.
   * **Pencegahan Koneksi Ganda**: Menolak koneksi dari IP yang sudah memiliki sesi aktif, membatasi *resource* yang dapat dihabiskan oleh satu sumber.
