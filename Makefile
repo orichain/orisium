@@ -16,7 +16,7 @@ COMMON_CFLAGS = -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-de
 BUILD_MODE ?= DEVELOPMENT
 LOG_TO ?= SCREEN
 ifeq ($(BUILD_MODE), PRODUCTION)
-    FINAL_CFLAGS = $(COMMON_CFLAGS) -O3 -DNDEBUG -DPRODUCTION
+	FINAL_CFLAGS = $(COMMON_CFLAGS) -O3 -DNDEBUG -DPRODUCTION
 else
 	ifeq ($(LOG_TO), FILE)
 		FINAL_CFLAGS = $(COMMON_CFLAGS) -fsanitize=address -fsanitize=leak -g -O3 -Werror -DDEVELOPMENT -DTOFILE
@@ -69,45 +69,87 @@ EXCLUDE_PATHS := $(foreach dir,$(EXCLUDED_DIRS),-path ./$(dir) -prune -o)
 CFILES := $(shell find . $(EXCLUDE_PATHS) -name '*.c' -print)
 
 # =============================
+# Package Manager Detection
+# =============================
+# Deteksi manajer paket
+ifeq ($(shell command -v yum 2>/dev/null),) # Coba yum dulu
+	ifeq ($(shell command -v dnf 2>/dev/null),)
+		ifeq ($(shell command -v apt-get 2>/dev/null),)
+			ifeq ($(shell command -v pacman 2>/dev/null),)
+				ifeq ($(shell command -v zypper 2>/dev/null),)
+					$(error "Tidak ada manajer paket (yum, dnf, apt, pacman, zypper) yang ditemukan.")
+				else
+					PACKAGE_MANAGER = zypper
+					INSTALL_CMD = sudo zypper install -y
+					QUERY_CMD = zypper search --installed
+				endif
+			else
+				PACKAGE_MANAGER = pacman
+				INSTALL_CMD = sudo pacman -S --noconfirm
+				QUERY_CMD = pacman -Q
+			endif
+		else
+			PACKAGE_MANAGER = apt
+			INSTALL_CMD = sudo apt-get install -y
+			QUERY_CMD = dpkg -s
+		endif
+	else
+		PACKAGE_MANAGER = dnf
+		INSTALL_CMD = sudo dnf install -y
+		QUERY_CMD = dnf list installed
+	endif
+else
+	PACKAGE_MANAGER = yum
+	INSTALL_CMD = sudo yum install -y
+	QUERY_CMD = yum list installed
+endif
+
+# Fungsi untuk memeriksa dan menginstal paket
+define install_package
+	@echo "🔧 Memeriksa dan menginstal $(1) menggunakan $(PACKAGE_MANAGER)..."
+	@if [ "$(PACKAGE_MANAGER)" = "dnf" ] || [ "$(PACKAGE_MANAGER)" = "yum" ] || [ "$(PACKAGE_MANAGER)" = "zypper" ]; then \
+		$(QUERY_CMD) $(1) >/dev/null 2>&1 || $(INSTALL_CMD) $(1) || true; \
+	elif [ "$(PACKAGE_MANAGER)" = "apt" ]; then \
+		$(QUERY_CMD) $(1) >/dev/null 2>&1 || $(INSTALL_CMD) $(1) || true; \
+	elif [ "$(PACKAGE_MANAGER)" = "pacman" ]; then \
+		$(QUERY_CMD) $(1) >/dev/null 2>&1 || $(INSTALL_CMD) $(1) || true; \
+	fi
+endef
+
+# =============================
 # Build Targets
 # =============================
-.PHONY: all dev prod clean run debug check_iwyu
+.PHONY: all dev prod clean run debug check_iwyu install_dev_libraries install_prod_libraries
 
 # Target default
 all: prod
 
-dev-libraries:
-	@echo "📥 Menginstall library yang di butuhkan orisium dengan sudo dnf..."
-	@echo "🔧 Menginstall JSON-C..."
-	dnf list installed json-c >/dev/null 2>&1 || sudo dnf install -y json-c || false;
-	@echo "🔧 Menginstall JSON-C-DEVEL..."
-	dnf list installed json-c-devel >/dev/null 2>&1 || sudo dnf install -y json-c-devel || false;
-	@echo "🔧 Menginstall LIBASAN..."
-	dnf list installed libasan >/dev/null 2>&1 || sudo dnf install -y libasan || false;
-	@echo "🔧 Menginstall PYTHON3..."
-	dnf list installed python3 >/dev/null 2>&1 || sudo dnf install -y python3 || false;
-	
-prod-libraries:
-	@echo "📥 Menginstall library yang di butuhkan orisium dengan sudo dnf..."
-	@echo "🔧 Menginstall JSON-C..."
-	dnf list installed json-c >/dev/null 2>&1 || sudo dnf install -y json-c || false;
-	@echo "🔧 Menginstall JSON-C-DEVEL..."
-	dnf list installed json-c-devel >/dev/null 2>&1 || sudo dnf install -y json-c-devel || false;
+install_dev_libraries:
+	@echo "📥 Menginstal library yang dibutuhkan Orisium dengan $(PACKAGE_MANAGER)..."
+	$(call install_package,json-c)
+	$(call install_package,json-c-devel)
+	$(call install_package,libasan)
+	$(call install_package,python3)
+
+install_prod_libraries:
+	@echo "📥 Menginstal library yang dibutuhkan Orisium dengan $(PACKAGE_MANAGER)..."
+	$(call install_package,json-c)
+	$(call install_package,json-c-devel)
 
 dev:
-	$(MAKE) dev-libraries check_iwyu $(TARGET)
+	$(MAKE) install_dev_libraries check_iwyu $(TARGET)
 	@echo "-------------------------------------"
 	@echo "orisium dikompilasi dalam mode DEVELOPMENT!"
 	@echo "Executable: $(TARGET)"
 	@echo "-------------------------------------"
 
 prod:
-	$(MAKE) prod-libraries $(TARGET) BUILD_MODE=PRODUCTION
+	$(MAKE) install_prod_libraries $(TARGET) BUILD_MODE=PRODUCTION
 	@echo "-------------------------------------"
 	@echo "orisium dikompilasi dalam mode PRODUCTION!"
 	@echo "Executable: $(TARGET)"
 	@echo "-------------------------------------"
-	
+
 $(TARGET): $(OBJS) $(PQCLEAN_COMMON_OBJS) \
 		$(PQCLEAN_SIGN_MLDSA87_LIB_PATH) \
 		$(PQCLEAN_SIGN_FALCONPADDED512_LIB_PATH) \
@@ -190,13 +232,19 @@ $(IWYU_BIN_PATH):
 	@echo "🔧 Membangun IWYU..."
 	@if [ ! -f "$(IWYU_BIN_PATH)" ]; then \
 		echo "📥 Membangun dari sumber..."; \
-		echo "📥 Menginstall library yang di butuhkan IWYU dengan sudo dnf..."; \
-		command -v cmake >/dev/null 2>&1 && \
-		command -v clang >/dev/null 2>&1 && \
-		command -v llvm-ar >/dev/null 2>&1 && \
-		dnf list installed clang-devel >/dev/null 2>&1 && \
-		dnf list installed llvm-devel >/dev/null 2>&1 || \
-		sudo dnf install -y cmake llvm clang llvm-devel clang-devel || true; \
+		echo "📥 Menginstal library yang dibutuhkan IWYU dengan $(PACKAGE_MANAGER)..."; \
+		$(call install_package,cmake); \
+		$(call install_package,clang); \
+		if [ "$(PACKAGE_MANAGER)" = "dnf" ] || [ "$(PACKAGE_MANAGER)" = "yum" ] || [ "$(PACKAGE_MANAGER)" = "zypper" ]; then \
+			$(call install_package,llvm-devel); \
+			$(call install_package,clang-devel); \
+		elif [ "$(PACKAGE_MANAGER)" = "apt" ]; then \
+			$(call install_package,libllvm-$(shell clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/')-dev); \
+			$(call install_package,libclang-$(shell clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/')-dev); \
+		elif [ "$(PACKAGE_MANAGER)" = "pacman" ]; then \
+			$(call install_package,llvm); \
+			$(call install_package,clang); \
+		fi; \
 		CLANG_MAJOR_VER=$$(clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \
 		echo "📌 Deteksi Clang versi $$CLANG_MAJOR_VER"; \
 		cd $(IWYU_DIR) && \
@@ -223,7 +271,7 @@ $(IWYU_BIN_PATH):
 		elif [ "$$CLANG_MAJOR_VER" = "20" ]; then \
 			git checkout clang_20; \
 		else \
-			echo "⚠️  Versi clang tidak dikenali: $$CLANG_MAJOR_VER. Lewati checkout branch."; \
+			echo "⚠️ Versi clang tidak dikenali: $$CLANG_MAJOR_VER. Lewati checkout branch."; \
 		fi && \
 		mkdir -p $(IWYU_BUILD) && \
 		cd $(IWYU_BUILD) && \
@@ -243,7 +291,7 @@ clean:
 run: $(TARGET)
 	@echo "Menjalankan Orisium..."
 	./$(TARGET)
-	
+
 debug: dev
 	@echo "🚀 Menjalankan Orisium dengan AddressSanitizer (ASAN)..."
 	ASAN_OPTIONS=detect_leaks=1 ./$(TARGET)
