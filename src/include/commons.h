@@ -2,6 +2,7 @@
 #define COMMONS_H
 
 #include <unistd.h>
+#include <sys/wait.h>
 
 #define IPC_LENGTH_PREFIX_BYTES sizeof(uint32_t)
 
@@ -39,6 +40,21 @@
             close(x); \
             x = -1; \
         } \
+    } while(0)
+    
+#define CLOSE_UDS(x) \
+    do { \
+        if (x != 0) { \
+			close(x); \
+			x = 0; \
+		} \
+    } while(0)
+    
+#define CLOSE_PID(x) \
+    do { \
+        if (x > 0) { \
+			waitpid(x, NULL, 0); \
+		} \
     } while(0)
              
 #endif

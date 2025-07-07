@@ -1,7 +1,5 @@
-#include <stdio.h>       // for printf, perror, fprintf, NULL, stderr
 #include <string.h>      // for memset, strncpy
 #include <errno.h>
-#include <sys/wait.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -9,6 +7,7 @@
 #include "log.h"
 #include "constants.h"
 #include "types.h"
+#include "commons.h"
 #include "utilities.h"
 #include "workers/sio.h"
 #include "workers/logic.h"
@@ -19,35 +18,17 @@
 
 status_t close_worker(const char *label, master_context *master_ctx, worker_type_t wot, int index) {
 	if (wot == SIO) {
-		waitpid(master_ctx->sio_pids[index], NULL, 0);
-		if (master_ctx->master_uds_sio_fds[index] != 0) {
-			close(master_ctx->master_uds_sio_fds[index]);
-			master_ctx->master_uds_sio_fds[index] = 0;
-		}
-		if (master_ctx->worker_uds_sio_fds[index] != 0) {
-			close(master_ctx->worker_uds_sio_fds[index]);
-			master_ctx->worker_uds_sio_fds[index] = 0;
-		}
+		CLOSE_UDS(master_ctx->master_uds_sio_fds[index]);
+		CLOSE_UDS(master_ctx->worker_uds_sio_fds[index]);
+		CLOSE_PID(master_ctx->sio_pids[index]);
 	} else if (wot == LOGIC) {
-		waitpid(master_ctx->logic_pids[index], NULL, 0);
-		if (master_ctx->master_uds_logic_fds[index] != 0) {
-			close(master_ctx->master_uds_logic_fds[index]);
-			master_ctx->master_uds_logic_fds[index] = 0;
-		}
-		if (master_ctx->worker_uds_logic_fds[index] != 0) {
-			close(master_ctx->worker_uds_logic_fds[index]);
-			master_ctx->worker_uds_logic_fds[index] = 0;
-		}			
+		CLOSE_UDS(master_ctx->master_uds_logic_fds[index]);
+		CLOSE_UDS(master_ctx->worker_uds_logic_fds[index]);
+		CLOSE_PID(master_ctx->logic_pids[index]);
 	} else if (wot == COW) {
-		waitpid(master_ctx->cow_pids[index], NULL, 0);
-		if (master_ctx->master_uds_cow_fds[index] != 0) {
-			close(master_ctx->master_uds_cow_fds[index]);
-			master_ctx->master_uds_cow_fds[index] = 0;
-		}
-		if (master_ctx->worker_uds_cow_fds[index] != 0) {
-			close(master_ctx->worker_uds_cow_fds[index]);
-			master_ctx->worker_uds_cow_fds[index] = 0;
-		}
+		CLOSE_UDS(master_ctx->master_uds_cow_fds[index]);
+		CLOSE_UDS(master_ctx->worker_uds_cow_fds[index]);
+		CLOSE_PID(master_ctx->cow_pids[index]);
 	}
 	return SUCCESS;
 }
@@ -115,19 +96,19 @@ status_t create_socket_pair(const char *label, master_context *master_ctx, worke
 void workers_cleanup(master_context *master_ctx) {
     LOG_INFO("Performing cleanup...");
     for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-        if (master_ctx->master_uds_sio_fds[i] != 0) close(master_ctx->master_uds_sio_fds[i]);
-        if (master_ctx->worker_uds_sio_fds[i] != 0) close(master_ctx->worker_uds_sio_fds[i]); // Close worker side in Master too
-        if (master_ctx->sio_pids[i] > 0) waitpid(master_ctx->sio_pids[i], NULL, 0);
+		CLOSE_UDS(master_ctx->master_uds_sio_fds[i]);
+		CLOSE_UDS(master_ctx->worker_uds_sio_fds[i]);
+		CLOSE_PID(master_ctx->sio_pids[i]);
     }
     for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-        if (master_ctx->master_uds_logic_fds[i] != 0) close(master_ctx->master_uds_logic_fds[i]);
-        if (master_ctx->worker_uds_logic_fds[i] != 0) close(master_ctx->worker_uds_logic_fds[i]); // Close worker side in Master too
-        if (master_ctx->logic_pids[i] > 0) waitpid(master_ctx->logic_pids[i], NULL, 0);
+		CLOSE_UDS(master_ctx->master_uds_logic_fds[i]);
+		CLOSE_UDS(master_ctx->worker_uds_logic_fds[i]);
+		CLOSE_PID(master_ctx->logic_pids[i]);
     }
     for (int i = 0; i < MAX_COW_WORKERS; ++i) {
-        if (master_ctx->master_uds_cow_fds[i] != 0) close(master_ctx->master_uds_cow_fds[i]);
-        if (master_ctx->worker_uds_cow_fds[i] != 0) close(master_ctx->worker_uds_cow_fds[i]); // Close worker side in Master too
-        if (master_ctx->cow_pids[i] > 0) waitpid(master_ctx->cow_pids[i], NULL, 0);
+		CLOSE_UDS(master_ctx->master_uds_cow_fds[i]);
+		CLOSE_UDS(master_ctx->worker_uds_cow_fds[i]);
+		CLOSE_PID(master_ctx->cow_pids[i]);
     }
     LOG_INFO("Cleanup complete.");
 }
