@@ -16,20 +16,65 @@ Orisium adalah jaringan *peer-to-peer* (P2P) berperforma tinggi yang dirancang u
 
 Orisium mengadopsi struktur jaringan berlapis yang unik untuk skalabilitas dan ketahanan. Jaringan Root didasarkan pada sekitar **40 *zona waktu* unik** di seluruh dunia, yang secara langsung memetakan ke *shard* data.
 
-  * **Node Root Bootstrap (3 Node)**: Ini adalah **fondasi awal jaringan** yang stabil, di-*hardcode* untuk mewakili 3 *zona waktu* spesifik yang berdekatan. Mereka adalah bagian dari total 40 Node Root, memiliki konektivitas horizontal terluas (terhubung ke semua 39 Node Root lainnya), dan **harus menyimpan basis data lengkap setiap *shard* *zona waktu***. Meskipun krusial di awal, node Bootstrap ini **dapat turun level** jika tidak mampu, namun akan tetap **menyediakan daftar IP** untuk membantu node baru menemukan jaringan.
-  * **Node Root (Maks. 40 Node)**: Ini adalah **tulang punggung utama *sharding* *zona waktu***. Setiap Node Root secara eksklusif **mewakili satu dari sekitar 40 *zona waktu* unik** dan **harus menyimpan basis data lengkap** untuk *shard* tersebut. Setiap Node Root **terhubung ke semua 39 Node Root lainnya** untuk konsensus yang cepat dan penyebaran informasi global. Setiap Node Root dapat mengelola hingga **10 koneksi *Downstream* ke Node Level-1**. Node Root mengelola sub-jaringan di bawahnya dan dapat menjatuhkan level *horizontalstream* yang melanggar syarat.
-  * **Node Level-1 (Maks. 400 Node)**: Berperan sebagai perantara penting di dalam *shard* *zona waktu* mereka. Node Level-1 memiliki **satu koneksi *Upstream* ke sebuah Node Root** dan **39 koneksi *Horizontalstream* ke Node Level-1 lainnya yang memiliki Root *Upstream* yang sama**. Node Level-1 dapat mengelola hingga **10 koneksi *Downstream* ke Node Level-2**. Node Level-1 sangat vital karena mereka dapat **berpindah *Upstream* Root** jika tidak memenuhi syarat, dan bahkan **mempromosikan diri menjadi Root baru** untuk mengisi slot kosong atau menggantikan Root yang bermasalah.
-  * **Node Level-2 (Maks. 4000 Node)**: Terhubung ke **satu *Upstream* Node Level-1** dan memiliki **39 koneksi *Horizontalstream* ke Node Level-2 lainnya yang memiliki Root *Upstream* yang sama**. Setiap Node Level-2 dapat mengelola hingga **10 koneksi *Downstream* ke Node Level-3**. Node ini berfungsi memperluas jangkauan jaringan.
-  * **Node Level-3 (Maks. 40000 Node)**: Terhubung ke **satu *Upstream* Node Level-2** dan memiliki **39 koneksi *Horizontalstream* ke Node Level-3 lainnya yang memiliki Root *Upstream* yang sama**. Setiap Node Level-3 dapat mengelola hingga **10 koneksi *Downstream* ke Node Level-4**. Node ini lebih lanjut memperluas jangkauan jaringan.
-  * **Node Level-4 (Maks. 400000 Node)**: Lapisan terluar jaringan, terhubung ke **satu *Upstream* Node Level-3** dan memiliki **39 koneksi *Horizontalstream* ke Node Level-4 lainnya yang memiliki Root *Upstream* yang sama**. Node Level-4 bertanggung jawab untuk jangkauan massal ke pengguna akhir dan **tidak memiliki koneksi *Downstream***.
+* **Node Root Bootstrap (3 Node)**: Ini adalah **fondasi awal jaringan** yang stabil, di-*hardcode* untuk mewakili 3 *zona waktu* spesifik yang berdekatan. Mereka adalah bagian dari total 40 Node Root, memiliki konektivitas horizontal terluas (terhubung ke semua 39 Node Root lainnya), dan **harus menyimpan basis data lengkap setiap *shard* *zona waktu***. Meskipun krusial di awal, node Bootstrap ini **dapat turun level** jika tidak mampu, namun akan tetap **menyediakan daftar IP** untuk membantu node baru menemukan jaringan.
+* **Node Root (Maks. 40 Node)**: Ini adalah **tulang punggung utama *sharding* *zona waktu***. Setiap Node Root secara eksklusif **mewakili satu dari sekitar 40 *zona waktu* unik** dan **harus menyimpan basis data lengkap** untuk *shard* tersebut. Setiap Node Root **terhubung ke semua 39 Node Root lainnya** untuk konsensus yang cepat dan penyebaran informasi global. Setiap Node Root dapat mengelola hingga **10 koneksi *Downstream* ke Node Level-1**. Node Root mengelola sub-jaringan di bawahnya dan dapat menjatuhkan level *horizontalstream* yang melanggar syarat.
+* **Node Level-1 (Maks. 400 Node)**: Berperan sebagai perantara penting di dalam *shard* *zona waktu* mereka. Node Level-1 memiliki **satu koneksi *Upstream* ke sebuah Node Root** dan **39 koneksi *Horizontalstream* ke Node Level-1 lainnya yang memiliki Root *Upstream* yang sama**. Node Level-1 dapat mengelola hingga **10 koneksi *Downstream* ke Node Level-2**. Node Level-1 sangat vital karena mereka dapat **berpindah *Upstream* Root** jika tidak memenuhi syarat, dan bahkan **mempromosikan diri menjadi Root baru** untuk mengisi slot kosong atau menggantikan Root yang bermasalah.
+* **Node Level-2 (Maks. 4000 Node)**: Terhubung ke **satu *Upstream* Node Level-1** dan memiliki **39 koneksi *Horizontalstream* ke Node Level-2 lainnya yang memiliki Root *Upstream* yang sama**. Setiap Node Level-2 dapat mengelola hingga **10 koneksi *Downstream* ke Node Level-3**. Node ini berfungsi memperluas jangkauan jaringan.
+* **Node Level-3 (Maks. 40000 Node)**: Terhubung ke **satu *Upstream* Node Level-2** dan memiliki **39 koneksi *Horizontalstream* ke Node Level-3 lainnya yang memiliki Root *Upstream* yang sama**. Setiap Node Level-3 dapat mengelola hingga **10 koneksi *Downstream* ke Node Level-4**. Node ini lebih lanjut memperluas jangkauan jaringan.
+* **Node Level-4 (Maks. 400000 Node)**: Lapisan terluar jaringan, terhubung ke **satu *Upstream* Node Level-3** dan memiliki **39 koneksi *Horizontalstream* ke Node Level-4 lainnya yang memiliki Root *Upstream* yang sama**. Node Level-4 bertanggung jawab untuk jangkauan massal ke pengguna akhir dan **tidak memiliki koneksi *Downstream***.
 
-### **2. *Sharding* Berbasis *Zona Waktu* pada *Public Key***
+### **2. *Sharding* Kombinasi *Zona Waktu* dan *Tanggal* pada *Public Key***
 
-Orisium memanfaatkan konsep *sharding* inovatif untuk distribusi data dan optimasi kinerja global:
+Orisium memanfaatkan strategi *sharding* dua dimensi berdasarkan **zona waktu** dan **tanggal pembuatan alamat** untuk skalabilitas tinggi dan pengarsipan efisien:
 
-  * **Identitas Tersemat *Zona Waktu***: Setiap Alamat/*Public Key* pengirim transaksi secara eksplisit **menyematkan kode *zona waktu*** saat dibuat. Kode ini berfungsi sebagai ***shard key*** yang deterministik, memastikan alamat tersebut terkait dengan *shard* *zona waktu* tertentu.
-  * **Optimalisasi Latensi Regional**: Transaksi dan data yang terkait dengan alamat dari *zona waktu* tertentu secara otomatis diarahkan ke *shard* yang relevan (dikelola oleh Node Root dalam *zona waktu* tersebut), secara signifikan mengurangi latensi bagi pengguna di wilayah yang sama.
-  * **Penanganan Perubahan *Zona Waktu***: Jika pengguna bertransaksi dari *zona waktu* yang berbeda dari *zona waktu* yang disematkan pada alamat mereka, sistem akan mendeteksi dan memberi **peringatan, merekomendasikan pembuatan alamat baru** untuk kinerja optimal. Transaksi tetap dapat diproses menggunakan alamat lama, namun dengan potensi latensi yang lebih tinggi karena memerlukan komunikasi antar-*shard* yang melibatkan Node Root.
+* **Identitas Tersemat: Zona Waktu dan Tanggal**: Setiap *public key*/alamat menyematkan dua komponen penting:
+
+  * `tz_code` → menunjukkan zona waktu geografis.
+  * `date_code` → menunjukkan tanggal pembuatan, digunakan sebagai dasar pembagian historis.
+
+* **Routing Deterministik**: Dengan menyematkan kode zona waktu dan tanggal, sistem dapat langsung merutekan transaksi ke *shard* spesifik dengan struktur direktori seperti:
+
+  ```bash
+  db/YYYYMMDD/tz-XX/
+  # contoh: db/20250707/tz-07/
+  ```
+
+* **Optimasi Latensi + Pengarsipan Mudah**:
+
+  * Akses lokal cepat karena berdasarkan zona.
+  * Pemangkasan (pruning) sangat mudah dilakukan berdasarkan tanggal.
+
+* **Pencarian Transaksi Terakhir Efisien**: Karena zona waktu ditentukan secara eksplisit, pencarian *last transaction* hanya perlu dilakukan dalam *shard* zona waktu tertentu, dimulai dari tanggal terbaru ke lama.
+
+* **Struktur Kombinasi**:
+
+  ```
+  address = date_code || tz_code || pubkey || checksum
+  ```
+
+* **Skalabilitas Horizontal + Temporal**: Memungkinkan rotasi writer per hari/zona, sharding time-aware, dan distribusi beban lintas wilayah dan waktu.
+
+```
+ root tmz-1  <─────>   root tmz-2
+     ▲                     ▲
+     │                     │
+     ▼                     ▼
+n-level1[10]           n-level1[10]
+     ▲                     ▲
+     │                     │
+     ▼                     ▼
+n-level2[100]          n-level2[100]
+     ▲                     ▲
+     │                     │
+     ▼                     ▼
+n-level3[1000]         n-level3[1000]
+     ▲                     ▲
+     │                     │
+     ▼                     ▼
+n-level4[10000]        n-level4[10000]
+
+Dalam Address/Publickey ada prefix `date_code` + `tz_code`
+```
 
 ### **3. Mekanisme Keamanan dan Ketahanan Canggih**
 
