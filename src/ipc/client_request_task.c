@@ -118,36 +118,34 @@ status_t ipc_deserialize_client_request_task(ipc_protocol_t *p, const uint8_t *b
 }
 
 ipc_protocol_t_status_t ipc_prepare_cmd_client_request_task(int *fd_to_close, uint64_t *correlation_id, uint8_t client_ip_for_request[], uint16_t data_len, uint8_t *data) {
-	ipc_protocol_t *p = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
 	ipc_protocol_t_status_t result;
+	result.r_ipc_protocol_t = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
 	result.status = FAILURE;
-	result.r_ipc_protocol_t = NULL;
-	if (!p) {
+	if (!result.r_ipc_protocol_t) {
 		perror("Failed to allocate ipc_protocol_t protocol");
 		if (*fd_to_close != -1) {
 			CLOSE_FD(*fd_to_close);
 		}
 		return result;
 	}
-	memset(p, 0, sizeof(ipc_protocol_t)); // Inisialisasi dengan nol
-	p->version[0] = VERSION_MAJOR;
-	p->version[1] = VERSION_MINOR;
-	p->type = IPC_CLIENT_REQUEST_TASK;
+	memset(result.r_ipc_protocol_t, 0, sizeof(ipc_protocol_t)); // Inisialisasi dengan nol
+	result.r_ipc_protocol_t->version[0] = VERSION_MAJOR;
+	result.r_ipc_protocol_t->version[1] = VERSION_MINOR;
+	result.r_ipc_protocol_t->type = IPC_CLIENT_REQUEST_TASK;
 	ipc_client_request_task_t *payload = (ipc_client_request_task_t *)calloc(1, sizeof(ipc_client_request_task_t) + data_len);
 	if (!payload) {
 		perror("Failed to allocate ipc_client_request_task_t payload");
 		if (*fd_to_close != -1) {
 			CLOSE_FD(*fd_to_close);
 		}
-		CLOSE_IPC_PROTOCOL(p);
+		CLOSE_IPC_PROTOCOL(result.r_ipc_protocol_t);
 		return result;
 	}
 	payload->correlation_id = *correlation_id;
 	memcpy(payload->ip, client_ip_for_request, INET6_ADDRSTRLEN);
 	payload->len = data_len;
 	if (data_len > 0 && data) memcpy(payload->data, data, data_len);
-	p->payload.ipc_client_request_task = payload;
-	result.r_ipc_protocol_t = p;
+	result.r_ipc_protocol_t->payload.ipc_client_request_task = payload;
 	result.status = SUCCESS;
 	return result;
 }
