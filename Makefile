@@ -116,7 +116,8 @@ dev-libraries:
 prod-libraries:
 	@echo "📥 Menginstall library production Orisium untuk $(DISTRO_ID) menggunakan $(PKG_MANAGER)..."
 	$(call install_pkg,json-c)
-	$(call install_pkg,json-c-devel)	
+	$(call install_pkg,json-c-devel)
+	$(call install_pkg,python3)	
 
 dev:
 	$(MAKE) dev-libraries check_iwyu $(TARGET)
@@ -126,7 +127,7 @@ dev:
 	@echo "-------------------------------------"
 
 prod:
-	$(MAKE) prod-libraries $(TARGET) BUILD_MODE=PRODUCTION
+	$(MAKE) prod-libraries check_iwyu $(TARGET) BUILD_MODE=PRODUCTION
 	@echo "-------------------------------------"
 	@echo "orisium dikompilasi dalam mode PRODUCTION!"
 	@echo "Executable: $(TARGET)"

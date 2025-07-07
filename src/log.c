@@ -14,6 +14,7 @@
 
     #include "globals.h"    // for shutdown_requested
     #include "utilities.h"  // for get_realtime_time_ns, sleep_s
+    #include "types.h"
 
     static FILE *log_fp = NULL;
     static char current_filename[64] = "";
