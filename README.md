@@ -54,11 +54,15 @@ Orisium memastikan alokasi beban kerja yang efisien untuk kinerja optimal:
 Arsitektur Orisium mengintegrasikan berbagai komponen dan level node untuk menciptakan jaringan yang kuat, dengan detail alur internal sebagai berikut:
 
 ```
-master --> sio (server IO) <--> logic <--> cow (client outbound)
-  ^                               ^
-  |                               |
-  v                               v 
-  ---------------------------------  (Laporan/Status ke Master)
+                                w-lmdb[1]     r-lmdb[50]
+                                   ▲             ▲
+                                   │             │
+                                   ▼             ▼ 
+master[1] ──> sio[2] <──────────>      logic[4]      <──────────> cow[50]
+   ▲                                      ▲
+   │                                      │
+   └──────── status / report ─────────────┘
+
 Komunikasi internal / IPC:
 Protocol IPC lewat Unix Domain Socket
 ```
