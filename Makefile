@@ -12,7 +12,7 @@ OBJ_DIR = obj
 CC = gcc
 GCC_INCLUDE_DIRS := $(shell echo '' | gcc -E -x c - -v 2>&1 | awk '/^ \/.*\/include/ { print "-I" $$1 }')
 INCLUDE_DIR = $(GCC_INCLUDE_DIRS) -I./$(SRC_DIR)/include -I./PQClean -I./PQClean/common
-COMMON_CFLAGS = -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration -pthread -mrdseed -ljson-c $(INCLUDE_DIR)
+COMMON_CFLAGS = -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration -pthread -mrdseed -ljson-c -lm $(INCLUDE_DIR)
 BUILD_MODE ?= DEVELOPMENT
 LOG_TO ?= SCREEN
 ifeq ($(BUILD_MODE), PRODUCTION)

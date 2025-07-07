@@ -10,9 +10,31 @@
 #include "types.h"
 #include "ipc/client_disconnect_info.h"
 
+status_t ipc_serialize_client_disconnect_info(const ipc_client_disconnect_info_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
+    if (!payload || !current_buffer || !offset) {
+        return FAILURE;
+    }
+
+    size_t current_offset_local = *offset;
+
+    // Salin Correlation ID (big-endian)
+    if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, sizeof(uint64_t), buffer_size)) return FAILURE_OOBUF;
+    uint64_t correlation_id_be = htobe64(payload->correlation_id);
+    memcpy(current_buffer + current_offset_local, &correlation_id_be, sizeof(uint64_t));
+    current_offset_local += sizeof(uint64_t);
+    
+    // Salin ip (INET6_ADDRSTRLEN)
+    if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, INET6_ADDRSTRLEN, buffer_size)) return FAILURE_OOBUF;
+    memcpy(current_buffer + current_offset_local, payload->ip, INET6_ADDRSTRLEN);
+    current_offset_local += INET6_ADDRSTRLEN;
+
+    *offset = current_offset_local;
+    return SUCCESS;
+}
+
 status_t ipc_deserialize_client_disconnect_info(ipc_protocol_t *p, const uint8_t *buffer, size_t total_buffer_len, size_t *offset_ptr) {
     // Validasi Pointer Input
-    if (!p || !buffer || !offset_ptr || !p->payload.ipc_client_request_task) {
+    if (!p || !buffer || !offset_ptr || !p->payload.ipc_client_disconnect_info) {
         fprintf(stderr, "[ipc_deserialize_client_disconnect_info Error]: Invalid input pointers.\n");
         return FAILURE;
     }
@@ -46,28 +68,6 @@ status_t ipc_deserialize_client_disconnect_info(ipc_protocol_t *p, const uint8_t
 
     fprintf(stderr, "==========================================================Panjang offset_ptr AKHIR: %ld\n", (long)*offset_ptr);
     
-    return SUCCESS;
-}
-
-status_t ipc_serialize_client_disconnect_info(const ipc_client_disconnect_info_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
-    if (!payload || !current_buffer || !offset) {
-        return FAILURE;
-    }
-
-    size_t current_offset_local = *offset;
-
-    // Salin Correlation ID (big-endian)
-    if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, sizeof(uint64_t), buffer_size)) return FAILURE_OOBUF;
-    uint64_t correlation_id_be = htobe64(payload->correlation_id);
-    memcpy(current_buffer + current_offset_local, &correlation_id_be, sizeof(uint64_t));
-    current_offset_local += sizeof(uint64_t);
-    
-    // Salin ip (INET6_ADDRSTRLEN)
-    if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, INET6_ADDRSTRLEN, buffer_size)) return FAILURE_OOBUF;
-    memcpy(current_buffer + current_offset_local, payload->ip, INET6_ADDRSTRLEN);
-    current_offset_local += INET6_ADDRSTRLEN;
-
-    *offset = current_offset_local;
     return SUCCESS;
 }
 

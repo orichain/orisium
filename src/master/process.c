@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <bits/types/sig_atomic_t.h>
 
 #include "log.h"
 #include "constants.h"
@@ -16,9 +17,12 @@
 #include "master/ipc.h"
 #include "master/workers.h"
 #include "master/process.h"
+#include "ipc/protocol.h"
+#include "ipc/shutdown.h"
 
 status_t setup_master(master_context *master_ctx) {
 	master_ctx->master_pid = -1;
+	master_ctx->shutdown_event_fd = -1;
     master_ctx->listen_sock = -1;
     master_ctx->master_async.async_fd = -1;
     master_ctx->master_pid = getpid();
@@ -26,12 +30,18 @@ status_t setup_master(master_context *master_ctx) {
 //======================================================================
 // Master setup socket listenner
 //======================================================================
-    if (setup_socket_listenner("[Master]: ", master_ctx) != SUCCESS) {
-		return FAILURE; 
-	}
-    if (async_create("[Master]: ", &master_ctx->master_async) != SUCCESS) {
+	if (async_create("[Master]: ", &master_ctx->master_async) != SUCCESS) {
 		return FAILURE;
 	}
+	if (async_create_eventfd("[Master]: ", &master_ctx->shutdown_event_fd) != SUCCESS) {
+		return FAILURE;
+	}
+	if (async_create_incoming_event("[Master]: ", &master_ctx->master_async, &master_ctx->shutdown_event_fd) != SUCCESS) {
+		return FAILURE;
+	}	
+    if (setup_socket_listenner("[Master]: ", master_ctx) != SUCCESS) {
+		return FAILURE; 
+	}	
     if (async_create_incoming_event("[Master]: ", &master_ctx->master_async, &master_ctx->listen_sock) != SUCCESS) {
 		return FAILURE;
 	}
@@ -83,6 +93,7 @@ status_t setup_workers(master_context *master_ctx) {
 }
 
 void run_master_process(master_context *master_ctx) {
+	volatile sig_atomic_t master_shutdown_requested = 0;
 	master_client_session_t master_client_sessions[MAX_MASTER_CONCURRENT_SESSIONS];
 	uint64_t next_client_id = 1ULL;
 	//double_t avg_connection = 0.0;
@@ -93,17 +104,68 @@ void run_master_process(master_context *master_ctx) {
         master_client_sessions[i].in_use = false;
         memset(master_client_sessions[i].ip, 0, INET6_ADDRSTRLEN);
     }
-    while (!shutdown_requested) {
+    while (!master_shutdown_requested) {
 		int_status_t snfds = async_wait("[Master]: ", &master_ctx->master_async);
 		if (snfds.status != SUCCESS) continue;
-		for (int n = 0; n < snfds.r_int; ++n) {
+		for (int n = 0; n < snfds.r_int; ++n) {		
+			if (master_shutdown_requested) {
+				break;
+			}
 			int_status_t fd_status = async_getfd("[Master]: ", &master_ctx->master_async, n);
 			if (fd_status.status != SUCCESS) continue;
 			int current_fd = fd_status.r_int;
 			uint32_t_status_t events_status = async_getevents("[Master]: ", &master_ctx->master_async, n);
 			if (events_status.status != SUCCESS) continue;
-			uint32_t current_events = events_status.r_uint32_t;
-            if (current_fd == master_ctx->listen_sock) {
+			uint32_t current_events = events_status.r_uint32_t;			
+			if (current_fd == master_ctx->shutdown_event_fd) {
+				uint64_t u;
+				read(master_ctx->shutdown_event_fd, &u, sizeof(u));
+				LOG_INFO("[Master]: SIGINT received. Initiating graceful shutdown...");
+				master_shutdown_requested = 1;
+				int not_used_fd = -1;
+				for (int i = 0; i < MAX_SIO_WORKERS; ++i) { 
+					ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
+					if (cmd_result.status != SUCCESS) {
+						continue;
+					}
+					ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->master_uds_sio_fds[i], cmd_result.r_ipc_protocol_t, &not_used_fd);
+					if (send_result.status != SUCCESS) {
+						LOG_INFO("[Master]: Failed to sent shutdown (ID %ld) to SIO.", i);
+					} else {
+						LOG_INFO("[Master]: Sent shutdown (ID %ld) to SIO.", i);
+					}
+					CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t); 
+				}
+				/*
+				for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
+					ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
+					if (cmd_result.status != SUCCESS) {
+						continue;
+					}	
+					ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->worker_uds_logic_fds[i], cmd_result.r_ipc_protocol_t, &not_used_fd);
+					if (send_result.status != SUCCESS) {
+						LOG_INFO("[Master]: Failed to sent shutdown (ID %ld) to Logic.", i);
+					} else {
+						LOG_INFO("[Server IO Worker %d]: Sent shutdown (ID %ld) to Logic.", i);
+					}
+					CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);
+				}
+				for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
+					ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
+					if (cmd_result.status != SUCCESS) {
+						continue;
+					}	
+					ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->worker_uds_cow_fds[i], cmd_result.r_ipc_protocol_t, &not_used_fd);
+					if (send_result.status != SUCCESS) {
+						LOG_INFO("[Master]: Failed to sent shutdown (ID %ld) to COW.", i);
+					} else {
+						LOG_INFO("[Server IO Worker %d]: Sent shutdown (ID %ld) to COW.", i);
+					}
+					CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);
+				}
+				*/
+				continue;
+			} else if (current_fd == master_ctx->listen_sock) {
 				if (async_event_is_EPOLLIN(current_events)) {
 					if (handle_listen_sock_event("[Master]: ", master_ctx, master_client_sessions, &next_client_id) != SUCCESS) {
 						continue;

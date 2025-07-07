@@ -3,9 +3,23 @@
 #include <fcntl.h>       // for fcntl, F_GETFL, F_SETFL, O_NONBLOCK
 #include <stdint.h>    // for uint64_t
 #include <time.h>     // for timespec
+#include <math.h>
+#include <stdio.h>
 
 #include "log.h"
 #include "types.h"
+
+void print_hex(const char* label, const uint8_t* data, size_t len, int uppercase) {
+    if (label)
+        printf("%s", label);
+
+    const char* fmt = uppercase ? "%02X" : "%02x";
+
+    for (size_t i = 0; i < len; ++i) {
+        printf(fmt, data[i]);
+    }
+    printf("\n");
+}
 
 status_t set_nonblocking(const char* label, int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
@@ -20,26 +34,30 @@ status_t set_nonblocking(const char* label, int fd) {
     return SUCCESS;
 }
 
-void sleep_ns(long nanoseconds) {
+status_t sleep_ns(long nanoseconds) {
+	if (nanoseconds < 0) {
+		return FAILURE;
+	}
     struct timespec ts;
     ts.tv_sec = nanoseconds / 1000000000L;
     ts.tv_nsec = nanoseconds % 1000000000L;
     while (nanosleep(&ts, &ts) == -1 && errno == EINTR) {
         // Retry if interrupted
     }
+    return SUCCESS;
 }
 
-void sleep_us(long microseconds) {
-    sleep_ns(microseconds * 1000L);
+status_t sleep_us(long microseconds) {
+    return sleep_ns(microseconds * 1000L);
 }
 
-void sleep_ms(long milliseconds) {
-    sleep_ns(milliseconds * 1000000L);
+status_t sleep_ms(long milliseconds) {
+    return sleep_ns(milliseconds * 1000000L);
 }
 
-void sleep_s(double seconds) {
-    long ns = (long)(seconds * 1000000000.0);
-    sleep_ns(ns);
+status_t sleep_s(double seconds) {
+    long ns = (long)(fmin(seconds, 60 * 60 * 24) * 1e9);
+    return sleep_ns(ns);
 }
 
 uint64_t_status_t get_realtime_time_ns(const char *label) {

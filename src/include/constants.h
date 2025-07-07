@@ -1,7 +1,7 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-#define MAX_EVENTS 10
+#define MAX_EVENTS 100
 #define MASTER_RECEIVE_BUFFER_SIZE 512
 #define MAX_NODES 5
 #define MAX_FILE_SIZE 1024

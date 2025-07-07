@@ -10,6 +10,7 @@
 #include <unistd.h>      // for close, fork, getpid
 #include <arpa/inet.h>   // for inet_ntop, inet_pton
 #include <stdint.h>
+#include <bits/types/sig_atomic_t.h>
 
 #include "log.h"
 #include "constants.h"
@@ -19,6 +20,7 @@
 
 void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
     LOG_INFO("[Client Outbound Worker %d, PID %d]: Started.", worker_idx, getpid());
+    sig_atomic_t worker_shutdown_requested = 0;
 
     int epoll_fd = epoll_create1(0);
     if (epoll_fd == -1) {
@@ -46,7 +48,7 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
     uint8_t active_outbound_request_data[MAX_DATA_BUFFER_IN_STRUCT];
     size_t active_outbound_request_data_len = 0;
 
-    while (1) {
+    while (!worker_shutdown_requested) {
         int nfds = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
         if (nfds == -1) {
             perror("epoll_wait (COW)");

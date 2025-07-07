@@ -122,7 +122,9 @@
 						cleanup_old_logs(7);
 						start_time = current_time;
 					}
-					sleep_s(1);
+					if (sleep_s(1) != SUCCESS) {
+						continue;
+					}
 				} else {
 					fprintf(stderr, "[LOG]: Log cleaner failed to get current_time.\n");
 				}

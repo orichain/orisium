@@ -10,6 +10,7 @@
 typedef struct {
 	int master_pid;
     int listen_sock;
+    int shutdown_event_fd;
     async_type_t master_async;
     int master_uds_sio_fds[MAX_SIO_WORKERS];
     int master_uds_logic_fds[MAX_LOGIC_WORKERS];

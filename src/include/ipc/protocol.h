@@ -9,14 +9,15 @@
 #define VERSION_MINOR 0x01
 
 typedef enum {
-    IPC_CLIENT_REQUEST_TASK = (uint8_t)0x01,        // From SIO Worker to Master (new client request)
-    IPC_LOGIC_TASK = (uint8_t)0x02,                 // From Master to Logic Worker (forward client request)
-    IPC_LOGIC_RESPONSE_TO_SIO = (uint8_t)0x03,      // From Logic Worker to Master (response for original client)
-    IPC_OUTBOUND_TASK = (uint8_t)0x04,              // From Logic Worker to Master (request to contact another node)
-    IPC_OUTBOUND_RESPONSE = (uint8_t)0x05,          // From Client Outbound Worker to Master (response from another node)
-    IPC_MASTER_ACK = (uint8_t)0x06,                 // Generic ACK from Master
-    IPC_WORKER_ACK = (uint8_t)0x07,                 // Generic ACK from Worker
-    IPC_CLIENT_DISCONNECTED = (uint8_t)0x08         // From SIO Worker to Master (client disconnected)
+    IPC_CLIENT_REQUEST_TASK = (uint8_t)0x00,        // From SIO Worker to Master (new client request)
+    IPC_LOGIC_TASK = (uint8_t)0x01,                 // From Master to Logic Worker (forward client request)
+    IPC_LOGIC_RESPONSE_TO_SIO = (uint8_t)0x02,      // From Logic Worker to Master (response for original client)
+    IPC_OUTBOUND_TASK = (uint8_t)0x03,              // From Logic Worker to Master (request to contact another node)
+    IPC_OUTBOUND_RESPONSE = (uint8_t)0x04,          // From Client Outbound Worker to Master (response from another node)
+    IPC_MASTER_ACK = (uint8_t)0x05,                 // Generic ACK from Master
+    IPC_WORKER_ACK = (uint8_t)0x06,                 // Generic ACK from Worker
+    IPC_CLIENT_DISCONNECTED = (uint8_t)0x07,
+    IPC_SHUTDOWN = (uint8_t)0x08
 } ipc_protocol_type_t;
 
 typedef struct {
@@ -53,6 +54,10 @@ typedef struct {
 } ipc_outbound_response_t;
 
 typedef struct {
+    uint8_t flag[1];
+} ipc_shutdown_t;
+
+typedef struct {
 	uint8_t version[VERSION_BYTES];
 	ipc_protocol_type_t type;
 	union {
@@ -61,6 +66,7 @@ typedef struct {
 		ipc_logic_response_t *ipc_logic_response;
 		ipc_outbound_task_t *ipc_outbound_task;
 		ipc_outbound_response_t *ipc_outbound_response;
+		ipc_shutdown_t *ipc_shutdown;
 	} payload;
 } ipc_protocol_t;
 
@@ -75,6 +81,8 @@ typedef struct {
                 CLOSE_IPC_PAYLOAD(x->payload.ipc_client_disconnect_info); \
             } else if (x->type == IPC_LOGIC_RESPONSE_TO_SIO) { \
                 CLOSE_IPC_PAYLOAD(x->payload.ipc_logic_response); \
+            } else if (x->type == IPC_SHUTDOWN) { \
+                CLOSE_IPC_PAYLOAD(x->payload.ipc_shutdown); \
             } \
             free(x); \
             x = NULL; \
@@ -86,14 +94,13 @@ typedef struct {
 	status_t status;
 } ipc_protocol_t_status_t;
 
-#include "client_request_task.h"
-#include "client_disconnect_info.h"
-#include "logic_response.h"
+#include "ipc/client_request_task.h"
+#include "ipc/client_disconnect_info.h"
+#include "ipc/logic_response.h"
+#include "ipc/shutdown.h"
 
-size_t_status_t calculate_ipc_payload_size(ipc_protocol_type_t type);
-size_t_status_t calculate_ipc_payload_buffer(const uint8_t* buffer, size_t len);
-ssize_t_status_t ipc_serialize(const ipc_protocol_t* p, uint8_t** ptr_buffer, size_t* buffer_size);
-ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len);
+//ssize_t_status_t ipc_serialize(const ipc_protocol_t* p, uint8_t** ptr_buffer, size_t* buffer_size);
+//ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len);
 ssize_t_status_t send_ipc_protocol_message(int *uds_fd, const ipc_protocol_t* p, int *fd_to_pass);
 ipc_protocol_t_status_t receive_and_deserialize_ipc_message(int *uds_fd, int *actual_fd_received);
 

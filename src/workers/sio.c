@@ -4,12 +4,13 @@
 #include <stdio.h>       // for printf, perror, fprintf, NULL, stderr
 #include <stdlib.h>      // for exit, EXIT_FAILURE, atoi, EXIT_SUCCESS, malloc, free
 #include <string.h>      // for memset, strncpy
-#include <sys/epoll.h>   // for epoll_event, epoll_ctl, EPOLLET, EPOLLIN
 #include <sys/types.h>   // for pid_t, ssize_t
 #include <unistd.h>      // for close, fork, getpid
 #include <stdint.h>
+#include <bits/types/sig_atomic_t.h>
 
 #include "log.h"
+#include "async.h"
 #include "constants.h"
 #include "commons.h"
 #include "ipc/protocol.h"
@@ -20,118 +21,115 @@
 #include "ipc/client_request_task.h"
 
 void run_server_io_worker(int worker_idx, int master_uds_fd) {
-    LOG_INFO("[Server IO Worker %d, PID %d]: Started.", worker_idx, getpid());
-    
+    volatile sig_atomic_t sio_shutdown_requested = 0;
     sio_client_conn_state_t client_connections[MAX_CLIENTS_PER_SIO_WORKER];
+    async_type_t sio_async;
+    sio_async.async_fd = -1;
     
+//======================================================================
+// SIO Setup
+//======================================================================
+	char *label;
+	int needed = snprintf(NULL, 0, "[SIO %d]: ", worker_idx);
+	label = malloc(needed + 1);
+	snprintf(label, needed + 1, "[SIO %d]: ", worker_idx);  
+//======================================================================	
+	if (async_create(label, &sio_async) != SUCCESS) goto exit;
+	if (async_create_incoming_event_with_disconnect(label, &sio_async, &master_uds_fd) != SUCCESS) goto exit;
+//======================================================================	    
     for (int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
         client_connections[i].in_use = false;
         client_connections[i].client_fd = -1;
         client_connections[i].correlation_id = -1;
         memset(client_connections[i].ip, 0, INET6_ADDRSTRLEN);
-    }
-
-    int epoll_fd = epoll_create1(0);
-    if (epoll_fd == -1) {
-        LOG_ERROR("epoll_create1 (SIO Worker %d): %s", worker_idx, strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-
-    struct epoll_event event;
-    event.events = EPOLLIN | EPOLLET; // Edge-triggered
-    event.data.fd = master_uds_fd;
-    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, master_uds_fd, &event) == -1) {
-        LOG_ERROR("epoll_ctl: add master_uds_fd (SIO Worker %d): %s", worker_idx, strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    LOG_INFO("[Server IO Worker %d]: Master UDS %d added to epoll.", worker_idx, master_uds_fd);
-    LOG_INFO("[Server IO Worker %d]: Entering event loop.", worker_idx);
-
-    struct epoll_event events[MAX_EVENTS];
-
-    while (1) {
-        int nfds = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
-        if (nfds == -1) {
-            perror("epoll_wait (SIO)");
-            exit(EXIT_FAILURE);
-        }
-
-        for (int n = 0; n < nfds; ++n) {
-            int current_fd = events[n].data.fd;
-
-            // Handle UDS from Master
+    }    
+    while (!sio_shutdown_requested) {
+		int_status_t snfds = async_wait(label, &sio_async);
+		if (snfds.status != SUCCESS) continue;
+        for (int n = 0; n < snfds.r_int; ++n) {
+			if (sio_shutdown_requested) {
+				break;
+			}
+			int_status_t fd_status = async_getfd(label, &sio_async, n);
+			if (fd_status.status != SUCCESS) continue;
+			int current_fd = fd_status.r_int;
+			uint32_t_status_t events_status = async_getevents(label, &sio_async, n);
+			if (events_status.status != SUCCESS) continue;
+			uint32_t current_events = events_status.r_uint32_t;
             if (current_fd == master_uds_fd) {
-                int received_client_fd = -1;
-                ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(&master_uds_fd, &received_client_fd);
-                if (deserialized_result.status != SUCCESS) {
-                    fprintf(stderr, "[Server IO Worker %d]: Error receiving or deserializing IPC message from Master: %d\n", worker_idx, deserialized_result.status);
-                    continue;
-                }
-                ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;
-                printf("[Server IO Worker %d]: Received message type: 0x%02x\n", worker_idx, received_protocol->type);
-                printf("[Server IO Worker %d]: Received FD: %d\n", worker_idx, received_client_fd);
-                
-
-                if (received_protocol->type == IPC_CLIENT_REQUEST_TASK) {
-                    ipc_client_request_task_t *req = received_protocol->payload.ipc_client_request_task;
-
-                    if (received_client_fd == -1) {
-                        LOG_ERROR("[Server IO Worker %d]: Error: No client FD received with IPC_CLIENT_REQUEST_TASK for ID %ld. Skipping.", worker_idx, req->correlation_id);
-                        CLOSE_FD(received_client_fd);
-                        CLOSE_IPC_PROTOCOL(received_protocol);
+				int received_client_fd = -1;
+				ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(&master_uds_fd, &received_client_fd);
+				if (deserialized_result.status != SUCCESS) {
+					if (async_event_is_EPOLLHUP(current_events) ||
+						async_event_is_EPOLLERR(current_events) ||
+						async_event_is_EPOLLRDHUP(current_events))
+					{
+						async_delete_event(label, &sio_async, &current_fd);
+						sio_shutdown_requested = 1;
+						LOG_INFO("%sMaster disconnected. Initiating graceful shutdown...", label);
 						continue;
-                    }
-
-                    if (set_nonblocking("[SIO Worker]: ", received_client_fd) != SUCCESS) {
-                        LOG_ERROR("[Server IO Worker %d]: Failed to set non-blocking for FD %d. Closing.", worker_idx, received_client_fd);
-                        CLOSE_FD(received_client_fd);
-                        CLOSE_IPC_PROTOCOL(received_protocol);
+					}
+					LOG_ERROR("%sError receiving or deserializing IPC message from Master: %d", label, deserialized_result.status);
+					continue;
+				}
+				ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;
+				LOG_INFO("%sReceived message type: 0x%02x", label, received_protocol->type);
+				LOG_INFO("%sReceived FD: %d", label, received_client_fd);
+				if (received_protocol->type == IPC_SHUTDOWN) {
+					LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
+					sio_shutdown_requested = 1;
+					CLOSE_IPC_PROTOCOL(received_protocol);
+					continue;
+				} else if (received_protocol->type == IPC_CLIENT_REQUEST_TASK) {
+					ipc_client_request_task_t *req = received_protocol->payload.ipc_client_request_task;
+					if (received_client_fd == -1) {
+						LOG_ERROR("%sError: No client FD received with IPC_CLIENT_REQUEST_TASK for ID %ld. Skipping.", label, req->correlation_id);
+						CLOSE_FD(received_client_fd);
+						CLOSE_IPC_PROTOCOL(received_protocol);
 						continue;
-                    }
-
-                    event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
-                    event.data.fd = received_client_fd;
-                    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, received_client_fd, &event) == -1) {
-                        LOG_ERROR("epoll_ctl: add client FD to SIO worker %d epoll: %s", worker_idx, strerror(errno));
-                        CLOSE_FD(received_client_fd);
-                        CLOSE_IPC_PROTOCOL(received_protocol);
+					}
+					if (set_nonblocking(label, received_client_fd) != SUCCESS) {
+						LOG_ERROR("%sFailed to set non-blocking for FD %d. Closing.", label, received_client_fd);
+						CLOSE_FD(received_client_fd);
+						CLOSE_IPC_PROTOCOL(received_protocol);
 						continue;
-                    }
-
-                    int slot_found = -1;
-                    for (int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
-                        if (!client_connections[i].in_use) {
-                            client_connections[i].in_use = true;
-                            client_connections[i].client_fd = received_client_fd;
-                            client_connections[i].correlation_id = req->correlation_id;
-                            memcpy(client_connections[i].ip, req->ip, INET6_ADDRSTRLEN);
-                            slot_found = i;
-                            break;
-                        }
-                    }
-
-                    if (slot_found != -1) {
-                        LOG_INFO("[Server IO Worker %d]: Received client FD %d (ID %ld, IP %s) from Master and added to epoll. Slot %d.",
-                               worker_idx, received_client_fd, req->correlation_id, req->ip, slot_found);
-                    } else {
-                        LOG_ERROR("[Server IO Worker %d]: No free slots for new client FD %d. Closing.", worker_idx, received_client_fd);
-                        CLOSE_FD(received_client_fd);
-                        CLOSE_IPC_PROTOCOL(received_protocol);
+					}
+					if (async_create_incoming_event_with_disconnect(label, &sio_async, &received_client_fd) != SUCCESS) {
 						continue;
-                    }
-
-                }
-                else {
-                     LOG_ERROR("[Server IO Worker %d]: Unknown message type %d from Master.", worker_idx, received_protocol->type);
-                }
-                CLOSE_IPC_PROTOCOL(received_protocol);
-            } else { // Handle client TCP connections
+					}
+					int slot_found = -1;
+					for (int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
+						if (!client_connections[i].in_use) {
+							client_connections[i].in_use = true;
+							client_connections[i].client_fd = received_client_fd;
+							client_connections[i].correlation_id = req->correlation_id;
+							memcpy(client_connections[i].ip, req->ip, INET6_ADDRSTRLEN);
+							slot_found = i;
+							break;
+						}
+					}
+					if (slot_found != -1) {
+						LOG_INFO("%sReceived client FD %d (ID %ld, IP %s) from Master and added to epoll. Slot %d.",
+							   label, received_client_fd, req->correlation_id, req->ip, slot_found);
+					} else {
+						LOG_ERROR("%sNo free slots for new client FD %d. Closing.", label, received_client_fd);
+						CLOSE_FD(received_client_fd);
+						CLOSE_IPC_PROTOCOL(received_protocol);
+						continue;
+					}
+				} else {
+					 LOG_ERROR("%sUnknown message type %d from Master.", label, received_protocol->type);
+				}
+				CLOSE_IPC_PROTOCOL(received_protocol);
+            } else {
                 char client_buffer[MAX_DATA_BUFFER_IN_STRUCT];
                 ssize_t bytes_read = read(current_fd, client_buffer, sizeof(client_buffer) - 1);
-
                 if (bytes_read <= 0) {
-                    if (bytes_read == 0 || (events[n].events & (EPOLLHUP | EPOLLERR))) {
-                        // Client disconnected or error
+                    if (bytes_read == 0 ||
+						async_event_is_EPOLLHUP(current_events) ||
+						async_event_is_EPOLLERR(current_events) ||
+						async_event_is_EPOLLRDHUP(current_events))
+					{
                         uint64_t disconnected_client_id = 0ULL;
                         uint8_t disconnected_client_ip[INET6_ADDRSTRLEN];
                         memset(disconnected_client_ip, 0, INET6_ADDRSTRLEN);
@@ -145,14 +143,9 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
                                 break;
                             }
                         }
-                        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, current_fd, NULL);
-                        close(current_fd);
-                        LOG_INFO("[Server IO Worker %d]: Client FD %d (ID %ld, IP %s) disconnected.", worker_idx, current_fd, disconnected_client_id, disconnected_client_ip);
-
-                        // Only send disconnect to Master if the session wasn't already completed by a response
-                        // (Master already handles marking session as unused on successful response)
-                        if (disconnected_client_id != 0ULL && client_connections[client_slot_idx].in_use) { // Check in_use before marking
-							client_connections[client_slot_idx].in_use = false; // Mark as not in use here
+                        async_delete_event(label, &sio_async, &current_fd);                        
+                        if (disconnected_client_id != 0ULL && client_connections[client_slot_idx].in_use) {
+							client_connections[client_slot_idx].in_use = false;
 							client_connections[client_slot_idx].client_fd = -1;
 							client_connections[client_slot_idx].correlation_id = -1;
 							memset(client_connections[client_slot_idx].ip, 0, INET6_ADDRSTRLEN);
@@ -164,23 +157,19 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 							int not_used_fd = -1;				
 							ssize_t_status_t send_result = send_ipc_protocol_message(&master_uds_fd, cmd_result.r_ipc_protocol_t, &not_used_fd);
 							if (send_result.status != SUCCESS) {
-								LOG_INFO("[Server IO Worker %d]: Failed to sent client disconnect signal for ID %ld (IP %s) to Master.", worker_idx, disconnected_client_id, disconnected_client_ip);
+								LOG_INFO("%sFailed to sent client disconnect signal for ID %ld (IP %s) to Master.", label, disconnected_client_id, disconnected_client_ip);
 							} else {
-								LOG_INFO("[Server IO Worker %d]: Sent client disconnect signal for ID %ld (IP %s) to Master.", worker_idx, disconnected_client_id, disconnected_client_ip);
+								LOG_INFO("%sSent client disconnect signal for ID %ld (IP %s) to Master.", label, disconnected_client_id, disconnected_client_ip);
 							}
 							CLOSE_FD(current_fd);
 							CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);
                         }
-
-
                     } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
                         perror("read from client (SIO)");
                     }
                     continue;
                 }
-
                 client_buffer[bytes_read] = '\0';
-
                 uint64_t client_id_for_request = 0ULL;
                 int client_idx = -1;
                 uint8_t client_ip_for_request[INET6_ADDRSTRLEN];
@@ -194,7 +183,6 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
                         break;
                     }
                 }
-
                 if (client_id_for_request == 0ULL || client_idx == -1) {
                     LOG_ERROR("[Server IO Worker %d]: Received data from unknown client FD %d. Ignoring.", worker_idx, current_fd);
                     continue;
@@ -217,6 +205,12 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
             }
         }
     }
-    close(epoll_fd);
-    close(master_uds_fd);
+
+//======================================================================
+// SIO Cleanup
+//======================================================================    
+exit:    
+	CLOSE_FD(master_uds_fd);
+    CLOSE_FD(sio_async.async_fd);
+    free(label);
 }

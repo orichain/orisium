@@ -6,6 +6,8 @@
 #include <string.h>
 #include <signal.h>
 #include <bits/types/sig_atomic_t.h>
+#include <unistd.h>
+#include <stdint.h>
 
 #include "log.h"
 #include "node.h"
@@ -16,10 +18,15 @@
 volatile sig_atomic_t shutdown_requested = 0;
 node_config_t node_config;
 closed_correlation_id_t *closed_correlation_id_head = NULL;
+int *shutdown_event_fd = NULL;
 
 void sigint_handler(int signum) {
-    shutdown_requested = 1;
-    LOG_INFO("SIGINT received. Initiating graceful shutdown...");
+    shutdown_requested = 1ULL;
+    //LOG_INFO("[Orisium]: SIGINT received. Initiating graceful shutdown...");
+    if (shutdown_event_fd && *shutdown_event_fd != -1) {
+        static const uint64_t u = 1ULL;
+        write(*shutdown_event_fd, &u, sizeof(uint64_t));
+    }
 }
 
 int main() {
@@ -39,7 +46,7 @@ int main() {
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = sigint_handler;
     sigaction(SIGINT, &sa, NULL);
-    LOG_INFO("SIGINT handler installed.");
+    LOG_INFO("[Orisium]: SIGINT handler installed.");
 //======================================================================
 // Configuring node and bootstrap
 //======================================================================
@@ -63,6 +70,7 @@ int main() {
 //======================================================================
 	master_context master_ctx;
     if (setup_master(&master_ctx) != SUCCESS) goto exit;
+    shutdown_event_fd = &master_ctx.shutdown_event_fd;
     if (setup_workers(&master_ctx) != SUCCESS) goto exit;
 	run_master_process(&master_ctx);
 //======================================================================

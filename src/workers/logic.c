@@ -4,6 +4,7 @@
 #include <string.h>      // for memset, strncpy
 #include <sys/epoll.h>   // for epoll_event, epoll_ctl, EPOLLET, EPOLLIN
 #include <unistd.h>      // for close, fork, getpid
+#include <bits/types/sig_atomic_t.h>
 
 #include "log.h"
 #include "constants.h"
@@ -12,7 +13,8 @@
 
 void run_logic_worker(int worker_idx, int master_uds_fd) {
     LOG_INFO("[Logic Worker %d, PID %d]: Started.", worker_idx, getpid());
-
+    sig_atomic_t worker_shutdown_requested = 0;
+    
     int epoll_fd = epoll_create1(0);
     if (epoll_fd == -1) {
         LOG_ERROR("epoll_create1 (Logic Worker %d): %s", worker_idx, strerror(errno));
@@ -31,7 +33,7 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
 
     struct epoll_event events[MAX_EVENTS];
 
-    while (1) {
+    while (!worker_shutdown_requested) {
         int nfds = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
         if (nfds == -1) {
             perror("epoll_wait (Logic)");
