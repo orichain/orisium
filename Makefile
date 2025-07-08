@@ -11,7 +11,7 @@ OBJ_DIR = obj
 
 CC = gcc
 GCC_INCLUDE_DIRS := $(shell echo '' | gcc -E -x c - -v 2>&1 | awk '/^ \/.*\/include/ { print "-I" $$1 }')
-INCLUDE_DIR = $(GCC_INCLUDE_DIRS) -I./$(SRC_DIR)/include -I./PQClean -I./PQClean/common
+INCLUDE_DIR = $(GCC_INCLUDE_DIRS) -I./$(SRC_DIR)/include -I./PQClean -I./PQClean/common -I./lmdb/libraries/liblmdb
 COMMON_CFLAGS = -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration -pthread -mrdseed -ljson-c -lm $(INCLUDE_DIR)
 BUILD_MODE ?= DEVELOPMENT
 LOG_TO ?= SCREEN
@@ -70,6 +70,13 @@ PQCLEAN_KEM_LIB_NAME = libml-kem-1024_clean.a
 PQCLEAN_KEM_LIB_PATH = $(PQCLEAN_KEM_DIR)/$(PQCLEAN_KEM_LIB_NAME)
 
 # =============================
+# LMDB Configuration
+# =============================
+LMDB_DIR = lmdb/libraries/liblmdb
+LMDB_LIB_NAME = liblmdb.a
+LMDB_LIB_PATH = $(LMDB_DIR)/$(LMDB_LIB_NAME)
+
+# =============================
 # IWYU Configuration
 # =============================
 IWYU_DIR := iwyu
@@ -77,7 +84,7 @@ IWYU_BUILD := build
 IWYU_BUILD_PATH := $(IWYU_DIR)/$(IWYU_BUILD)
 IWYU_BIN_PATH := $(IWYU_BUILD_PATH)/bin/include-what-you-use
 
-EXCLUDED_DIRS := PQClean iwyu
+EXCLUDED_DIRS := PQClean iwyu lmdb
 EXCLUDE_PATHS := $(foreach dir,$(EXCLUDED_DIRS),-path ./$(dir) -prune -o)
 CFILES := $(shell find . $(EXCLUDE_PATHS) -name '*.c' -print)
 
@@ -136,7 +143,8 @@ prod:
 $(TARGET): $(OBJS) $(PQCLEAN_COMMON_OBJS) \
 		$(PQCLEAN_SIGN_MLDSA87_LIB_PATH) \
 		$(PQCLEAN_SIGN_FALCONPADDED512_LIB_PATH) \
-		$(PQCLEAN_KEM_LIB_PATH)
+		$(PQCLEAN_KEM_LIB_PATH) \
+	    $(LMDB_LIB_PATH)
 	$(CC) $(FINAL_CFLAGS) $^ -o $@ $(LDFLAGS)
 
 # =============================
@@ -158,7 +166,7 @@ $(OBJ_DIR)/%.o: $(PQCLEAN_COMMON_DIR)/%.c
 $(PQCLEAN_SIGN_MLDSA87_LIB_PATH):
 	@echo "Membangun ML-DSA-87..."
 	@echo "📥 Membangun dari sumber..."
-	@if [ ! -f "$@" ]; then \
+	@if [ ! -f "$(PQCLEAN_SIGN_MLDSA87_LIB_PATH)" ]; then \
 		$(MAKE) -C $(PQCLEAN_SIGN_MLDSA87_DIR); \
 	else \
 		echo "✅ Library sudah ada: $@"; \
@@ -167,7 +175,7 @@ $(PQCLEAN_SIGN_MLDSA87_LIB_PATH):
 $(PQCLEAN_SIGN_FALCONPADDED512_LIB_PATH):
 	@echo "Membangun Falcon-Padded-512..."
 	@echo "📥 Membangun dari sumber..."
-	@if [ ! -f "$@" ]; then \
+	@if [ ! -f "$(PQCLEAN_SIGN_FALCONPADDED512_LIB_PATH)" ]; then \
 		$(MAKE) -C $(PQCLEAN_SIGN_FALCONPADDED512_DIR); \
 	else \
 		echo "✅ Library sudah ada: $@"; \
@@ -176,10 +184,23 @@ $(PQCLEAN_SIGN_FALCONPADDED512_LIB_PATH):
 $(PQCLEAN_KEM_LIB_PATH):
 	@echo "Membangun ML-KEM-1024..."
 	@echo "📥 Membangun dari sumber..."
-	@if [ ! -f "$@" ]; then \
+	@if [ ! -f "$(PQCLEAN_KEM_LIB_PATH)" ]; then \
 		$(MAKE) -C $(PQCLEAN_KEM_DIR); \
 	else \
 		echo "✅ Library sudah ada: $@"; \
+	fi
+	
+# =============================
+# Bangun LMDB (jika belum ada)
+# =============================
+$(LMDB_LIB_PATH):
+	@echo "-------------------------------------"
+	@echo "Membangun pustaka LMDB..."
+	@echo "-------------------------------------"
+	@if [ -f "$(LMDB_LIB_PATH)" ]; then \
+		echo "LMDB library sudah ada. Melewati build."; \
+	else \
+		$(MAKE) -C $(LMDB_DIR); \
 	fi
 
 # =============================
