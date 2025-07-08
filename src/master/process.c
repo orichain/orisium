@@ -92,6 +92,50 @@ status_t setup_workers(master_context *master_ctx) {
     return SUCCESS;
 }
 
+static inline status_t broadcast_shutdown(master_context *master_ctx) {
+	int not_used_fd = -1;
+	for (int i = 0; i < MAX_SIO_WORKERS; ++i) { 
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
+		if (cmd_result.status != SUCCESS) {
+			return FAILURE;
+		}
+		ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->master_uds_sio_fds[i], cmd_result.r_ipc_protocol_t, &not_used_fd);
+		if (send_result.status != SUCCESS) {
+			LOG_INFO("[Master]: Failed to sent shutdown to SIO %ld.", i);
+		} else {
+			LOG_INFO("[Master]: Sent shutdown to SIO %ld.", i);
+		}
+		CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t); 
+	}
+	for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
+		if (cmd_result.status != SUCCESS) {
+			return FAILURE;
+		}	
+		ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->master_uds_logic_fds[i], cmd_result.r_ipc_protocol_t, &not_used_fd);
+		if (send_result.status != SUCCESS) {
+			LOG_INFO("[Master]: Failed to sent shutdown to Logic %ld.", i);
+		} else {
+			LOG_INFO("[Master]: Sent shutdown to Logic %ld.", i);
+		}
+		CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);
+	}
+	for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
+		if (cmd_result.status != SUCCESS) {
+			return FAILURE;
+		}	
+		ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->master_uds_cow_fds[i], cmd_result.r_ipc_protocol_t, &not_used_fd);
+		if (send_result.status != SUCCESS) {
+			LOG_INFO("[Master]: Failed to sent shutdown to COW %ld.", i);
+		} else {
+			LOG_INFO("[Master]: Sent shutdown to COW %ld.", i);
+		}
+		CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);
+	}
+	return SUCCESS;
+}
+
 void run_master_process(master_context *master_ctx) {
 	volatile sig_atomic_t master_shutdown_requested = 0;
 	master_client_session_t master_client_sessions[MAX_MASTER_CONCURRENT_SESSIONS];
@@ -122,48 +166,7 @@ void run_master_process(master_context *master_ctx) {
 				read(master_ctx->shutdown_event_fd, &u, sizeof(u));
 				LOG_INFO("[Master]: SIGINT received. Initiating graceful shutdown...");
 				master_shutdown_requested = 1;
-				int not_used_fd = -1;
-				for (int i = 0; i < MAX_SIO_WORKERS; ++i) { 
-					ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
-					if (cmd_result.status != SUCCESS) {
-						continue;
-					}
-					ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->master_uds_sio_fds[i], cmd_result.r_ipc_protocol_t, &not_used_fd);
-					if (send_result.status != SUCCESS) {
-						LOG_INFO("[Master]: Failed to sent shutdown to SIO %ld.", i);
-					} else {
-						LOG_INFO("[Master]: Sent shutdown to SIO %ld.", i);
-					}
-					CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t); 
-				}
-				for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-					ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
-					if (cmd_result.status != SUCCESS) {
-						continue;
-					}	
-					ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->master_uds_logic_fds[i], cmd_result.r_ipc_protocol_t, &not_used_fd);
-					if (send_result.status != SUCCESS) {
-						LOG_INFO("[Master]: Failed to sent shutdown to Logic %ld.", i);
-					} else {
-						LOG_INFO("[Master]: Sent shutdown to Logic %ld.", i);
-					}
-					CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);
-				}
-				/*
-				for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
-					ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
-					if (cmd_result.status != SUCCESS) {
-						continue;
-					}	
-					ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->worker_uds_cow_fds[i], cmd_result.r_ipc_protocol_t, &not_used_fd);
-					if (send_result.status != SUCCESS) {
-						LOG_INFO("[Master]: Failed to sent shutdown (ID %ld) to COW.", i);
-					} else {
-						LOG_INFO("[Server IO Worker %d]: Sent shutdown (ID %ld) to COW.", i);
-					}
-					CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);
-				}
-				*/
+				broadcast_shutdown(master_ctx);
 				continue;
 			} else if (current_fd == master_ctx->listen_sock) {
 				if (async_event_is_EPOLLIN(current_events)) {

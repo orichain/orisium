@@ -15,7 +15,7 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
     logic_async.async_fd = -1;
     
 //======================================================================
-// SIO Logic
+// Setup Logic
 //======================================================================
 	char *label;
 	int needed = snprintf(NULL, 0, "[Logic %d]: ", worker_idx);

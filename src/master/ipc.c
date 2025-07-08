@@ -8,7 +8,6 @@
 #include "ipc/protocol.h"
 #include "sessions/closed_correlation_id.h"
 #include "sessions/master_client_session.h"
-#include "under_refinement_and_will_be_delete_after_finished.h"
 #include "types.h"
 #include "async.h"
 #include "master/ipc.h"
@@ -75,7 +74,7 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, master_
 	ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;                
 	switch (received_protocol->type) {
 		case IPC_CLIENT_REQUEST_TASK: {
-			
+			/*
 			printf("=========================================Sini 2==================================\n");
 			
 			ipc_client_request_task_t *req = received_protocol->payload.ipc_client_request_task;
@@ -87,6 +86,7 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, master_
 			send_ipc_message(logic_worker_uds_fd, IPC_LOGIC_TASK, req, sizeof(client_request_task_t), -1);
 			LOG_INFO("[Master]: Forwarding client request (ID %ld) to Logic Worker %d (UDS FD %d).",
 				   req->correlation_id, logic_worker_idx, logic_worker_uds_fd);
+			*/
 			break;
 		}
 		/*
@@ -148,18 +148,13 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, master_
 			add_closed_correlation_id("[Master]: ", &closed_correlation_id_head, disconnect_info->correlation_id, disconnect_info->ip); 
 			//cnt_connection -= (double_t)1;
 			//avg_connection = cnt_connection / sio_worker;
-			
-			
 			LOG_INFO("[Master]: Received Client Disconnected signal for ID %ld from IP %s (from SIO Worker UDS FD %d).",
 					 disconnect_info->correlation_id, disconnect_info->ip, *current_fd);
-
 			for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
-				
 				LOG_INFO("Searching(%d) IP %s ?? %s|CI %llu ?? %llu",
 					 INET6_ADDRSTRLEN, master_client_sessions[i].ip, disconnect_info->ip,
 					 master_client_sessions[i].correlation_id, disconnect_info->correlation_id
 					 );
-					 
 				if (master_client_sessions[i].in_use &&
 					master_client_sessions[i].correlation_id == disconnect_info->correlation_id &&
 					memcmp(master_client_sessions[i].ip, disconnect_info->ip, INET6_ADDRSTRLEN) == 0) {
