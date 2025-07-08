@@ -220,6 +220,11 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 // SIO Cleanup
 //======================================================================    
 exit:
+	for (int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) { // Kebiasaann bagus = harus selalu ingat "CLOSE FD + HAPUS event"
+		if (client_connections[i].in_use) {
+			CLOSE_FD(client_connections[i].client_fd);
+		}
+	}
 	CLOSE_FD(master_uds_fd);
 	async_delete_event(label, &sio_async, &sio_timer_fd);
     CLOSE_FD(sio_async.async_fd);

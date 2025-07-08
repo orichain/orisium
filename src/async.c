@@ -98,7 +98,7 @@ status_t async_create(const char* label, async_type_t *async) {
     return SUCCESS;
 }
 
-status_t async_create_eventfd(const char* label, int *event_fd) {
+status_t async_create_eventfd_nonblock_close_after_exec(const char* label, int *event_fd) {
     *event_fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
     if (*event_fd == -1) {
         LOG_ERROR("%sGagal membuat eventfd: %s", label, strerror(errno));

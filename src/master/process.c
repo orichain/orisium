@@ -35,18 +35,12 @@ status_t setup_master(master_context *master_ctx) {
 	if (async_create(label, &master_ctx->master_async) != SUCCESS) {
 		return FAILURE;
 	}
-	if (async_create_eventfd(label, &master_ctx->shutdown_event_fd) != SUCCESS) {
+	if (async_create_eventfd_nonblock_close_after_exec(label, &master_ctx->shutdown_event_fd) != SUCCESS) {
 		return FAILURE;
 	}
 	if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->shutdown_event_fd) != SUCCESS) {
 		return FAILURE;
 	}
-	if (async_create_eventfd(label, &master_ctx->shutdown_event_fd) != SUCCESS) {
-		return FAILURE;
-	}
-	if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->shutdown_event_fd) != SUCCESS) {
-		return FAILURE;
-	}	
 	if (async_create_timerfd(label, &master_ctx->master_timer_fd, WORKER_HEARTBEATSEC_TIMEOUT) != SUCCESS) {
 		return FAILURE;
 	}
@@ -233,6 +227,8 @@ void run_master_process(master_context *master_ctx) {
     }
 //======================================================================
 // Cleanup
+// event shutdown tidak di close karena
+// async_create_eventfd_nonblock_close_after_exec <= close after exec/read
 //======================================================================
     workers_cleanup(master_ctx);
     memset(&node_config, 0, sizeof(node_config_t));
