@@ -179,6 +179,8 @@ void run_master_process(master_context *master_ctx) {
 			if (events_status.status != SUCCESS) continue;
 			uint32_t current_events = events_status.r_uint32_t;	
 			if (current_fd == master_ctx->master_timer_fd) {
+				uint64_t u;
+				read(master_ctx->master_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
 //======================================================
 // 1. Tutup worker yang tidak ada aktifitas > WORKER_HEARTBEATSEC detik
 // 2. Buat ulang worker dengan tipe dan index sesuai diatas

@@ -2,6 +2,7 @@
 #include <stdlib.h>      // for exit, EXIT_FAILURE, atoi, EXIT_SUCCESS, malloc, free
 #include <bits/types/sig_atomic_t.h>
 #include <stdint.h>
+#include <unistd.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -43,7 +44,8 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
 			if (events_status.status != SUCCESS) continue;
 			uint32_t current_events = events_status.r_uint32_t;
             if (current_fd == logic_timer_fd) {
-				LOG_DEBUG("%s===================DEBUG TIMER=====================", label);
+				uint64_t u;
+				read(logic_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
 //======================================================
 // 1. Kirim IPC Hertbeat ke Master
 //======================================================
