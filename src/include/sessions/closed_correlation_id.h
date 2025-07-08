@@ -9,7 +9,7 @@
 
 typedef struct closed_correlation_id_t {
     uint64_t correlation_id;
-    uint8_t ip[INET6_ADDRSTRLEN];
+    uint8_t ip[IP_ADDRESS_LEN];
     uint64_t closed_time;
     struct closed_correlation_id_t *next;
 } closed_correlation_id_t;

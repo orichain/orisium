@@ -6,7 +6,7 @@
 
 #include "types.h"
 
-typedef struct master_client_session_t {
+typedef struct {
 	int sio_uds_fd;
     bool in_use;
     uint64_t last_used;

@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <netinet/in.h>
 
 #include "sessions/closed_correlation_id.h"
 #include "log.h"
@@ -19,7 +18,7 @@ status_t add_closed_correlation_id(const char *label, closed_correlation_id_t **
     uint64_t_status_t grtns_result = get_realtime_time_ns(label);    
     if (grtns_result.status == SUCCESS) {
 		new_node->correlation_id = id;
-		memcpy(new_node->ip, host_ip, INET6_ADDRSTRLEN);
+		memcpy(new_node->ip, host_ip, IP_ADDRESS_LEN);
 		new_node->closed_time = grtns_result.r_uint64_t;
 		new_node->next = *head; // Node baru menunjuk ke head lama
 		*head = new_node;       // Head sekarang adalah node baru
@@ -82,7 +81,7 @@ closed_correlation_id_t_status_t find_first_ratelimited_closed_correlation_id(co
     result.status = FAILURE;
     //==========FILTER RATELIMIT========================================
     while (result.r_closed_correlation_id_t != NULL) {
-        if (memcmp(result.r_closed_correlation_id_t->ip, host_ip, INET6_ADDRSTRLEN) == 0) {
+        if (memcmp(result.r_closed_correlation_id_t->ip, host_ip, IP_ADDRESS_LEN) == 0) {
 			uint64_t_status_t grtns_result = get_realtime_time_ns(label);    
 			if (grtns_result.status == SUCCESS) {
 				uint64_t ratelimit_ns = (uint64_t)RATELIMITSEC * 1000000000ULL;

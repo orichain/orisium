@@ -1,4 +1,3 @@
-#include <netinet/in.h>  // for sockaddr_in, INADDR_ANY, in_addr
 #include <stdio.h>       // for printf, perror, fprintf, NULL, stderr
 #include <string.h>      // for memset, strncpy
 #include <endian.h>
@@ -9,6 +8,7 @@
 #include "ipc/protocol.h"
 #include "types.h"
 #include "ipc/client_disconnect_info.h"
+#include "constants.h"
 
 status_t ipc_serialize_client_disconnect_info(const ipc_client_disconnect_info_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
     if (!payload || !current_buffer || !offset) {
@@ -23,10 +23,10 @@ status_t ipc_serialize_client_disconnect_info(const ipc_client_disconnect_info_t
     memcpy(current_buffer + current_offset_local, &correlation_id_be, sizeof(uint64_t));
     current_offset_local += sizeof(uint64_t);
     
-    // Salin ip (INET6_ADDRSTRLEN)
-    if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, INET6_ADDRSTRLEN, buffer_size)) return FAILURE_OOBUF;
-    memcpy(current_buffer + current_offset_local, payload->ip, INET6_ADDRSTRLEN);
-    current_offset_local += INET6_ADDRSTRLEN;
+    // Salin ip (IP_ADDRESS_LEN)
+    if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, IP_ADDRESS_LEN, buffer_size)) return FAILURE_OOBUF;
+    memcpy(current_buffer + current_offset_local, payload->ip, IP_ADDRESS_LEN);
+    current_offset_local += IP_ADDRESS_LEN;
 
     *offset = current_offset_local;
     return SUCCESS;
@@ -56,14 +56,14 @@ status_t ipc_deserialize_client_disconnect_info(ipc_protocol_t *p, const uint8_t
     cursor += sizeof(uint64_t);
     current_offset += sizeof(uint64_t);
     
-    // 2. Deserialisasi ip (INET6_ADDRSTRLEN)
-    if (current_offset + INET6_ADDRSTRLEN > total_buffer_len) {
+    // 2. Deserialisasi ip (IP_ADDRESS_LEN)
+    if (current_offset + IP_ADDRESS_LEN > total_buffer_len) {
         fprintf(stderr, "[ipc_deserialize_client_disconnect_info Error]: Out of bounds reading correlation_id.\n");
         return FAILURE_OOBUF;
     }
-    memcpy(payload->ip, cursor, INET6_ADDRSTRLEN);
-    cursor += INET6_ADDRSTRLEN;
-    current_offset += INET6_ADDRSTRLEN;
+    memcpy(payload->ip, cursor, IP_ADDRESS_LEN);
+    cursor += IP_ADDRESS_LEN;
+    current_offset += IP_ADDRESS_LEN;
     *offset_ptr = current_offset;
 
     fprintf(stderr, "==========================================================Panjang offset_ptr AKHIR: %ld\n", (long)*offset_ptr);
@@ -94,7 +94,7 @@ ipc_protocol_t_status_t ipc_prepare_cmd_client_disconnect_info(int *fd_to_close,
 		return result;
 	}
 	payload->correlation_id = *correlation_id; // Cast ke uint64_t
-	memcpy(payload->ip, disconnected_client_ip, INET6_ADDRSTRLEN);				
+	memcpy(payload->ip, disconnected_client_ip, IP_ADDRESS_LEN);				
 	result.r_ipc_protocol_t->payload.ipc_client_disconnect_info = payload;
 	result.status = SUCCESS;
 	return result;

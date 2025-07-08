@@ -1,7 +1,7 @@
-#include <netinet/in.h>  // for sockaddr_in, INADDR_ANY, in_addr
 #include <stdbool.h>     // for false, bool, true
 #include <stdio.h>       // for printf, perror, fprintf, NULL, stderr
 #include <string.h>      // for memset, strncpy
+#include <netinet/in.h>
 
 #include "log.h"
 #include "constants.h"
@@ -9,6 +9,7 @@
 #include "sessions/closed_correlation_id.h"
 #include "sessions/master_client_session.h"
 #include "types.h"
+#include "utilities.h"
 #include "async.h"
 #include "master/ipc.h"
 #include "master/process.h"
@@ -148,22 +149,20 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, master_
 			add_closed_correlation_id("[Master]: ", &closed_correlation_id_head, disconnect_info->correlation_id, disconnect_info->ip); 
 			//cnt_connection -= (double_t)1;
 			//avg_connection = cnt_connection / sio_worker;
+			char ip_str[INET6_ADDRSTRLEN];
+			convert_ipv6_bin_to_str(disconnect_info->ip, ip_str);
 			LOG_INFO("[Master]: Received Client Disconnected signal for ID %ld from IP %s (from SIO Worker UDS FD %d).",
-					 disconnect_info->correlation_id, disconnect_info->ip, *current_fd);
+					 disconnect_info->correlation_id, ip_str, *current_fd);
 			for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
-				LOG_INFO("Searching(%d) IP %s ?? %s|CI %llu ?? %llu",
-					 INET6_ADDRSTRLEN, master_client_sessions[i].ip, disconnect_info->ip,
-					 master_client_sessions[i].correlation_id, disconnect_info->correlation_id
-					 );
 				if (master_client_sessions[i].in_use &&
 					master_client_sessions[i].correlation_id == disconnect_info->correlation_id &&
-					memcmp(master_client_sessions[i].ip, disconnect_info->ip, INET6_ADDRSTRLEN) == 0) {
+					memcmp(master_client_sessions[i].ip, disconnect_info->ip, IP_ADDRESS_LEN) == 0) {
 					master_client_sessions[i].in_use = false;
 					master_client_sessions[i].correlation_id = -1;
 					master_client_sessions[i].sio_uds_fd = -1;
-					memset(master_client_sessions[i].ip, 0, INET6_ADDRSTRLEN);
+					memset(master_client_sessions[i].ip, 0, IP_ADDRESS_LEN);
 					LOG_INFO("[Master]: IP %s (ID %ld) dihapus dari daftar koneksi aktif.",
-							 disconnect_info->ip, disconnect_info->correlation_id);
+							 ip_str, disconnect_info->correlation_id);
 					break;
 				}
 			}

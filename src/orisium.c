@@ -8,6 +8,7 @@
 #include <bits/types/sig_atomic_t.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <netinet/in.h>
 
 #include "log.h"
 #include "node.h"
@@ -48,7 +49,7 @@ int main() {
 	memset(&node_config, 0, sizeof(node_config_t));
     strncpy(node_config.node_id, "Node1", sizeof(node_config.node_id) - 1);
     node_config.node_id[sizeof(node_config.node_id) - 1] = '\0';
-    if (read_network_config_from_json("config.json", &node_config) != SUCCESS) {
+    if (read_network_config_from_json("[Orisium]: ", "config.json", &node_config) != SUCCESS) {
         LOG_ERROR("[Orisium]: Gagal membaca konfigurasi dari %s.", "config.json");
         goto exit;
     }    
@@ -57,7 +58,9 @@ int main() {
     LOG_INFO("[Orisium]: Listen Port: %d", node_config.listen_port);
     LOG_INFO("[Orisium]: Bootstrap Nodes (%d):", node_config.num_bootstrap_nodes);
     for (int i = 0; i < node_config.num_bootstrap_nodes; i++) {
-        LOG_INFO("[Orisium]:   - Node %d: IP %s, Port %d", i + 1, node_config.bootstrap_nodes[i].ip, node_config.bootstrap_nodes[i].port);
+		char ip_str[INET6_ADDRSTRLEN];
+		if (convert_ipv6_bin_to_str(node_config.bootstrap_nodes[i].ip, ip_str) != SUCCESS)goto exit;
+        LOG_INFO("[Orisium]:   - Node %d: IP %s, Port %d", i + 1, ip_str, node_config.bootstrap_nodes[i].port);
     }
     LOG_INFO("[Orisium]: -------------------------");
 //======================================================================

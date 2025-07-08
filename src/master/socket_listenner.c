@@ -12,9 +12,9 @@
 #include "log.h"
 #include "constants.h"
 #include "commons.h"
+#include "utilities.h"
 #include "node.h"
 #include "ipc/protocol.h"
-#include "utilities.h"
 #include "sessions/closed_correlation_id.h"
 #include "sessions/master_client_session.h"
 #include "types.h"
@@ -107,24 +107,30 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
         return FAILURE_IVLDPORT;
     }
     
-    uint8_t host_ip[INET6_ADDRSTRLEN];
-	memset(host_ip, 0, INET6_ADDRSTRLEN);
-	memcpy(host_ip, host_str, host_str_len);
+    uint8_t host_ip[IP_ADDRESS_LEN];	
+	if (convert_str_to_ipv6_bin(host_str, host_ip) != SUCCESS) {
+		LOG_ERROR("%sIP tidak valid %s.", label, host_str);
+		return FAILURE_IVLDIP;
+	}
     
 	bool ip_already_connected = false;
 	for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
 		if (master_client_sessions[i].in_use &&
-			memcmp(master_client_sessions[i].ip, host_ip, INET6_ADDRSTRLEN) == 0) {
+			memcmp(master_client_sessions[i].ip, host_ip, IP_ADDRESS_LEN) == 0) {
 			ip_already_connected = true;
 			break;
 		}
 	}
+	
+	char ip_str[INET6_ADDRSTRLEN];
+	convert_ipv6_bin_to_str(host_ip, ip_str);
+	
 	if (ip_already_connected) {
-		LOG_WARN("%sKoneksi ditolak dari IP %s. Sudah ada koneksi aktif dari IP ini.", label, host_ip);
+		LOG_WARN("%sKoneksi ditolak dari IP %s. Sudah ada koneksi aktif dari IP ini.", label, ip_str);
 		close(client_sock);
 		return FAILURE_ALRDYCONTD;
 	}
-	LOG_INFO("%sNew client connected from IP %s on FD %d.", label, host_ip, client_sock);
+	LOG_INFO("%sNew client connected from IP %s on FD %d.", label, ip_str, client_sock);
 	
 	uint64_t current_client_id = 0ULL;
 	closed_correlation_id_t_status_t ccid_result = find_first_ratelimited_closed_correlation_id("[Master]: ", closed_correlation_id_head, host_ip);
@@ -136,7 +142,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 		}
 	} else {
 		if (ccid_result.status == FAILURE_RATELIMIT) {
-			LOG_WARN("%sKoneksi ditolak dari IP %s. ratelimit mungkin ddoser.", label, host_ip);
+			LOG_WARN("%sKoneksi ditolak dari IP %s. ratelimit mungkin ddoser.", label, ip_str);
 			close(client_sock);
 			return FAILURE_ALRDYCONTD;
 		} else {
@@ -163,7 +169,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 			master_client_sessions[i].in_use = true;
 			master_client_sessions[i].correlation_id = current_client_id;
 			master_client_sessions[i].sio_uds_fd = sio_worker_uds_fd;
-			memcpy(master_client_sessions[i].ip, host_ip, INET6_ADDRSTRLEN);
+			memcpy(master_client_sessions[i].ip, host_ip, IP_ADDRESS_LEN);
 			slot_found = i;
 			break;
 		}
@@ -184,7 +190,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 				  label, client_sock, current_client_id, sio_worker_idx);
 	} else {
 		LOG_INFO("%sForwarding client FD %d (ID %ld) from IP %s to Server IO Worker %d (UDS FD %d). Bytes sent: %zd.",
-				 label, client_sock, current_client_id, host_ip, sio_worker_idx, sio_worker_uds_fd, send_result.r_ssize_t);
+				 label, client_sock, current_client_id, ip_str, sio_worker_idx, sio_worker_uds_fd, send_result.r_ssize_t);
 	}
 	CLOSE_FD(client_sock); // Menghindari kebocoran FD jika send_ipc gagal => biarkan client reconnect
 	CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);

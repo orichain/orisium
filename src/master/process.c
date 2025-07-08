@@ -1,4 +1,3 @@
-#include <netinet/in.h>
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
@@ -157,7 +156,7 @@ void run_master_process(master_context *master_ctx) {
 	
 	for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
         master_client_sessions[i].in_use = false;
-        memset(master_client_sessions[i].ip, 0, INET6_ADDRSTRLEN);
+        memset(master_client_sessions[i].ip, 0, IP_ADDRESS_LEN);
     }
     while (!master_shutdown_requested) {
 		int_status_t snfds = async_wait(label, &master_ctx->master_async);

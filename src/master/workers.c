@@ -5,10 +5,10 @@
 #include <unistd.h>
 
 #include "log.h"
+#include "utilities.h"
 #include "constants.h"
 #include "types.h"
 #include "commons.h"
-#include "utilities.h"
 #include "workers/sio.h"
 #include "workers/logic.h"
 #include "workers/cow.h"

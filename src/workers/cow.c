@@ -91,7 +91,7 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
                     outbound_task_t *outbound_task = (outbound_task_t *)master_msg_data;
                     
                     active_outbound_correlation_id = outbound_task->client_correlation_id;
-                    memcpy(active_outbound_target_ip, outbound_task->node_ip, INET6_ADDRSTRLEN);
+                    memcpy(active_outbound_target_ip, outbound_task->node_ip, IP_ADDRESS_LEN);
                     active_outbound_target_port = outbound_task->node_port;
                     memcpy(active_outbound_request_data, outbound_task->request_data, MAX_DATA_BUFFER_IN_STRUCT);
                     active_outbound_request_data_len = outbound_task->request_data_len;

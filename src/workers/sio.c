@@ -1,5 +1,4 @@
 #include <errno.h>       // for errno, EAGAIN, EWOULDBLOCK
-#include <netinet/in.h>  // for sockaddr_in, INADDR_ANY, in_addr
 #include <stdbool.h>     // for false, bool, true
 #include <stdio.h>       // for printf, perror, fprintf, NULL, stderr
 #include <stdlib.h>      // for exit, EXIT_FAILURE, atoi, EXIT_SUCCESS, malloc, free
@@ -8,13 +7,14 @@
 #include <unistd.h>      // for close, fork, getpid
 #include <stdint.h>
 #include <bits/types/sig_atomic_t.h>
+#include <netinet/in.h>
 
 #include "log.h"
 #include "async.h"
 #include "constants.h"
+#include "utilities.h"
 #include "commons.h"
 #include "ipc/protocol.h"
-#include "utilities.h"
 #include "sessions/sio_client_conn_state.h"
 #include "types.h"
 #include "ipc/client_disconnect_info.h"
@@ -44,7 +44,7 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
         client_connections[i].in_use = false;
         client_connections[i].client_fd = -1;
         client_connections[i].correlation_id = -1;
-        memset(client_connections[i].ip, 0, INET6_ADDRSTRLEN);
+        memset(client_connections[i].ip, 0, IP_ADDRESS_LEN);
     }    
     while (!sio_shutdown_requested) {
 		int_status_t snfds = async_wait(label, &sio_async);
@@ -113,14 +113,16 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 							client_connections[i].in_use = true;
 							client_connections[i].client_fd = received_client_fd;
 							client_connections[i].correlation_id = req->correlation_id;
-							memcpy(client_connections[i].ip, req->ip, INET6_ADDRSTRLEN);
+							memcpy(client_connections[i].ip, req->ip, IP_ADDRESS_LEN);
 							slot_found = i;
 							break;
 						}
 					}
 					if (slot_found != -1) {
+						char ip_str[INET6_ADDRSTRLEN];
+						convert_ipv6_bin_to_str(req->ip, ip_str);
 						LOG_INFO("%sReceived client FD %d (ID %ld, IP %s) from Master and added to epoll. Slot %d.",
-							   label, received_client_fd, req->correlation_id, req->ip, slot_found);
+							   label, received_client_fd, req->correlation_id, ip_str, slot_found);
 					} else {
 						LOG_ERROR("%sNo free slots for new client FD %d. Closing.", label, received_client_fd);
 						CLOSE_FD(received_client_fd);
@@ -141,14 +143,14 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 						async_event_is_EPOLLRDHUP(current_events))
 					{
                         uint64_t disconnected_client_id = 0ULL;
-                        uint8_t disconnected_client_ip[INET6_ADDRSTRLEN];
-                        memset(disconnected_client_ip, 0, INET6_ADDRSTRLEN);
+                        uint8_t disconnected_client_ip[IP_ADDRESS_LEN];
+                        memset(disconnected_client_ip, 0, IP_ADDRESS_LEN);
 
                         int client_slot_idx = -1;
                         for(int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
                             if(client_connections[i].in_use && client_connections[i].client_fd == current_fd) {
                                 disconnected_client_id = client_connections[i].correlation_id;
-                                memcpy(disconnected_client_ip, client_connections[i].ip, INET6_ADDRSTRLEN);
+                                memcpy(disconnected_client_ip, client_connections[i].ip, IP_ADDRESS_LEN);
                                 client_slot_idx = i;
                                 break;
                             }
@@ -158,7 +160,7 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 							client_connections[client_slot_idx].in_use = false;
 							client_connections[client_slot_idx].client_fd = -1;
 							client_connections[client_slot_idx].correlation_id = -1;
-							memset(client_connections[client_slot_idx].ip, 0, INET6_ADDRSTRLEN);
+							memset(client_connections[client_slot_idx].ip, 0, IP_ADDRESS_LEN);
 							
 							ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_client_disconnect_info(&current_fd, &disconnected_client_id, disconnected_client_ip);
 							if (cmd_result.status != SUCCESS) {
@@ -182,14 +184,14 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
                 client_buffer[bytes_read] = '\0';
                 uint64_t client_id_for_request = 0ULL;
                 int client_idx = -1;
-                uint8_t client_ip_for_request[INET6_ADDRSTRLEN];
-                memset(client_ip_for_request, 0, INET6_ADDRSTRLEN);
+                uint8_t client_ip_for_request[IP_ADDRESS_LEN];
+                memset(client_ip_for_request, 0, IP_ADDRESS_LEN);
 
                 for(int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
                     if(client_connections[i].in_use && client_connections[i].client_fd == current_fd) {
                         client_id_for_request = client_connections[i].correlation_id;
                         client_idx = i;
-                        memcpy(client_ip_for_request, client_connections[i].ip, INET6_ADDRSTRLEN);
+                        memcpy(client_ip_for_request, client_connections[i].ip, IP_ADDRESS_LEN);
                         break;
                     }
                 }

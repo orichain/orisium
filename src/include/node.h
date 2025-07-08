@@ -1,12 +1,11 @@
 #ifndef NODE_H
 #define NODE_H
 
-#include <arpa/inet.h>
 #include "types.h"
 #include "constants.h"
 
 typedef struct {
-    uint8_t ip[INET6_ADDRSTRLEN];
+    uint8_t ip[IP_ADDRESS_LEN];
     int port;
 } node_info_t;
 
@@ -19,6 +18,6 @@ typedef struct {
 
 extern node_config_t node_config;
 
-status_t read_network_config_from_json(const char* filename, node_config_t* config_out);
+status_t read_network_config_from_json(const char* label, const char* filename, node_config_t* config_out);
 
 #endif
