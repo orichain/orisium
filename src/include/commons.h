@@ -49,20 +49,12 @@
 			x = 0; \
 		} \
     } while(0)
-/*    
-#define CLOSE_PID(pid) do { \
-    if ((pid) > 0) { \
-        kill((pid), SIGTERM); \
-        waitpid((pid), NULL, 0); \
-        (pid) = 0; \
+
+#define CLOSE_PID(x) do { \
+    if (x > 0) { \
+        kill(x, SIGTERM); \
+        waitpid(x, NULL, 0); \
     } \
-} while (0)    
-*/  
-#define CLOSE_PID(x) \
-    do { \
-        if (x > 0) { \
-			waitpid(x, NULL, 0); \
-		} \
-    } while(0)
+} while (0)
              
 #endif
