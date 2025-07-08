@@ -63,7 +63,7 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 				uint64_t u;
 				read(sio_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
 //======================================================
-// 1. Tutup koneksi yang tidak ada aktifitas > WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT detik
+// 1. Tutup koneksi dr client_connections yang tidak ada aktifitas > WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT detik
 // 2. Kirim IPC Hertbeat ke Master
 //======================================================
 			} else if (current_fd == master_uds_fd) {

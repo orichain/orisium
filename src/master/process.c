@@ -182,8 +182,9 @@ void run_master_process(master_context *master_ctx) {
 				uint64_t u;
 				read(master_ctx->master_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
 //======================================================
-// 1. Tutup worker yang tidak ada aktifitas > WORKER_HEARTBEATSEC detik
-// 2. Buat ulang worker dengan tipe dan index sesuai diatas
+// 1. Tutup worker yang tidak ada aktifitas > WORKER_HEARTBEATSEC_TIMEOUT detik
+// 2. Jika yang ditutup adalah sio masukkan correlation id milik sio tersebut ke list diskonnected correlation id
+// 3. Buat ulang worker dengan tipe dan index sesuai diatas
 //======================================================
 			} else if (current_fd == master_ctx->shutdown_event_fd) {
 				uint64_t u;
