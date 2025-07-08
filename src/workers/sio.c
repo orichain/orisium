@@ -221,7 +221,7 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 //======================================================================    
 exit:
 	CLOSE_FD(master_uds_fd);
-	CLOSE_FD(sio_timer_fd);
+	async_delete_event(label, &sio_async, &sio_timer_fd);
     CLOSE_FD(sio_async.async_fd);
     free(label);
 }

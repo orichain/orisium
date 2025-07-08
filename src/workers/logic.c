@@ -176,7 +176,7 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
 //======================================================================    
 exit:    
 	CLOSE_FD(master_uds_fd);
-	CLOSE_FD(logic_timer_fd);
+	async_delete_event(label, &logic_async, &logic_timer_fd);
     CLOSE_FD(logic_async.async_fd);
     free(label);
 }

@@ -292,7 +292,7 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
 //======================================================================    
 exit:    
 	CLOSE_FD(master_uds_fd);
-	CLOSE_FD(cow_timer_fd);
+	async_delete_event(label, &cow_async, &cow_timer_fd);
     CLOSE_FD(cow_async.async_fd);
     free(label);
 }
