@@ -54,6 +54,7 @@
     if (x > 0) { \
         kill(x, SIGTERM); \
         waitpid(x, NULL, 0); \
+        x = 0; \
     } \
 } while (0)
              
