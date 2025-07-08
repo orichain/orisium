@@ -1,78 +1,68 @@
-#include <errno.h>       // for errno, EAGAIN, EWOULDBLOCK
 #include <stdio.h>       // for printf, perror, fprintf, NULL, stderr
 #include <stdlib.h>      // for exit, EXIT_FAILURE, atoi, EXIT_SUCCESS, malloc, free
-#include <string.h>      // for memset, strncpy
-#include <sys/epoll.h>   // for epoll_event, epoll_ctl, EPOLLET, EPOLLIN
-#include <unistd.h>      // for close, fork, getpid
 #include <bits/types/sig_atomic_t.h>
+#include <stdint.h>
 
 #include "log.h"
-#include "constants.h"
 #include "ipc/protocol.h"
 #include "types.h"
+#include "async.h"
+#include "commons.h"
 
 void run_logic_worker(int worker_idx, int master_uds_fd) {
-    LOG_INFO("[Logic Worker %d, PID %d]: Started.", worker_idx, getpid());
-    sig_atomic_t worker_shutdown_requested = 0;
+	volatile sig_atomic_t logic_shutdown_requested = 0;
+    async_type_t logic_async;
+    logic_async.async_fd = -1;
     
-    int epoll_fd = epoll_create1(0);
-    if (epoll_fd == -1) {
-        LOG_ERROR("epoll_create1 (Logic Worker %d): %s", worker_idx, strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-
-    struct epoll_event event;
-    event.events = EPOLLIN | EPOLLET; // Edge-triggered
-    event.data.fd = master_uds_fd;
-    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, master_uds_fd, &event) == -1) {
-        LOG_ERROR("epoll_ctl: add master_uds_fd (Logic Worker %d): %s", worker_idx, strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    LOG_INFO("[Logic Worker %d]: Master UDS %d added to epoll.", worker_idx, master_uds_fd);
-    LOG_INFO("[Logic Worker %d]: Entering event loop.", worker_idx);
-
-    struct epoll_event events[MAX_EVENTS];
-
-    while (!worker_shutdown_requested) {
-        int nfds = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
-        if (nfds == -1) {
-            perror("epoll_wait (Logic)");
-            exit(EXIT_FAILURE);
-        }
-
-        for (int n = 0; n < nfds; ++n) {
-            int current_fd = events[n].data.fd;
-
+//======================================================================
+// SIO Logic
+//======================================================================
+	char *label;
+	int needed = snprintf(NULL, 0, "[Logic %d]: ", worker_idx);
+	label = malloc(needed + 1);
+	snprintf(label, needed + 1, "[Logic %d]: ", worker_idx);  
+//======================================================================	
+	if (async_create(label, &logic_async) != SUCCESS) goto exit;
+	if (async_create_incoming_event_with_disconnect(label, &logic_async, &master_uds_fd) != SUCCESS) goto exit;
+//======================================================================	     
+    while (!logic_shutdown_requested) {
+		int_status_t snfds = async_wait(label, &logic_async);
+		if (snfds.status != SUCCESS) continue;
+        for (int n = 0; n < snfds.r_int; ++n) {
+            if (logic_shutdown_requested) {
+				break;
+			}
+			int_status_t fd_status = async_getfd(label, &logic_async, n);
+			if (fd_status.status != SUCCESS) continue;
+			int current_fd = fd_status.r_int;
+			uint32_t_status_t events_status = async_getevents(label, &logic_async, n);
+			if (events_status.status != SUCCESS) continue;
+			uint32_t current_events = events_status.r_uint32_t;
             if (current_fd == master_uds_fd) {
-				
-				printf("=========================================Sini 3==================================\n");
-				
-				/*
-                ipc_msg_header_t master_msg_header;
-                char master_msg_data[sizeof(client_request_task_t) > sizeof(outbound_response_t) ?
-                                     sizeof(client_request_task_t) : sizeof(outbound_response_t)];
-                int received_fd = -1;
-                */
-                int received_fd = -1;
-                ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(&master_uds_fd, &received_fd);
-                if (deserialized_result.status != SUCCESS) {
-                    fprintf(stderr, "[Logic Worker %d]: Error receiving or deserializing IPC message from Master: %d\n", worker_idx, deserialized_result.status);
-                    continue;
-                }
-                ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;
-                printf("[Logic Worker %d]: Received message type: 0x%02x\n", worker_idx, received_protocol->type);
-                printf("[Logic Worker %d]: Received FD: %d\n", worker_idx, received_fd);
-                /*
-                ssize_t bytes_read = recv_ipc_message(master_uds_fd, &master_msg_header, master_msg_data, sizeof(master_msg_data), &received_fd);
-                if (bytes_read == -1) {
-                    if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                        perror("recv_ipc_message from master (Logic)");
-                    }
-                    continue;
-                }
-                */
-                if (received_protocol->type == IPC_LOGIC_TASK) {
-					
+				int received_client_fd = -1;
+				ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(&master_uds_fd, &received_client_fd);
+				if (deserialized_result.status != SUCCESS) {
+					if (async_event_is_EPOLLHUP(current_events) ||
+						async_event_is_EPOLLERR(current_events) ||
+						async_event_is_EPOLLRDHUP(current_events))
+					{
+						async_delete_event(label, &logic_async, &current_fd);
+						logic_shutdown_requested = 1;
+						LOG_INFO("%sMaster disconnected. Initiating graceful shutdown...", label);
+						continue;
+					}
+					LOG_ERROR("%sError receiving or deserializing IPC message from Master: %d", label, deserialized_result.status);
+					continue;
+				}
+				ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;
+				LOG_INFO("%sReceived message type: 0x%02x", label, received_protocol->type);
+				LOG_INFO("%sReceived FD: %d", label, received_client_fd);
+                if (received_protocol->type == IPC_SHUTDOWN) {
+					LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
+					logic_shutdown_requested = 1;
+					CLOSE_IPC_PROTOCOL(received_protocol);
+					continue;
+				} else if (received_protocol->type == IPC_LOGIC_TASK) {					
 					/*
                     client_request_task_t *task = (client_request_task_t *)master_msg_data;
                     LOG_INFO("[Logic Worker %d]: Received client request (ID %ld) from Master. Data: '%.*s'",
@@ -163,12 +153,18 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
                            worker_idx, resp->client_correlation_id);
                     */
                 } else {
-                    LOG_ERROR("[Logic Worker %d]: Unknown message type %d from Master.", worker_idx, received_protocol->type);
+                    LOG_ERROR("%sUnknown message type %d from Master.", label, received_protocol->type);
                 }
                 CLOSE_IPC_PROTOCOL(received_protocol);
             }
         }
     }
-    close(epoll_fd);
-    close(master_uds_fd);
+    
+//======================================================================
+// Logic Cleanup
+//======================================================================    
+exit:    
+	CLOSE_FD(master_uds_fd);
+    CLOSE_FD(logic_async.async_fd);
+    free(label);
 }

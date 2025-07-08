@@ -130,26 +130,26 @@ void run_master_process(master_context *master_ctx) {
 					}
 					ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->master_uds_sio_fds[i], cmd_result.r_ipc_protocol_t, &not_used_fd);
 					if (send_result.status != SUCCESS) {
-						LOG_INFO("[Master]: Failed to sent shutdown (ID %ld) to SIO.", i);
+						LOG_INFO("[Master]: Failed to sent shutdown to SIO %ld.", i);
 					} else {
-						LOG_INFO("[Master]: Sent shutdown (ID %ld) to SIO.", i);
+						LOG_INFO("[Master]: Sent shutdown to SIO %ld.", i);
 					}
 					CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t); 
 				}
-				/*
 				for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
 					ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
 					if (cmd_result.status != SUCCESS) {
 						continue;
 					}	
-					ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->worker_uds_logic_fds[i], cmd_result.r_ipc_protocol_t, &not_used_fd);
+					ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->master_uds_logic_fds[i], cmd_result.r_ipc_protocol_t, &not_used_fd);
 					if (send_result.status != SUCCESS) {
-						LOG_INFO("[Master]: Failed to sent shutdown (ID %ld) to Logic.", i);
+						LOG_INFO("[Master]: Failed to sent shutdown to Logic %ld.", i);
 					} else {
-						LOG_INFO("[Server IO Worker %d]: Sent shutdown (ID %ld) to Logic.", i);
+						LOG_INFO("[Master]: Sent shutdown to Logic %ld.", i);
 					}
 					CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);
 				}
+				/*
 				for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
 					ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
 					if (cmd_result.status != SUCCESS) {
