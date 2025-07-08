@@ -8,11 +8,13 @@
 #include "async.h"
 #include "commons.h"
 #include "types.h"
+#include "constants.h"
 
 void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
     volatile sig_atomic_t cow_shutdown_requested = 0;
     async_type_t cow_async;
     cow_async.async_fd = -1;
+    int cow_timer_fd = -1;
     
 //======================================================================
 // Setup Logic
@@ -24,6 +26,8 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
 //======================================================================	
 	if (async_create(label, &cow_async) != SUCCESS) goto exit;
 	if (async_create_incoming_event_with_disconnect(label, &cow_async, &master_uds_fd) != SUCCESS) goto exit;
+	if (async_create_timerfd(label, &cow_timer_fd, WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT) != SUCCESS) goto exit;
+	if (async_create_incoming_event(label, &cow_async, &cow_timer_fd) != SUCCESS) goto exit;
 //======================================================================
     while (!cow_shutdown_requested) {
         int_status_t snfds = async_wait(label, &cow_async);
@@ -38,7 +42,12 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
 			uint32_t_status_t events_status = async_getevents(label, &cow_async, n);
 			if (events_status.status != SUCCESS) continue;
 			uint32_t current_events = events_status.r_uint32_t;
-            if (current_fd == master_uds_fd) {
+            if (current_fd == cow_timer_fd) {
+				LOG_DEBUG("%s===================DEBUG TIMER=====================", label);
+//======================================================
+// 1. Kirim IPC Hertbeat ke Master
+//======================================================
+			} else if (current_fd == master_uds_fd) {
                 int received_client_fd = -1;
 				ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(&master_uds_fd, &received_client_fd);
 				if (deserialized_result.status != SUCCESS) {
@@ -281,6 +290,7 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
 //======================================================================    
 exit:    
 	CLOSE_FD(master_uds_fd);
+	CLOSE_FD(cow_timer_fd);
     CLOSE_FD(cow_async.async_fd);
     free(label);
 }

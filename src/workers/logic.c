@@ -8,11 +8,13 @@
 #include "types.h"
 #include "async.h"
 #include "commons.h"
+#include "constants.h"
 
 void run_logic_worker(int worker_idx, int master_uds_fd) {
 	volatile sig_atomic_t logic_shutdown_requested = 0;
     async_type_t logic_async;
     logic_async.async_fd = -1;
+    int logic_timer_fd = -1;
     
 //======================================================================
 // Setup Logic
@@ -24,6 +26,8 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
 //======================================================================	
 	if (async_create(label, &logic_async) != SUCCESS) goto exit;
 	if (async_create_incoming_event_with_disconnect(label, &logic_async, &master_uds_fd) != SUCCESS) goto exit;
+	if (async_create_timerfd(label, &logic_timer_fd, WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT) != SUCCESS) goto exit;
+	if (async_create_incoming_event(label, &logic_async, &logic_timer_fd) != SUCCESS) goto exit;
 //======================================================================	     
     while (!logic_shutdown_requested) {
 		int_status_t snfds = async_wait(label, &logic_async);
@@ -38,7 +42,12 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
 			uint32_t_status_t events_status = async_getevents(label, &logic_async, n);
 			if (events_status.status != SUCCESS) continue;
 			uint32_t current_events = events_status.r_uint32_t;
-            if (current_fd == master_uds_fd) {
+            if (current_fd == logic_timer_fd) {
+				LOG_DEBUG("%s===================DEBUG TIMER=====================", label);
+//======================================================
+// 1. Kirim IPC Hertbeat ke Master
+//======================================================
+			} else if (current_fd == master_uds_fd) {
 				int received_client_fd = -1;
 				ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(&master_uds_fd, &received_client_fd);
 				if (deserialized_result.status != SUCCESS) {
@@ -165,6 +174,7 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
 //======================================================================    
 exit:    
 	CLOSE_FD(master_uds_fd);
+	CLOSE_FD(logic_timer_fd);
     CLOSE_FD(logic_async.async_fd);
     free(label);
 }

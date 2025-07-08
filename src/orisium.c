@@ -12,8 +12,9 @@
 #include "log.h"
 #include "node.h"
 #include "sessions/closed_correlation_id.h"
-#include "types.h"
 #include "master/process.h"
+#include "utilities.h"
+#include "types.h"
 
 volatile sig_atomic_t shutdown_requested = 0;
 node_config_t node_config;
@@ -40,16 +41,10 @@ int main() {
     pthread_create(&cleaner_thread, NULL, log_cleaner_thread, NULL);
 #endif
 //======================================================================
-// Install sigint handler
-//======================================================================    
-    struct sigaction sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sa_handler = sigint_handler;
-    sigaction(SIGINT, &sa, NULL);
-    LOG_INFO("[Orisium]: SIGINT handler installed.");
-//======================================================================
 // Configuring node and bootstrap
 //======================================================================
+	if (ensure_directory_exists("[Orisium]: ", "./database") != SUCCESS) goto exit;
+//======================================================================    
 	memset(&node_config, 0, sizeof(node_config_t));
     strncpy(node_config.node_id, "Node1", sizeof(node_config.node_id) - 1);
     node_config.node_id[sizeof(node_config.node_id) - 1] = '\0';
@@ -65,6 +60,14 @@ int main() {
         LOG_INFO("[Orisium]:   - Node %d: IP %s, Port %d", i + 1, node_config.bootstrap_nodes[i].ip, node_config.bootstrap_nodes[i].port);
     }
     LOG_INFO("[Orisium]: -------------------------");
+//======================================================================
+// Install sigint handler
+//======================================================================    
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = sigint_handler;
+    sigaction(SIGINT, &sa, NULL);
+    LOG_INFO("[Orisium]: SIGINT handler installed.");
 //======================================================================
 // Master
 //======================================================================

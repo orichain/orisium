@@ -5,6 +5,7 @@
 #include <time.h>     // for timespec
 #include <math.h>
 #include <stdio.h>
+#include <sys/stat.h>
 
 #include "log.h"
 #include "types.h"
@@ -72,4 +73,28 @@ uint64_t_status_t get_realtime_time_ns(const char *label) {
     result.r_uint64_t = (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
     result.status = SUCCESS;
     return result;
+}
+
+status_t ensure_directory_exists(const char *label, const char *path) {
+	if (!path) {
+        LOG_ERROR("%sNULL path provided to ensure_directory_exists.", label);
+        return FAILURE;
+    }
+    struct stat st;
+    if (stat(path, &st) == 0) {
+        if (S_ISDIR(st.st_mode)) {
+            LOG_DEBUG("%sDirectory already exists: %s", label, path);
+            return SUCCESS;
+        } else {
+            LOG_ERROR("%sPath exists but is not a directory: %s", label, path);
+            return FAILURE;
+        }
+    }
+    if (mkdir(path, 0755) == 0) {
+        LOG_INFO("%sDirectory created: %s", label, path);
+        return 0;
+    } else {
+        LOG_ERROR("%smkdir failed for path '%s': %s", label, path, strerror(errno));
+        return FAILURE;
+    }
 }

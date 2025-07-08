@@ -1,14 +1,16 @@
-#include <errno.h>      // for errno, EINTR
-#include <stdbool.h>    // for bool
-#include <stdint.h>     // for uint32_t
-#include <string.h>     // for strerror
-#include <sys/epoll.h>  // for epoll_event, epoll_create1, epoll_ctl, epoll_...
+#include <errno.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
+#include <sys/epoll.h>
 #include <sys/eventfd.h>
+#include <sys/timerfd.h>
+#include <time.h>
 
-#include "async.h"      // for async_type_t, async_create, async_create_inco...
-#include "constants.h"  // for MAX_EVENTS
-#include "log.h"        // for LOG_ERROR
-#include "types.h"      // for FAILURE, SUCCESS, fd_events_status_t, int_sta...
+#include "async.h"
+#include "constants.h"
+#include "log.h"
+#include "types.h"
 #include "commons.h"
 #include "globals.h"
 
@@ -103,6 +105,24 @@ status_t async_create_eventfd(const char* label, int *event_fd) {
         return FAILURE;
     }
     LOG_INFO("%sBerhasil membuat event fd %d", label, *event_fd);
+    return SUCCESS;
+}
+
+status_t async_create_timerfd(const char* label, int *timer_fd, int heartbeat_sec) {
+    *timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
+    if (*timer_fd == -1) {
+        LOG_ERROR("%sGagal membuat timerfd: %s", label, strerror(errno));
+        return FAILURE;
+    }
+    struct itimerspec new_value;
+    new_value.it_value.tv_sec = heartbeat_sec;
+    new_value.it_value.tv_nsec = 0;
+    new_value.it_interval.tv_sec = heartbeat_sec;
+    new_value.it_interval.tv_nsec = 0;
+    if (timerfd_settime(*timer_fd, 0, &new_value, NULL) == -1) {
+		LOG_ERROR("%sGagal set time timerfd: %s", label, strerror(errno));
+		return FAILURE;
+    }
     return SUCCESS;
 }
 
