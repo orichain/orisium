@@ -9,6 +9,8 @@
 #include "constants.h"
 #include "types.h"
 #include "workers/sio.h"
+#include "workers/logic.h"
+#include "workers/cow.h"
 #include "master/workers.h"
 #include "async.h"
 #include "master/process.h"
@@ -135,7 +137,7 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
 				}
 			}
             for (int j = 0; j < MAX_COW_WORKERS; ++j) { CLOSE_FD(&master_ctx->cow[j].uds[1]); }            
-            run_server_io_worker(wot, index, master_ctx->logic[index].uds[1]);
+            run_logic_worker(wot, index, master_ctx->logic[index].uds[1]);
             exit(EXIT_SUCCESS);
         } else {
 			CLOSE_FD(&master_ctx->logic[index].uds[1]);
@@ -160,7 +162,7 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
 					CLOSE_FD(&master_ctx->cow[j].uds[1]); 
 				}
 			}            
-            run_server_io_worker(wot, index, master_ctx->cow[index].uds[1]);
+            run_client_outbound_worker(wot, index, master_ctx->cow[index].uds[1]);
             exit(EXIT_SUCCESS);
         } else {
 			CLOSE_FD(&master_ctx->cow[index].uds[1]);

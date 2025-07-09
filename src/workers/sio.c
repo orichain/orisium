@@ -101,7 +101,7 @@ void run_server_io_worker(worker_type_t wot, int worker_idx, int master_uds_fd) 
 					LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
 					continue;
                 }
-                //LOG_DEBUG("%s===============TIMER============", label);
+                LOG_DEBUG("%s===============HEARTBEAT============", label);
 //======================================================
 // 1. Tutup koneksi dr sio_c_state yang tidak ada aktifitas > WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT detik
 // 2. Kirim IPC Hertbeat ke Master

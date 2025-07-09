@@ -87,7 +87,7 @@ void run_client_outbound_worker(worker_type_t wot, int worker_idx, int master_ud
 					LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
 					continue;
                 }
-                //LOG_DEBUG("%s===============TIMER============", label);
+                LOG_DEBUG("%s===============HEARTBEAT============", label);
 //======================================================
 // 1. Kirim IPC Hertbeat ke Master
 // 2. "piggybacking"/"implicit heartbeat" kalau sudah ada ipc lain yang dikirim < interval. lewati pengiriman heartbeat.
