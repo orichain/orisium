@@ -1,6 +1,10 @@
 #ifndef UTILITIES_H
 #define UTILITIES_H
 
+#include <unistd.h>
+#include <sys/wait.h>
+#include <stddef.h>
+#include <sys/types.h>
 #include <errno.h>
 #include <string.h>
 #include <fcntl.h>
@@ -145,6 +149,51 @@ static inline status_t ensure_directory_exists(const char *label, const char *pa
     } else {
         LOG_ERROR("%smkdir failed for path '%s': %s", label, path, strerror(errno));
         return FAILURE;
+    }
+}
+//Huruf_besar biar selalu ingat karena akan sering digunakan
+static inline status_t CHECK_BUFFER_BOUNDS(size_t current_offset, size_t bytes_to_write, size_t total_buffer_size) {
+    if (current_offset + bytes_to_write > total_buffer_size) {
+        fprintf(stderr, "[SER Error]: Buffer overflow check failed. Offset: %zu, Bytes to write: %zu, Total buffer size: %zu\n",
+                current_offset, bytes_to_write, total_buffer_size);
+        return FAILURE_OOBUF;
+    }
+    return SUCCESS;
+}
+//Huruf_besar biar selalu ingat karena akan sering digunakan
+static inline status_t SER_CHECK_SPACE(size_t bytes_needed, size_t buffer_size) {
+    if (bytes_needed > buffer_size) {
+        return FAILURE_OOBUF;
+    }
+    return SUCCESS;
+}
+//Huruf_besar biar selalu ingat karena akan sering digunakan
+static inline status_t DESER_CHECK_SPACE(size_t bytes_needed, size_t current_len) {
+    if (current_len < bytes_needed) {
+        return FAILURE_OOBUF;
+    }
+    return SUCCESS;
+}
+//Huruf_besar biar selalu ingat karena akan sering digunakan
+static inline void CLOSE_FD(int *fd) {
+    if (*fd != -1) {
+        close(*fd);
+        *fd = -1;
+    }
+}
+//Huruf_besar biar selalu ingat karena akan sering digunakan
+static inline void CLOSE_UDS(int *uds_fd) {
+    if (*uds_fd != 0) {
+        close(*uds_fd);
+        *uds_fd = 0;
+    }
+}
+//Huruf_besar biar selalu ingat karena akan sering digunakan
+static inline void CLOSE_PID(pid_t *pid) {
+    if (*pid > 0) {
+        kill(*pid, SIGTERM);
+        waitpid(*pid, NULL, 0);
+        *pid = 0;
     }
 }
 

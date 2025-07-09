@@ -169,6 +169,6 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, master_
 			LOG_ERROR("[Master]: Unknown message type %d from UDS FD %d. Ignoring.", received_protocol->type, *current_fd);
 			break;
 	}
-	CLOSE_IPC_PROTOCOL(received_protocol);
+	CLOSE_IPC_PROTOCOL(&received_protocol);
 	return SUCCESS;
 }

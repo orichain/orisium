@@ -1,6 +1,8 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
+#include <stdint.h>
+
 #define MAX_EVENTS 100
 #define MASTER_RECEIVE_BUFFER_SIZE 512
 #define MAX_NODES 5
@@ -20,5 +22,11 @@
 #define WORKER_HEARTBEATSEC_TIMEOUT 10
 
 #define IP_ADDRESS_LEN 16
+
+#define IPC_LENGTH_PREFIX_BYTES sizeof(uint32_t)
+
+#define IPC_VERSION_BYTES 2
+#define IPC_VERSION_MAJOR 0x00
+#define IPC_VERSION_MINOR 0x01
 
 #endif

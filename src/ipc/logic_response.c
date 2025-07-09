@@ -3,9 +3,9 @@
 #include <endian.h>
 #include <stdint.h>
 
-#include "commons.h"
 #include "ipc/protocol.h"
 #include "types.h"
+#include "utilities.h"
 #include "ipc/logic_response.h"
 
 status_t ipc_serialize_logic_response(const ipc_logic_response_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
@@ -16,14 +16,14 @@ status_t ipc_serialize_logic_response(const ipc_logic_response_t* payload, uint8
     size_t current_offset_local = *offset;
 
     // Salin Len
-    if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, sizeof(uint16_t), buffer_size)) return FAILURE_OOBUF;
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint16_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
     uint16_t len_be = htobe16(payload->len);
     memcpy(current_buffer + current_offset_local, &len_be, sizeof(uint16_t));
     current_offset_local += sizeof(uint16_t);
 
     // Salin Data
     if (payload->len > 0) {
-        if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, payload->len, buffer_size)) return FAILURE_OOBUF;
+        if (CHECK_BUFFER_BOUNDS(current_offset_local, payload->len, buffer_size) != SUCCESS) return FAILURE_OOBUF;
         memcpy(current_buffer + current_offset_local, payload->data, payload->len);
         current_offset_local += payload->len;
     }

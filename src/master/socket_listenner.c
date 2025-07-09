@@ -11,7 +11,6 @@
 
 #include "log.h"
 #include "constants.h"
-#include "commons.h"
 #include "utilities.h"
 #include "node.h"
 #include "ipc/protocol.h"
@@ -150,7 +149,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 	if (*client_num > MAX_MASTER_CONCURRENT_SESSIONS) {
 		*client_num -= 1ULL;
 		LOG_ERROR("%sWARNING: MAX_MASTER_CONCURRENT_SESSIONS reached. Rejecting client FD %d.", label, client_sock);
-		CLOSE_FD(client_sock);
+		CLOSE_FD(&client_sock);
 		return FAILURE_MAXREACHD;
 	}
 	
@@ -172,7 +171,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 	}
 	if (slot_found == -1) {
 		LOG_ERROR("%sWARNING: No free session slots in master_sio_c_session. Rejecting client FD %d.", label, client_sock);
-		CLOSE_FD(client_sock);
+		CLOSE_FD(&client_sock);
 		return FAILURE_NOSLOT;
 	}
 	
@@ -188,7 +187,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 		LOG_INFO("%sForwarding client FD %d from IP %s to Server IO Worker %d (UDS FD %d). Bytes sent: %zd.",
 				 label, client_sock, ip_str, sio_worker_idx, sio_worker_uds_fd, send_result.r_ssize_t);
 	}
-	CLOSE_FD(client_sock); // Menghindari kebocoran FD jika send_ipc gagal => biarkan client reconnect
-	CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);
+	CLOSE_FD(&client_sock); // Menghindari kebocoran FD jika send_ipc gagal => biarkan client reconnect
+	CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
 	return SUCCESS;
 }

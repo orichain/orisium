@@ -7,7 +7,7 @@
 #include "log.h"
 #include "ipc/protocol.h"
 #include "async.h"
-#include "commons.h"
+#include "utilities.h"
 #include "types.h"
 #include "constants.h"
 
@@ -71,7 +71,7 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
                 if (received_protocol->type == IPC_SHUTDOWN) {
 					LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
 					cow_shutdown_requested = 1;
-					CLOSE_IPC_PROTOCOL(received_protocol);
+					CLOSE_IPC_PROTOCOL(&received_protocol);
 					continue;
 				}
 				/*
@@ -184,7 +184,7 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
                     LOG_ERROR("[Client Outbound Worker %d]: Unknown message type %d from Master.", worker_idx, master_msg_header.type);
                 }
                 */
-				CLOSE_IPC_PROTOCOL(received_protocol);
+				CLOSE_IPC_PROTOCOL(&received_protocol);
             }
             /*
             else if (current_fd == active_outbound_fd) {
@@ -291,8 +291,8 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
 // COW Cleanup
 //======================================================================    
 exit:    
-	CLOSE_FD(master_uds_fd);
+	CLOSE_FD(&master_uds_fd);
 	async_delete_event(label, &cow_async, &cow_timer_fd);
-    CLOSE_FD(cow_async.async_fd);
+    CLOSE_FD(&cow_async.async_fd);
     free(label);
 }

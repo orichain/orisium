@@ -8,7 +8,7 @@
 #include "ipc/protocol.h"
 #include "types.h"
 #include "async.h"
-#include "commons.h"
+#include "utilities.h"
 #include "constants.h"
 
 void run_logic_worker(int worker_idx, int master_uds_fd) {
@@ -71,7 +71,7 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
                 if (received_protocol->type == IPC_SHUTDOWN) {
 					LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
 					logic_shutdown_requested = 1;
-					CLOSE_IPC_PROTOCOL(received_protocol);
+					CLOSE_IPC_PROTOCOL(&received_protocol);
 					continue;
 				} else if (received_protocol->type == IPC_LOGIC_TASK) {					
 					/*
@@ -166,7 +166,7 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
                 } else {
                     LOG_ERROR("%sUnknown message type %d from Master.", label, received_protocol->type);
                 }
-                CLOSE_IPC_PROTOCOL(received_protocol);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
             }
         }
     }
@@ -175,8 +175,8 @@ void run_logic_worker(int worker_idx, int master_uds_fd) {
 // Logic Cleanup
 //======================================================================    
 exit:    
-	CLOSE_FD(master_uds_fd);
+	CLOSE_FD(&master_uds_fd);
 	async_delete_event(label, &logic_async, &logic_timer_fd);
-    CLOSE_FD(logic_async.async_fd);
+    CLOSE_FD(&logic_async.async_fd);
     free(label);
 }

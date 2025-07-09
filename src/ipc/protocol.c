@@ -8,7 +8,6 @@
 #include <stdint.h>
 #include <sys/uio.h>
 
-#include "commons.h"
 #include "utilities.h"
 #include "ipc/protocol.h"
 #include "types.h"
@@ -71,7 +70,7 @@ static inline size_t_status_t calculate_ipc_payload_size(const ipc_protocol_t* p
             result.status = FAILURE_IPYLD;
             return result;
     }
-    result.r_size_t = VERSION_BYTES + sizeof(ipc_protocol_type_t) + payload_fixed_size + payload_dynamic_size;
+    result.r_size_t = IPC_VERSION_BYTES + sizeof(ipc_protocol_type_t) + payload_fixed_size + payload_dynamic_size;
     result.status = SUCCESS;
     return result;
 }
@@ -117,15 +116,14 @@ ssize_t_status_t ipc_serialize(const ipc_protocol_t* p, uint8_t** ptr_buffer, si
 
     size_t offset = 0;
 
-    // Gunakan CHECK_BUFFER_BOUNDS_NO_RETURN dan tangani nilai kembaliannya
-    if (CHECK_BUFFER_BOUNDS_NO_RETURN(offset, VERSION_BYTES, *buffer_size)) {
+    if (CHECK_BUFFER_BOUNDS(offset, IPC_VERSION_BYTES, *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
     }
-    memcpy(current_buffer + offset, p->version, VERSION_BYTES);
-    offset += VERSION_BYTES;
+    memcpy(current_buffer + offset, p->version, IPC_VERSION_BYTES);
+    offset += IPC_VERSION_BYTES;
 
-    if (CHECK_BUFFER_BOUNDS_NO_RETURN(offset, sizeof(ipc_protocol_type_t), *buffer_size)) {
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(ipc_protocol_type_t), *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
     }
@@ -173,7 +171,7 @@ ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
     result.status = FAILURE;
 
     // Pengecekan dasar buffer
-    if (!buffer || len < (VERSION_BYTES + sizeof(ipc_protocol_type_t))) {
+    if (!buffer || len < (IPC_VERSION_BYTES + sizeof(ipc_protocol_type_t))) {
         fprintf(stderr, "[ipc_deserialize Error]: Buffer terlalu kecil untuk Version dan Type. Len: %zu\n", len);
         result.status = FAILURE_OOBUF;
         return result;
@@ -190,9 +188,9 @@ ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
     fprintf(stderr, "Allocating ipc_protocol_t struct: %zu bytes\n", sizeof(ipc_protocol_t));
 
     // Salin Version dan Type
-    memcpy(p->version, buffer, VERSION_BYTES);
-    p->type = (ipc_protocol_type_t)buffer[VERSION_BYTES];
-    size_t current_buffer_offset = VERSION_BYTES + sizeof(ipc_protocol_type_t); // Offset awal payload
+    memcpy(p->version, buffer, IPC_VERSION_BYTES);
+    p->type = (ipc_protocol_type_t)buffer[IPC_VERSION_BYTES];
+    size_t current_buffer_offset = IPC_VERSION_BYTES + sizeof(ipc_protocol_type_t); // Offset awal payload
 
     fprintf(stderr, "[ipc_deserialize Debug]: Deserializing type 0x%02x. Current offset: %zu\n", p->type, current_buffer_offset);
 
@@ -201,7 +199,7 @@ ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
         case IPC_CLIENT_REQUEST_TASK: {
             if (current_buffer_offset + IP_ADDRESS_LEN + sizeof(uint16_t) > len) {
                 fprintf(stderr, "[ipc_deserialize Error]: Buffer terlalu kecil untuk IPC_CLIENT_REQUEST_TASK fixed header.\n");
-                CLOSE_IPC_PROTOCOL(p);
+                CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
@@ -211,7 +209,7 @@ ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
             ipc_client_request_task_t *task_payload = (ipc_client_request_task_t*) calloc(1, sizeof(ipc_client_request_task_t) + actual_data_len);
             if (!task_payload) {
                 perror("ipc_deserialize: Failed to allocate ipc_client_request_task_t with FAM");
-                CLOSE_IPC_PROTOCOL(p);
+                CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
@@ -222,14 +220,14 @@ ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
         case IPC_CLIENT_DISCONNECTED: {
 			if (current_buffer_offset + IP_ADDRESS_LEN > len) {
                 fprintf(stderr, "[ipc_deserialize Error]: Buffer terlalu kecil untuk IPC_CLIENT_DISCONNECTED fixed header.\n");
-                CLOSE_IPC_PROTOCOL(p);
+                CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
             ipc_client_disconnect_info_t *disconnect_info_payload = (ipc_client_disconnect_info_t*) calloc(1, sizeof(ipc_client_disconnect_info_t));
             if (!disconnect_info_payload) {
                 perror("ipc_deserialize: Failed to allocate ipc_client_disconnect_info_t without FAM");
-                CLOSE_IPC_PROTOCOL(p);
+                CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
@@ -240,7 +238,7 @@ ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
 		case IPC_LOGIC_RESPONSE_TO_SIO: {
 			if (current_buffer_offset + sizeof(uint16_t) > len) {
                 fprintf(stderr, "[ipc_deserialize Error]: Buffer terlalu kecil untuk IPC_LOGIC_RESPONSE_TO_SIO fixed header.\n");
-                CLOSE_IPC_PROTOCOL(p);
+                CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
@@ -250,7 +248,7 @@ ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
             ipc_logic_response_t *task_payload = (ipc_logic_response_t*) calloc(1, sizeof(ipc_logic_response_t) + actual_data_len);
             if (!task_payload) {
                 perror("ipc_deserialize: Failed to allocate ipc_logic_response_t with FAM");
-                CLOSE_IPC_PROTOCOL(p);
+                CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
@@ -261,14 +259,14 @@ ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
 		case IPC_SHUTDOWN: {
 			if (current_buffer_offset + 1 > len) {
                 fprintf(stderr, "[ipc_deserialize Error]: Buffer terlalu kecil untuk IPC_SHUTDOWN fixed header.\n");
-                CLOSE_IPC_PROTOCOL(p);
+                CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
             ipc_shutdown_t *task_payload = (ipc_shutdown_t*) calloc(1, sizeof(ipc_shutdown_t));
             if (!task_payload) {
                 perror("ipc_deserialize: Failed to allocate ipc_shutdown_t without FAM");
-                CLOSE_IPC_PROTOCOL(p);
+                CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
@@ -279,12 +277,12 @@ ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
         default:
             fprintf(stderr, "[ipc_deserialize Error]: Unknown message type 0x%02x.\n", p->type);
             result.status = FAILURE_IPYLD;
-            CLOSE_IPC_PROTOCOL(p);
+            CLOSE_IPC_PROTOCOL(&p);
             return result;
     }
     if (result_pyld != SUCCESS) {
         fprintf(stderr, "[ipc_deserialize Error]: Payload deserialization failed with status %d.\n", result_pyld);        
-        CLOSE_IPC_PROTOCOL(p);
+        CLOSE_IPC_PROTOCOL(&p);
         result.status = FAILURE_IPYLD;
         return result;
     }
@@ -303,7 +301,7 @@ ssize_t_status_t send_ipc_protocol_message(int *uds_fd, const ipc_protocol_t* p,
     size_t serialized_ipc_data_len = 0; // Ini adalah panjang dari buffer di atas
 
     // 1. Panggil ipc_serialize untuk mendapatkan data yang diserialisasi
-    // Hasil dari ipc_serialize adalah data mulai dari VERSION_BYTES + ipc_protocol_type_t + actual_payload
+    // Hasil dari ipc_serialize adalah data mulai dari IPC_VERSION_BYTES + ipc_protocol_type_t + actual_payload
     ssize_t_status_t serialize_result = ipc_serialize(p, &serialized_ipc_data_buffer, &serialized_ipc_data_len);
 
     if (serialize_result.status != SUCCESS) {

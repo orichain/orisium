@@ -2,21 +2,18 @@
 #define IPC_PROTOCOL_H
 
 #include <arpa/inet.h>
+#include <stdlib.h>
 #include "types.h"
 #include "constants.h"
 
-#define VERSION_BYTES 2
-#define VERSION_MAJOR 0x00
-#define VERSION_MINOR 0x01
-
 typedef enum {
-    IPC_CLIENT_REQUEST_TASK = (uint8_t)0x00,        // From SIO Worker to Master (new client request)
-    IPC_LOGIC_TASK = (uint8_t)0x01,                 // From Master to Logic Worker (forward client request)
-    IPC_LOGIC_RESPONSE_TO_SIO = (uint8_t)0x02,      // From Logic Worker to Master (response for original client)
-    IPC_OUTBOUND_TASK = (uint8_t)0x03,              // From Logic Worker to Master (request to contact another node)
-    IPC_OUTBOUND_RESPONSE = (uint8_t)0x04,          // From Client Outbound Worker to Master (response from another node)
-    IPC_MASTER_ACK = (uint8_t)0x05,                 // Generic ACK from Master
-    IPC_WORKER_ACK = (uint8_t)0x06,                 // Generic ACK from Worker
+    IPC_CLIENT_REQUEST_TASK = (uint8_t)0x00,
+    IPC_LOGIC_TASK = (uint8_t)0x01,
+    IPC_LOGIC_RESPONSE_TO_SIO = (uint8_t)0x02,
+    IPC_OUTBOUND_TASK = (uint8_t)0x03,
+    IPC_OUTBOUND_RESPONSE = (uint8_t)0x04,
+    IPC_MASTER_ACK = (uint8_t)0x05,
+    IPC_WORKER_ACK = (uint8_t)0x06,
     IPC_CLIENT_DISCONNECTED = (uint8_t)0x07,
     IPC_SHUTDOWN = (uint8_t)0x08
 } ipc_protocol_type_t;
@@ -54,7 +51,7 @@ typedef struct {
 } ipc_shutdown_t;
 
 typedef struct {
-	uint8_t version[VERSION_BYTES];
+	uint8_t version[IPC_VERSION_BYTES];
 	ipc_protocol_type_t type;
 	union {
 		ipc_client_request_task_t *ipc_client_request_task;
@@ -65,25 +62,30 @@ typedef struct {
 		ipc_shutdown_t *ipc_shutdown;
 	} payload;
 } ipc_protocol_t;
-
-#define CLOSE_IPC_PAYLOAD(x) do { if ((x)) { free(x); (x) = NULL; } } while(0)    
-
-#define CLOSE_IPC_PROTOCOL(x) \
-    do { \
-        if (x) { \
-			if (x->type == IPC_CLIENT_REQUEST_TASK) { \
-                CLOSE_IPC_PAYLOAD(x->payload.ipc_client_request_task); \
-            } else if (x->type == IPC_CLIENT_DISCONNECTED) { \
-                CLOSE_IPC_PAYLOAD(x->payload.ipc_client_disconnect_info); \
-            } else if (x->type == IPC_LOGIC_RESPONSE_TO_SIO) { \
-                CLOSE_IPC_PAYLOAD(x->payload.ipc_logic_response); \
-            } else if (x->type == IPC_SHUTDOWN) { \
-                CLOSE_IPC_PAYLOAD(x->payload.ipc_shutdown); \
-            } \
-            free(x); \
-            x = NULL; \
-        } \
-    } while(0)
+//Huruf_besar biar selalu ingat karena akan sering digunakan
+static inline void CLOSE_IPC_PAYLOAD(void **ptr) {
+    if (ptr != NULL && *ptr != NULL) {
+        free(*ptr);
+        *ptr = NULL;
+    }
+}
+//Huruf_besar biar selalu ingat karena akan sering digunakan
+static inline void CLOSE_IPC_PROTOCOL(ipc_protocol_t **protocol_ptr) {
+    if (protocol_ptr != NULL && *protocol_ptr != NULL) {
+        ipc_protocol_t *x = *protocol_ptr;
+        if (x->type == IPC_CLIENT_REQUEST_TASK) {
+            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_client_request_task);
+        } else if (x->type == IPC_CLIENT_DISCONNECTED) {
+            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_client_disconnect_info);
+        } else if (x->type == IPC_LOGIC_RESPONSE_TO_SIO) {
+            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_logic_response);
+        } else if (x->type == IPC_SHUTDOWN) {
+            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_shutdown);
+        }
+        free(x);
+        *protocol_ptr = NULL;
+    }
+}
 
 typedef struct {
 	ipc_protocol_t *r_ipc_protocol_t;

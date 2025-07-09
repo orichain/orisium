@@ -13,7 +13,6 @@
 #include "async.h"
 #include "constants.h"
 #include "utilities.h"
-#include "commons.h"
 #include "ipc/protocol.h"
 #include "sessions/workers_session.h"
 #include "types.h"
@@ -87,7 +86,7 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 				if (received_protocol->type == IPC_SHUTDOWN) {
 					LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
 					sio_shutdown_requested = 1;
-					CLOSE_IPC_PROTOCOL(received_protocol);
+					CLOSE_IPC_PROTOCOL(&received_protocol);
 					continue;
 				} else if (received_protocol->type == IPC_CLIENT_REQUEST_TASK) {
 					ipc_client_request_task_t *req = received_protocol->payload.ipc_client_request_task;
@@ -96,14 +95,14 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 	
 					if (received_client_fd == -1) {
 						LOG_ERROR("%sError: No client FD received with IPC_CLIENT_REQUEST_TASK for IP %s. Skipping.", label, ip_str);
-						CLOSE_FD(received_client_fd);
-						CLOSE_IPC_PROTOCOL(received_protocol);
+						CLOSE_FD(&received_client_fd);
+						CLOSE_IPC_PROTOCOL(&received_protocol);
 						continue;
 					}
 					if (set_nonblocking(label, received_client_fd) != SUCCESS) {
 						LOG_ERROR("%sFailed to set non-blocking for FD %d. Closing.", label, received_client_fd);
-						CLOSE_FD(received_client_fd);
-						CLOSE_IPC_PROTOCOL(received_protocol);
+						CLOSE_FD(&received_client_fd);
+						CLOSE_IPC_PROTOCOL(&received_protocol);
 						continue;
 					}
 					if (async_create_incoming_event_with_disconnect(label, &sio_async, &received_client_fd) != SUCCESS) {
@@ -127,14 +126,14 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 							   label, received_client_fd, ip_str, slot_found);
 					} else {
 						LOG_ERROR("%sNo free slots for new client FD %d. Closing.", label, received_client_fd);
-						CLOSE_FD(received_client_fd);
-						CLOSE_IPC_PROTOCOL(received_protocol);
+						CLOSE_FD(&received_client_fd);
+						CLOSE_IPC_PROTOCOL(&received_protocol);
 						continue;
 					}
 				} else {
 					 LOG_ERROR("%sUnknown message type %d from Master.", label, received_protocol->type);
 				}
-				CLOSE_IPC_PROTOCOL(received_protocol);
+				CLOSE_IPC_PROTOCOL(&received_protocol);
             } else {
                 char client_buffer[MAX_DATA_BUFFER_IN_STRUCT];
                 ssize_t bytes_read = read(current_fd, client_buffer, sizeof(client_buffer) - 1);
@@ -172,8 +171,8 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 							} else {
 								LOG_INFO("%sSent client disconnect signal for (IP %s) to Master.", label, disconnected_client_ip);
 							}
-							CLOSE_FD(current_fd);
-							CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);
+							CLOSE_FD(&current_fd);
+							CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
                         }
                     } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
                         perror("read from client (SIO)");
@@ -212,7 +211,7 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 					LOG_INFO("[Server IO Worker %d]: Sent client request IP %s to Master for Logic Worker.",
                        worker_idx, ip_str);
 				}
-				CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);
+				CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
             }
         }
     }
@@ -223,11 +222,11 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 exit:
 	for (int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) { // Kebiasaann bagus = harus selalu ingat "CLOSE FD + HAPUS event"
 		if (sio_c_state[i].in_use) {
-			CLOSE_FD(sio_c_state[i].client_fd);
+			CLOSE_FD(&sio_c_state[i].client_fd);
 		}
 	}
-	CLOSE_FD(master_uds_fd);
+	CLOSE_FD(&master_uds_fd);
 	async_delete_event(label, &sio_async, &sio_timer_fd);
-    CLOSE_FD(sio_async.async_fd);
+    CLOSE_FD(&sio_async.async_fd);
     free(label);
 }

@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "commons.h"
+#include "utilities.h"
 #include "ipc/protocol.h"
 #include "types.h"
 #include "ipc/client_request_task.h"
@@ -18,19 +18,19 @@ status_t ipc_serialize_client_request_task(const ipc_client_request_task_t* payl
     size_t current_offset_local = *offset;
 
     // Salin ip (IP_ADDRESS_LEN)
-    if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, IP_ADDRESS_LEN, buffer_size)) return FAILURE_OOBUF;
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, IP_ADDRESS_LEN, buffer_size) != SUCCESS) return FAILURE_OOBUF;
     memcpy(current_buffer + current_offset_local, payload->ip, IP_ADDRESS_LEN);
     current_offset_local += IP_ADDRESS_LEN;
 
     // Salin Len
-    if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, sizeof(uint16_t), buffer_size)) return FAILURE_OOBUF;
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint16_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
     uint16_t len_be = htobe16(payload->len);
     memcpy(current_buffer + current_offset_local, &len_be, sizeof(uint16_t));
     current_offset_local += sizeof(uint16_t);
 
     // Salin Data
     if (payload->len > 0) {
-        if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, payload->len, buffer_size)) return FAILURE_OOBUF;
+        if (CHECK_BUFFER_BOUNDS(current_offset_local, payload->len, buffer_size) != SUCCESS) return FAILURE_OOBUF;
         memcpy(current_buffer + current_offset_local, payload->data, payload->len);
         current_offset_local += payload->len;
     }
@@ -107,21 +107,21 @@ ipc_protocol_t_status_t ipc_prepare_cmd_client_request_task(int *fd_to_close, ui
 	if (!result.r_ipc_protocol_t) {
 		perror("Failed to allocate ipc_protocol_t protocol");
 		if (*fd_to_close != -1) {
-			CLOSE_FD(*fd_to_close);
+			CLOSE_FD(fd_to_close);
 		}
 		return result;
 	}
 	memset(result.r_ipc_protocol_t, 0, sizeof(ipc_protocol_t)); // Inisialisasi dengan nol
-	result.r_ipc_protocol_t->version[0] = VERSION_MAJOR;
-	result.r_ipc_protocol_t->version[1] = VERSION_MINOR;
+	result.r_ipc_protocol_t->version[0] = IPC_VERSION_MAJOR;
+	result.r_ipc_protocol_t->version[1] = IPC_VERSION_MINOR;
 	result.r_ipc_protocol_t->type = IPC_CLIENT_REQUEST_TASK;
 	ipc_client_request_task_t *payload = (ipc_client_request_task_t *)calloc(1, sizeof(ipc_client_request_task_t) + data_len);
 	if (!payload) {
 		perror("Failed to allocate ipc_client_request_task_t payload");
 		if (*fd_to_close != -1) {
-			CLOSE_FD(*fd_to_close);
+			CLOSE_FD(fd_to_close);
 		}
-		CLOSE_IPC_PROTOCOL(result.r_ipc_protocol_t);
+		CLOSE_IPC_PROTOCOL(&result.r_ipc_protocol_t);
 		return result;
 	}
 	memcpy(payload->ip, client_ip_for_request, IP_ADDRESS_LEN);

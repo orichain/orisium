@@ -40,7 +40,7 @@ status_t delete_master_sio_dc_session(const char *label, master_sio_dc_session_t
     if (current != NULL && memcmp(current->ip, ip, IP_ADDRESS_LEN) == 0) {
         *head = current->next;
         free(current);        
-        LOG_INFO("%IP %s berhasil dihapus (head).", label, ip_str);
+        LOG_INFO("%sIP %s berhasil dihapus (head).", label, ip_str);
         return SUCCESS;
     }
     while (current != NULL && memcmp(current->ip, ip, IP_ADDRESS_LEN) != 0) {

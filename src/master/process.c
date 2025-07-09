@@ -9,7 +9,7 @@
 #include "node.h"
 #include "async.h"
 #include "globals.h"
-#include "commons.h"
+#include "utilities.h"
 #include "types.h"
 #include "master/socket_listenner.h"
 #include "master/ipc.h"
@@ -114,7 +114,7 @@ static inline status_t broadcast_shutdown(master_context *master_ctx) {
 		} else {
 			LOG_INFO("%sSent shutdown to SIO %ld.", label, i);
 		}
-		CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t); 
+		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t); 
 	}
 	for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
 		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
@@ -127,7 +127,7 @@ static inline status_t broadcast_shutdown(master_context *master_ctx) {
 		} else {
 			LOG_INFO("%sSent shutdown to Logic %ld.", label, i);
 		}
-		CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);
+		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
 	}
 	for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
 		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
@@ -140,7 +140,7 @@ static inline status_t broadcast_shutdown(master_context *master_ctx) {
 		} else {
 			LOG_INFO("%sSent shutdown to COW %ld.", label, i);
 		}
-		CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);
+		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
 	}
 	return SUCCESS;
 }
@@ -192,7 +192,7 @@ void run_master_process(master_context *master_ctx) {
 						continue;
 					}
 				} else {
-					CLOSE_FD(current_fd);
+					CLOSE_FD(&current_fd);
 				}
             } else {
 				if (async_event_is_EPOLLHUP(current_events) ||
@@ -231,7 +231,7 @@ void run_master_process(master_context *master_ctx) {
 //======================================================================
     workers_cleanup(master_ctx);
     memset(&node_config, 0, sizeof(node_config_t));
-    CLOSE_FD(master_ctx->listen_sock);
+    CLOSE_FD(&master_ctx->listen_sock);
     async_delete_event(label, &master_ctx->master_async, &master_ctx->master_timer_fd);
-    CLOSE_FD(master_ctx->master_async.async_fd);
+    CLOSE_FD(&master_ctx->master_async.async_fd);
 }

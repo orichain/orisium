@@ -3,10 +3,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "commons.h"
+#include "utilities.h"
 #include "ipc/protocol.h"
 #include "types.h"
 #include "ipc/shutdown.h"
+#include "constants.h"
 
 status_t ipc_serialize_shutdown(const ipc_shutdown_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
     if (!payload || !current_buffer || !offset) {
@@ -16,7 +17,7 @@ status_t ipc_serialize_shutdown(const ipc_shutdown_t* payload, uint8_t* current_
     size_t current_offset_local = *offset;
 
     // Salin type
-    if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, 1, buffer_size)) return FAILURE_OOBUF;
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, 1, buffer_size) != SUCCESS) return FAILURE_OOBUF;
     memcpy(current_buffer + current_offset_local, payload->flag, 1);
     current_offset_local += 1;
 
@@ -60,19 +61,19 @@ ipc_protocol_t_status_t ipc_prepare_cmd_shutdown(int *fd_to_close) {
 	if (!result.r_ipc_protocol_t) {
 		perror("Failed to allocate ipc_protocol_t protocol");
 		//CLOSE_FD(client_sock);
-		CLOSE_FD(*fd_to_close);
+		CLOSE_FD(fd_to_close);
 		return result;
 	}
 	memset(result.r_ipc_protocol_t, 0, sizeof(ipc_protocol_t)); // Inisialisasi dengan nol
-	result.r_ipc_protocol_t->version[0] = VERSION_MAJOR;
-	result.r_ipc_protocol_t->version[1] = VERSION_MINOR;
+	result.r_ipc_protocol_t->version[0] = IPC_VERSION_MAJOR;
+	result.r_ipc_protocol_t->version[1] = IPC_VERSION_MINOR;
 	result.r_ipc_protocol_t->type = IPC_SHUTDOWN;
 	ipc_shutdown_t *payload = (ipc_shutdown_t *)calloc(1, sizeof(ipc_shutdown_t));
 	if (!payload) {
 		perror("Failed to allocate ipc_shutdown_t payload");
 		//CLOSE_FD(client_sock);
-		CLOSE_FD(*fd_to_close);
-		CLOSE_IPC_PROTOCOL(result.r_ipc_protocol_t);
+		CLOSE_FD(fd_to_close);
+		CLOSE_IPC_PROTOCOL(&result.r_ipc_protocol_t);
 		return result;
 	}
 	payload->flag[0] = (uint8_t)0x01;

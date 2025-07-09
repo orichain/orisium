@@ -11,7 +11,7 @@
 #include "constants.h"
 #include "log.h"
 #include "types.h"
-#include "commons.h"
+#include "utilities.h"
 #include "globals.h"
 
 bool async_event_is_EPOLLHUP(uint32_t events) {
@@ -153,6 +153,6 @@ status_t async_delete_event(const char* label, async_type_t *async, int *fd_to_d
 			return FAILURE;
 		}
 	}
-	CLOSE_FD(*fd_to_delete);
+	CLOSE_FD(fd_to_delete);
 	return SUCCESS;
 }

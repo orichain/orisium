@@ -8,7 +8,6 @@
 #include "utilities.h"
 #include "constants.h"
 #include "types.h"
-#include "commons.h"
 #include "workers/sio.h"
 #include "workers/logic.h"
 #include "workers/cow.h"
@@ -18,17 +17,17 @@
 
 status_t close_worker(const char *label, master_context *master_ctx, worker_type_t wot, int index) {
 	if (wot == SIO) {
-		CLOSE_UDS(master_ctx->master_uds_sio_fds[index]);
-		CLOSE_UDS(master_ctx->worker_uds_sio_fds[index]);
-		CLOSE_PID(master_ctx->sio_pids[index]);
+		CLOSE_UDS(&master_ctx->master_uds_sio_fds[index]);
+		CLOSE_UDS(&master_ctx->worker_uds_sio_fds[index]);
+		CLOSE_PID(&master_ctx->sio_pids[index]);
 	} else if (wot == LOGIC) {
-		CLOSE_UDS(master_ctx->master_uds_logic_fds[index]);
-		CLOSE_UDS(master_ctx->worker_uds_logic_fds[index]);
-		CLOSE_PID(master_ctx->logic_pids[index]);
+		CLOSE_UDS(&master_ctx->master_uds_logic_fds[index]);
+		CLOSE_UDS(&master_ctx->worker_uds_logic_fds[index]);
+		CLOSE_PID(&master_ctx->logic_pids[index]);
 	} else if (wot == COW) {
-		CLOSE_UDS(master_ctx->master_uds_cow_fds[index]);
-		CLOSE_UDS(master_ctx->worker_uds_cow_fds[index]);
-		CLOSE_PID(master_ctx->cow_pids[index]);
+		CLOSE_UDS(&master_ctx->master_uds_cow_fds[index]);
+		CLOSE_UDS(&master_ctx->worker_uds_cow_fds[index]);
+		CLOSE_PID(&master_ctx->cow_pids[index]);
 	}
 	return SUCCESS;
 }
@@ -96,19 +95,19 @@ status_t create_socket_pair(const char *label, master_context *master_ctx, worke
 void workers_cleanup(master_context *master_ctx) {
     LOG_INFO("Performing cleanup...");
     for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-		CLOSE_UDS(master_ctx->master_uds_sio_fds[i]);
-		CLOSE_UDS(master_ctx->worker_uds_sio_fds[i]);
-		CLOSE_PID(master_ctx->sio_pids[i]);
+		CLOSE_UDS(&master_ctx->master_uds_sio_fds[i]);
+		CLOSE_UDS(&master_ctx->worker_uds_sio_fds[i]);
+		CLOSE_PID(&master_ctx->sio_pids[i]);
     }
     for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-		CLOSE_UDS(master_ctx->master_uds_logic_fds[i]);
-		CLOSE_UDS(master_ctx->worker_uds_logic_fds[i]);
-		CLOSE_PID(master_ctx->logic_pids[i]);
+		CLOSE_UDS(&master_ctx->master_uds_logic_fds[i]);
+		CLOSE_UDS(&master_ctx->worker_uds_logic_fds[i]);
+		CLOSE_PID(&master_ctx->logic_pids[i]);
     }
     for (int i = 0; i < MAX_COW_WORKERS; ++i) {
-		CLOSE_UDS(master_ctx->master_uds_cow_fds[i]);
-		CLOSE_UDS(master_ctx->worker_uds_cow_fds[i]);
-		CLOSE_PID(master_ctx->cow_pids[i]);
+		CLOSE_UDS(&master_ctx->master_uds_cow_fds[i]);
+		CLOSE_UDS(&master_ctx->worker_uds_cow_fds[i]);
+		CLOSE_PID(&master_ctx->cow_pids[i]);
     }
     LOG_INFO("Cleanup complete.");
 }
