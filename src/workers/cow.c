@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <bits/types/sig_atomic_t.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -11,11 +12,13 @@
 #include "types.h"
 #include "constants.h"
 
-void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
+void run_client_outbound_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
     volatile sig_atomic_t cow_shutdown_requested = 0;
     async_type_t cow_async;
     cow_async.async_fd = -1;
     int cow_timer_fd = -1;
+    srandom(time(NULL) ^ getpid());
+    int worker_type_id = (int)wot;
     
 //======================================================================
 // Setup Logic
@@ -27,7 +30,28 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
 //======================================================================	
 	if (async_create(label, &cow_async) != SUCCESS) goto exit;
 	if (async_create_incoming_event_with_disconnect(label, &cow_async, &master_uds_fd) != SUCCESS) goto exit;
-	if (async_create_timerfd(label, &cow_timer_fd, WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT) != SUCCESS) goto exit;
+//======================================================================
+	const int HEARTBEAT_BASE_SEC = WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT;
+    const int MILISECONDS_PER_UNIT = INITIAL_MILISECONDS_PER_UNIT;
+    const long MAX_INITIAL_DELAY_MS = WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT * 1000;
+    long initial_delay_ms = (long)worker_type_id * worker_idx * MILISECONDS_PER_UNIT;
+    if (initial_delay_ms > MAX_INITIAL_DELAY_MS) {
+        initial_delay_ms = MAX_INITIAL_DELAY_MS;
+    }
+    if (initial_delay_ms > 0) {
+        LOG_INFO("%sApplying initial delay of %ld ms...", label, initial_delay_ms);
+        sleep_ms(initial_delay_ms);
+    }
+//======================================================================
+	if (async_create_timerfd(label, &cow_timer_fd) != SUCCESS) {
+		 goto exit;
+	}
+	if (async_set_timerfd_time(label, &cow_timer_fd,
+		HEARTBEAT_BASE_SEC, 0,
+        HEARTBEAT_BASE_SEC, 0) != SUCCESS)
+    {
+		 goto exit;
+	}
 	if (async_create_incoming_event(label, &cow_async, &cow_timer_fd) != SUCCESS) goto exit;
 //======================================================================
     while (!cow_shutdown_requested) {
@@ -46,6 +70,23 @@ void run_client_outbound_worker(int worker_idx, int master_uds_fd) {
             if (current_fd == cow_timer_fd) {
 				uint64_t u;
 				read(cow_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+//======================================================				
+				double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * HEARTBEAT_JITTER_PERCENTAGE * 2) - HEARTBEAT_JITTER_PERCENTAGE;
+                double new_heartbeat_interval_double = HEARTBEAT_BASE_SEC * (1.0 + jitter_amount);
+                if (new_heartbeat_interval_double < 0.1) {
+                    new_heartbeat_interval_double = 0.1;
+                }
+                if (async_set_timerfd_time(label, &cow_timer_fd,
+					(time_t)new_heartbeat_interval_double,
+                    (long)((new_heartbeat_interval_double - (time_t)new_heartbeat_interval_double) * 1e9),
+                    (time_t)new_heartbeat_interval_double,
+                    (long)((new_heartbeat_interval_double - (time_t)new_heartbeat_interval_double) * 1e9)) != SUCCESS)
+                {
+                    cow_shutdown_requested = 1;
+					LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
+					continue;
+                }
+                LOG_DEBUG("%s===============TIMER============", label);
 //======================================================
 // 1. Kirim IPC Hertbeat ke Master
 //======================================================

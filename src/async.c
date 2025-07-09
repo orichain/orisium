@@ -108,20 +108,27 @@ status_t async_create_eventfd_nonblock_close_after_exec(const char* label, int *
     return SUCCESS;
 }
 
-status_t async_create_timerfd(const char* label, int *timer_fd, int heartbeat_sec) {
+status_t async_create_timerfd(const char* label, int *timer_fd) {
     *timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
     if (*timer_fd == -1) {
         LOG_ERROR("%sGagal membuat timerfd: %s", label, strerror(errno));
         return FAILURE;
     }
+    return SUCCESS;
+}
+
+status_t async_set_timerfd_time(const char* label, int *timer_fd,
+	time_t initial_sec, long initial_nsec,
+	time_t interval_sec, long interval_nsec)
+{
     struct itimerspec new_value;
-    new_value.it_value.tv_sec = heartbeat_sec;
-    new_value.it_value.tv_nsec = 0;
-    new_value.it_interval.tv_sec = heartbeat_sec;
-    new_value.it_interval.tv_nsec = 0;
+    new_value.it_value.tv_sec = initial_sec;
+    new_value.it_value.tv_nsec = initial_nsec;
+    new_value.it_interval.tv_sec = interval_sec;
+    new_value.it_interval.tv_nsec = interval_nsec;
     if (timerfd_settime(*timer_fd, 0, &new_value, NULL) == -1) {
-		LOG_ERROR("%sGagal set time timerfd: %s", label, strerror(errno));
-		return FAILURE;
+        LOG_ERROR("%sGagal set time timerfd (FD %d): %s", label, *timer_fd, strerror(errno));
+        return FAILURE;
     }
     return SUCCESS;
 }

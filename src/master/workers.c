@@ -131,7 +131,7 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
             }
             for (int j = 0; j < MAX_LOGIC_WORKERS; ++j) { if (master_ctx->worker_uds_logic_fds[j] != 0) close(master_ctx->worker_uds_logic_fds[j]); }
             for (int j = 0; j < MAX_COW_WORKERS; ++j) { if (master_ctx->worker_uds_cow_fds[j] != 0) close(master_ctx->worker_uds_cow_fds[j]); }            
-            run_server_io_worker(index, master_ctx->worker_uds_sio_fds[index]);
+            run_server_io_worker(wot, index, master_ctx->worker_uds_sio_fds[index]);
             exit(EXIT_SUCCESS);
         } else {
             if (master_ctx->worker_uds_sio_fds[index] != 0) close(master_ctx->worker_uds_sio_fds[index]);
@@ -154,7 +154,7 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
                 if (j != index && master_ctx->worker_uds_logic_fds[j] != 0) close(master_ctx->worker_uds_logic_fds[j]);
             }
             for (int j = 0; j < MAX_COW_WORKERS; ++j) { if (master_ctx->worker_uds_cow_fds[j] != 0) close(master_ctx->worker_uds_cow_fds[j]); }         
-            run_logic_worker(index, master_ctx->worker_uds_logic_fds[index]);
+            run_logic_worker(wot, index, master_ctx->worker_uds_logic_fds[index]);
             exit(EXIT_SUCCESS);
         } else {
             if (master_ctx->worker_uds_logic_fds[index] != 0) close(master_ctx->worker_uds_logic_fds[index]);
@@ -177,7 +177,7 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
             for (int j = 0; j < MAX_COW_WORKERS; ++j) {
                 if (j != index && master_ctx->worker_uds_cow_fds[j] != 0) close(master_ctx->worker_uds_cow_fds[j]);
             }
-            run_client_outbound_worker(index, master_ctx->worker_uds_cow_fds[index]);
+            run_client_outbound_worker(wot, index, master_ctx->worker_uds_cow_fds[index]);
             exit(EXIT_SUCCESS);
         } else {
             if (master_ctx->worker_uds_cow_fds[index] != 0) close(master_ctx->worker_uds_cow_fds[index]);

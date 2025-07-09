@@ -23,7 +23,10 @@ uint32_t_status_t async_getevents(const char* label, async_type_t *async, int n)
 int_status_t async_wait(const char* label, async_type_t *async);
 status_t async_create(const char* label, async_type_t *async);
 status_t async_create_eventfd_nonblock_close_after_exec(const char* label, int *event_fd);
-status_t async_create_timerfd(const char* label, int *timer_fd, int heartbeat_sec);
+status_t async_create_timerfd(const char* label, int *timer_fd);
+status_t async_set_timerfd_time(const char* label, int *timer_fd,
+	time_t initial_sec, long initial_nsec,
+	time_t interval_sec, long interval_nsec);
 status_t async_create_incoming_event(const char* label, async_type_t *async, int *fd_to_add);
 status_t async_create_incoming_event_with_disconnect(const char* label, async_type_t *async, int *fd_to_add);
 status_t async_delete_event(const char* label, async_type_t *async, int *fd_to_delete);

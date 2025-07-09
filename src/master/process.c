@@ -40,9 +40,17 @@ status_t setup_master(master_context *master_ctx) {
 	if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->shutdown_event_fd) != SUCCESS) {
 		return FAILURE;
 	}
-	if (async_create_timerfd(label, &master_ctx->master_timer_fd, WORKER_HEARTBEATSEC_TIMEOUT) != SUCCESS) {
+//======================================================================	
+	if (async_create_timerfd(label, &master_ctx->master_timer_fd) != SUCCESS) {
 		return FAILURE;
 	}
+	if (async_set_timerfd_time(label, &master_ctx->master_timer_fd,
+		WORKER_HEARTBEATSEC_TIMEOUT, 0,
+        WORKER_HEARTBEATSEC_TIMEOUT, 0) != SUCCESS)
+    {
+		return FAILURE;
+	}
+//======================================================================	
 	if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->master_timer_fd) != SUCCESS) {
 		return FAILURE;
 	}
