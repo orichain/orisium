@@ -15,14 +15,14 @@
 #include "utilities.h"
 #include "commons.h"
 #include "ipc/protocol.h"
-#include "sessions/sio_client_conn_state.h"
+#include "sessions/workers_session.h"
 #include "types.h"
 #include "ipc/client_disconnect_info.h"
 #include "ipc/client_request_task.h"
 
 void run_server_io_worker(int worker_idx, int master_uds_fd) {
     volatile sig_atomic_t sio_shutdown_requested = 0;
-    sio_client_conn_state_t client_connections[MAX_CLIENTS_PER_SIO_WORKER];
+    sio_c_state_t sio_c_state[MAX_CLIENTS_PER_SIO_WORKER];
     async_type_t sio_async;
     sio_async.async_fd = -1;
     int sio_timer_fd = -1;
@@ -41,10 +41,9 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 	if (async_create_incoming_event(label, &sio_async, &sio_timer_fd) != SUCCESS) goto exit;
 //======================================================================	    
     for (int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
-        client_connections[i].in_use = false;
-        client_connections[i].client_fd = -1;
-        client_connections[i].correlation_id = -1;
-        memset(client_connections[i].ip, 0, IP_ADDRESS_LEN);
+        sio_c_state[i].in_use = false;
+        sio_c_state[i].client_fd = -1;
+        memset(sio_c_state[i].ip, 0, IP_ADDRESS_LEN);
     }    
     while (!sio_shutdown_requested) {
 		int_status_t snfds = async_wait(label, &sio_async);
@@ -63,7 +62,7 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 				uint64_t u;
 				read(sio_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
 //======================================================
-// 1. Tutup koneksi dr client_connections yang tidak ada aktifitas > WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT detik
+// 1. Tutup koneksi dr sio_c_state yang tidak ada aktifitas > WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT detik
 // 2. Kirim IPC Hertbeat ke Master
 //======================================================
 			} else if (current_fd == master_uds_fd) {
@@ -92,8 +91,11 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 					continue;
 				} else if (received_protocol->type == IPC_CLIENT_REQUEST_TASK) {
 					ipc_client_request_task_t *req = received_protocol->payload.ipc_client_request_task;
+					char ip_str[INET6_ADDRSTRLEN];
+					convert_ipv6_bin_to_str(req->ip, ip_str);
+	
 					if (received_client_fd == -1) {
-						LOG_ERROR("%sError: No client FD received with IPC_CLIENT_REQUEST_TASK for ID %ld. Skipping.", label, req->correlation_id);
+						LOG_ERROR("%sError: No client FD received with IPC_CLIENT_REQUEST_TASK for IP %s. Skipping.", label, ip_str);
 						CLOSE_FD(received_client_fd);
 						CLOSE_IPC_PROTOCOL(received_protocol);
 						continue;
@@ -109,11 +111,10 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 					}
 					int slot_found = -1;
 					for (int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
-						if (!client_connections[i].in_use) {
-							client_connections[i].in_use = true;
-							client_connections[i].client_fd = received_client_fd;
-							client_connections[i].correlation_id = req->correlation_id;
-							memcpy(client_connections[i].ip, req->ip, IP_ADDRESS_LEN);
+						if (!sio_c_state[i].in_use) {
+							sio_c_state[i].in_use = true;
+							sio_c_state[i].client_fd = received_client_fd;
+							memcpy(sio_c_state[i].ip, req->ip, IP_ADDRESS_LEN);
 							slot_found = i;
 							break;
 						}
@@ -121,8 +122,9 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 					if (slot_found != -1) {
 						char ip_str[INET6_ADDRSTRLEN];
 						convert_ipv6_bin_to_str(req->ip, ip_str);
-						LOG_INFO("%sReceived client FD %d (ID %ld, IP %s) from Master and added to epoll. Slot %d.",
-							   label, received_client_fd, req->correlation_id, ip_str, slot_found);
+						
+						LOG_INFO("%sReceived client FD %d (IP %s) from Master and added to epoll. Slot %d.",
+							   label, received_client_fd, ip_str, slot_found);
 					} else {
 						LOG_ERROR("%sNo free slots for new client FD %d. Closing.", label, received_client_fd);
 						CLOSE_FD(received_client_fd);
@@ -142,36 +144,33 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 						async_event_is_EPOLLERR(current_events) ||
 						async_event_is_EPOLLRDHUP(current_events))
 					{
-                        uint64_t disconnected_client_id = 0ULL;
                         uint8_t disconnected_client_ip[IP_ADDRESS_LEN];
                         memset(disconnected_client_ip, 0, IP_ADDRESS_LEN);
 
                         int client_slot_idx = -1;
                         for(int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
-                            if(client_connections[i].in_use && client_connections[i].client_fd == current_fd) {
-                                disconnected_client_id = client_connections[i].correlation_id;
-                                memcpy(disconnected_client_ip, client_connections[i].ip, IP_ADDRESS_LEN);
+                            if(sio_c_state[i].in_use && sio_c_state[i].client_fd == current_fd) {
+                                memcpy(disconnected_client_ip, sio_c_state[i].ip, IP_ADDRESS_LEN);
                                 client_slot_idx = i;
                                 break;
                             }
                         }
                         async_delete_event(label, &sio_async, &current_fd);                        
-                        if (disconnected_client_id != 0ULL && client_connections[client_slot_idx].in_use) {
-							client_connections[client_slot_idx].in_use = false;
-							client_connections[client_slot_idx].client_fd = -1;
-							client_connections[client_slot_idx].correlation_id = -1;
-							memset(client_connections[client_slot_idx].ip, 0, IP_ADDRESS_LEN);
+                        if (sio_c_state[client_slot_idx].in_use) {
+							sio_c_state[client_slot_idx].in_use = false;
+							sio_c_state[client_slot_idx].client_fd = -1;
+							memset(sio_c_state[client_slot_idx].ip, 0, IP_ADDRESS_LEN);
 							
-							ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_client_disconnect_info(&current_fd, &disconnected_client_id, disconnected_client_ip);
+							ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_client_disconnect_info(&current_fd, disconnected_client_ip);
 							if (cmd_result.status != SUCCESS) {
 								continue;
 							}
 							int not_used_fd = -1;				
 							ssize_t_status_t send_result = send_ipc_protocol_message(&master_uds_fd, cmd_result.r_ipc_protocol_t, &not_used_fd);
 							if (send_result.status != SUCCESS) {
-								LOG_INFO("%sFailed to sent client disconnect signal for ID %ld (IP %s) to Master.", label, disconnected_client_id, disconnected_client_ip);
+								LOG_INFO("%sFailed to sent client disconnect signal for (IP %s) to Master.", label, disconnected_client_ip);
 							} else {
-								LOG_INFO("%sSent client disconnect signal for ID %ld (IP %s) to Master.", label, disconnected_client_id, disconnected_client_ip);
+								LOG_INFO("%sSent client disconnect signal for (IP %s) to Master.", label, disconnected_client_ip);
 							}
 							CLOSE_FD(current_fd);
 							CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);
@@ -182,36 +181,36 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
                     continue;
                 }
                 client_buffer[bytes_read] = '\0';
-                uint64_t client_id_for_request = 0ULL;
                 int client_idx = -1;
                 uint8_t client_ip_for_request[IP_ADDRESS_LEN];
                 memset(client_ip_for_request, 0, IP_ADDRESS_LEN);
 
                 for(int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
-                    if(client_connections[i].in_use && client_connections[i].client_fd == current_fd) {
-                        client_id_for_request = client_connections[i].correlation_id;
+                    if(sio_c_state[i].in_use && sio_c_state[i].client_fd == current_fd) {
                         client_idx = i;
-                        memcpy(client_ip_for_request, client_connections[i].ip, IP_ADDRESS_LEN);
+                        memcpy(client_ip_for_request, sio_c_state[i].ip, IP_ADDRESS_LEN);
                         break;
                     }
                 }
-                if (client_id_for_request == 0ULL || client_idx == -1) {
+                if (client_idx == -1) {
                     LOG_ERROR("[Server IO Worker %d]: Received data from unknown client FD %d. Ignoring.", worker_idx, current_fd);
                     continue;
                 }
                 
                 int not_used_fd = -1;
-                ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_client_request_task(&not_used_fd, &client_id_for_request, client_ip_for_request, (uint16_t)bytes_read, (uint8_t *)client_buffer);
+                ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_client_request_task(&not_used_fd, client_ip_for_request, (uint16_t)bytes_read, (uint8_t *)client_buffer);
                 if (cmd_result.status != SUCCESS) {
 					continue;
 				}	
 				ssize_t_status_t send_result = send_ipc_protocol_message(&master_uds_fd, cmd_result.r_ipc_protocol_t, &not_used_fd);
+				char ip_str[INET6_ADDRSTRLEN];
+				convert_ipv6_bin_to_str(client_ip_for_request, ip_str);
 				if (send_result.status != SUCCESS) {
-					LOG_INFO("[Server IO Worker %d]: Failed to sent client request (ID %ld) to Master for Logic Worker.",
-                       worker_idx, client_id_for_request);
+					LOG_INFO("[Server IO Worker %d]: Failed to sent client request IP %s to Master for Logic Worker.",
+                       worker_idx, ip_str);
 				} else {
-					LOG_INFO("[Server IO Worker %d]: Sent client request (ID %ld) to Master for Logic Worker.",
-                       worker_idx, client_id_for_request);
+					LOG_INFO("[Server IO Worker %d]: Sent client request IP %s to Master for Logic Worker.",
+                       worker_idx, ip_str);
 				}
 				CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);
             }
@@ -223,8 +222,8 @@ void run_server_io_worker(int worker_idx, int master_uds_fd) {
 //======================================================================    
 exit:
 	for (int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) { // Kebiasaann bagus = harus selalu ingat "CLOSE FD + HAPUS event"
-		if (client_connections[i].in_use) {
-			CLOSE_FD(client_connections[i].client_fd);
+		if (sio_c_state[i].in_use) {
+			CLOSE_FD(sio_c_state[i].client_fd);
 		}
 	}
 	CLOSE_FD(master_uds_fd);

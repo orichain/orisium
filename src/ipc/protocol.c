@@ -32,7 +32,7 @@ static inline size_t_status_t calculate_ipc_payload_size(const ipc_protocol_t* p
                 result.status = FAILURE; // Atur status hasil ke FAILURE
                 return result;
             }
-            payload_fixed_size = sizeof(uint64_t) + IP_ADDRESS_LEN + sizeof(uint16_t);
+            payload_fixed_size = IP_ADDRESS_LEN + sizeof(uint16_t);
             payload_dynamic_size = p->payload.ipc_client_request_task->len;
             break;
         }
@@ -42,7 +42,7 @@ static inline size_t_status_t calculate_ipc_payload_size(const ipc_protocol_t* p
                 result.status = FAILURE; // Atur status hasil ke FAILURE
                 return result;
             }
-            payload_fixed_size = sizeof(uint64_t) + IP_ADDRESS_LEN;
+            payload_fixed_size = IP_ADDRESS_LEN;
             payload_dynamic_size = 0;
             break;
 		}
@@ -52,7 +52,7 @@ static inline size_t_status_t calculate_ipc_payload_size(const ipc_protocol_t* p
                 result.status = FAILURE; // Atur status hasil ke FAILURE
                 return result;
             }
-            payload_fixed_size = sizeof(uint64_t) + sizeof(uint16_t);
+            payload_fixed_size = sizeof(uint16_t);
             payload_dynamic_size = p->payload.ipc_logic_response->len;
             break;
         }
@@ -199,14 +199,14 @@ ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
     status_t result_pyld = FAILURE;
     switch (p->type) {
         case IPC_CLIENT_REQUEST_TASK: {
-            if (current_buffer_offset + sizeof(uint64_t) + IP_ADDRESS_LEN + sizeof(uint16_t) > len) {
+            if (current_buffer_offset + IP_ADDRESS_LEN + sizeof(uint16_t) > len) {
                 fprintf(stderr, "[ipc_deserialize Error]: Buffer terlalu kecil untuk IPC_CLIENT_REQUEST_TASK fixed header.\n");
                 CLOSE_IPC_PROTOCOL(p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
             uint16_t raw_data_len_be;
-            memcpy(&raw_data_len_be, buffer + current_buffer_offset + sizeof(uint64_t) + IP_ADDRESS_LEN, sizeof(uint16_t));
+            memcpy(&raw_data_len_be, buffer + current_buffer_offset + IP_ADDRESS_LEN, sizeof(uint16_t));
             uint16_t actual_data_len = be16toh(raw_data_len_be);
             ipc_client_request_task_t *task_payload = (ipc_client_request_task_t*) calloc(1, sizeof(ipc_client_request_task_t) + actual_data_len);
             if (!task_payload) {
@@ -220,7 +220,7 @@ ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
             break;
         }
         case IPC_CLIENT_DISCONNECTED: {
-			if (current_buffer_offset + sizeof(uint64_t) + IP_ADDRESS_LEN > len) {
+			if (current_buffer_offset + IP_ADDRESS_LEN > len) {
                 fprintf(stderr, "[ipc_deserialize Error]: Buffer terlalu kecil untuk IPC_CLIENT_DISCONNECTED fixed header.\n");
                 CLOSE_IPC_PROTOCOL(p);
                 result.status = FAILURE_OOBUF;
@@ -238,14 +238,14 @@ ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len) {
             break;
 		}
 		case IPC_LOGIC_RESPONSE_TO_SIO: {
-			if (current_buffer_offset + sizeof(uint64_t) + sizeof(uint16_t) > len) {
+			if (current_buffer_offset + sizeof(uint16_t) > len) {
                 fprintf(stderr, "[ipc_deserialize Error]: Buffer terlalu kecil untuk IPC_LOGIC_RESPONSE_TO_SIO fixed header.\n");
                 CLOSE_IPC_PROTOCOL(p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
             uint16_t raw_data_len_be;
-            memcpy(&raw_data_len_be, buffer + current_buffer_offset + sizeof(uint64_t), sizeof(uint16_t));
+            memcpy(&raw_data_len_be, buffer + current_buffer_offset, sizeof(uint16_t));
             uint16_t actual_data_len = be16toh(raw_data_len_be);
             ipc_logic_response_t *task_payload = (ipc_logic_response_t*) calloc(1, sizeof(ipc_logic_response_t) + actual_data_len);
             if (!task_payload) {

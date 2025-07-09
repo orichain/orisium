@@ -1,6 +1,5 @@
 #include <stdio.h>       // for printf, perror, fprintf, NULL, stderr
 #include <string.h>      // for memset, strncpy
-#include <endian.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -17,12 +16,6 @@ status_t ipc_serialize_client_disconnect_info(const ipc_client_disconnect_info_t
 
     size_t current_offset_local = *offset;
 
-    // Salin Correlation ID (big-endian)
-    if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, sizeof(uint64_t), buffer_size)) return FAILURE_OOBUF;
-    uint64_t correlation_id_be = htobe64(payload->correlation_id);
-    memcpy(current_buffer + current_offset_local, &correlation_id_be, sizeof(uint64_t));
-    current_offset_local += sizeof(uint64_t);
-    
     // Salin ip (IP_ADDRESS_LEN)
     if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, IP_ADDRESS_LEN, buffer_size)) return FAILURE_OOBUF;
     memcpy(current_buffer + current_offset_local, payload->ip, IP_ADDRESS_LEN);
@@ -45,17 +38,6 @@ status_t ipc_deserialize_client_disconnect_info(ipc_protocol_t *p, const uint8_t
 
     fprintf(stderr, "==========================================================Panjang offset_ptr AWAL: %ld\n", (long)(cursor - buffer));
 
-    // 1. Deserialisasi correlation_id (uint64_t)
-    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
-        fprintf(stderr, "[ipc_deserialize_client_disconnect_info Error]: Out of bounds reading correlation_id.\n");
-        return FAILURE_OOBUF;
-    }
-    uint64_t correlation_id_be;
-    memcpy(&correlation_id_be, cursor, sizeof(uint64_t));
-    payload->correlation_id = be64toh(correlation_id_be);
-    cursor += sizeof(uint64_t);
-    current_offset += sizeof(uint64_t);
-    
     // 2. Deserialisasi ip (IP_ADDRESS_LEN)
     if (current_offset + IP_ADDRESS_LEN > total_buffer_len) {
         fprintf(stderr, "[ipc_deserialize_client_disconnect_info Error]: Out of bounds reading correlation_id.\n");
@@ -71,7 +53,7 @@ status_t ipc_deserialize_client_disconnect_info(ipc_protocol_t *p, const uint8_t
     return SUCCESS;
 }
 
-ipc_protocol_t_status_t ipc_prepare_cmd_client_disconnect_info(int *fd_to_close, uint64_t *correlation_id, uint8_t disconnected_client_ip[]) {
+ipc_protocol_t_status_t ipc_prepare_cmd_client_disconnect_info(int *fd_to_close, uint8_t disconnected_client_ip[]) {
 	ipc_protocol_t_status_t result;
 	result.r_ipc_protocol_t = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
 	result.status = FAILURE;
@@ -93,7 +75,6 @@ ipc_protocol_t_status_t ipc_prepare_cmd_client_disconnect_info(int *fd_to_close,
 		CLOSE_IPC_PROTOCOL(result.r_ipc_protocol_t);
 		return result;
 	}
-	payload->correlation_id = *correlation_id; // Cast ke uint64_t
 	memcpy(payload->ip, disconnected_client_ip, IP_ADDRESS_LEN);				
 	result.r_ipc_protocol_t->payload.ipc_client_disconnect_info = payload;
 	result.status = SUCCESS;

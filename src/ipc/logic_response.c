@@ -15,12 +15,6 @@ status_t ipc_serialize_logic_response(const ipc_logic_response_t* payload, uint8
 
     size_t current_offset_local = *offset;
 
-    // Salin Correlation ID (big-endian)
-    if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, sizeof(uint64_t), buffer_size)) return FAILURE_OOBUF;
-    uint64_t correlation_id_be = htobe64(payload->correlation_id);
-    memcpy(current_buffer + current_offset_local, &correlation_id_be, sizeof(uint64_t));
-    current_offset_local += sizeof(uint64_t);
-    
     // Salin Len
     if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, sizeof(uint16_t), buffer_size)) return FAILURE_OOBUF;
     uint16_t len_be = htobe16(payload->len);
@@ -51,17 +45,6 @@ status_t ipc_deserialize_logic_response(ipc_protocol_t *p, const uint8_t *buffer
 
     fprintf(stderr, "==========================================================Panjang offset_ptr AWAL: %ld\n", (long)(cursor - buffer));
 
-    // 1. Deserialisasi correlation_id (uint64_t)
-    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
-        fprintf(stderr, "[ipc_deserialize_logic_response Error]: Out of bounds reading correlation_id.\n");
-        return FAILURE_OOBUF;
-    }
-    uint64_t correlation_id_be;
-    memcpy(&correlation_id_be, cursor, sizeof(uint64_t));
-    payload->correlation_id = be64toh(correlation_id_be);
-    cursor += sizeof(uint64_t);
-    current_offset += sizeof(uint64_t);
-    
     // 2. Deserialisasi len (uint16_t - panjang data aktual)
     if (current_offset + sizeof(uint16_t) > total_buffer_len) {
         fprintf(stderr, "[ipc_deserialize_logic_response Error]: Out of bounds reading data length.\n");

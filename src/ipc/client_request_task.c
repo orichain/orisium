@@ -17,12 +17,6 @@ status_t ipc_serialize_client_request_task(const ipc_client_request_task_t* payl
 
     size_t current_offset_local = *offset;
 
-    // Salin Correlation ID (big-endian)
-    if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, sizeof(uint64_t), buffer_size)) return FAILURE_OOBUF;
-    uint64_t correlation_id_be = htobe64(payload->correlation_id);
-    memcpy(current_buffer + current_offset_local, &correlation_id_be, sizeof(uint64_t));
-    current_offset_local += sizeof(uint64_t);
-    
     // Salin ip (IP_ADDRESS_LEN)
     if (CHECK_BUFFER_BOUNDS_NO_RETURN(current_offset_local, IP_ADDRESS_LEN, buffer_size)) return FAILURE_OOBUF;
     memcpy(current_buffer + current_offset_local, payload->ip, IP_ADDRESS_LEN);
@@ -58,17 +52,6 @@ status_t ipc_deserialize_client_request_task(ipc_protocol_t *p, const uint8_t *b
 
     fprintf(stderr, "==========================================================Panjang offset_ptr AWAL: %ld\n", (long)(cursor - buffer));
 
-    // 1. Deserialisasi correlation_id (uint64_t)
-    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
-        fprintf(stderr, "[ipc_deserialize_client_request_task Error]: Out of bounds reading correlation_id.\n");
-        return FAILURE_OOBUF;
-    }
-    uint64_t correlation_id_be;
-    memcpy(&correlation_id_be, cursor, sizeof(uint64_t));
-    payload->correlation_id = be64toh(correlation_id_be);
-    cursor += sizeof(uint64_t);
-    current_offset += sizeof(uint64_t);
-    
     // 2. Deserialisasi ip (IP_ADDRESS_LEN)
     if (current_offset + IP_ADDRESS_LEN > total_buffer_len) {
         fprintf(stderr, "[ipc_deserialize_client_request_task Error]: Out of bounds reading correlation_id.\n");
@@ -117,7 +100,7 @@ status_t ipc_deserialize_client_request_task(ipc_protocol_t *p, const uint8_t *b
     return SUCCESS;
 }
 
-ipc_protocol_t_status_t ipc_prepare_cmd_client_request_task(int *fd_to_close, uint64_t *correlation_id, uint8_t client_ip_for_request[], uint16_t data_len, uint8_t *data) {
+ipc_protocol_t_status_t ipc_prepare_cmd_client_request_task(int *fd_to_close, uint8_t client_ip_for_request[], uint16_t data_len, uint8_t *data) {
 	ipc_protocol_t_status_t result;
 	result.r_ipc_protocol_t = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
 	result.status = FAILURE;
@@ -141,7 +124,6 @@ ipc_protocol_t_status_t ipc_prepare_cmd_client_request_task(int *fd_to_close, ui
 		CLOSE_IPC_PROTOCOL(result.r_ipc_protocol_t);
 		return result;
 	}
-	payload->correlation_id = *correlation_id;
 	memcpy(payload->ip, client_ip_for_request, IP_ADDRESS_LEN);
 	payload->len = data_len;
 	if (data_len > 0 && data) memcpy(payload->data, data, data_len);

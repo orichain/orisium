@@ -12,14 +12,14 @@
 
 #include "log.h"
 #include "node.h"
-#include "sessions/closed_correlation_id.h"
+#include "sessions/master_session.h"
 #include "master/process.h"
 #include "utilities.h"
 #include "types.h"
 
 volatile sig_atomic_t shutdown_requested = 0;
 node_config_t node_config;
-closed_correlation_id_t *closed_correlation_id_head = NULL;
+master_sio_dc_session_t *master_sio_dc_session_head = NULL;
 int *shutdown_event_fd = NULL;
 
 void sigint_handler(int signum) {
@@ -83,7 +83,7 @@ int main() {
 // Cleanup
 //======================================================================
 exit:
-	free_closed_correlation_ids("[Orisium]: ", &closed_correlation_id_head);
+	free_master_sio_dc_sessions("[Orisium]: ", &master_sio_dc_session_head);
 #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))    
 	pthread_join(cleaner_thread, NULL);
     log_close();

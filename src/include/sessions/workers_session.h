@@ -8,6 +8,8 @@
 
 typedef struct {
 	int client_fd;
+	bool in_use;
+    bool is_busy;
     uint8_t ip[IP_ADDRESS_LEN];
     uint64_t last_ack;
     uint8_t *buffer;
@@ -19,6 +21,8 @@ typedef struct {
 
 typedef struct {
 	int client_fd;
+	bool in_use;
+    bool is_busy;
     uint8_t ip[IP_ADDRESS_LEN];
     uint64_t last_ack;
     uint8_t *buffer;

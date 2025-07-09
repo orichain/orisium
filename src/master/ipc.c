@@ -6,8 +6,7 @@
 #include "log.h"
 #include "constants.h"
 #include "ipc/protocol.h"
-#include "sessions/closed_correlation_id.h"
-#include "sessions/master_client_session.h"
+#include "sessions/master_session.h"
 #include "types.h"
 #include "utilities.h"
 #include "async.h"
@@ -65,7 +64,7 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
 	return result;
 }
 
-status_t handle_ipc_event(const char *label, master_context *master_ctx, master_client_session_t master_client_sessions[], int *current_fd) {	
+status_t handle_ipc_event(const char *label, master_context *master_ctx, master_sio_c_session_t master_sio_c_session[], int *current_fd) {	
 	int received_fd = -1;
 	ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(current_fd, &received_fd);
 	if (deserialized_result.status != SUCCESS) {
@@ -97,12 +96,12 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, master_
 
 			int target_sio_uds_fd = -1;
 			for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
-				if (master_client_sessions[i].in_use && master_client_sessions[i].correlation_id == resp->client_correlation_id) {
-					target_sio_uds_fd = master_client_sessions[i].sio_uds_fd;
-					master_client_sessions[i].in_use = false;
-					master_client_sessions[i].correlation_id = -1;
-					master_client_sessions[i].sio_uds_fd = -1;
-					memset(master_client_sessions[i].client_ip, 0, sizeof(master_client_sessions[i].client_ip));
+				if (master_sio_c_session[i].in_use && master_sio_c_session[i].correlation_id == resp->client_correlation_id) {
+					target_sio_uds_fd = master_sio_c_session[i].sio_uds_fd;
+					master_sio_c_session[i].in_use = false;
+					master_sio_c_session[i].correlation_id = -1;
+					master_sio_c_session[i].sio_uds_fd = -1;
+					memset(master_sio_c_session[i].client_ip, 0, sizeof(master_sio_c_session[i].client_ip));
 					break;
 				}
 			}
@@ -146,23 +145,21 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, master_
 		*/
 		case IPC_CLIENT_DISCONNECTED: {
 			ipc_client_disconnect_info_t *disconnect_info = received_protocol->payload.ipc_client_disconnect_info;
-			add_closed_correlation_id("[Master]: ", &closed_correlation_id_head, disconnect_info->correlation_id, disconnect_info->ip); 
+			add_master_sio_dc_session("[Master]: ", &master_sio_dc_session_head, disconnect_info->ip); 
 			//cnt_connection -= (double_t)1;
 			//avg_connection = cnt_connection / sio_worker;
 			char ip_str[INET6_ADDRSTRLEN];
 			convert_ipv6_bin_to_str(disconnect_info->ip, ip_str);
-			LOG_INFO("[Master]: Received Client Disconnected signal for ID %ld from IP %s (from SIO Worker UDS FD %d).",
-					 disconnect_info->correlation_id, ip_str, *current_fd);
+			LOG_INFO("[Master]: Received Client Disconnected signal from IP %s (from SIO Worker UDS FD %d).",
+					 ip_str, *current_fd);
 			for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
-				if (master_client_sessions[i].in_use &&
-					master_client_sessions[i].correlation_id == disconnect_info->correlation_id &&
-					memcmp(master_client_sessions[i].ip, disconnect_info->ip, IP_ADDRESS_LEN) == 0) {
-					master_client_sessions[i].in_use = false;
-					master_client_sessions[i].correlation_id = -1;
-					master_client_sessions[i].sio_uds_fd = -1;
-					memset(master_client_sessions[i].ip, 0, IP_ADDRESS_LEN);
-					LOG_INFO("[Master]: IP %s (ID %ld) dihapus dari daftar koneksi aktif.",
-							 ip_str, disconnect_info->correlation_id);
+				if (master_sio_c_session[i].in_use &&
+					memcmp(master_sio_c_session[i].ip, disconnect_info->ip, IP_ADDRESS_LEN) == 0) {
+					master_sio_c_session[i].in_use = false;
+					master_sio_c_session[i].sio_uds_fd = -1;
+					memset(master_sio_c_session[i].ip, 0, IP_ADDRESS_LEN);
+					LOG_INFO("[Master]: IP %s dihapus dari daftar koneksi aktif.",
+							 ip_str);
 					break;
 				}
 			}

@@ -22,25 +22,21 @@ typedef enum {
 } ipc_protocol_type_t;
 
 typedef struct {
-    uint64_t correlation_id;
     uint8_t ip[IP_ADDRESS_LEN];
     uint16_t len;
     uint8_t data[];
 } ipc_client_request_task_t;
 
 typedef struct {
-    uint64_t correlation_id;
     uint8_t ip[IP_ADDRESS_LEN];
 } ipc_client_disconnect_info_t;
 
 typedef struct {
-    uint64_t correlation_id;
     uint16_t len;
     uint8_t data[];
 } ipc_logic_response_t;
 
 typedef struct {
-    uint64_t correlation_id;
     uint8_t ip[IP_ADDRESS_LEN];
     uint16_t port;
     uint16_t len;
@@ -48,7 +44,6 @@ typedef struct {
 } ipc_outbound_task_t;
 
 typedef struct {
-    uint64_t correlation_id;
     uint8_t success;
     uint16_t len;
     uint8_t data[];

@@ -15,8 +15,7 @@
 #include "utilities.h"
 #include "node.h"
 #include "ipc/protocol.h"
-#include "sessions/closed_correlation_id.h"
-#include "sessions/master_client_session.h"
+#include "sessions/master_session.h"
 #include "types.h"
 #include "ipc/client_request_task.h"
 #include "master/socket_listenner.h"
@@ -68,7 +67,7 @@ status_t setup_socket_listenner(const char *label, master_context *master_ctx) {
     return SUCCESS;
 }
 
-status_t handle_listen_sock_event(const char *label, master_context *master_ctx, master_client_session_t master_client_sessions[], uint64_t *next_client_id) {
+status_t handle_listen_sock_event(const char *label, master_context *master_ctx, master_sio_c_session_t master_sio_c_session[], uint64_t *client_num) {
 	struct sockaddr_storage client_addr;
 	socklen_t client_addr_len = sizeof(client_addr);
 	char host_str[NI_MAXHOST];
@@ -107,23 +106,23 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
         return FAILURE_IVLDPORT;
     }
     
-    uint8_t host_ip[IP_ADDRESS_LEN];	
-	if (convert_str_to_ipv6_bin(host_str, host_ip) != SUCCESS) {
+    uint8_t host_ip_bin[IP_ADDRESS_LEN];	
+	if (convert_str_to_ipv6_bin(host_str, host_ip_bin) != SUCCESS) {
 		LOG_ERROR("%sIP tidak valid %s.", label, host_str);
 		return FAILURE_IVLDIP;
 	}
     
 	bool ip_already_connected = false;
 	for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
-		if (master_client_sessions[i].in_use &&
-			memcmp(master_client_sessions[i].ip, host_ip, IP_ADDRESS_LEN) == 0) {
+		if (master_sio_c_session[i].in_use &&
+			memcmp(master_sio_c_session[i].ip, host_ip_bin, IP_ADDRESS_LEN) == 0) {
 			ip_already_connected = true;
 			break;
 		}
 	}
 	
 	char ip_str[INET6_ADDRSTRLEN];
-	convert_ipv6_bin_to_str(host_ip, ip_str);
+	convert_ipv6_bin_to_str(host_ip_bin, ip_str);
 	
 	if (ip_already_connected) {
 		LOG_WARN("%sKoneksi ditolak dari IP %s. Sudah ada koneksi aktif dari IP ini.", label, ip_str);
@@ -132,13 +131,11 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 	}
 	LOG_INFO("%sNew client connected from IP %s on FD %d.", label, ip_str, client_sock);
 	
-	uint64_t current_client_id = 0ULL;
-	closed_correlation_id_t_status_t ccid_result = find_first_ratelimited_closed_correlation_id("[Master]: ", closed_correlation_id_head, host_ip);
+	master_sio_dc_session_t_status_t ccid_result = find_first_ratelimited_master_sio_dc_session("[Master]: ", master_sio_dc_session_head, host_ip_bin);
 	if (ccid_result.status == SUCCESS) {
-		current_client_id = ccid_result.r_closed_correlation_id_t->correlation_id;
-		status_t ccid_del_result = delete_closed_correlation_id("[Master]: ", &closed_correlation_id_head, current_client_id);
+		status_t ccid_del_result = delete_master_sio_dc_session("[Master]: ", &master_sio_dc_session_head, host_ip_bin);
 		if (ccid_del_result != SUCCESS) {
-			current_client_id = *next_client_id++;
+			*client_num += 1ULL;
 		}
 	} else {
 		if (ccid_result.status == FAILURE_RATELIMIT) {
@@ -146,12 +143,12 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 			close(client_sock);
 			return FAILURE_ALRDYCONTD;
 		} else {
-			current_client_id = *next_client_id++;
+			*client_num += 1ULL;
 		}
 	}
 	
-	if (current_client_id > MAX_MASTER_CONCURRENT_SESSIONS) {
-		*next_client_id -= 1ULL;
+	if (*client_num > MAX_MASTER_CONCURRENT_SESSIONS) {
+		*client_num -= 1ULL;
 		LOG_ERROR("%sWARNING: MAX_MASTER_CONCURRENT_SESSIONS reached. Rejecting client FD %d.", label, client_sock);
 		CLOSE_FD(client_sock);
 		return FAILURE_MAXREACHD;
@@ -160,37 +157,36 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 	//cnt_connection += (double_t)1;
 	//avg_connection = cnt_connection / sio_worker;
 	
-	int sio_worker_idx = (int)(current_client_id % MAX_SIO_WORKERS);
+	int sio_worker_idx = (int)(*client_num % MAX_SIO_WORKERS);
 	int sio_worker_uds_fd = master_ctx->master_uds_sio_fds[sio_worker_idx]; // Master uses its side of UDS
 
 	int slot_found = -1;
 	for(int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
-		if(!master_client_sessions[i].in_use) {
-			master_client_sessions[i].in_use = true;
-			master_client_sessions[i].correlation_id = current_client_id;
-			master_client_sessions[i].sio_uds_fd = sio_worker_uds_fd;
-			memcpy(master_client_sessions[i].ip, host_ip, IP_ADDRESS_LEN);
+		if(!master_sio_c_session[i].in_use) {
+			master_sio_c_session[i].in_use = true;
+			master_sio_c_session[i].sio_uds_fd = sio_worker_uds_fd;
+			memcpy(master_sio_c_session[i].ip, host_ip_bin, IP_ADDRESS_LEN);
 			slot_found = i;
 			break;
 		}
 	}
 	if (slot_found == -1) {
-		LOG_ERROR("%sWARNING: No free session slots in master_client_sessions. Rejecting client FD %d.", label, client_sock);
+		LOG_ERROR("%sWARNING: No free session slots in master_sio_c_session. Rejecting client FD %d.", label, client_sock);
 		CLOSE_FD(client_sock);
 		return FAILURE_NOSLOT;
 	}
 	
-	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_client_request_task(&client_sock, &current_client_id, host_ip, (uint16_t)0, NULL);
+	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_client_request_task(&client_sock, host_ip_bin, (uint16_t)0, NULL);
 	if (cmd_result.status != SUCCESS) {
 		return cmd_result.status;
 	}	
 	ssize_t_status_t send_result = send_ipc_protocol_message(&sio_worker_uds_fd, cmd_result.r_ipc_protocol_t, &client_sock);
 	if (send_result.status != SUCCESS) {
-		LOG_ERROR("%sFailed to forward client FD %d (ID %ld) to Server IO Worker %d.",
-				  label, client_sock, current_client_id, sio_worker_idx);
+		LOG_ERROR("%sFailed to forward client FD %d to Server IO Worker %d.",
+				  label, client_sock, sio_worker_idx);
 	} else {
-		LOG_INFO("%sForwarding client FD %d (ID %ld) from IP %s to Server IO Worker %d (UDS FD %d). Bytes sent: %zd.",
-				 label, client_sock, current_client_id, ip_str, sio_worker_idx, sio_worker_uds_fd, send_result.r_ssize_t);
+		LOG_INFO("%sForwarding client FD %d from IP %s to Server IO Worker %d (UDS FD %d). Bytes sent: %zd.",
+				 label, client_sock, ip_str, sio_worker_idx, sio_worker_uds_fd, send_result.r_ssize_t);
 	}
 	CLOSE_FD(client_sock); // Menghindari kebocoran FD jika send_ipc gagal => biarkan client reconnect
 	CLOSE_IPC_PROTOCOL(cmd_result.r_ipc_protocol_t);

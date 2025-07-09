@@ -10,7 +10,6 @@
 #include "async.h"
 #include "globals.h"
 #include "commons.h"
-#include "sessions/master_client_session.h"
 #include "types.h"
 #include "master/socket_listenner.h"
 #include "master/ipc.h"
@@ -18,6 +17,7 @@
 #include "master/process.h"
 #include "ipc/protocol.h"
 #include "ipc/shutdown.h"
+#include "sessions/master_session.h"
 
 status_t setup_master(master_context *master_ctx) {
 	master_ctx->master_pid = -1;
@@ -148,15 +148,15 @@ static inline status_t broadcast_shutdown(master_context *master_ctx) {
 void run_master_process(master_context *master_ctx) {
 	const char *label = "[Master]: ";
 	volatile sig_atomic_t master_shutdown_requested = 0;
-	master_client_session_t master_client_sessions[MAX_MASTER_CONCURRENT_SESSIONS];
-	uint64_t next_client_id = 1ULL;
+	master_sio_c_session_t master_sio_c_session[MAX_MASTER_CONCURRENT_SESSIONS];
+	uint64_t client_num = 1ULL;
 	//double_t avg_connection = 0.0;
 	//double_t cnt_connection = 0.0;
 	//double_t sio_worker = (double_t)MAX_SIO_WORKERS;
 	
 	for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
-        master_client_sessions[i].in_use = false;
-        memset(master_client_sessions[i].ip, 0, IP_ADDRESS_LEN);
+        master_sio_c_session[i].in_use = false;
+        memset(master_sio_c_session[i].ip, 0, IP_ADDRESS_LEN);
     }
     while (!master_shutdown_requested) {
 		int_status_t snfds = async_wait(label, &master_ctx->master_async);
@@ -188,7 +188,7 @@ void run_master_process(master_context *master_ctx) {
 				continue;
 			} else if (current_fd == master_ctx->listen_sock) {
 				if (async_event_is_EPOLLIN(current_events)) {
-					if (handle_listen_sock_event(label, master_ctx, master_client_sessions, &next_client_id) != SUCCESS) {
+					if (handle_listen_sock_event(label, master_ctx, master_sio_c_session, &client_num) != SUCCESS) {
 						continue;
 					}
 				} else {
@@ -217,7 +217,7 @@ void run_master_process(master_context *master_ctx) {
 					}
 //======================================================================
 				} else {
-					if (handle_ipc_event(label, master_ctx, master_client_sessions, &current_fd) != SUCCESS) {
+					if (handle_ipc_event(label, master_ctx, master_sio_c_session, &current_fd) != SUCCESS) {
 						continue;
 					}
 				}
