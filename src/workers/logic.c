@@ -29,6 +29,7 @@ void run_logic_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
 	snprintf(label, needed + 1, "[Logic %d]: ", worker_idx);  
 //======================================================================	
 	if (async_create(label, &logic_async) != SUCCESS) goto exit;
+	LOG_INFO("%s==============================Worker side: %d).", label, master_uds_fd);
 	if (async_create_incoming_event_with_disconnect(label, &logic_async, &master_uds_fd) != SUCCESS) goto exit;
 //======================================================================
 	const int HEARTBEAT_BASE_SEC = WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT;
@@ -86,7 +87,7 @@ void run_logic_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
 					LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
 					continue;
                 }
-                LOG_DEBUG("%s===============TIMER============", label);
+                //LOG_DEBUG("%s===============TIMER============", label);
 //======================================================
 // 1. Kirim IPC Hertbeat ke Master
 // 2. "piggybacking"/"implicit heartbeat" kalau sudah ada ipc lain yang dikirim < interval. lewati pengiriman heartbeat.
@@ -99,7 +100,6 @@ void run_logic_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
 						async_event_is_EPOLLERR(current_events) ||
 						async_event_is_EPOLLRDHUP(current_events))
 					{
-						async_delete_event(label, &logic_async, &current_fd);
 						logic_shutdown_requested = 1;
 						LOG_INFO("%sMaster disconnected. Initiating graceful shutdown...", label);
 						continue;
@@ -217,7 +217,7 @@ void run_logic_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
 // Logic Cleanup
 //======================================================================    
 exit:    
-	CLOSE_FD(&master_uds_fd);
+	async_delete_event(label, &logic_async, &master_uds_fd);
 	async_delete_event(label, &logic_async, &logic_timer_fd);
     CLOSE_FD(&logic_async.async_fd);
     free(label);

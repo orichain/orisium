@@ -9,7 +9,6 @@
 #include <bits/types/sig_atomic_t.h>
 #include <netinet/in.h>
 #include <time.h>
-#include <sys/timerfd.h>
 
 #include "log.h"
 #include "async.h"
@@ -39,7 +38,8 @@ void run_server_io_worker(worker_type_t wot, int worker_idx, int master_uds_fd) 
 	snprintf(label, needed + 1, "[SIO %d]: ", worker_idx);  
 //======================================================================	
 	if (async_create(label, &sio_async) != SUCCESS) goto exit;
-	if (async_create_incoming_event_with_disconnect(label, &sio_async, &master_uds_fd) != SUCCESS) goto exit;	
+	LOG_INFO("%s==============================Worker side: %d).", label, master_uds_fd);
+	if (async_create_incoming_event_with_disconnect(label, &sio_async, &master_uds_fd) != SUCCESS) goto exit;
 //======================================================================
 	const int HEARTBEAT_BASE_SEC = WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT;
     const int MILISECONDS_PER_UNIT = INITIAL_MILISECONDS_PER_UNIT;
@@ -101,7 +101,7 @@ void run_server_io_worker(worker_type_t wot, int worker_idx, int master_uds_fd) 
 					LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
 					continue;
                 }
-                LOG_DEBUG("%s===============TIMER============", label);
+                //LOG_DEBUG("%s===============TIMER============", label);
 //======================================================
 // 1. Tutup koneksi dr sio_c_state yang tidak ada aktifitas > WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT detik
 // 2. Kirim IPC Hertbeat ke Master
@@ -115,7 +115,6 @@ void run_server_io_worker(worker_type_t wot, int worker_idx, int master_uds_fd) 
 						async_event_is_EPOLLERR(current_events) ||
 						async_event_is_EPOLLRDHUP(current_events))
 					{
-						async_delete_event(label, &sio_async, &current_fd);
 						sio_shutdown_requested = 1;
 						LOG_INFO("%sMaster disconnected. Initiating graceful shutdown...", label);
 						continue;
@@ -268,7 +267,7 @@ exit:
 			CLOSE_FD(&sio_c_state[i].client_fd);
 		}
 	}
-	CLOSE_FD(&master_uds_fd);
+	async_delete_event(label, &sio_async, &master_uds_fd);
 	async_delete_event(label, &sio_async, &sio_timer_fd);
     CLOSE_FD(&sio_async.async_fd);
     free(label);

@@ -7,21 +7,22 @@
 #include "constants.h"
 #include "types.h"
 
+typedef int uds_pair[2];
+
+typedef struct {
+	uds_pair uds;
+	pid_t pid;
+} uds_pair_pid_t;
+
 typedef struct {
 	int master_pid;
     int listen_sock;
     int master_timer_fd;
     int shutdown_event_fd;
     async_type_t master_async;
-    int master_uds_sio_fds[MAX_SIO_WORKERS];
-    int master_uds_logic_fds[MAX_LOGIC_WORKERS];
-    int master_uds_cow_fds[MAX_COW_WORKERS];
-    int worker_uds_sio_fds[MAX_SIO_WORKERS];
-    int worker_uds_logic_fds[MAX_LOGIC_WORKERS];
-    int worker_uds_cow_fds[MAX_COW_WORKERS];
-    pid_t sio_pids[MAX_SIO_WORKERS];
-    pid_t logic_pids[MAX_LOGIC_WORKERS];
-    pid_t cow_pids[MAX_COW_WORKERS];
+    uds_pair_pid_t sio[MAX_SIO_WORKERS];
+    uds_pair_pid_t logic[MAX_LOGIC_WORKERS];
+    uds_pair_pid_t cow[MAX_COW_WORKERS];
 } master_context;
 
 void run_master_process(master_context *master_ctx);

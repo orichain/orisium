@@ -157,7 +157,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 	//avg_connection = cnt_connection / sio_worker;
 	
 	int sio_worker_idx = (int)(*client_num % MAX_SIO_WORKERS);
-	int sio_worker_uds_fd = master_ctx->master_uds_sio_fds[sio_worker_idx]; // Master uses its side of UDS
+	int sio_worker_uds_fd = master_ctx->sio[sio_worker_idx].uds[0]; // Master uses its side of UDS
 
 	int slot_found = -1;
 	for(int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {

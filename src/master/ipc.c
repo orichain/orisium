@@ -9,7 +9,6 @@
 #include "sessions/master_session.h"
 #include "types.h"
 #include "utilities.h"
-#include "async.h"
 #include "master/ipc.h"
 #include "master/process.h"
 
@@ -22,7 +21,7 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
     bool is_worker_uds = false;
 
     for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-        if (*current_fd == master_ctx->master_uds_sio_fds[i]) {
+        if (*current_fd == master_ctx->sio[i].uds[0]) {
             is_worker_uds = true;
             result.r_worker_type_t = SIO;
             worker_name = "SIO";
@@ -32,7 +31,7 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
     }
     if (!is_worker_uds) {
         for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-            if (*current_fd == master_ctx->master_uds_logic_fds[i]) {
+            if (*current_fd == master_ctx->logic[i].uds[0]) {
                 is_worker_uds = true;
                 result.r_worker_type_t = LOGIC;
                 worker_name = "Logic";
@@ -43,7 +42,7 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
     }
     if (!is_worker_uds) {
         for (int i = 0; i < MAX_COW_WORKERS; ++i) {
-            if (*current_fd == master_ctx->master_uds_cow_fds[i]) {
+            if (*current_fd == master_ctx->cow[i].uds[0]) {
                 is_worker_uds = true;
                 result.r_worker_type_t = COW;
                 worker_name = "COW";
@@ -54,10 +53,10 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
     }
     if (is_worker_uds) {
 		LOG_INFO("%sWorker UDS FD %d (%s Worker %d) terputus.", label, *current_fd, worker_name, result.index);
-		if (async_delete_event(label, &master_ctx->master_async, current_fd) != SUCCESS) {
-			result.status = FAILURE;			
-			return result;
-		}
+		//if (async_delete_event(label, &master_ctx->master_async, current_fd) != SUCCESS) {
+		//	result.status = FAILURE;			
+		//	return result;
+		//}
         result.status = SUCCESS;			
 		return result;
 	}

@@ -64,16 +64,16 @@ status_t setup_master(master_context *master_ctx) {
 // Setup uds and socketpair for workers
 //======================================================================
     for (int i = 0; i < MAX_SIO_WORKERS; ++i) { 
-		master_ctx->master_uds_sio_fds[i] = 0; 
-		master_ctx->worker_uds_sio_fds[i] = 0; 
+		master_ctx->sio[i].uds[0] = 0; 
+		master_ctx->sio[i].uds[1] = 0; 
 	}
     for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) { 
-		master_ctx->master_uds_logic_fds[i] = 0; 
-		master_ctx->worker_uds_logic_fds[i] = 0; 
+		master_ctx->logic[i].uds[0] = 0; 
+		master_ctx->logic[i].uds[1] = 0; 
 	}
     for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
-		master_ctx->master_uds_cow_fds[i] = 0; 
-		master_ctx->worker_uds_cow_fds[i] = 0; 
+		master_ctx->cow[i].uds[0] = 0; 
+		master_ctx->cow[i].uds[1] = 0; 
 	}
     for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
 		if (create_socket_pair(label, master_ctx, SIO, i) != SUCCESS) return FAILURE;
@@ -116,7 +116,7 @@ static inline status_t broadcast_shutdown(master_context *master_ctx) {
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}
-		ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->master_uds_sio_fds[i], cmd_result.r_ipc_protocol_t, &not_used_fd);
+		ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->sio[i].uds[0], cmd_result.r_ipc_protocol_t, &not_used_fd);
 		if (send_result.status != SUCCESS) {
 			LOG_INFO("%sFailed to sent shutdown to SIO %ld.", label, i);
 		} else {
@@ -129,7 +129,7 @@ static inline status_t broadcast_shutdown(master_context *master_ctx) {
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}	
-		ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->master_uds_logic_fds[i], cmd_result.r_ipc_protocol_t, &not_used_fd);
+		ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->logic[i].uds[0], cmd_result.r_ipc_protocol_t, &not_used_fd);
 		if (send_result.status != SUCCESS) {
 			LOG_INFO("%sFailed to sent shutdown to Logic %ld.", label, i);
 		} else {
@@ -142,7 +142,7 @@ static inline status_t broadcast_shutdown(master_context *master_ctx) {
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}	
-		ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->master_uds_cow_fds[i], cmd_result.r_ipc_protocol_t, &not_used_fd);
+		ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->cow[i].uds[0], cmd_result.r_ipc_protocol_t, &not_used_fd);
 		if (send_result.status != SUCCESS) {
 			LOG_INFO("%sFailed to sent shutdown to COW %ld.", label, i);
 		} else {
@@ -220,7 +220,7 @@ void run_master_process(master_context *master_ctx) {
 					if (create_socket_pair(label, master_ctx, worker_closed.r_worker_type_t, worker_closed.index) != SUCCESS) {
 						continue;
 					}
-					if (setup_fork_worker(label, master_ctx,	worker_closed.r_worker_type_t, worker_closed.index) != SUCCESS) {
+					if (setup_fork_worker(label, master_ctx, worker_closed.r_worker_type_t, worker_closed.index) != SUCCESS) {
 						continue;
 					}
 //======================================================================
