@@ -10,36 +10,30 @@
 // new_avg = ((last_avg * count) + current_task_time) / (count + 1);
 //======================================================================
 typedef struct {
+    uint64_t last_ack;
+    uint16_t task_count;
+    uint64_t last_task_started;
+    uint64_t last_task_finished;
+    double longest_task_time;
+    double avg_task_time;
+} worker_metrics_t;
+
+typedef struct {
 	int sio_uds_fd;
 	bool in_use;
-	uint64_t last_ack;
-	uint16_t task_count;
-	uint64_t last_task_started;
-	uint64_t last_task_finished;
-	double longest_task_time;
-	double avg_task_time;
+	worker_metrics_t metrics;
 } master_sio_state_t;
 
 typedef struct {
 	int logic_uds_fd;
 	bool in_use;
-	uint64_t last_ack;
-	uint16_t task_count;
-	uint64_t last_task_started;
-	uint64_t last_task_finished;
-	double longest_task_time;
-	double avg_task_time;
+	worker_metrics_t metrics;
 } master_logic_state_t;
 
 typedef struct {
 	int dbr_uds_fd;
 	bool in_use;
-	uint64_t last_ack;
-	uint16_t task_count;
-	uint64_t last_task_started;
-	uint64_t last_task_finished;
-	double longest_task_time;
-	double avg_task_time;
+	worker_metrics_t metrics;
 } master_dbr_state_t;
 //======================================================================
 // hanya ada 1 writer
@@ -51,11 +45,7 @@ typedef struct {
 typedef struct {
 	int dbw_uds_fd;
 	bool in_use;
-	uint64_t last_ack;
-	uint64_t last_task_started;
-	uint64_t last_task_finished;
-	double longest_task_time;
-	double avg_task_time;
+	worker_metrics_t metrics;
 } master_dbw_state_t;
 
 typedef struct {
@@ -63,22 +53,14 @@ typedef struct {
     bool in_use;
     uint8_t ip[IP_ADDRESS_LEN];
     uint16_t port;
-    uint64_t last_ack;
-    uint64_t last_task_started;
-	uint64_t last_task_finished;
-	double longest_task_time;
-	double avg_task_time;
+    worker_metrics_t metrics;
 } master_cow_session_t;
 
 typedef struct {
 	int sio_uds_fd;
     bool in_use;
     uint8_t ip[IP_ADDRESS_LEN];
-    uint64_t last_ack;
-    uint64_t last_task_started;
-	uint64_t last_task_finished;
-	double longest_task_time;
-	double avg_task_time;
+    worker_metrics_t metrics;
 } master_sio_c_session_t;
 
 typedef struct master_sio_dc_session_t {
