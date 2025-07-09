@@ -12,7 +12,6 @@
 typedef struct {
 	int sio_uds_fd;
 	bool in_use;
-    bool is_busy;
 	uint64_t last_ack;
 	uint16_t task_count;
 	uint64_t last_task_started;
@@ -24,7 +23,6 @@ typedef struct {
 typedef struct {
 	int logic_uds_fd;
 	bool in_use;
-    bool is_busy;
 	uint64_t last_ack;
 	uint16_t task_count;
 	uint64_t last_task_started;
@@ -36,7 +34,6 @@ typedef struct {
 typedef struct {
 	int dbr_uds_fd;
 	bool in_use;
-    bool is_busy;
 	uint64_t last_ack;
 	uint16_t task_count;
 	uint64_t last_task_started;
@@ -48,15 +45,12 @@ typedef struct {
 // hanya ada 1 writer
 // LMDB tidak bisa multi writer
 // Master harus punya write cache dalam bentuk linked list
-// Master harus punya timer untuk cek master_dbw_state_t in_use
-// Saat in_use=false write cache dikirim ke dbw worker
-// yang membuat in_use=false dan is_busy=true haruslah dbw worker
+// dbwriter memberi signal write complete dan akan mentrigger in_use=false dan flush cache 1 per satu sampai kosong
 // untuk memastikan penulisan ditangani
 //======================================================================
 typedef struct {
 	int dbw_uds_fd;
 	bool in_use;
-	bool is_busy;
 	uint64_t last_ack;
 	uint64_t last_task_started;
 	uint64_t last_task_finished;
@@ -67,7 +61,6 @@ typedef struct {
 typedef struct {
 	int cow_uds_fd;
     bool in_use;
-    bool is_busy;
     uint8_t ip[IP_ADDRESS_LEN];
     uint16_t port;
     uint64_t last_ack;
@@ -80,7 +73,6 @@ typedef struct {
 typedef struct {
 	int sio_uds_fd;
     bool in_use;
-    bool is_busy;
     uint8_t ip[IP_ADDRESS_LEN];
     uint64_t last_ack;
     uint64_t last_task_started;
