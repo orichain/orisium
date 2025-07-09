@@ -9,6 +9,7 @@
 #include <bits/types/sig_atomic_t.h>
 #include <netinet/in.h>
 #include <time.h>
+#include <sys/timerfd.h>
 
 #include "log.h"
 #include "async.h"
@@ -104,6 +105,7 @@ void run_server_io_worker(worker_type_t wot, int worker_idx, int master_uds_fd) 
 //======================================================
 // 1. Tutup koneksi dr sio_c_state yang tidak ada aktifitas > WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT detik
 // 2. Kirim IPC Hertbeat ke Master
+// 3. "piggybacking"/"implicit heartbeat" kalau sudah ada ipc lain yang dikirim < interval. lewati pengiriman heartbeat.
 //======================================================
 			} else if (current_fd == master_uds_fd) {
 				int received_client_fd = -1;

@@ -89,6 +89,7 @@ void run_client_outbound_worker(worker_type_t wot, int worker_idx, int master_ud
                 LOG_DEBUG("%s===============TIMER============", label);
 //======================================================
 // 1. Kirim IPC Hertbeat ke Master
+// 2. "piggybacking"/"implicit heartbeat" kalau sudah ada ipc lain yang dikirim < interval. lewati pengiriman heartbeat.
 //======================================================
 			} else if (current_fd == master_uds_fd) {
                 int received_client_fd = -1;
