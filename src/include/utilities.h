@@ -154,7 +154,7 @@ static inline status_t ensure_directory_exists(const char *label, const char *pa
 //Huruf_besar biar selalu ingat karena akan sering digunakan
 static inline status_t CHECK_BUFFER_BOUNDS(size_t current_offset, size_t bytes_to_write, size_t total_buffer_size) {
     if (current_offset + bytes_to_write > total_buffer_size) {
-        fprintf(stderr, "[SER Error]: Buffer overflow check failed. Offset: %zu, Bytes to write: %zu, Total buffer size: %zu\n",
+        LOG_ERROR("[SER Error]: Buffer overflow check failed. Offset: %zu, Bytes to write: %zu, Total buffer size: %zu",
                 current_offset, bytes_to_write, total_buffer_size);
         return FAILURE_OOBUF;
     }
