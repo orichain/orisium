@@ -89,7 +89,7 @@ static inline void CLOSE_IPC_PROTOCOL(ipc_protocol_t **protocol_ptr) {
 
 typedef struct {
 	ipc_protocol_t *r_ipc_protocol_t;
-	status_t status;
+    status_t status;
 } ipc_protocol_t_status_t;
 
 #include "ipc/client_request_task.h"

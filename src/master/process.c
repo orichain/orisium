@@ -2,7 +2,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdint.h>
-#include <bits/types/sig_atomic_t.h>
+#include <signal.h>
 
 #include "log.h"
 #include "constants.h"

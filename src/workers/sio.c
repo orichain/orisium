@@ -6,9 +6,9 @@
 #include <sys/types.h>   // for pid_t, ssize_t
 #include <unistd.h>      // for close, fork, getpid
 #include <stdint.h>
-#include <bits/types/sig_atomic_t.h>
 #include <netinet/in.h>
 #include <time.h>
+#include <signal.h>
 
 #include "log.h"
 #include "async.h"

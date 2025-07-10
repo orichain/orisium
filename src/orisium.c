@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <signal.h>
-#include <bits/types/sig_atomic_t.h>
 #include <unistd.h>
 #include <stdint.h>
 #include <netinet/in.h>

@@ -1,9 +1,9 @@
 #include <stdio.h>       // for printf, perror, fprintf, NULL, stderr
 #include <stdlib.h>      // for exit, EXIT_FAILURE, atoi, EXIT_SUCCESS, malloc, free
-#include <bits/types/sig_atomic_t.h>
 #include <stdint.h>
 #include <unistd.h>
 #include <time.h>
+#include <signal.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
