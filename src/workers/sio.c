@@ -197,6 +197,7 @@ void run_server_io_worker(worker_type_t wot, int worker_idx, int master_uds_fd) 
                             }
                         }
                         async_delete_event(label, &sio_async, &current_fd);                        
+                        CLOSE_FD(&current_fd);
                         if (sio_c_state[client_slot_idx].in_use) {
 							sio_c_state[client_slot_idx].in_use = false;
 							sio_c_state[client_slot_idx].client_fd = -1;
@@ -268,7 +269,9 @@ exit:
 		}
 	}
 	async_delete_event(label, &sio_async, &master_uds_fd);
+    CLOSE_FD(&master_uds_fd);
 	async_delete_event(label, &sio_async, &sio_timer_fd);
+    CLOSE_FD(&sio_timer_fd);
     CLOSE_FD(&sio_async.async_fd);
     free(label);
 }

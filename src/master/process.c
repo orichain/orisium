@@ -241,5 +241,6 @@ void run_master_process(master_context *master_ctx) {
     memset(&node_config, 0, sizeof(node_config_t));
     CLOSE_FD(&master_ctx->listen_sock);
     async_delete_event(label, &master_ctx->master_async, &master_ctx->master_timer_fd);
+    CLOSE_FD(&master_ctx->master_timer_fd);
     CLOSE_FD(&master_ctx->master_async.async_fd);
 }

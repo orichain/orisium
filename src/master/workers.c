@@ -20,18 +20,21 @@ status_t close_worker(const char *label, master_context *master_ctx, worker_type
 		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->sio[index].uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
+        CLOSE_UDS(&master_ctx->sio[index].uds[0]);
 		CLOSE_UDS(&master_ctx->sio[index].uds[1]);
 		CLOSE_PID(&master_ctx->sio[index].pid);
 	} else if (wot == LOGIC) {
 		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->logic[index].uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
+        CLOSE_UDS(&master_ctx->logic[index].uds[0]);
 		CLOSE_UDS(&master_ctx->logic[index].uds[1]);
 		CLOSE_PID(&master_ctx->logic[index].pid);
 	} else if (wot == COW) {
 		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->cow[index].uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
+        CLOSE_UDS(&master_ctx->cow[index].uds[0]);
 		CLOSE_UDS(&master_ctx->cow[index].uds[1]);
 		CLOSE_PID(&master_ctx->cow[index].pid);
 	}
@@ -176,16 +179,19 @@ void workers_cleanup(master_context *master_ctx) {
     LOG_INFO("[Master]: Performing cleanup...");
     for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
 		async_delete_event("[Master]: ", &master_ctx->master_async, &master_ctx->sio[i].uds[0]);
+        CLOSE_UDS(&master_ctx->sio[i].uds[0]);
 		CLOSE_UDS(&master_ctx->sio[i].uds[1]);
 		CLOSE_PID(&master_ctx->sio[i].pid);
     }
     for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
 		async_delete_event("[Master]: ", &master_ctx->master_async, &master_ctx->logic[i].uds[0]);
+        CLOSE_UDS(&master_ctx->logic[i].uds[0]);
 		CLOSE_UDS(&master_ctx->logic[i].uds[1]);
 		CLOSE_PID(&master_ctx->logic[i].pid);
     }
     for (int i = 0; i < MAX_COW_WORKERS; ++i) {
 		async_delete_event("[Master]: ", &master_ctx->master_async, &master_ctx->cow[i].uds[0]);
+        CLOSE_UDS(&master_ctx->cow[i].uds[0]);
 		CLOSE_UDS(&master_ctx->cow[i].uds[1]);
 		CLOSE_PID(&master_ctx->cow[i].pid);
     }

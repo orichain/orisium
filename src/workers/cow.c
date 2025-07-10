@@ -334,7 +334,9 @@ void run_client_outbound_worker(worker_type_t wot, int worker_idx, int master_ud
 //======================================================================    
 exit:    
 	async_delete_event(label, &cow_async, &master_uds_fd);
+    CLOSE_FD(&master_uds_fd);
 	async_delete_event(label, &cow_async, &cow_timer_fd);
+    CLOSE_FD(&cow_timer_fd);
     CLOSE_FD(&cow_async.async_fd);
     free(label);
 }
