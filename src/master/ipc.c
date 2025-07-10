@@ -63,7 +63,7 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
 	return result;
 }
 
-status_t handle_ipc_event(const char *label, master_context *master_ctx, master_sio_c_session_t master_sio_c_session[], int *current_fd) {	
+status_t handle_ipc_event(const char *label, master_context *master_ctx, int *current_fd) {	
 	int received_fd = -1;
 	ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(current_fd, &received_fd);
 	if (deserialized_result.status != SUCCESS) {
@@ -95,12 +95,12 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, master_
 
 			int target_sio_uds_fd = -1;
 			for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
-				if (master_sio_c_session[i].in_use && master_sio_c_session[i].correlation_id == resp->client_correlation_id) {
-					target_sio_uds_fd = master_sio_c_session[i].sio_uds_fd;
-					master_sio_c_session[i].in_use = false;
-					master_sio_c_session[i].correlation_id = -1;
-					master_sio_c_session[i].sio_uds_fd = -1;
-					memset(master_sio_c_session[i].client_ip, 0, sizeof(master_sio_c_session[i].client_ip));
+				if (master_ctx->sio_c_session[i].in_use && master_ctx->sio_c_session[i].correlation_id == resp->client_correlation_id) {
+					target_sio_uds_fd = master_ctx->sio_c_session[i].sio_uds_fd;
+					master_ctx->sio_c_session[i].in_use = false;
+					master_ctx->sio_c_session[i].correlation_id = -1;
+					master_ctx->sio_c_session[i].sio_uds_fd = -1;
+					memset(master_ctx->sio_c_session[i].client_ip, 0, sizeof(master_ctx->sio_c_session[i].client_ip));
 					break;
 				}
 			}
@@ -144,7 +144,7 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, master_
 		*/
 		case IPC_CLIENT_DISCONNECTED: {
 			ipc_client_disconnect_info_t *disconnect_info = received_protocol->payload.ipc_client_disconnect_info;
-			add_master_sio_dc_session("[Master]: ", &master_sio_dc_session_head, disconnect_info->ip); 
+			add_master_sio_dc_session("[Master]: ", &master_ctx->sio_dc_session, disconnect_info->ip); 
 			//cnt_connection -= (double_t)1;
 			//avg_connection = cnt_connection / sio_worker;
 			char ip_str[INET6_ADDRSTRLEN];
@@ -152,11 +152,11 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, master_
 			LOG_INFO("[Master]: Received Client Disconnected signal from IP %s (from SIO Worker UDS FD %d).",
 					 ip_str, *current_fd);
 			for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
-				if (master_sio_c_session[i].in_use &&
-					memcmp(master_sio_c_session[i].ip, disconnect_info->ip, IP_ADDRESS_LEN) == 0) {
-					master_sio_c_session[i].in_use = false;
-					master_sio_c_session[i].sio_uds_fd = -1;
-					memset(master_sio_c_session[i].ip, 0, IP_ADDRESS_LEN);
+				if (master_ctx->sio_c_session[i].in_use &&
+					memcmp(master_ctx->sio_c_session[i].ip, disconnect_info->ip, IP_ADDRESS_LEN) == 0) {
+					master_ctx->sio_c_session[i].in_use = false;
+					master_ctx->sio_c_session[i].sio_uds_fd = -1;
+					memset(master_ctx->sio_c_session[i].ip, 0, IP_ADDRESS_LEN);
 					LOG_INFO("[Master]: IP %s dihapus dari daftar koneksi aktif.",
 							 ip_str);
 					break;

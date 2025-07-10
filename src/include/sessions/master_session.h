@@ -11,7 +11,6 @@
 //======================================================================
 typedef struct {
     uint64_t last_ack;
-    uint16_t task_count;
     uint64_t last_task_started;
     uint64_t last_task_finished;
     double longest_task_time;
@@ -21,18 +20,21 @@ typedef struct {
 typedef struct {
 	int sio_uds_fd;
 	bool in_use;
+    uint16_t task_count;
 	worker_metrics_t metrics;
 } master_sio_state_t;
 
 typedef struct {
 	int logic_uds_fd;
 	bool in_use;
+    uint16_t task_count;
 	worker_metrics_t metrics;
 } master_logic_state_t;
 
 typedef struct {
 	int dbr_uds_fd;
 	bool in_use;
+    uint16_t task_count;
 	worker_metrics_t metrics;
 } master_dbr_state_t;
 //======================================================================
@@ -51,16 +53,13 @@ typedef struct {
 typedef struct {
 	int cow_uds_fd;
     bool in_use;
-    uint8_t ip[IP_ADDRESS_LEN];
-    uint16_t port;
     worker_metrics_t metrics;
-} master_cow_session_t;
+} master_cow_state_t;
 
 typedef struct {
 	int sio_uds_fd;
     bool in_use;
     uint8_t ip[IP_ADDRESS_LEN];
-    worker_metrics_t metrics;
 } master_sio_c_session_t;
 
 typedef struct master_sio_dc_session_t {
@@ -81,7 +80,5 @@ master_sio_dc_session_t_status_t find_first_ratelimited_master_sio_dc_session(co
 int_status_t count_master_sio_dc_sessions(const char *label, master_sio_dc_session_t *head);
 void display_master_sio_dc_sessions(const char *label, master_sio_dc_session_t *head);
 void free_master_sio_dc_sessions(const char *label, master_sio_dc_session_t **head);
-
-extern master_sio_dc_session_t *master_sio_dc_session_head;
 
 #endif

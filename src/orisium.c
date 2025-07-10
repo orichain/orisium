@@ -18,7 +18,6 @@
 
 volatile sig_atomic_t shutdown_requested = 0;
 node_config_t node_config;
-master_sio_dc_session_t *master_sio_dc_session_head = NULL;
 int *shutdown_event_fd = NULL;
 
 void sigint_handler(int signum) {
@@ -74,6 +73,7 @@ int main() {
 // Master
 //======================================================================
 	master_context master_ctx;
+    master_ctx.sio_dc_session = NULL;
     if (setup_master(&master_ctx) != SUCCESS) goto exit;
     shutdown_event_fd = &master_ctx.shutdown_event_fd;
     if (setup_workers(&master_ctx) != SUCCESS) goto exit;
@@ -82,7 +82,7 @@ int main() {
 // Cleanup
 //======================================================================
 exit:
-	free_master_sio_dc_sessions("[Orisium]: ", &master_sio_dc_session_head);
+	free_master_sio_dc_sessions("[Orisium]: ", &master_ctx.sio_dc_session);
 #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))    
 	pthread_join(cleaner_thread, NULL);
     log_close();

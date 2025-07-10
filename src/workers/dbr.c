@@ -12,11 +12,11 @@
 #include "types.h"
 #include "constants.h"
 
-void run_cow_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
-    volatile sig_atomic_t cow_shutdown_requested = 0;
-    async_type_t cow_async;
-    cow_async.async_fd = -1;
-    int cow_timer_fd = -1;
+void run_dbr_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
+    volatile sig_atomic_t dbr_shutdown_requested = 0;
+    async_type_t dbr_async;
+    dbr_async.async_fd = -1;
+    int dbr_timer_fd = -1;
     srandom(time(NULL) ^ getpid());
     int worker_type_id = (int)wot;
     
@@ -24,13 +24,13 @@ void run_cow_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
 // Setup Logic
 //======================================================================
 	char *label;
-	int needed = snprintf(NULL, 0, "[COW %d]: ", worker_idx);
+	int needed = snprintf(NULL, 0, "[DBR %d]: ", worker_idx);
 	label = malloc(needed + 1);
-	snprintf(label, needed + 1, "[COW %d]: ", worker_idx);  
+	snprintf(label, needed + 1, "[DBR %d]: ", worker_idx);  
 //======================================================================	
-	if (async_create(label, &cow_async) != SUCCESS) goto exit;
+	if (async_create(label, &dbr_async) != SUCCESS) goto exit;
 	LOG_INFO("%s==============================Worker side: %d).", label, master_uds_fd);
-	if (async_create_incoming_event_with_disconnect(label, &cow_async, &master_uds_fd) != SUCCESS) goto exit;
+	if (async_create_incoming_event_with_disconnect(label, &dbr_async, &master_uds_fd) != SUCCESS) goto exit;
 //======================================================================
 	const int HEARTBEAT_BASE_SEC = WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT;
     const int MILISECONDS_PER_UNIT = INITIAL_MILISECONDS_PER_UNIT;
@@ -44,46 +44,46 @@ void run_cow_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
         sleep_ms(initial_delay_ms);
     }
 //======================================================================
-	if (async_create_timerfd(label, &cow_timer_fd) != SUCCESS) {
+	if (async_create_timerfd(label, &dbr_timer_fd) != SUCCESS) {
 		 goto exit;
 	}
-	if (async_set_timerfd_time(label, &cow_timer_fd,
+	if (async_set_timerfd_time(label, &dbr_timer_fd,
 		HEARTBEAT_BASE_SEC, 0,
         HEARTBEAT_BASE_SEC, 0) != SUCCESS)
     {
 		 goto exit;
 	}
-	if (async_create_incoming_event(label, &cow_async, &cow_timer_fd) != SUCCESS) goto exit;
+	if (async_create_incoming_event(label, &dbr_async, &dbr_timer_fd) != SUCCESS) goto exit;
 //======================================================================
-    while (!cow_shutdown_requested) {
-        int_status_t snfds = async_wait(label, &cow_async);
+    while (!dbr_shutdown_requested) {
+        int_status_t snfds = async_wait(label, &dbr_async);
 		if (snfds.status != SUCCESS) continue;
         for (int n = 0; n < snfds.r_int; ++n) {
-            if (cow_shutdown_requested) {
+            if (dbr_shutdown_requested) {
 				break;
 			}
-			int_status_t fd_status = async_getfd(label, &cow_async, n);
+			int_status_t fd_status = async_getfd(label, &dbr_async, n);
 			if (fd_status.status != SUCCESS) continue;
 			int current_fd = fd_status.r_int;
-			uint32_t_status_t events_status = async_getevents(label, &cow_async, n);
+			uint32_t_status_t events_status = async_getevents(label, &dbr_async, n);
 			if (events_status.status != SUCCESS) continue;
 			uint32_t current_events = events_status.r_uint32_t;
-            if (current_fd == cow_timer_fd) {
+            if (current_fd == dbr_timer_fd) {
 				uint64_t u;
-				read(cow_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+				read(dbr_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
 //======================================================				
 				double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * HEARTBEAT_JITTER_PERCENTAGE * 2) - HEARTBEAT_JITTER_PERCENTAGE;
                 double new_heartbeat_interval_double = HEARTBEAT_BASE_SEC * (1.0 + jitter_amount);
                 if (new_heartbeat_interval_double < 0.1) {
                     new_heartbeat_interval_double = 0.1;
                 }
-                if (async_set_timerfd_time(label, &cow_timer_fd,
+                if (async_set_timerfd_time(label, &dbr_timer_fd,
 					(time_t)new_heartbeat_interval_double,
                     (long)((new_heartbeat_interval_double - (time_t)new_heartbeat_interval_double) * 1e9),
                     (time_t)new_heartbeat_interval_double,
                     (long)((new_heartbeat_interval_double - (time_t)new_heartbeat_interval_double) * 1e9)) != SUCCESS)
                 {
-                    cow_shutdown_requested = 1;
+                    dbr_shutdown_requested = 1;
 					LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
 					continue;
                 }
@@ -100,7 +100,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
 						async_event_is_EPOLLERR(current_events) ||
 						async_event_is_EPOLLRDHUP(current_events))
 					{
-						cow_shutdown_requested = 1;
+						dbr_shutdown_requested = 1;
 						LOG_INFO("%sMaster disconnected. Initiating graceful shutdown...", label);
 						continue;
 					}
@@ -112,7 +112,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
 				LOG_INFO("%sReceived FD: %d", label, received_client_fd);			
                 if (received_protocol->type == IPC_SHUTDOWN) {
 					LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
-					cow_shutdown_requested = 1;
+					dbr_shutdown_requested = 1;
 					CLOSE_IPC_PROTOCOL(&received_protocol);
 					continue;
 				}
@@ -127,10 +127,10 @@ void run_cow_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
 // COW Cleanup
 //======================================================================    
 exit:    
-	async_delete_event(label, &cow_async, &master_uds_fd);
+	async_delete_event(label, &dbr_async, &master_uds_fd);
     CLOSE_FD(&master_uds_fd);
-	async_delete_event(label, &cow_async, &cow_timer_fd);
-    CLOSE_FD(&cow_timer_fd);
-    CLOSE_FD(&cow_async.async_fd);
+	async_delete_event(label, &dbr_async, &dbr_timer_fd);
+    CLOSE_FD(&dbr_timer_fd);
+    CLOSE_FD(&dbr_async.async_fd);
     free(label);
 }

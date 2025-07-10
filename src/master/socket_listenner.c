@@ -66,7 +66,7 @@ status_t setup_socket_listenner(const char *label, master_context *master_ctx) {
     return SUCCESS;
 }
 
-status_t handle_listen_sock_event(const char *label, master_context *master_ctx, master_sio_c_session_t master_sio_c_session[], uint64_t *client_num) {
+status_t handle_listen_sock_event(const char *label, master_context *master_ctx, uint64_t *client_num) {
 	struct sockaddr_storage client_addr;
 	socklen_t client_addr_len = sizeof(client_addr);
 	char host_str[NI_MAXHOST];
@@ -113,8 +113,8 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
     
 	bool ip_already_connected = false;
 	for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
-		if (master_sio_c_session[i].in_use &&
-			memcmp(master_sio_c_session[i].ip, host_ip_bin, IP_ADDRESS_LEN) == 0) {
+		if (master_ctx->sio_c_session[i].in_use &&
+			memcmp(master_ctx->sio_c_session[i].ip, host_ip_bin, IP_ADDRESS_LEN) == 0) {
 			ip_already_connected = true;
 			break;
 		}
@@ -130,9 +130,9 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 	}
 	LOG_INFO("%sNew client connected from IP %s on FD %d.", label, ip_str, client_sock);
 	
-	master_sio_dc_session_t_status_t ccid_result = find_first_ratelimited_master_sio_dc_session("[Master]: ", master_sio_dc_session_head, host_ip_bin);
+	master_sio_dc_session_t_status_t ccid_result = find_first_ratelimited_master_sio_dc_session("[Master]: ", master_ctx->sio_dc_session, host_ip_bin);
 	if (ccid_result.status == SUCCESS) {
-		status_t ccid_del_result = delete_master_sio_dc_session("[Master]: ", &master_sio_dc_session_head, host_ip_bin);
+		status_t ccid_del_result = delete_master_sio_dc_session("[Master]: ", &master_ctx->sio_dc_session, host_ip_bin);
 		if (ccid_del_result != SUCCESS) {
 			*client_num += 1ULL;
 		}
@@ -161,16 +161,16 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 
 	int slot_found = -1;
 	for(int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
-		if(!master_sio_c_session[i].in_use) {
-			master_sio_c_session[i].in_use = true;
-			master_sio_c_session[i].sio_uds_fd = sio_worker_uds_fd;
-			memcpy(master_sio_c_session[i].ip, host_ip_bin, IP_ADDRESS_LEN);
+		if(!master_ctx->sio_c_session[i].in_use) {
+			master_ctx->sio_c_session[i].in_use = true;
+			master_ctx->sio_c_session[i].sio_uds_fd = sio_worker_uds_fd;
+			memcpy(master_ctx->sio_c_session[i].ip, host_ip_bin, IP_ADDRESS_LEN);
 			slot_found = i;
 			break;
 		}
 	}
 	if (slot_found == -1) {
-		LOG_ERROR("%sWARNING: No free session slots in master_sio_c_session. Rejecting client FD %d.", label, client_sock);
+		LOG_ERROR("%sWARNING: No free session slots in master_ctx->sio_c_session. Rejecting client FD %d.", label, client_sock);
 		CLOSE_FD(&client_sock);
 		return FAILURE_NOSLOT;
 	}

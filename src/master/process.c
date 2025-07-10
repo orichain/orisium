@@ -17,9 +17,12 @@
 #include "master/process.h"
 #include "ipc/protocol.h"
 #include "ipc/shutdown.h"
-#include "sessions/master_session.h"
 
 status_t setup_master(master_context *master_ctx) {
+    for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
+        master_ctx->sio_c_session[i].in_use = false;
+        memset(master_ctx->sio_c_session[i].ip, 0, IP_ADDRESS_LEN);
+    }
 	master_ctx->master_pid = -1;
 	master_ctx->shutdown_event_fd = -1;
     master_ctx->listen_sock = -1;
@@ -75,6 +78,14 @@ status_t setup_master(master_context *master_ctx) {
 		master_ctx->cow[i].uds[0] = 0; 
 		master_ctx->cow[i].uds[1] = 0; 
 	}
+    for (int i = 0; i < MAX_DBR_WORKERS; ++i) { 
+		master_ctx->dbr[i].uds[0] = 0; 
+		master_ctx->dbr[i].uds[1] = 0; 
+	}
+    for (int i = 0; i < MAX_DBW_WORKERS; ++i) { 
+		master_ctx->dbw[i].uds[0] = 0; 
+		master_ctx->dbw[i].uds[1] = 0; 
+	}
     for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
 		if (create_socket_pair(label, master_ctx, SIO, i) != SUCCESS) return FAILURE;
     }
@@ -84,23 +95,39 @@ status_t setup_master(master_context *master_ctx) {
     for (int i = 0; i < MAX_COW_WORKERS; ++i) {
 		if (create_socket_pair(label, master_ctx, COW, i) != SUCCESS) return FAILURE;
     }
+    for (int i = 0; i < MAX_DBR_WORKERS; ++i) {
+		if (create_socket_pair(label, master_ctx, DBR, i) != SUCCESS) return FAILURE;
+    }
+    for (int i = 0; i < MAX_DBW_WORKERS; ++i) {
+		if (create_socket_pair(label, master_ctx, DBW, i) != SUCCESS) return FAILURE;
+    }
     return SUCCESS;
 }
 
 status_t setup_workers(master_context *master_ctx) {
 	const char *label = "[Master]: ";
 	for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-		if (setup_fork_worker(label, master_ctx,	SIO, i) != SUCCESS) {
+		if (setup_fork_worker(label, master_ctx, SIO, i) != SUCCESS) {
 			return FAILURE;
 		}
     }
     for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-		if (setup_fork_worker(label, master_ctx,	LOGIC, i) != SUCCESS) {
+		if (setup_fork_worker(label, master_ctx, LOGIC, i) != SUCCESS) {
 			return FAILURE;
 		}
     }
     for (int i = 0; i < MAX_COW_WORKERS; ++i) {
-		if (setup_fork_worker(label, master_ctx,	COW, i) != SUCCESS) {
+		if (setup_fork_worker(label, master_ctx, COW, i) != SUCCESS) {
+			return FAILURE;
+		}
+    }
+    for (int i = 0; i < MAX_DBR_WORKERS; ++i) {
+		if (setup_fork_worker(label, master_ctx, DBR, i) != SUCCESS) {
+			return FAILURE;
+		}
+    }
+    for (int i = 0; i < MAX_DBW_WORKERS; ++i) {
+		if (setup_fork_worker(label, master_ctx, DBW, i) != SUCCESS) {
 			return FAILURE;
 		}
     }
@@ -150,22 +177,43 @@ static inline status_t broadcast_shutdown(master_context *master_ctx) {
 		}
 		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
 	}
+    for (int i = 0; i < MAX_DBR_WORKERS; ++i) { 
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
+		if (cmd_result.status != SUCCESS) {
+			return FAILURE;
+		}	
+		ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->dbr[i].uds[0], cmd_result.r_ipc_protocol_t, &not_used_fd);
+		if (send_result.status != SUCCESS) {
+			LOG_INFO("%sFailed to sent shutdown to DBR %ld.", label, i);
+		} else {
+			LOG_INFO("%sSent shutdown to DBR %ld.", label, i);
+		}
+		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+	}
+    for (int i = 0; i < MAX_DBW_WORKERS; ++i) { 
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
+		if (cmd_result.status != SUCCESS) {
+			return FAILURE;
+		}	
+		ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->dbw[i].uds[0], cmd_result.r_ipc_protocol_t, &not_used_fd);
+		if (send_result.status != SUCCESS) {
+			LOG_INFO("%sFailed to sent shutdown to DBW %ld.", label, i);
+		} else {
+			LOG_INFO("%sSent shutdown to DBW %ld.", label, i);
+		}
+		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+	}
 	return SUCCESS;
 }
 
 void run_master_process(master_context *master_ctx) {
 	const char *label = "[Master]: ";
 	volatile sig_atomic_t master_shutdown_requested = 0;
-	master_sio_c_session_t master_sio_c_session[MAX_MASTER_CONCURRENT_SESSIONS];
 	uint64_t client_num = 1ULL;
 	//double_t avg_connection = 0.0;
 	//double_t cnt_connection = 0.0;
 	//double_t sio_worker = (double_t)MAX_SIO_WORKERS;
-	
-	for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
-        master_sio_c_session[i].in_use = false;
-        memset(master_sio_c_session[i].ip, 0, IP_ADDRESS_LEN);
-    }
+    
     while (!master_shutdown_requested) {
 		int_status_t snfds = async_wait(label, &master_ctx->master_async);
 		if (snfds.status != SUCCESS) continue;
@@ -196,7 +244,7 @@ void run_master_process(master_context *master_ctx) {
 				continue;
 			} else if (current_fd == master_ctx->listen_sock) {
 				if (async_event_is_EPOLLIN(current_events)) {
-					if (handle_listen_sock_event(label, master_ctx, master_sio_c_session, &client_num) != SUCCESS) {
+					if (handle_listen_sock_event(label, master_ctx, &client_num) != SUCCESS) {
 						continue;
 					}
 				} else {
@@ -225,7 +273,7 @@ void run_master_process(master_context *master_ctx) {
 					}
 //======================================================================
 				} else {
-					if (handle_ipc_event(label, master_ctx, master_sio_c_session, &current_fd) != SUCCESS) {
+					if (handle_ipc_event(label, master_ctx, &current_fd) != SUCCESS) {
 						continue;
 					}
 				}

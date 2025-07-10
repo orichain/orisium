@@ -25,7 +25,9 @@ typedef enum {
 	UNKNOWN = (uint8_t)0x00,
     SIO = (uint8_t)0x01,
     LOGIC = (uint8_t)0x02,
-    COW = (uint8_t)0x03
+    COW = (uint8_t)0x03,
+    DBR = (uint8_t)0x04,
+    DBW = (uint8_t)0x05
 } worker_type_t;
 
 typedef struct {

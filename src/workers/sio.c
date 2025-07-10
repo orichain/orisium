@@ -20,7 +20,7 @@
 #include "ipc/client_disconnect_info.h"
 #include "ipc/client_request_task.h"
 
-void run_server_io_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
+void run_sio_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
     volatile sig_atomic_t sio_shutdown_requested = 0;
     sio_c_state_t sio_c_state[MAX_CLIENTS_PER_SIO_WORKER];
     async_type_t sio_async;
