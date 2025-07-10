@@ -18,21 +18,18 @@ typedef struct {
 } worker_metrics_t;
 
 typedef struct {
-	int sio_uds_fd;
 	bool in_use;
     uint16_t task_count;
 	worker_metrics_t metrics;
 } master_sio_state_t;
 
 typedef struct {
-	int logic_uds_fd;
 	bool in_use;
     uint16_t task_count;
 	worker_metrics_t metrics;
 } master_logic_state_t;
 
 typedef struct {
-	int dbr_uds_fd;
 	bool in_use;
     uint16_t task_count;
 	worker_metrics_t metrics;
@@ -45,19 +42,17 @@ typedef struct {
 // untuk memastikan penulisan ditangani
 //======================================================================
 typedef struct {
-	int dbw_uds_fd;
 	bool in_use;
 	worker_metrics_t metrics;
 } master_dbw_state_t;
 
 typedef struct {
-	int cow_uds_fd;
     bool in_use;
     worker_metrics_t metrics;
 } master_cow_state_t;
 
 typedef struct {
-	int sio_uds_fd;
+	int sio_index;
     bool in_use;
     uint8_t ip[IP_ADDRESS_LEN];
 } master_sio_c_session_t;

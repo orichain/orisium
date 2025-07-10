@@ -154,8 +154,8 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
 			for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
 				if (master_ctx->sio_c_session[i].in_use &&
 					memcmp(master_ctx->sio_c_session[i].ip, disconnect_info->ip, IP_ADDRESS_LEN) == 0) {
+                    master_ctx->sio_c_session[i].sio_index = -1;
 					master_ctx->sio_c_session[i].in_use = false;
-					master_ctx->sio_c_session[i].sio_uds_fd = -1;
 					memset(master_ctx->sio_c_session[i].ip, 0, IP_ADDRESS_LEN);
 					LOG_INFO("[Master]: IP %s dihapus dari daftar koneksi aktif.",
 							 ip_str);

@@ -19,7 +19,52 @@
 #include "ipc/shutdown.h"
 
 status_t setup_master(master_context *master_ctx) {
+    uint64_t_status_t rt = get_realtime_time_ns("[Master]: ");
+    for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
+        master_ctx->sio_state[i].in_use = false;
+        master_ctx->sio_state[i].task_count = (uint16_t)0;
+        master_ctx->sio_state[i].metrics.last_ack = rt.r_uint64_t;
+        master_ctx->sio_state[i].metrics.last_task_started = rt.r_uint64_t;
+        master_ctx->sio_state[i].metrics.last_task_finished = rt.r_uint64_t;
+        master_ctx->sio_state[i].metrics.longest_task_time = (double)0;
+        master_ctx->sio_state[i].metrics.avg_task_time = (double)0;
+    }
+    for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
+        master_ctx->logic_state[i].in_use = false;
+        master_ctx->logic_state[i].task_count = (uint16_t)0;
+        master_ctx->logic_state[i].metrics.last_ack = rt.r_uint64_t;
+        master_ctx->logic_state[i].metrics.last_task_started = rt.r_uint64_t;
+        master_ctx->logic_state[i].metrics.last_task_finished = rt.r_uint64_t;
+        master_ctx->logic_state[i].metrics.longest_task_time = (double)0;
+        master_ctx->logic_state[i].metrics.avg_task_time = (double)0;
+    }
+    for (int i = 0; i < MAX_COW_WORKERS; ++i) {
+        master_ctx->cow_state[i].in_use = false;
+        master_ctx->cow_state[i].metrics.last_ack = rt.r_uint64_t;
+        master_ctx->cow_state[i].metrics.last_task_started = rt.r_uint64_t;
+        master_ctx->cow_state[i].metrics.last_task_finished = rt.r_uint64_t;
+        master_ctx->cow_state[i].metrics.longest_task_time = (double)0;
+        master_ctx->cow_state[i].metrics.avg_task_time = (double)0;
+    }
+    for (int i = 0; i < MAX_DBR_WORKERS; ++i) {
+        master_ctx->dbr_state[i].in_use = false;
+        master_ctx->dbr_state[i].task_count = (uint16_t)0;
+        master_ctx->dbr_state[i].metrics.last_ack = rt.r_uint64_t;
+        master_ctx->dbr_state[i].metrics.last_task_started = rt.r_uint64_t;
+        master_ctx->dbr_state[i].metrics.last_task_finished = rt.r_uint64_t;
+        master_ctx->dbr_state[i].metrics.longest_task_time = (double)0;
+        master_ctx->dbr_state[i].metrics.avg_task_time = (double)0;
+    }
+    for (int i = 0; i < MAX_DBW_WORKERS; ++i) {
+        master_ctx->dbw_state[i].in_use = false;
+        master_ctx->dbw_state[i].metrics.last_ack = rt.r_uint64_t;
+        master_ctx->dbw_state[i].metrics.last_task_started = rt.r_uint64_t;
+        master_ctx->dbw_state[i].metrics.last_task_finished = rt.r_uint64_t;
+        master_ctx->dbw_state[i].metrics.longest_task_time = (double)0;
+        master_ctx->dbw_state[i].metrics.avg_task_time = (double)0;
+    }
     for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
+        master_ctx->sio_c_session[i].sio_index = -1;
         master_ctx->sio_c_session[i].in_use = false;
         memset(master_ctx->sio_c_session[i].ip, 0, IP_ADDRESS_LEN);
     }

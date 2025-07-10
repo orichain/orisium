@@ -162,8 +162,8 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 	int slot_found = -1;
 	for(int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
 		if(!master_ctx->sio_c_session[i].in_use) {
+            master_ctx->sio_c_session[i].sio_index = sio_worker_idx;
 			master_ctx->sio_c_session[i].in_use = true;
-			master_ctx->sio_c_session[i].sio_uds_fd = sio_worker_uds_fd;
 			memcpy(master_ctx->sio_c_session[i].ip, host_ip_bin, IP_ADDRESS_LEN);
 			slot_found = i;
 			break;
