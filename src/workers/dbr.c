@@ -11,6 +11,7 @@
 #include "utilities.h"
 #include "types.h"
 #include "constants.h"
+#include "ipc/heartbeat.h"
 
 void run_dbr_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
     volatile sig_atomic_t dbr_shutdown_requested = 0;
@@ -87,11 +88,23 @@ void run_dbr_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
 					LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
 					continue;
                 }
-                //LOG_DEBUG("%s===============HEARTBEAT============", label);
-//======================================================
-// 1. Kirim IPC Hertbeat ke Master
-// 2. "piggybacking"/"implicit heartbeat" kalau sudah ada ipc lain yang dikirim < interval. lewati pengiriman heartbeat.
-//======================================================
+//======================================================================
+// 1. if => "piggybacking"/"implicit heartbeat" kalau sudah ada ipc lain yang dikirim < interval. lewati pengiriman heartbeat.
+// 2. Kirim IPC Hertbeat ke Master
+//======================================================================
+                int not_used_fd = -1;
+                ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_heartbeat(&not_used_fd, wot, worker_idx);
+                if (cmd_result.status != SUCCESS) {
+                    continue;
+                }
+                ssize_t_status_t send_result = send_ipc_protocol_message(&master_uds_fd, cmd_result.r_ipc_protocol_t, &not_used_fd);
+                if (send_result.status != SUCCESS) {
+                    LOG_INFO("%sFailed to sent heartbeat to Master.", label);
+                } else {
+                    LOG_INFO("%sSent heartbeat to Master.", label);
+                }
+                CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+//======================================================================
 			} else if (current_fd == master_uds_fd) {
                 int received_client_fd = -1;
 				ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(&master_uds_fd, &received_client_fd);

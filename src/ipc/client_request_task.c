@@ -106,9 +106,7 @@ ipc_protocol_t_status_t ipc_prepare_cmd_client_request_task(int *fd_to_close, ui
 	result.status = FAILURE;
 	if (!result.r_ipc_protocol_t) {
 		perror("Failed to allocate ipc_protocol_t protocol");
-		if (*fd_to_close != -1) {
-			CLOSE_FD(fd_to_close);
-		}
+		CLOSE_FD(fd_to_close);
 		return result;
 	}
 	memset(result.r_ipc_protocol_t, 0, sizeof(ipc_protocol_t)); // Inisialisasi dengan nol
@@ -118,9 +116,7 @@ ipc_protocol_t_status_t ipc_prepare_cmd_client_request_task(int *fd_to_close, ui
 	ipc_client_request_task_t *payload = (ipc_client_request_task_t *)calloc(1, sizeof(ipc_client_request_task_t) + data_len);
 	if (!payload) {
 		perror("Failed to allocate ipc_client_request_task_t payload");
-		if (*fd_to_close != -1) {
-			CLOSE_FD(fd_to_close);
-		}
+		CLOSE_FD(fd_to_close);
 		CLOSE_IPC_PROTOCOL(&result.r_ipc_protocol_t);
 		return result;
 	}

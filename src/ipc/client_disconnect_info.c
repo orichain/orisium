@@ -58,7 +58,6 @@ ipc_protocol_t_status_t ipc_prepare_cmd_client_disconnect_info(int *fd_to_close,
 	result.status = FAILURE;
 	if (!result.r_ipc_protocol_t) {
 		perror("Failed to allocate ipc_protocol_t protocol");
-		//CLOSE_FD(client_sock);
 		CLOSE_FD(fd_to_close);
 		return result;
 	}
@@ -69,7 +68,6 @@ ipc_protocol_t_status_t ipc_prepare_cmd_client_disconnect_info(int *fd_to_close,
 	ipc_client_disconnect_info_t *payload = (ipc_client_disconnect_info_t *)calloc(1, sizeof(ipc_client_disconnect_info_t));
 	if (!payload) {
 		perror("Failed to allocate ipc_client_disconnect_info_t payload");
-		//CLOSE_FD(client_sock);
 		CLOSE_FD(fd_to_close);
 		CLOSE_IPC_PROTOCOL(&result.r_ipc_protocol_t);
 		return result;

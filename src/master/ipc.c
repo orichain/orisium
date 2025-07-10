@@ -72,76 +72,27 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
 	}
 	ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;                
 	switch (received_protocol->type) {
-		case IPC_CLIENT_REQUEST_TASK: {
-			/*
-			printf("=========================================Sini 2==================================\n");
-			
-			ipc_client_request_task_t *req = received_protocol->payload.ipc_client_request_task;
-			LOG_INFO("[Master]: Received Client Request Task (ID %ld) from Server IO Worker (UDS FD %d).", req->correlation_id, *current_fd);
-
-			int logic_worker_idx = (int)(req->correlation_id % MAX_LOGIC_WORKERS);
-			int logic_worker_uds_fd = master_ctx->master_uds_logic_fds[logic_worker_idx]; // Master uses its side of UDS
-
-			send_ipc_message(logic_worker_uds_fd, IPC_LOGIC_TASK, req, sizeof(client_request_task_t), -1);
-			LOG_INFO("[Master]: Forwarding client request (ID %ld) to Logic Worker %d (UDS FD %d).",
-				   req->correlation_id, logic_worker_idx, logic_worker_uds_fd);
-			*/
+		case IPC_HEARTBEAT: {
+            ipc_heartbeat_t *hbt = received_protocol->payload.ipc_heartbeat;
+            uint64_t_status_t rt = get_realtime_time_ns("[Master]: ");
+            if (hbt->wot[0] == SIO) {
+                LOG_INFO("[Master]: SIO %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
+                master_ctx->sio_state[hbt->index[0]].metrics.last_ack = rt.r_uint64_t;
+            } else if (hbt->wot[0] == LOGIC) {
+                LOG_INFO("[Master]: Logic %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
+                master_ctx->logic_state[hbt->index[0]].metrics.last_ack = rt.r_uint64_t;
+            } else if (hbt->wot[0] == COW) {
+                LOG_INFO("[Master]: COW %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
+                master_ctx->cow_state[hbt->index[0]].metrics.last_ack = rt.r_uint64_t;
+            } else if (hbt->wot[0] == DBR) {
+                LOG_INFO("[Master]: DBR %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
+                master_ctx->dbr_state[hbt->index[0]].metrics.last_ack = rt.r_uint64_t;
+            } else if (hbt->wot[0] == DBW) {
+                LOG_INFO("[Master]: DBW %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
+                master_ctx->dbw_state[hbt->index[0]].metrics.last_ack = rt.r_uint64_t;
+            }
 			break;
 		}
-		/*
-		case IPC_LOGIC_RESPONSE_TO_SIO: {
-			logic_response_t *resp = (logic_response_t *)master_rcv_buffer;
-			LOG_INFO("[Master]: Received Client Response (ID %ld) from Logic Worker (UDS FD %d).", resp->client_correlation_id, *current_fd);
-
-			int target_sio_uds_fd = -1;
-			for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
-				if (master_ctx->sio_c_session[i].in_use && master_ctx->sio_c_session[i].correlation_id == resp->client_correlation_id) {
-					target_sio_uds_fd = master_ctx->sio_c_session[i].sio_uds_fd;
-					master_ctx->sio_c_session[i].in_use = false;
-					master_ctx->sio_c_session[i].correlation_id = -1;
-					master_ctx->sio_c_session[i].sio_uds_fd = -1;
-					memset(master_ctx->sio_c_session[i].client_ip, 0, sizeof(master_ctx->sio_c_session[i].client_ip));
-					break;
-				}
-			}
-
-			if (target_sio_uds_fd != -1) {
-				send_ipc_message(target_sio_uds_fd, IPC_LOGIC_RESPONSE_TO_SIO, resp, sizeof(logic_response_t), -1);
-				LOG_INFO("[Master]: Forwarding client response (ID %ld) to Server IO Worker (UDS FD %d).",
-					   resp->client_correlation_id, target_sio_uds_fd);
-			} else {
-				LOG_ERROR("[Master]: No SIO worker found for client ID %ld for response. Ignoring.", resp->client_correlation_id);
-			}
-			break;
-		}
-		case IPC_OUTBOUND_TASK: {
-			outbound_task_t *task = (outbound_task_t *)master_rcv_buffer;
-			LOG_INFO("[Master]: Received Outbound Task (ID %ld) from Logic Worker (UDS FD %d) for node %s:%d.",
-				   task->client_correlation_id, *current_fd, task->node_ip, task->node_port);
-
-			int cow_worker_idx = (int)(task->client_correlation_id % MAX_COW_WORKERS);
-			int cow_uds_fd = master_ctx->master_uds_cow_fds[cow_worker_idx]; // Master uses its side of UDS
-
-			send_ipc_message(cow_uds_fd, IPC_OUTBOUND_TASK, task, sizeof(outbound_task_t), -1);
-			LOG_INFO("[Master]: Forwarding outbound task (ID %ld) to Client Outbound Worker %d (UDS FD %d).",
-				   task->client_correlation_id, cow_worker_idx, cow_uds_fd);
-			break;
-		}
-		case IPC_OUTBOUND_RESPONSE: {
-			outbound_response_t *resp = (outbound_response_t *)master_rcv_buffer;
-			LOG_INFO("[Master]: Received Outbound Response (ID %ld) from Client Outbound Worker (UDS FD %d). Success: %s, Data: '%.*s'",
-				   resp->client_correlation_id, *current_fd, resp->success ? "true" : "false",
-				   (int)resp->response_data_len, resp->response_data);
-
-			int logic_worker_idx_for_response = (int)(resp->client_correlation_id % MAX_LOGIC_WORKERS);
-			int logic_worker_uds_fd = master_ctx->master_uds_logic_fds[logic_worker_idx_for_response]; // Master uses its side of UDS
-
-			send_ipc_message(logic_worker_uds_fd, IPC_OUTBOUND_RESPONSE, resp, sizeof(outbound_response_t), -1);
-			LOG_INFO("[Master]: Forwarding outbound response (ID %ld) to Logic Worker %d (UDS FD %d).",
-				   resp->client_correlation_id, logic_worker_idx_for_response, logic_worker_uds_fd);
-			break;
-		}
-		*/
 		case IPC_CLIENT_DISCONNECTED: {
 			ipc_client_disconnect_info_t *disconnect_info = received_protocol->payload.ipc_client_disconnect_info;
 			add_master_sio_dc_session("[Master]: ", &master_ctx->sio_dc_session, disconnect_info->ip); 
@@ -157,8 +108,7 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
                     master_ctx->sio_c_session[i].sio_index = -1;
 					master_ctx->sio_c_session[i].in_use = false;
 					memset(master_ctx->sio_c_session[i].ip, 0, IP_ADDRESS_LEN);
-					LOG_INFO("[Master]: IP %s dihapus dari daftar koneksi aktif.",
-							 ip_str);
+					LOG_INFO("[Master]: IP %s dihapus dari daftar koneksi aktif.", ip_str);
 					break;
 				}
 			}
