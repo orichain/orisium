@@ -40,7 +40,7 @@ void run_dbr_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
         initial_delay_ms = MAX_INITIAL_DELAY_MS;
     }
     if (initial_delay_ms > 0) {
-        LOG_INFO("%sApplying initial delay of %ld ms...", label, initial_delay_ms);
+        LOG_DEBUG("%sApplying initial delay of %ld ms...", label, initial_delay_ms);
         sleep_ms(initial_delay_ms);
     }
 //======================================================================

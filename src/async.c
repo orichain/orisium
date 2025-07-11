@@ -93,7 +93,7 @@ status_t async_create(const char* label, async_type_t *async) {
         LOG_ERROR("%sGagal membuat epoll fd: %s", label, strerror(errno));
         return FAILURE;
     }
-    LOG_INFO("%sBerhasil membuat epoll fd %d", label, async->async_fd);
+    LOG_DEBUG("%sBerhasil membuat epoll fd %d", label, async->async_fd);
     return SUCCESS;
 }
 
@@ -103,7 +103,7 @@ status_t async_create_eventfd_nonblock_close_after_exec(const char* label, int *
         LOG_ERROR("%sGagal membuat eventfd: %s", label, strerror(errno));
         return FAILURE;
     }
-    LOG_INFO("%sBerhasil membuat event fd %d", label, *event_fd);
+    LOG_DEBUG("%sBerhasil membuat event fd %d", label, *event_fd);
     return SUCCESS;
 }
 

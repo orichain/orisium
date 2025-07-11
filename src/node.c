@@ -57,7 +57,7 @@ status_t read_network_config_from_json(const char* label, const char* filename, 
 
     int array_len = json_object_array_length(bootstrap_nodes_array);
     if (array_len > MAX_NODES) {
-        LOG_WARN("%sJumlah bootstrap nodes (%d) melebihi MAX_NODES (%d). Hanya %d yang akan dibaca.",
+        LOG_DEBUG("%sJumlah bootstrap nodes (%d) melebihi MAX_NODES (%d). Hanya %d yang akan dibaca.",
                 label, array_len, MAX_NODES, MAX_NODES);
         array_len = MAX_NODES;
     }
@@ -66,7 +66,7 @@ status_t read_network_config_from_json(const char* label, const char* filename, 
     for (int i = 0; i < array_len; i++) {
         struct json_object *node_obj = json_object_array_get_idx(bootstrap_nodes_array, i);
         if (!json_object_is_type(node_obj, json_type_object)) {
-            LOG_WARN("%sElemen array bootstrap_nodes bukan objek pada indeks %d. Melewatkan.", label, i);
+            LOG_DEBUG("%sElemen array bootstrap_nodes bukan objek pada indeks %d. Melewatkan.", label, i);
             continue;
         }
 
@@ -74,7 +74,7 @@ status_t read_network_config_from_json(const char* label, const char* filename, 
         struct json_object *port_obj = NULL;
 
         if (!json_object_object_get_ex(node_obj, "ip", &ip_obj) || !json_object_is_type(ip_obj, json_type_string)) {
-            LOG_WARN("%sKunci 'ip' tidak ditemukan atau bukan string pada node indeks %d. Melewatkan.", label, i);
+            LOG_DEBUG("%sKunci 'ip' tidak ditemukan atau bukan string pada node indeks %d. Melewatkan.", label, i);
             continue;
         }
         
@@ -90,7 +90,7 @@ status_t read_network_config_from_json(const char* label, const char* filename, 
         inet_pton(AF_INET6, iptmp, config_out->bootstrap_nodes[config_out->num_bootstrap_nodes].ip);
                 
         if (!json_object_object_get_ex(node_obj, "port", &port_obj) || !json_object_is_type(port_obj, json_type_int)) {
-            LOG_WARN("%sKunci 'port' tidak ditemukan atau bukan integer pada node indeks %d. Melewatkan.", label, i);
+            LOG_DEBUG("%sKunci 'port' tidak ditemukan atau bukan integer pada node indeks %d. Melewatkan.", label, i);
             continue;
         }
         
