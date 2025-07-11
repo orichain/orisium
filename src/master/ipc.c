@@ -51,6 +51,28 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
             }
         }
     }
+    if (!is_worker_uds) {
+        for (int i = 0; i < MAX_DBR_WORKERS; ++i) {
+            if (*current_fd == master_ctx->dbr[i].uds[0]) {
+                is_worker_uds = true;
+                result.r_worker_type_t = DBR;
+                worker_name = "DBR";
+                result.index = i;
+                break;
+            }
+        }
+    }
+    if (!is_worker_uds) {
+        for (int i = 0; i < MAX_DBW_WORKERS; ++i) {
+            if (*current_fd == master_ctx->dbw[i].uds[0]) {
+                is_worker_uds = true;
+                result.r_worker_type_t = DBW;
+                worker_name = "DBW";
+                result.index = i;
+                break;
+            }
+        }
+    }
     if (is_worker_uds) {
 		LOG_DEBUG("%sWorker UDS FD %d (%s Worker %d) terputus.", label, *current_fd, worker_name, result.index);
         result.status = SUCCESS;			
