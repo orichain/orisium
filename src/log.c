@@ -137,6 +137,7 @@
 #endif
 
 #ifdef PRODUCTION
+    void log_no_write(const char *level, const char *fmt, ...) {}
     void log_write(const char *level, const char *fmt, ...) {
         char filename[64];
         get_log_filename(filename, sizeof(filename));
@@ -166,6 +167,7 @@
         fflush(log_fp);
     }
 #elif defined(DEVELOPMENT)
+    void log_no_write(const char *level, const char *file, const char *func, int line, const char *fmt, ...) {}
     #ifdef TOSCREEN
         void log_write(const char *level, const char *file, const char *func, int line, const char *fmt, ...) {
             va_list args;

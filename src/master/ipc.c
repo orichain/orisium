@@ -1,7 +1,7 @@
 #include <stdbool.h>     // for false, bool, true
-#include <stdio.h>       // for printf, perror, fprintf, NULL, stderr
 #include <string.h>      // for memset, strncpy
 #include <netinet/in.h>
+#include <errno.h>
 
 #include "log.h"
 #include "constants.h"
@@ -52,11 +52,7 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
         }
     }
     if (is_worker_uds) {
-		LOG_INFO("%sWorker UDS FD %d (%s Worker %d) terputus.", label, *current_fd, worker_name, result.index);
-		//if (async_delete_event(label, &master_ctx->master_async, current_fd) != SUCCESS) {
-		//	result.status = FAILURE;			
-		//	return result;
-		//}
+		LOG_DEBUG("%sWorker UDS FD %d (%s Worker %d) terputus.", label, *current_fd, worker_name, result.index);
         result.status = SUCCESS;			
 		return result;
 	}
@@ -65,9 +61,9 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
 
 status_t handle_ipc_event(const char *label, master_context *master_ctx, int *current_fd) {	
 	int received_fd = -1;
-	ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(current_fd, &received_fd);
+	ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(label, current_fd, &received_fd);
 	if (deserialized_result.status != SUCCESS) {
-		perror("recv_ipc_message from worker (Master)");
+		LOG_ERROR("%srecv_ipc_message from worker. %s", label, strerror(errno));
 		return deserialized_result.status;
 	}
 	ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;                
@@ -76,19 +72,19 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
             ipc_heartbeat_t *hbt = received_protocol->payload.ipc_heartbeat;
             uint64_t_status_t rt = get_realtime_time_ns("[Master]: ");
             if (hbt->wot[0] == SIO) {
-                LOG_INFO("[Master]: SIO %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
+                LOG_DEBUG("[Master]: SIO %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
                 master_ctx->sio_state[hbt->index[0]].metrics.last_ack = rt.r_uint64_t;
             } else if (hbt->wot[0] == LOGIC) {
-                LOG_INFO("[Master]: Logic %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
+                LOG_DEBUG("[Master]: Logic %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
                 master_ctx->logic_state[hbt->index[0]].metrics.last_ack = rt.r_uint64_t;
             } else if (hbt->wot[0] == COW) {
-                LOG_INFO("[Master]: COW %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
+                LOG_DEBUG("[Master]: COW %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
                 master_ctx->cow_state[hbt->index[0]].metrics.last_ack = rt.r_uint64_t;
             } else if (hbt->wot[0] == DBR) {
-                LOG_INFO("[Master]: DBR %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
+                LOG_DEBUG("[Master]: DBR %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
                 master_ctx->dbr_state[hbt->index[0]].metrics.last_ack = rt.r_uint64_t;
             } else if (hbt->wot[0] == DBW) {
-                LOG_INFO("[Master]: DBW %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
+                LOG_DEBUG("[Master]: DBW %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
                 master_ctx->dbw_state[hbt->index[0]].metrics.last_ack = rt.r_uint64_t;
             }
 			break;
@@ -100,7 +96,7 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
 			//avg_connection = cnt_connection / sio_worker;
 			char ip_str[INET6_ADDRSTRLEN];
 			convert_ipv6_bin_to_str(disconnect_info->ip, ip_str);
-			LOG_INFO("[Master]: Received Client Disconnected signal from IP %s (from SIO Worker UDS FD %d).",
+			LOG_DEBUG("[Master]: Received Client Disconnected signal from IP %s (from SIO Worker UDS FD %d).",
 					 ip_str, *current_fd);
 			for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
 				if (master_ctx->sio_c_session[i].in_use &&
@@ -108,14 +104,14 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
                     master_ctx->sio_c_session[i].sio_index = -1;
 					master_ctx->sio_c_session[i].in_use = false;
 					memset(master_ctx->sio_c_session[i].ip, 0, IP_ADDRESS_LEN);
-					LOG_INFO("[Master]: IP %s dihapus dari daftar koneksi aktif.", ip_str);
+					LOG_DEBUG("[Master]: IP %s dihapus dari daftar koneksi aktif.", ip_str);
 					break;
 				}
 			}
 			break;
 		}
 		default:
-			LOG_ERROR("[Master]: Unknown message type %d from UDS FD %d. Ignoring.", received_protocol->type, *current_fd);
+			LOG_ERROR("[Master]: Unknown protocol type %d from UDS FD %d. Ignoring.", received_protocol->type, *current_fd);
 			break;
 	}
 	CLOSE_IPC_PROTOCOL(&received_protocol);

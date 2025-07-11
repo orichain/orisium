@@ -1,12 +1,12 @@
-#include <errno.h>       // for errno, EAGAIN, EWOULDBLOCK
-#include <netdb.h>       // for getnameinfo, NI_MAXHOST, NI_MAXSERV, NI_NUME...
-#include <netinet/in.h>  // for INET6_ADDRSTRLEN
-#include <stdint.h>      // for uint16_t, uint64_t
-#include <stdio.h>       // for NULL, perror
-#include <stdlib.h>      // for malloc, free
-#include <string.h>      // for strerror, memset, strcmp, memcpy, strncpy
-#include <sys/socket.h>  // for accept, sockaddr_storage, socklen_t
-#include <unistd.h>      // for close
+#include <errno.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
 #include <arpa/inet.h>
 
 #include "log.h"
@@ -28,16 +28,16 @@ status_t setup_socket_listenner(const char *label, master_context *master_ctx) {
     
     master_ctx->listen_sock = socket(AF_INET6, SOCK_STREAM, 0);
     if (master_ctx->listen_sock == -1) {
-		LOG_ERROR("%s%s", label, strerror(errno));
+		LOG_ERROR("%ssocket failed. %s", label, strerror(errno));
         return FAILURE;
     }
     status_t r_snbkg = set_nonblocking(label, master_ctx->listen_sock);
     if (r_snbkg != SUCCESS) {
-        LOG_ERROR("%s%s", label, strerror(errno));
+        LOG_ERROR("%sset_nonblocking failed.", label);
         return r_snbkg;
     }
     if (setsockopt(master_ctx->listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
-        LOG_ERROR("%s%s", label, strerror(errno));
+        LOG_ERROR("%ssetsockopt failed. %s", label, strerror(errno));
         return FAILURE;
     }
     //di FreeBSD tidak bisa reuseport. sudah pernah coba
@@ -48,7 +48,7 @@ status_t setup_socket_listenner(const char *label, master_context *master_ctx) {
     }
     */
     if (setsockopt(master_ctx->listen_sock, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) == -1) {
-		LOG_ERROR("%s%s", label, strerror(errno));
+		LOG_ERROR("%ssetsockopt failed. %s", label, strerror(errno));
         return FAILURE;
     }
     memset(&addr, 0, sizeof(addr));
@@ -56,11 +56,11 @@ status_t setup_socket_listenner(const char *label, master_context *master_ctx) {
     addr.sin6_port = htons(node_config.listen_port);
     addr.sin6_addr = in6addr_any;
     if (bind(master_ctx->listen_sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        LOG_ERROR("%s%s", label, strerror(errno));
+        LOG_ERROR("%sbind failed. %s", label, strerror(errno));
         return FAILURE;
     }
     if (listen(master_ctx->listen_sock, 128) < 0) {
-        LOG_ERROR("%s%s", label, strerror(errno));
+        LOG_ERROR("%slisten failed. %s", label, strerror(errno));
         return FAILURE;
     }
     return SUCCESS;
@@ -75,7 +75,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 	int client_sock = accept(master_ctx->listen_sock, (struct sockaddr*)&client_addr, &client_addr_len);
 	if (client_sock == -1) {
 		if (errno != EAGAIN && errno != EWOULDBLOCK) {
-			LOG_ERROR("%s%s", label, strerror(errno));
+			LOG_ERROR("%saccept failed. %s", label, strerror(errno));
 			return FAILURE;
 		}
 		return FAILURE_EAGNEWBLK;
@@ -86,7 +86,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 					  	NI_NUMERICHOST | NI_NUMERICSERV
 					  );
 	if (getname_res != 0) {
-		LOG_ERROR("%s%s", label, strerror(errno));
+		LOG_ERROR("%sgetnameinfo failed. %s", label, strerror(errno));
 		close(client_sock);
 		return FAILURE;
 	}
@@ -128,7 +128,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 		close(client_sock);
 		return FAILURE_ALRDYCONTD;
 	}
-	LOG_INFO("%sNew client connected from IP %s on FD %d.", label, ip_str, client_sock);
+	LOG_DEBUG("%sNew client connected from IP %s on FD %d.", label, ip_str, client_sock);
 	
 	master_sio_dc_session_t_status_t ccid_result = find_first_ratelimited_master_sio_dc_session("[Master]: ", master_ctx->sio_dc_session, host_ip_bin);
 	if (ccid_result.status == SUCCESS) {
@@ -175,16 +175,16 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 		return FAILURE_NOSLOT;
 	}
 	
-	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_client_request_task(&client_sock, host_ip_bin, (uint16_t)0, NULL);
+	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_client_request_task(label, &client_sock, host_ip_bin, (uint16_t)0, NULL);
 	if (cmd_result.status != SUCCESS) {
 		return cmd_result.status;
 	}	
-	ssize_t_status_t send_result = send_ipc_protocol_message(&sio_worker_uds_fd, cmd_result.r_ipc_protocol_t, &client_sock);
+	ssize_t_status_t send_result = send_ipc_protocol_message(label, &sio_worker_uds_fd, cmd_result.r_ipc_protocol_t, &client_sock);
 	if (send_result.status != SUCCESS) {
 		LOG_ERROR("%sFailed to forward client FD %d to Server IO Worker %d.",
 				  label, client_sock, sio_worker_idx);
 	} else {
-		LOG_INFO("%sForwarding client FD %d from IP %s to Server IO Worker %d (UDS FD %d). Bytes sent: %zd.",
+		LOG_DEBUG("%sForwarding client FD %d from IP %s to Server IO Worker %d (UDS FD %d). Bytes sent: %zd.",
 				 label, client_sock, ip_str, sio_worker_idx, sio_worker_uds_fd, send_result.r_ssize_t);
 	}
 	CLOSE_FD(&client_sock); // Menghindari kebocoran FD jika send_ipc gagal => biarkan client reconnect

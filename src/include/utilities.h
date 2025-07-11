@@ -144,7 +144,7 @@ static inline status_t ensure_directory_exists(const char *label, const char *pa
         }
     }
     if (mkdir(path, 0755) == 0) {
-        LOG_INFO("%sDirectory created: %s", label, path);
+        LOG_DEBUG("%sDirectory created: %s", label, path);
         return 0;
     } else {
         LOG_ERROR("%smkdir failed for path '%s': %s", label, path, strerror(errno));

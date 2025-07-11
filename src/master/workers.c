@@ -73,7 +73,7 @@ status_t create_socket_pair(const char *label, master_context *master_ctx, worke
 		if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->sio[index].uds[0]) != SUCCESS) {
 			return FAILURE;
 		}
-		LOG_INFO("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, master_ctx->sio[index].uds[0], master_ctx->sio[index].uds[1]);
+		LOG_DEBUG("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, master_ctx->sio[index].uds[0], master_ctx->sio[index].uds[1]);
 	} else if (wot == LOGIC) {
 		const char *worker_name = "Logic";
 		if (socketpair(AF_UNIX, SOCK_STREAM, 0, master_ctx->logic[index].uds) == -1) {
@@ -89,7 +89,7 @@ status_t create_socket_pair(const char *label, master_context *master_ctx, worke
 		if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->logic[index].uds[0]) != SUCCESS) {
 			return FAILURE;
 		}
-		LOG_INFO("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, master_ctx->logic[index].uds[0], master_ctx->logic[index].uds[1]);
+		LOG_DEBUG("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, master_ctx->logic[index].uds[0], master_ctx->logic[index].uds[1]);
 	} else if (wot == COW) {
 		const char *worker_name = "COW";
 		if (socketpair(AF_UNIX, SOCK_STREAM, 0, master_ctx->cow[index].uds) == -1) {
@@ -105,7 +105,7 @@ status_t create_socket_pair(const char *label, master_context *master_ctx, worke
 		if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->cow[index].uds[0]) != SUCCESS) {
 			return FAILURE;
 		}
-		LOG_INFO("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, master_ctx->cow[index].uds[0], master_ctx->cow[index].uds[1]);
+		LOG_DEBUG("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, master_ctx->cow[index].uds[0], master_ctx->cow[index].uds[1]);
 	} else if (wot == DBR) {
 		const char *worker_name = "DBR";
 		if (socketpair(AF_UNIX, SOCK_STREAM, 0, master_ctx->dbr[index].uds) == -1) {
@@ -121,7 +121,7 @@ status_t create_socket_pair(const char *label, master_context *master_ctx, worke
 		if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->dbr[index].uds[0]) != SUCCESS) {
 			return FAILURE;
 		}
-		LOG_INFO("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, master_ctx->dbr[index].uds[0], master_ctx->dbr[index].uds[1]);
+		LOG_DEBUG("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, master_ctx->dbr[index].uds[0], master_ctx->dbr[index].uds[1]);
 	} else if (wot == DBW) {
 		const char *worker_name = "DBW";
 		if (socketpair(AF_UNIX, SOCK_STREAM, 0, master_ctx->dbw[index].uds) == -1) {
@@ -137,7 +137,7 @@ status_t create_socket_pair(const char *label, master_context *master_ctx, worke
 		if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->dbw[index].uds[0]) != SUCCESS) {
 			return FAILURE;
 		}
-		LOG_INFO("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, master_ctx->dbw[index].uds[0], master_ctx->dbw[index].uds[1]);
+		LOG_DEBUG("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, master_ctx->dbw[index].uds[0], master_ctx->dbw[index].uds[1]);
 	}
 	return SUCCESS;
 }
@@ -171,7 +171,7 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
             exit(EXIT_SUCCESS);
         } else {
 			CLOSE_FD(&master_ctx->sio[index].uds[1]);
-            LOG_INFO("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->sio[index].pid);
+            LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->sio[index].pid);
         }
 	} else if (wot == LOGIC) {
 		const char *worker_name = "Logic";		
@@ -200,7 +200,7 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
             exit(EXIT_SUCCESS);
         } else {
 			CLOSE_FD(&master_ctx->logic[index].uds[1]);
-            LOG_INFO("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->logic[index].pid);
+            LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->logic[index].pid);
         }
 	} else if (wot == COW) {
 		const char *worker_name = "COW";
@@ -229,7 +229,7 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
             exit(EXIT_SUCCESS);
         } else {
 			CLOSE_FD(&master_ctx->cow[index].uds[1]);
-            LOG_INFO("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->cow[index].pid);
+            LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->cow[index].pid);
         }
 	} else if (wot == DBR) {
 		const char *worker_name = "DBR";
@@ -258,7 +258,7 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
             exit(EXIT_SUCCESS);
         } else {
 			CLOSE_FD(&master_ctx->dbr[index].uds[1]);
-            LOG_INFO("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->dbr[index].pid);
+            LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->dbr[index].pid);
         }
 	} else if (wot == DBW) {
 		const char *worker_name = "DBW";
@@ -287,7 +287,7 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
             exit(EXIT_SUCCESS);
         } else {
 			CLOSE_FD(&master_ctx->dbw[index].uds[1]);
-            LOG_INFO("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->dbw[index].pid);
+            LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->dbw[index].pid);
         }
 	}
     return SUCCESS;

@@ -14,6 +14,7 @@ GCC_INCLUDE_DIRS := $(shell echo '' | gcc -E -x c - -v 2>&1 | awk '/^ \/.*\/incl
 INCLUDE_DIR = $(GCC_INCLUDE_DIRS) -I./$(SRC_DIR)/include -I./PQClean -I./PQClean/common -I./lmdb/libraries/liblmdb
 COMMON_CFLAGS = -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration -pthread -mrdseed -ljson-c -lm $(INCLUDE_DIR)
 BUILD_MODE ?= DEVELOPMENT
+DEBUG_MODE ?= DEVELOPMENT
 LOG_TO ?= SCREEN
 ifeq ($(BUILD_MODE), PRODUCTION)
     FINAL_CFLAGS = $(COMMON_CFLAGS) -O3 -DNDEBUG -DPRODUCTION
@@ -21,7 +22,7 @@ else
 	ifeq ($(LOG_TO), FILE)
 		FINAL_CFLAGS = $(COMMON_CFLAGS) -fsanitize=address -fsanitize=leak -g -O3 -Werror -DDEVELOPMENT -DTOFILE
 	else
-		FINAL_CFLAGS = $(COMMON_CFLAGS) -fsanitize=address -fsanitize=leak -g -O3 -Werror -DDEVELOPMENT -DTOSCREEN
+		FINAL_CFLAGS = $(COMMON_CFLAGS) -fsanitize=address -fsanitize=leak -g -O3 -Werror -DNDEBUG -DDEVELOPMENT -DTOSCREEN
 	endif
 endif
 LDFLAGS =

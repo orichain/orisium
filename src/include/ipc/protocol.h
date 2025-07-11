@@ -77,9 +77,7 @@ typedef struct {
 #include "ipc/shutdown.h"
 #include "ipc/heartbeat.h"
 
-//ssize_t_status_t ipc_serialize(const ipc_protocol_t* p, uint8_t** ptr_buffer, size_t* buffer_size);
-//ipc_protocol_t_status_t ipc_deserialize(const uint8_t* buffer, size_t len);
-ssize_t_status_t send_ipc_protocol_message(int *uds_fd, const ipc_protocol_t* p, int *fd_to_pass);
-ipc_protocol_t_status_t receive_and_deserialize_ipc_message(int *uds_fd, int *actual_fd_received);
+ssize_t_status_t send_ipc_protocol_message(const char *label, int *uds_fd, const ipc_protocol_t* p, int *fd_to_pass);
+ipc_protocol_t_status_t receive_and_deserialize_ipc_message(const char *label, int *uds_fd, int *actual_fd_received);
 
 #endif

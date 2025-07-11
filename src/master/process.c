@@ -19,7 +19,8 @@
 #include "ipc/shutdown.h"
 
 status_t setup_master(master_context *master_ctx) {
-    uint64_t_status_t rt = get_realtime_time_ns("[Master]: ");
+    const char *label = "[Master]: ";
+    uint64_t_status_t rt = get_realtime_time_ns(label);
     for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
         master_ctx->sio_state[i].in_use = false;
         master_ctx->sio_state[i].task_count = (uint16_t)0;
@@ -74,8 +75,6 @@ status_t setup_master(master_context *master_ctx) {
     master_ctx->master_timer_fd = -1;
     master_ctx->master_async.async_fd = -1;
     master_ctx->master_pid = getpid();
-    const char *label = "[Master]: ";
-    LOG_INFO("%sPID %d TCP Server listening on port %d.", label, master_ctx->master_pid, node_config.listen_port);
 //======================================================================
 // Master setup socket listenner & timer heartbeat
 //======================================================================
@@ -176,7 +175,7 @@ status_t setup_workers(master_context *master_ctx) {
 			return FAILURE;
 		}
     }
-    LOG_INFO("%sStarting main event loop. Waiting for clients and worker communications...", label);
+    LOG_DEBUG("%sStarting main event loop. Waiting for clients and worker communications...", label);
     return SUCCESS;
 }
 
@@ -184,67 +183,67 @@ static inline status_t broadcast_shutdown(master_context *master_ctx) {
 	const char *label = "[Master]: ";
 	int not_used_fd = -1;
 	for (int i = 0; i < MAX_SIO_WORKERS; ++i) { 
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(label, &not_used_fd);
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}
-		ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->sio[i].uds[0], cmd_result.r_ipc_protocol_t, &not_used_fd);
+		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->sio[i].uds[0], cmd_result.r_ipc_protocol_t, &not_used_fd);
 		if (send_result.status != SUCCESS) {
-			LOG_INFO("%sFailed to sent shutdown to SIO %ld.", label, i);
+			LOG_ERROR("%sFailed to sent shutdown to SIO %ld.", label, i);
 		} else {
-			LOG_INFO("%sSent shutdown to SIO %ld.", label, i);
+			LOG_DEBUG("%sSent shutdown to SIO %ld.", label, i);
 		}
 		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t); 
 	}
 	for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(label, &not_used_fd);
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}	
-		ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->logic[i].uds[0], cmd_result.r_ipc_protocol_t, &not_used_fd);
+		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->logic[i].uds[0], cmd_result.r_ipc_protocol_t, &not_used_fd);
 		if (send_result.status != SUCCESS) {
-			LOG_INFO("%sFailed to sent shutdown to Logic %ld.", label, i);
+			LOG_ERROR("%sFailed to sent shutdown to Logic %ld.", label, i);
 		} else {
-			LOG_INFO("%sSent shutdown to Logic %ld.", label, i);
+			LOG_DEBUG("%sSent shutdown to Logic %ld.", label, i);
 		}
 		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
 	}
 	for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(label, &not_used_fd);
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}	
-		ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->cow[i].uds[0], cmd_result.r_ipc_protocol_t, &not_used_fd);
+		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->cow[i].uds[0], cmd_result.r_ipc_protocol_t, &not_used_fd);
 		if (send_result.status != SUCCESS) {
-			LOG_INFO("%sFailed to sent shutdown to COW %ld.", label, i);
+			LOG_ERROR("%sFailed to sent shutdown to COW %ld.", label, i);
 		} else {
-			LOG_INFO("%sSent shutdown to COW %ld.", label, i);
+			LOG_DEBUG("%sSent shutdown to COW %ld.", label, i);
 		}
 		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
 	}
     for (int i = 0; i < MAX_DBR_WORKERS; ++i) { 
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(label, &not_used_fd);
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}	
-		ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->dbr[i].uds[0], cmd_result.r_ipc_protocol_t, &not_used_fd);
+		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->dbr[i].uds[0], cmd_result.r_ipc_protocol_t, &not_used_fd);
 		if (send_result.status != SUCCESS) {
-			LOG_INFO("%sFailed to sent shutdown to DBR %ld.", label, i);
+			LOG_ERROR("%sFailed to sent shutdown to DBR %ld.", label, i);
 		} else {
-			LOG_INFO("%sSent shutdown to DBR %ld.", label, i);
+			LOG_DEBUG("%sSent shutdown to DBR %ld.", label, i);
 		}
 		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
 	}
     for (int i = 0; i < MAX_DBW_WORKERS; ++i) { 
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(&not_used_fd);
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_shutdown(label, &not_used_fd);
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}	
-		ssize_t_status_t send_result = send_ipc_protocol_message(&master_ctx->dbw[i].uds[0], cmd_result.r_ipc_protocol_t, &not_used_fd);
+		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->dbw[i].uds[0], cmd_result.r_ipc_protocol_t, &not_used_fd);
 		if (send_result.status != SUCCESS) {
-			LOG_INFO("%sFailed to sent shutdown to DBW %ld.", label, i);
+			LOG_ERROR("%sFailed to sent shutdown to DBW %ld.", label, i);
 		} else {
-			LOG_INFO("%sSent shutdown to DBW %ld.", label, i);
+			LOG_DEBUG("%sSent shutdown to DBW %ld.", label, i);
 		}
 		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
 	}
@@ -259,6 +258,7 @@ void run_master_process(master_context *master_ctx) {
 	//double_t cnt_connection = 0.0;
 	//double_t sio_worker = (double_t)MAX_SIO_WORKERS;
     
+    LOG_INFO("%sPID %d TCP Server listening on port %d.", label, master_ctx->master_pid, node_config.listen_port);
     while (!master_shutdown_requested) {
 		int_status_t snfds = async_wait(label, &master_ctx->master_async);
 		if (snfds.status != SUCCESS) continue;

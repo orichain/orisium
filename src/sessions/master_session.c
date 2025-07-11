@@ -25,7 +25,7 @@ status_t add_master_sio_dc_session(const char *label, master_sio_dc_session_t **
 		new_node->dc_time = grtns_result.r_uint64_t;
 		new_node->next = *head;
 		*head = new_node;
-		LOG_INFO("%sIP %s berhasil ditambahkan.", label, ip_str);
+		LOG_DEBUG("%sIP %s berhasil ditambahkan.", label, ip_str);
 		return grtns_result.status;
 	}
 	return FAILURE;
@@ -40,7 +40,7 @@ status_t delete_master_sio_dc_session(const char *label, master_sio_dc_session_t
     if (current != NULL && memcmp(current->ip, ip, IP_ADDRESS_LEN) == 0) {
         *head = current->next;
         free(current);        
-        LOG_INFO("%sIP %s berhasil dihapus (head).", label, ip_str);
+        LOG_DEBUG("%sIP %s berhasil dihapus (head).", label, ip_str);
         return SUCCESS;
     }
     while (current != NULL && memcmp(current->ip, ip, IP_ADDRESS_LEN) != 0) {
@@ -48,12 +48,12 @@ status_t delete_master_sio_dc_session(const char *label, master_sio_dc_session_t
         current = current->next;
     }
     if (current == NULL) {
-        LOG_WARN("%sIP %s tidak ditemukan.", label, ip_str);
+        LOG_DEBUG("%sIP %s tidak ditemukan.", label, ip_str);
         return FAILURE;
     }
     prev->next = current->next;
     free(current);
-    LOG_INFO("%sIP %s berhasil dihapus.", label, ip_str);
+    LOG_DEBUG("%sIP %s berhasil dihapus.", label, ip_str);
     return SUCCESS;
 }
 
@@ -66,13 +66,13 @@ master_sio_dc_session_t_status_t find_master_sio_dc_session(const char *label, m
 	
     while (result.r_master_sio_dc_session_t != NULL) {
         if (memcmp(result.r_master_sio_dc_session_t->ip, ip, IP_ADDRESS_LEN) == 0) {
-            LOG_INFO("%sIP %s ditemukan.", label, ip_str);
+            LOG_DEBUG("%sIP %s ditemukan.", label, ip_str);
             result.status = SUCCESS;
             return result;
         }
         result.r_master_sio_dc_session_t = result.r_master_sio_dc_session_t->next;
     }
-    LOG_WARN("%sIP %s tidak ditemukan.", label, ip_str);
+    LOG_DEBUG("%sIP %s tidak ditemukan.", label, ip_str);
     return result;
 }
 
@@ -112,17 +112,17 @@ master_sio_dc_session_t_status_t find_first_ratelimited_master_sio_dc_session(co
 			uint64_t ratelimit_ns = (uint64_t)RATELIMITSEC * 1000000000ULL;
 			if ((grtns_result.r_uint64_t - result.r_master_sio_dc_session_t->dc_time) > ratelimit_ns) {
 				result.status = grtns_result.status;
-				LOG_INFO("%sIP %s menemukan reusable slot.", label, ip_str);
+				LOG_DEBUG("%sIP %s menemukan reusable slot.", label, ip_str);
 				return result;
 			}
 		} else {
 			result.status = grtns_result.status;
-			LOG_WARN("%sIP %s gagal menemukan reusable slot yang bebas ratelimit -> dianggap gagal menemukan reusable slot.", label, ip_str);
+			LOG_DEBUG("%sIP %s gagal menemukan reusable slot yang bebas ratelimit -> dianggap gagal menemukan reusable slot.", label, ip_str);
 			return result;
 		}
         result.r_master_sio_dc_session_t = result.r_master_sio_dc_session_t->next;
     }
-    LOG_WARN("%sIP %s tidak menemukan reusable slot.", label, ip_str);
+    LOG_DEBUG("%sIP %s tidak menemukan reusable slot.", label, ip_str);
     return result;
 }
 
@@ -135,7 +135,7 @@ int_status_t count_master_sio_dc_sessions(const char *label, master_sio_dc_sessi
         result.r_int++;
         current = current->next;
     }
-    LOG_INFO("%sJumlah Correlation ID dalam list: %d", label, result.r_int);
+    LOG_DEBUG("%sJumlah Correlation ID dalam list: %d", label, result.r_int);
     result.status = SUCCESS;
     return result;
 }
@@ -143,18 +143,18 @@ int_status_t count_master_sio_dc_sessions(const char *label, master_sio_dc_sessi
 void display_master_sio_dc_sessions(const char *label, master_sio_dc_session_t *head) {
     master_sio_dc_session_t *current = head;
     if (current == NULL) {
-        LOG_WARN("%sList kosong.", label);
+        LOG_DEBUG("%sList kosong.", label);
         return;
     }
-    LOG_INFO("%sIsi list: ", label);
+    LOG_DEBUG("%sIsi list: ", label);
     while (current != NULL) {
 		char ip_str[INET6_ADDRSTRLEN];
 		convert_ipv6_bin_to_str(current->ip, ip_str);
 		
-        LOG_INFO("%s%s -> ", label, ip_str);
+        LOG_DEBUG("%s%s -> ", label, ip_str);
         current = current->next;
     }
-    LOG_INFO("%sNULL", label);
+    LOG_DEBUG("%sNULL", label);
 }
 
 void free_master_sio_dc_sessions(const char *label, master_sio_dc_session_t **head) {
@@ -166,5 +166,5 @@ void free_master_sio_dc_sessions(const char *label, master_sio_dc_session_t **he
         current = next;
     }
     *head = NULL; // Pastikan head menjadi NULL setelah semua node dibebaskan
-    LOG_INFO("%smaster_sio_dc_sessions dibebaskan.", label);
+    LOG_DEBUG("%smaster_sio_dc_sessions dibebaskan.", label);
 }

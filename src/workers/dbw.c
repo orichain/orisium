@@ -30,7 +30,6 @@ void run_dbw_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
 	snprintf(label, needed + 1, "[DBW %d]: ", worker_idx);  
 //======================================================================	
 	if (async_create(label, &dbw_async) != SUCCESS) goto exit;
-	LOG_INFO("%s==============================Worker side: %d).", label, master_uds_fd);
 	if (async_create_incoming_event_with_disconnect(label, &dbw_async, &master_uds_fd) != SUCCESS) goto exit;
 //======================================================================
 	const int HEARTBEAT_BASE_SEC = WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT;
@@ -93,21 +92,21 @@ void run_dbw_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
 // 2. Kirim IPC Hertbeat ke Master
 //======================================================================
                 int not_used_fd = -1;
-                ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_heartbeat(&not_used_fd, wot, worker_idx);
+                ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_heartbeat(label, &not_used_fd, wot, worker_idx);
                 if (cmd_result.status != SUCCESS) {
                     continue;
                 }
-                ssize_t_status_t send_result = send_ipc_protocol_message(&master_uds_fd, cmd_result.r_ipc_protocol_t, &not_used_fd);
+                ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_uds_fd, cmd_result.r_ipc_protocol_t, &not_used_fd);
                 if (send_result.status != SUCCESS) {
-                    LOG_INFO("%sFailed to sent heartbeat to Master.", label);
+                    LOG_ERROR("%sFailed to sent heartbeat to Master.", label);
                 } else {
-                    LOG_INFO("%sSent heartbeat to Master.", label);
+                    LOG_DEBUG("%sSent heartbeat to Master.", label);
                 }
                 CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
 //======================================================================
 			} else if (current_fd == master_uds_fd) {
                 int received_client_fd = -1;
-				ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(&master_uds_fd, &received_client_fd);
+				ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(label, &master_uds_fd, &received_client_fd);
 				if (deserialized_result.status != SUCCESS) {
 					if (async_event_is_EPOLLHUP(current_events) ||
 						async_event_is_EPOLLERR(current_events) ||
@@ -121,8 +120,8 @@ void run_dbw_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
 					continue;
 				}
 				ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;
-				LOG_INFO("%sReceived message type: 0x%02x", label, received_protocol->type);
-				LOG_INFO("%sReceived FD: %d", label, received_client_fd);			
+				LOG_DEBUG("%sReceived message type: 0x%02x", label, received_protocol->type);
+				LOG_DEBUG("%sReceived FD: %d", label, received_client_fd);			
                 if (received_protocol->type == IPC_SHUTDOWN) {
 					LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
 					dbw_shutdown_requested = 1;

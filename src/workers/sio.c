@@ -18,7 +18,6 @@
 #include "sessions/workers_session.h"
 #include "types.h"
 #include "ipc/client_disconnect_info.h"
-#include "ipc/client_request_task.h"
 #include "ipc/heartbeat.h"
 
 void run_sio_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
@@ -39,7 +38,6 @@ void run_sio_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
 	snprintf(label, needed + 1, "[SIO %d]: ", worker_idx);  
 //======================================================================	
 	if (async_create(label, &sio_async) != SUCCESS) goto exit;
-	LOG_INFO("%s==============================Worker side: %d).", label, master_uds_fd);
 	if (async_create_incoming_event_with_disconnect(label, &sio_async, &master_uds_fd) != SUCCESS) goto exit;
 //======================================================================
 	const int HEARTBEAT_BASE_SEC = WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT;
@@ -107,15 +105,15 @@ void run_sio_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
 // 2. Kirim IPC Hertbeat ke Master
 //======================================================================
                 int not_used_fd = -1;
-                ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_heartbeat(&not_used_fd, wot, worker_idx);
+                ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_heartbeat(label, &not_used_fd, wot, worker_idx);
                 if (cmd_result.status != SUCCESS) {
                     continue;
                 }
-                ssize_t_status_t send_result = send_ipc_protocol_message(&master_uds_fd, cmd_result.r_ipc_protocol_t, &not_used_fd);
+                ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_uds_fd, cmd_result.r_ipc_protocol_t, &not_used_fd);
                 if (send_result.status != SUCCESS) {
-                    LOG_INFO("%sFailed to sent heartbeat to Master.", label);
+                    LOG_ERROR("%sFailed to sent heartbeat to Master.", label);
                 } else {
-                    LOG_INFO("%sSent heartbeat to Master.", label);
+                    LOG_DEBUG("%sSent heartbeat to Master.", label);
                 }
                 CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
 //======================================================================
@@ -123,7 +121,7 @@ void run_sio_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
 //======================================================================
 			} else if (current_fd == master_uds_fd) {
 				int received_client_fd = -1;
-				ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(&master_uds_fd, &received_client_fd);
+				ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(label, &master_uds_fd, &received_client_fd);
 				if (deserialized_result.status != SUCCESS) {
 					if (async_event_is_EPOLLHUP(current_events) ||
 						async_event_is_EPOLLERR(current_events) ||
@@ -137,8 +135,8 @@ void run_sio_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
 					continue;
 				}
 				ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;
-				LOG_INFO("%sReceived message type: 0x%02x", label, received_protocol->type);
-				LOG_INFO("%sReceived FD: %d", label, received_client_fd);
+				LOG_DEBUG("%sReceived message type: 0x%02x", label, received_protocol->type);
+				LOG_DEBUG("%sReceived FD: %d", label, received_client_fd);
 				if (received_protocol->type == IPC_SHUTDOWN) {
 					LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
 					sio_shutdown_requested = 1;
@@ -177,8 +175,7 @@ void run_sio_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
 					if (slot_found != -1) {
 						char ip_str[INET6_ADDRSTRLEN];
 						convert_ipv6_bin_to_str(req->ip, ip_str);
-						
-						LOG_INFO("%sReceived client FD %d (IP %s) from Master and added to epoll. Slot %d.",
+						LOG_DEBUG("%sReceived client FD %d (IP %s) from Master and added to epoll. Slot %d.",
 							   label, received_client_fd, ip_str, slot_found);
 					} else {
 						LOG_ERROR("%sNo free slots for new client FD %d. Closing.", label, received_client_fd);
@@ -217,25 +214,26 @@ void run_sio_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
 							sio_c_state[client_slot_idx].client_fd = -1;
 							memset(sio_c_state[client_slot_idx].ip, 0, IP_ADDRESS_LEN);
 							
-							ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_client_disconnect_info(&current_fd, disconnected_client_ip);
+							ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_client_disconnect_info(label, &current_fd, disconnected_client_ip);
 							if (cmd_result.status != SUCCESS) {
 								continue;
 							}
 							int not_used_fd = -1;				
-							ssize_t_status_t send_result = send_ipc_protocol_message(&master_uds_fd, cmd_result.r_ipc_protocol_t, &not_used_fd);
+							ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_uds_fd, cmd_result.r_ipc_protocol_t, &not_used_fd);
 							if (send_result.status != SUCCESS) {
-								LOG_INFO("%sFailed to sent client disconnect signal for (IP %s) to Master.", label, disconnected_client_ip);
+								LOG_ERROR("%sFailed to sent client disconnect signal for (IP %s) to Master.", label, disconnected_client_ip);
 							} else {
-								LOG_INFO("%sSent client disconnect signal for (IP %s) to Master.", label, disconnected_client_ip);
+								LOG_DEBUG("%sSent client disconnect signal for (IP %s) to Master.", label, disconnected_client_ip);
 							}
 							CLOSE_FD(&current_fd);
 							CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
                         }
                     } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                        perror("read from client (SIO)");
+                        LOG_ERROR("%sread from client (SIO). %s", label, strerror(errno));
                     }
                     continue;
                 }
+                /*
                 client_buffer[bytes_read] = '\0';
                 int client_idx = -1;
                 uint8_t client_ip_for_request[IP_ADDRESS_LEN];
@@ -254,11 +252,11 @@ void run_sio_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
                 }
                 
                 int not_used_fd = -1;
-                ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_client_request_task(&not_used_fd, client_ip_for_request, (uint16_t)bytes_read, (uint8_t *)client_buffer);
+                ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_client_request_task(label, &not_used_fd, client_ip_for_request, (uint16_t)bytes_read, (uint8_t *)client_buffer);
                 if (cmd_result.status != SUCCESS) {
 					continue;
 				}	
-				ssize_t_status_t send_result = send_ipc_protocol_message(&master_uds_fd, cmd_result.r_ipc_protocol_t, &not_used_fd);
+				ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_uds_fd, cmd_result.r_ipc_protocol_t, &not_used_fd);
 				char ip_str[INET6_ADDRSTRLEN];
 				convert_ipv6_bin_to_str(client_ip_for_request, ip_str);
 				if (send_result.status != SUCCESS) {
@@ -269,6 +267,7 @@ void run_sio_worker(worker_type_t wot, int worker_idx, int master_uds_fd) {
                        worker_idx, ip_str);
 				}
 				CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+                */
             }
         }
     }
