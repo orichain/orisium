@@ -94,21 +94,21 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
 		case IPC_HEARTBEAT: {
             ipc_heartbeat_t *hbt = received_protocol->payload.ipc_heartbeat;
             uint64_t_status_t rt = get_realtime_time_ns("[Master]: ");
-            if (hbt->wot[0] == SIO) {
-                LOG_DEBUG("[Master]: SIO %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
-                master_ctx->sio_state[hbt->index[0]].metrics.last_ack = rt.r_uint64_t;
-            } else if (hbt->wot[0] == LOGIC) {
-                LOG_DEBUG("[Master]: Logic %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
-                master_ctx->logic_state[hbt->index[0]].metrics.last_ack = rt.r_uint64_t;
-            } else if (hbt->wot[0] == COW) {
-                LOG_DEBUG("[Master]: COW %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
-                master_ctx->cow_state[hbt->index[0]].metrics.last_ack = rt.r_uint64_t;
-            } else if (hbt->wot[0] == DBR) {
-                LOG_DEBUG("[Master]: DBR %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
-                master_ctx->dbr_state[hbt->index[0]].metrics.last_ack = rt.r_uint64_t;
-            } else if (hbt->wot[0] == DBW) {
-                LOG_DEBUG("[Master]: DBW %d set last_ack to %llu.", hbt->index[0], rt.r_uint64_t);
-                master_ctx->dbw_state[hbt->index[0]].metrics.last_ack = rt.r_uint64_t;
+            if (hbt->wot == SIO) {
+                LOG_DEBUG("[Master]: SIO %d set last_ack to %llu.", hbt->index, rt.r_uint64_t);
+                master_ctx->sio_state[hbt->index].metrics.last_ack = rt.r_uint64_t;
+            } else if (hbt->wot == LOGIC) {
+                LOG_DEBUG("[Master]: Logic %d set last_ack to %llu.", hbt->index, rt.r_uint64_t);
+                master_ctx->logic_state[hbt->index].metrics.last_ack = rt.r_uint64_t;
+            } else if (hbt->wot == COW) {
+                LOG_DEBUG("[Master]: COW %d set last_ack to %llu.", hbt->index, rt.r_uint64_t);
+                master_ctx->cow_state[hbt->index].metrics.last_ack = rt.r_uint64_t;
+            } else if (hbt->wot == DBR) {
+                LOG_DEBUG("[Master]: DBR %d set last_ack to %llu.", hbt->index, rt.r_uint64_t);
+                master_ctx->dbr_state[hbt->index].metrics.last_ack = rt.r_uint64_t;
+            } else if (hbt->wot == DBW) {
+                LOG_DEBUG("[Master]: DBW %d set last_ack to %llu.", hbt->index, rt.r_uint64_t);
+                master_ctx->dbw_state[hbt->index].metrics.last_ack = rt.r_uint64_t;
             }
 			break;
 		}

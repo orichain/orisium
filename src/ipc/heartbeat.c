@@ -17,12 +17,12 @@ status_t ipc_serialize_heartbeat(const char *label, const ipc_heartbeat_t* paylo
         return FAILURE;
     }
     size_t current_offset_local = *offset;
-    if (CHECK_BUFFER_BOUNDS(current_offset_local, 1, buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    memcpy(current_buffer + current_offset_local, payload->wot, 1);
-    current_offset_local += 1;
-    if (CHECK_BUFFER_BOUNDS(current_offset_local, 1, buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    memcpy(current_buffer + current_offset_local, payload->index, 1);
-    current_offset_local += 1;
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(worker_type_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    current_buffer[current_offset_local] = (uint8_t)payload->wot;
+    current_offset_local += sizeof(worker_type_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    current_buffer[current_offset_local] = (uint8_t)payload->index;
+    current_offset_local += sizeof(uint8_t);
     *offset = current_offset_local;
     return SUCCESS;
 }
@@ -35,20 +35,20 @@ status_t ipc_deserialize_heartbeat(const char *label, ipc_protocol_t *p, const u
     size_t current_offset = *offset_ptr;
     const uint8_t *cursor = buffer + current_offset;
     ipc_heartbeat_t *payload = p->payload.ipc_heartbeat;
-    if (current_offset + 1 > total_buffer_len) {
+    if (current_offset + sizeof(worker_type_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading wot.", label);
         return FAILURE_OOBUF;
     }
-    memcpy(payload->wot, cursor, 1);
-    cursor += 1;
-    current_offset += 1;
-    if (current_offset + 1 > total_buffer_len) {
+    payload->wot = *cursor;
+    cursor += sizeof(worker_type_t);
+    current_offset += sizeof(worker_type_t);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading index.", label);
         return FAILURE_OOBUF;
     }
-    memcpy(payload->index, cursor, 1);
-    cursor += 1;
-    current_offset += 1;
+    payload->index = *cursor;
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
     *offset_ptr = current_offset;
     return SUCCESS;
 }
@@ -73,8 +73,8 @@ ipc_protocol_t_status_t ipc_prepare_cmd_heartbeat(const char *label, int *fd_to_
 		CLOSE_IPC_PROTOCOL(&result.r_ipc_protocol_t);
 		return result;
 	}
-	payload->wot[0] = (uint8_t)wot;
-    payload->index[0] = (uint8_t)index;
+	payload->wot = wot;
+    payload->index = index;
 	result.r_ipc_protocol_t->payload.ipc_heartbeat = payload;
 	result.status = SUCCESS;
 	return result;

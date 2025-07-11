@@ -52,7 +52,7 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
                 result.status = FAILURE;
                 return result;
             }
-            payload_fixed_size = 1;
+            payload_fixed_size = sizeof(shutdown_type_t);
             payload_dynamic_size = 0;
             break;
         }
@@ -62,7 +62,7 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
                 result.status = FAILURE;
                 return result;
             }
-            payload_fixed_size = 2;
+            payload_fixed_size = sizeof(worker_type_t) + sizeof(uint8_t);
             payload_dynamic_size = 0;
             break;
         }
@@ -215,7 +215,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, const uint8_t* buffer
             break;
 		}
 		case IPC_SHUTDOWN: {
-			if (current_buffer_offset + 1 > len) {
+			if (current_buffer_offset + sizeof(shutdown_type_t) > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_SHUTDOWN fixed header.", label);
                 CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_OOBUF;
@@ -233,7 +233,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, const uint8_t* buffer
             break;
 		}
         case IPC_HEARTBEAT: {
-			if (current_buffer_offset + 2 > len) {
+			if (current_buffer_offset + sizeof(worker_type_t) + sizeof(uint8_t) > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_HEARTBEAT fixed header.", label);
                 CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_OOBUF;

@@ -30,6 +30,10 @@ typedef enum {
     DBW = (uint8_t)0x05
 } worker_type_t;
 
+typedef enum {
+	IMMEDIATELY = (uint8_t)0xfe
+} shutdown_type_t;
+
 typedef struct {
 	int index;
 	worker_type_t r_worker_type_t;

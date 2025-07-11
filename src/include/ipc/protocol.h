@@ -24,12 +24,12 @@ typedef struct {
 } ipc_client_disconnect_info_t;
 
 typedef struct {
-    uint8_t flag[1];
+    shutdown_type_t flag;
 } ipc_shutdown_t;
 
 typedef struct {
-    uint8_t wot[1];
-    uint8_t index[1];
+    worker_type_t wot;
+    uint8_t index;
 } ipc_heartbeat_t;
 
 typedef struct {
