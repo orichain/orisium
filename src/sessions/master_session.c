@@ -103,7 +103,7 @@ master_sio_dc_session_t_status_t find_first_ratelimited_master_sio_dc_session(co
         }
         result.r_master_sio_dc_session_t = result.r_master_sio_dc_session_t->next;
     }
-    LOG_INFO("%sIP %s tidak ditemukan di tabel ratelimit.", label, ip_str);
+    LOG_DEBUG("%sIP %s tidak ditemukan di tabel ratelimit.", label, ip_str);
     //==================================================================
     result.r_master_sio_dc_session_t = head;
     while (result.r_master_sio_dc_session_t != NULL) {
