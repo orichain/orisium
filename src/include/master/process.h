@@ -24,6 +24,7 @@ typedef struct {
     uds_pair_pid_t sio[MAX_SIO_WORKERS];
     master_sio_c_session_t sio_c_session[MAX_MASTER_CONCURRENT_SESSIONS];
     master_sio_dc_session_t *sio_dc_session;
+    int last_sio_rr_idx;
     uds_pair_pid_t logic[MAX_LOGIC_WORKERS];
     uds_pair_pid_t cow[MAX_COW_WORKERS];
     uds_pair_pid_t dbr[MAX_DBR_WORKERS];

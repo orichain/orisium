@@ -13,24 +13,21 @@ typedef struct {
     uint64_t last_ack;
     uint64_t last_task_started;
     uint64_t last_task_finished;
-    double longest_task_time;
-    double avg_task_time;
+    uint64_t longest_task_time;
+    long double avg_task_time;
 } worker_metrics_t;
 
 typedef struct {
-	bool in_use;
     uint16_t task_count;
 	worker_metrics_t metrics;
 } master_sio_state_t;
 
 typedef struct {
-	bool in_use;
     uint16_t task_count;
 	worker_metrics_t metrics;
 } master_logic_state_t;
 
 typedef struct {
-	bool in_use;
     uint16_t task_count;
 	worker_metrics_t metrics;
 } master_dbr_state_t;

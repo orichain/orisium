@@ -1,13 +1,15 @@
 #include <errno.h>
 #include <netdb.h>
 #include <netinet/in.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <inttypes.h>
+#include <float.h>
+#include <limits.h>
 
 #include "log.h"
 #include "constants.h"
@@ -64,6 +66,64 @@ status_t setup_socket_listenner(const char *label, master_context *master_ctx) {
         return FAILURE;
     }
     return SUCCESS;
+}
+
+int select_best_sio_worker(const char *label, master_context *master_ctx) {
+    int best_sio_idx = -1;
+    long double min_avg_cost_per_empty_slot = LDBL_MAX;
+    uint64_t min_longest_task_time = ULLONG_MAX;
+
+    for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
+        if (master_ctx->sio_state[i].metrics.avg_task_time < min_avg_cost_per_empty_slot) {
+            min_avg_cost_per_empty_slot = master_ctx->sio_state[i].metrics.avg_task_time;
+            best_sio_idx = i;
+        }
+    }
+    if (best_sio_idx != -1) {
+        if (min_avg_cost_per_empty_slot == 0.0L) {
+            LOG_DEVEL_DEBUG("%sAll healthy SIO workers have 0 Avg Cost per Empty Slot. Falling back to Longest Task Time / Round Robin.", label);
+        } else {
+            LOG_DEVEL_DEBUG("%sSelecting SIO worker %d based on lowest Avg Cost per Empty Slot: %Lf", 
+                      label, best_sio_idx, min_avg_cost_per_empty_slot);
+            return best_sio_idx;
+        }
+    } else {
+        LOG_DEVEL_DEBUG("%sNo active/healthy SIO workers found for Avg Cost per Empty Slot check. Falling back.", label);
+    }
+    best_sio_idx = -1;
+    min_longest_task_time = ULLONG_MAX;
+    for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
+        if (master_ctx->sio_state[i].metrics.longest_task_time < min_longest_task_time) {
+            min_longest_task_time = master_ctx->sio_state[i].metrics.longest_task_time;
+            best_sio_idx = i;
+        }
+    }
+    if (best_sio_idx != -1) {
+        if (min_longest_task_time == 0ULL) {
+            LOG_DEVEL_DEBUG("%sAll healthy SIO workers have 0 Longest Task Time. Falling back to Round Robin.", label);
+        } else {
+            LOG_DEVEL_DEBUG("%sSelecting SIO worker %d based on lowest Longest Task Time: %" PRIu64, 
+                      label, best_sio_idx, min_longest_task_time);
+            return best_sio_idx;
+        }
+    } else {
+        LOG_DEVEL_DEBUG("%sNo healthy SIO workers found for Longest Task Time check. Falling back to Round Robin.", label);
+    }
+    int selected_rr_idx = -1;
+    int start_rr_check_idx = master_ctx->last_sio_rr_idx; 
+    for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
+        int current_rr_idx = (start_rr_check_idx + i) % MAX_SIO_WORKERS;
+        selected_rr_idx = current_rr_idx;
+        master_ctx->last_sio_rr_idx = (current_rr_idx + 1) % MAX_SIO_WORKERS;
+        break;
+    }
+    if (selected_rr_idx != -1) {
+        LOG_DEVEL_DEBUG("%sSelecting SIO worker %d using Round Robin (fallback).", label, selected_rr_idx);
+        return selected_rr_idx;
+    } else {
+        LOG_ERROR("%sNo SIO worker available/healthy to assign the client. All workers might be down.", label);
+        return -1;
+    }
 }
 
 status_t handle_listen_sock_event(const char *label, master_context *master_ctx, uint64_t *client_num) {
@@ -145,20 +205,22 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 			*client_num += 1ULL;
 		}
 	}
-	
+    
 	if (*client_num > MAX_MASTER_CONCURRENT_SESSIONS) {
 		*client_num -= 1ULL;
 		LOG_ERROR("%sWARNING: MAX_MASTER_CONCURRENT_SESSIONS reached. Rejecting client FD %d.", label, client_sock);
 		CLOSE_FD(&client_sock);
 		return FAILURE_MAXREACHD;
 	}
-	
-	//cnt_connection += (double_t)1;
-	//avg_connection = cnt_connection / sio_worker;
-	
-	int sio_worker_idx = (int)(*client_num % MAX_SIO_WORKERS);
-	int sio_worker_uds_fd = master_ctx->sio[sio_worker_idx].uds[0]; // Master uses its side of UDS
-
+    
+    int sio_worker_idx = select_best_sio_worker(label, master_ctx);
+    if (sio_worker_idx == -1) {
+        LOG_ERROR("%sFailed to select an SIO worker for new client %s on FD %d. Rejecting.", label, ip_str, client_sock);
+        CLOSE_FD(&client_sock);
+        return FAILURE_NOSLOT;
+    }
+	int sio_worker_uds_fd = master_ctx->sio[sio_worker_idx].uds[0];
+    
 	int slot_found = -1;
 	for(int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
 		if(!master_ctx->sio_c_session[i].in_use) {
@@ -184,6 +246,22 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 		LOG_ERROR("%sFailed to forward client FD %d to Server IO Worker %d.",
 				  label, client_sock, sio_worker_idx);
 	} else {
+//======================================================================
+// Mengisi metrics sio_state
+//======================================================================
+        uint64_t_status_t rt = get_realtime_time_ns(label);
+        master_ctx->sio_state[sio_worker_idx].task_count += 1;
+        master_ctx->sio_state[sio_worker_idx].metrics.last_task_started = rt.r_uint64_t;
+        LOG_DEVEL_DEBUG("%sSIO_STATE:\nTask Count: %" PRIu64 "\nLast Ack: %" PRIu64 "\nLast Started: %" PRIu64 "\nLast Finished: %" PRIu64 "\nLongest Task Time: %" PRIu64 "\nAvg Task Time: %Lf",
+            label,
+            master_ctx->sio_state[sio_worker_idx].task_count,
+            master_ctx->sio_state[sio_worker_idx].metrics.last_ack,
+            master_ctx->sio_state[sio_worker_idx].metrics.last_task_started,
+            master_ctx->sio_state[sio_worker_idx].metrics.last_task_finished,
+            master_ctx->sio_state[sio_worker_idx].metrics.longest_task_time,
+            master_ctx->sio_state[sio_worker_idx].metrics.avg_task_time
+        );
+//======================================================================
 		LOG_DEBUG("%sForwarding client FD %d from IP %s to Server IO Worker %d (UDS FD %d). Bytes sent: %zd.",
 				 label, client_sock, ip_str, sio_worker_idx, sio_worker_uds_fd, send_result.r_ssize_t);
 	}
