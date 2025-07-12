@@ -225,7 +225,7 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
         m->healthypct = 100.0;
         m->ishealthy = true;
         m->last_checkhealthy = now_ns;
-        LOG_DEVEL_DEBUG("%s[%s %d] First-time health check -> assumed healthy (100%%)", label, worker_name, index);
+        LOG_DEBUG("%s[%s %d] First-time health check -> assumed healthy (100%%)", label, worker_name, index);
         return SUCCESS;
     }
     if (m->count_ack == (double)0) {
@@ -233,7 +233,7 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
         m->ishealthy = false;
         m->last_checkhealthy = now_ns;
         m->sum_hbtime = m->hbtime;
-        LOG_DEVEL_DEBUG("%s[%s %d] health ratio: %.2f%% [%s]",
+        LOG_DEBUG("%s[%s %d] health ratio: %.2f%% [%s]",
               label, worker_name, index, m->healthypct,
               m->ishealthy ? "HEALTHY" : "UNHEALTHY");
         return SUCCESS;
@@ -241,7 +241,6 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
     double ttl_delay_jitter = (m->sum_hbtime - m->hbtime)-((double)WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT * m->count_ack);
     double actual_elapsed_sec = (double)(now_ns - m->last_checkhealthy) / 1e9;
     double setup_elapsed_sec = (double)WORKER_HEARTBEATSEC_TIMEOUT + ttl_delay_jitter;
-    if (setup_elapsed_sec < 1e-3) setup_elapsed_sec = 1e-3;
     double setup_count_ack = setup_elapsed_sec / (double)WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT;
     double comp_elapsed_sec = actual_elapsed_sec / setup_elapsed_sec;
     double expected_count_ack = setup_count_ack * comp_elapsed_sec;
@@ -266,7 +265,7 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
     double tmp_count_ack = m->count_ack;
     m->count_ack = (double)0;
     m->sum_hbtime = m->hbtime;
-    LOG_DEVEL_DEBUG(
+    LOG_DEBUG(
         "%s[%s %d] act elpse: %.2f stp elpse: %.2f exp ack: %.2f act ack: %.2f cry: %.2f -> health: %.2f%% [%s]",
         label, worker_name, index,
         actual_elapsed_sec, setup_elapsed_sec,
@@ -284,25 +283,85 @@ static inline status_t check_workers_healthy(master_context *master_ctx) {
 		if (check_worker_healthy(label, SIO, i, &master_ctx->sio_state[i].metrics) != SUCCESS) {
             return FAILURE;
         }
+        if (master_ctx->sio_state[i].metrics.healthypct < (double)25) {
+            master_ctx->sio_state[i].metrics.isactive = false;
+            if (close_worker(label, master_ctx, SIO, i) != SUCCESS) {
+                return FAILURE;
+            }
+            if (create_socket_pair(label, master_ctx, SIO, i) != SUCCESS) {
+                return FAILURE;
+            }
+            if (setup_fork_worker(label, master_ctx, SIO, i) != SUCCESS) {
+                return FAILURE;
+            }
+        }
 	}
 	for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
 		if (check_worker_healthy(label, LOGIC, i, &master_ctx->logic_state[i].metrics) != SUCCESS) {
             return FAILURE;
+        }
+        if (master_ctx->logic_state[i].metrics.healthypct < (double)25) {
+            master_ctx->logic_state[i].metrics.isactive = false;
+            if (close_worker(label, master_ctx, LOGIC, i) != SUCCESS) {
+                return FAILURE;
+            }
+            if (create_socket_pair(label, master_ctx, LOGIC, i) != SUCCESS) {
+                return FAILURE;
+            }
+            if (setup_fork_worker(label, master_ctx, LOGIC, i) != SUCCESS) {
+                return FAILURE;
+            }
         }
 	}
 	for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
 		if (check_worker_healthy(label, COW, i, &master_ctx->cow_state[i].metrics) != SUCCESS) {
             return FAILURE;
         }
+        if (master_ctx->cow_state[i].metrics.healthypct < (double)25) {
+            master_ctx->cow_state[i].metrics.isactive = false;
+            if (close_worker(label, master_ctx, COW, i) != SUCCESS) {
+                return FAILURE;
+            }
+            if (create_socket_pair(label, master_ctx, COW, i) != SUCCESS) {
+                return FAILURE;
+            }
+            if (setup_fork_worker(label, master_ctx, COW, i) != SUCCESS) {
+                return FAILURE;
+            }
+        }
 	}
     for (int i = 0; i < MAX_DBR_WORKERS; ++i) { 
 		if (check_worker_healthy(label, DBR, i, &master_ctx->dbr_state[i].metrics) != SUCCESS) {
             return FAILURE;
         }
+        if (master_ctx->dbr_state[i].metrics.healthypct < (double)25) {
+            master_ctx->dbr_state[i].metrics.isactive = false;
+            if (close_worker(label, master_ctx, DBR, i) != SUCCESS) {
+                return FAILURE;
+            }
+            if (create_socket_pair(label, master_ctx, DBR, i) != SUCCESS) {
+                return FAILURE;
+            }
+            if (setup_fork_worker(label, master_ctx, DBR, i) != SUCCESS) {
+                return FAILURE;
+            }
+        }
 	}
     for (int i = 0; i < MAX_DBW_WORKERS; ++i) { 
 		if (check_worker_healthy(label, DBW, i, &master_ctx->dbw_state[i].metrics) != SUCCESS) {
             return FAILURE;
+        }
+        if (master_ctx->dbw_state[i].metrics.healthypct < (double)25) {
+            master_ctx->dbw_state[i].metrics.isactive = false;
+            if (close_worker(label, master_ctx, DBW, i) != SUCCESS) {
+                return FAILURE;
+            }
+            if (create_socket_pair(label, master_ctx, DBW, i) != SUCCESS) {
+                return FAILURE;
+            }
+            if (setup_fork_worker(label, master_ctx, DBW, i) != SUCCESS) {
+                return FAILURE;
+            }
         }
 	}
 	return SUCCESS;
@@ -341,13 +400,7 @@ void run_master_process(master_context *master_ctx) {
                     broadcast_shutdown(master_ctx);
                     continue;
                 }
-                
                 if (check_workers_healthy(master_ctx) != SUCCESS) continue;
-//======================================================
-// 1. Tutup worker yang tidak ada aktifitas > WORKER_HEARTBEATSEC_TIMEOUT detik
-// 2. Jika yang ditutup adalah sio masukkan correlation id milik sio tersebut ke list diskonnected correlation id
-// 3. Buat ulang worker dengan tipe dan index sesuai diatas
-//======================================================
 			} else if (current_fd == master_ctx->shutdown_event_fd) {
 				uint64_t u;
 				read(master_ctx->shutdown_event_fd, &u, sizeof(u));
