@@ -151,6 +151,24 @@ static inline status_t ensure_directory_exists(const char *label, const char *pa
         return FAILURE;
     }
 }
+
+static inline void double_to_uint8_be(double value, uint8_t out[8]) {
+    uint64_t temp_u64;
+
+    memcpy(&temp_u64, &value, sizeof(double));
+    uint64_t big_endian_u64 = htobe64(temp_u64);
+    memcpy(out, &big_endian_u64, sizeof(uint64_t));
+}
+
+static inline double uint8_be_to_double(const uint8_t in[8]) {
+    uint64_t big_endian_u64;
+    double value;
+
+    memcpy(&big_endian_u64, in, sizeof(uint64_t));
+    uint64_t host_u64 = be64toh(big_endian_u64);
+    memcpy(&value, &host_u64, sizeof(double));
+    return value;
+}
 //Huruf_besar biar selalu ingat karena akan sering digunakan
 static inline status_t CHECK_BUFFER_BOUNDS(size_t current_offset, size_t bytes_to_write, size_t total_buffer_size) {
     if (current_offset + bytes_to_write > total_buffer_size) {

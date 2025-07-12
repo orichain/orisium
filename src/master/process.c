@@ -17,50 +17,10 @@
 #include "master/process.h"
 #include "ipc/protocol.h"
 #include "ipc/shutdown.h"
+#include "sessions/master_session.h"
 
 status_t setup_master(master_context *master_ctx) {
     const char *label = "[Master]: ";
-    uint64_t_status_t rt = get_realtime_time_ns(label);
-    for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-        master_ctx->sio_state[i].task_count = (uint16_t)0;
-        master_ctx->sio_state[i].metrics.last_ack = rt.r_uint64_t;
-        master_ctx->sio_state[i].metrics.last_task_started = rt.r_uint64_t;
-        master_ctx->sio_state[i].metrics.last_task_finished = rt.r_uint64_t;
-        master_ctx->sio_state[i].metrics.longest_task_time = 0ULL;
-        master_ctx->sio_state[i].metrics.avg_task_time = (long double)0;
-    }
-    for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-        master_ctx->logic_state[i].task_count = (uint16_t)0;
-        master_ctx->logic_state[i].metrics.last_ack = rt.r_uint64_t;
-        master_ctx->logic_state[i].metrics.last_task_started = rt.r_uint64_t;
-        master_ctx->logic_state[i].metrics.last_task_finished = rt.r_uint64_t;
-        master_ctx->logic_state[i].metrics.longest_task_time = 0ULL;
-        master_ctx->logic_state[i].metrics.avg_task_time = (long double)0;
-    }
-    for (int i = 0; i < MAX_COW_WORKERS; ++i) {
-        master_ctx->cow_state[i].in_use = false;
-        master_ctx->cow_state[i].metrics.last_ack = rt.r_uint64_t;
-        master_ctx->cow_state[i].metrics.last_task_started = rt.r_uint64_t;
-        master_ctx->cow_state[i].metrics.last_task_finished = rt.r_uint64_t;
-        master_ctx->cow_state[i].metrics.longest_task_time = 0ULL;
-        master_ctx->cow_state[i].metrics.avg_task_time = (long double)0;
-    }
-    for (int i = 0; i < MAX_DBR_WORKERS; ++i) {
-        master_ctx->dbr_state[i].task_count = (uint16_t)0;
-        master_ctx->dbr_state[i].metrics.last_ack = rt.r_uint64_t;
-        master_ctx->dbr_state[i].metrics.last_task_started = rt.r_uint64_t;
-        master_ctx->dbr_state[i].metrics.last_task_finished = rt.r_uint64_t;
-        master_ctx->dbr_state[i].metrics.longest_task_time = 0ULL;
-        master_ctx->dbr_state[i].metrics.avg_task_time = (long double)0;
-    }
-    for (int i = 0; i < MAX_DBW_WORKERS; ++i) {
-        master_ctx->dbw_state[i].in_use = false;
-        master_ctx->dbw_state[i].metrics.last_ack = rt.r_uint64_t;
-        master_ctx->dbw_state[i].metrics.last_task_started = rt.r_uint64_t;
-        master_ctx->dbw_state[i].metrics.last_task_finished = rt.r_uint64_t;
-        master_ctx->dbw_state[i].metrics.longest_task_time = 0ULL;
-        master_ctx->dbw_state[i].metrics.avg_task_time = (long double)0;
-    }
     for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
         master_ctx->sio_c_session[i].sio_index = -1;
         master_ctx->sio_c_session[i].in_use = false;
@@ -86,19 +46,6 @@ status_t setup_master(master_context *master_ctx) {
 		return FAILURE;
 	}
 //======================================================================	
-	if (async_create_timerfd(label, &master_ctx->master_timer_fd) != SUCCESS) {
-		return FAILURE;
-	}
-	if (async_set_timerfd_time(label, &master_ctx->master_timer_fd,
-		WORKER_HEARTBEATSEC_TIMEOUT, 0,
-        WORKER_HEARTBEATSEC_TIMEOUT, 0) != SUCCESS)
-    {
-		return FAILURE;
-	}
-//======================================================================	
-	if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->master_timer_fd) != SUCCESS) {
-		return FAILURE;
-	}
     if (setup_socket_listenner(label, master_ctx) != SUCCESS) {
 		return FAILURE; 
 	}	
@@ -173,7 +120,20 @@ status_t setup_workers(master_context *master_ctx) {
 			return FAILURE;
 		}
     }
-    LOG_DEBUG("%sStarting main event loop. Waiting for clients and worker communications...", label);
+//======================================================================	
+	if (async_create_timerfd(label, &master_ctx->master_timer_fd) != SUCCESS) {
+		return FAILURE;
+	}
+	if (async_set_timerfd_time(label, &master_ctx->master_timer_fd,
+		1, 0,
+        1, 0) != SUCCESS)
+    {
+		return FAILURE;
+	}
+    if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->master_timer_fd) != SUCCESS) {
+		return FAILURE;
+	}
+//======================================================================	    
     return SUCCESS;
 }
 
@@ -248,13 +208,91 @@ static inline status_t broadcast_shutdown(master_context *master_ctx) {
 	return SUCCESS;
 }
 
+static inline status_t check_worker_healthy(const char* label, worker_type_t wot, int index, worker_metrics_t* m) {
+    const char *worker_name = "Unknown";
+    switch (wot) {
+        case SIO: { worker_name = "SIO"; break; }
+        case LOGIC: { worker_name = "Logic"; break; }
+        case COW: { worker_name = "COW"; break; }
+        case DBR: { worker_name = "DBR"; break; }
+        case DBW: { worker_name = "DBW"; break; }
+        default: { worker_name = "Unknown"; break; }
+    }
+    uint64_t_status_t rt = get_realtime_time_ns(label);
+    uint64_t now_ns = rt.r_uint64_t;
+    if (m->first_check_healthy == (uint8_t)0x01) {
+        m->first_check_healthy = (uint8_t)0x00;
+        m->healthypct = 100.0;
+        m->ishealthy = true;
+        m->last_checkhealthy = now_ns;
+        LOG_DEVEL_DEBUG("%s[%s %d] First-time health check -> assumed healthy (100%%)", label, worker_name, index);
+        return SUCCESS;
+    }
+    if (m->count_ack == (double)0) {
+        m->healthypct = (double)0;
+        m->ishealthy = false;
+        m->last_checkhealthy = now_ns;
+        m->count_ack = (double)0;
+        m->sum_hbtime = m->hbtime;
+        LOG_DEVEL_DEBUG("%s[%s %d] health ratio: %.2f%% [%s]",
+              label, worker_name, index, m->healthypct,
+              m->ishealthy ? "HEALTHY" : "UNHEALTHY");
+        return SUCCESS;
+    }
+    double ttl_delay_jitter = (m->sum_hbtime - m->hbtime)-((double)WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT * m->count_ack);
+    double actual_elapsed_sec = (double)(now_ns - m->last_checkhealthy) / 1e9;
+    double setup_elapsed_sec = (double)WORKER_HEARTBEATSEC_TIMEOUT + ttl_delay_jitter;
+    double setup_count_ack = setup_elapsed_sec / (double)WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT;
+    double comp_elapsed_sec = actual_elapsed_sec / setup_elapsed_sec;
+    double expected_count_ack = setup_count_ack * comp_elapsed_sec;
+    double health_ratio = m->count_ack / expected_count_ack;
+    if (health_ratio > 1.0) health_ratio = 1.0;
+    if (health_ratio < 0.0) health_ratio = 0.0;
+    m->healthypct = health_ratio * 100.0;
+    m->ishealthy = (health_ratio >= 0.75);
+    m->last_checkhealthy = now_ns;
+    m->count_ack = (double)0;
+    m->sum_hbtime = m->hbtime;
+    LOG_DEVEL_DEBUG("%s[%s %d] health ratio: %.2f%% [%s]",
+              label, worker_name, index, m->healthypct,
+              m->ishealthy ? "HEALTHY" : "UNHEALTHY");
+    return SUCCESS;
+}
+
+static inline status_t check_workers_healthy(master_context *master_ctx) {
+	const char *label = "[Master]: ";
+	for (int i = 0; i < MAX_SIO_WORKERS; ++i) { 
+		if (check_worker_healthy(label, SIO, i, &master_ctx->sio_state[i].metrics) != SUCCESS) {
+            return FAILURE;
+        }
+	}
+	for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
+		if (check_worker_healthy(label, LOGIC, i, &master_ctx->logic_state[i].metrics) != SUCCESS) {
+            return FAILURE;
+        }
+	}
+	for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
+		if (check_worker_healthy(label, COW, i, &master_ctx->cow_state[i].metrics) != SUCCESS) {
+            return FAILURE;
+        }
+	}
+    for (int i = 0; i < MAX_DBR_WORKERS; ++i) { 
+		if (check_worker_healthy(label, DBR, i, &master_ctx->dbr_state[i].metrics) != SUCCESS) {
+            return FAILURE;
+        }
+	}
+    for (int i = 0; i < MAX_DBW_WORKERS; ++i) { 
+		if (check_worker_healthy(label, DBW, i, &master_ctx->dbw_state[i].metrics) != SUCCESS) {
+            return FAILURE;
+        }
+	}
+	return SUCCESS;
+}
+
 void run_master_process(master_context *master_ctx) {
 	const char *label = "[Master]: ";
 	volatile sig_atomic_t master_shutdown_requested = 0;
 	uint64_t client_num = 1ULL;
-	//double_t avg_connection = 0.0;
-	//double_t cnt_connection = 0.0;
-	//double_t sio_worker = (double_t)MAX_SIO_WORKERS;
     
     LOG_INFO("%sPID %d TCP Server listening on port %d.", label, master_ctx->master_pid, node_config.listen_port);
     while (!master_shutdown_requested) {
@@ -273,6 +311,19 @@ void run_master_process(master_context *master_ctx) {
 			if (current_fd == master_ctx->master_timer_fd) {
 				uint64_t u;
 				read(master_ctx->master_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                if (async_set_timerfd_time(label, &master_ctx->master_timer_fd,
+                    WORKER_HEARTBEATSEC_TIMEOUT,
+                    0,
+                    WORKER_HEARTBEATSEC_TIMEOUT,
+                    0) != SUCCESS)
+                {
+                    LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
+                    master_shutdown_requested = 1;
+                    broadcast_shutdown(master_ctx);
+                    continue;
+                }
+                
+                if (check_workers_healthy(master_ctx) != SUCCESS) continue;
 //======================================================
 // 1. Tutup worker yang tidak ada aktifitas > WORKER_HEARTBEATSEC_TIMEOUT detik
 // 2. Jika yang ditutup adalah sio masukkan correlation id milik sio tersebut ke list diskonnected correlation id

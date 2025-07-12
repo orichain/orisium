@@ -69,98 +69,67 @@ status_t setup_socket_listenner(const char *label, master_context *master_ctx) {
 }
 
 int select_best_sio_worker(const char *label, master_context *master_ctx) {
-    int selected_worker_idx = -1; // Gunakan nama baru untuk hasil akhir
+    int selected_worker_idx = -1;
     long double min_avg_task_time = LDBL_MAX;
     uint64_t min_longest_task_time = ULLONG_MAX;
     
-    // ====================================================================
-    // Tahap 1: Cari worker dengan avg_task_time terendah (dan tidak penuh)
-    // ====================================================================
     int temp_best_idx_t1 = -1;
     for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-        // Hanya pertimbangkan worker yang TIDAK PENUH
         if (master_ctx->sio_state[i].task_count < MAX_CLIENTS_PER_SIO_WORKER) {
-            // Gunakan avg_task_time
-            if (master_ctx->sio_state[i].metrics.avg_task_time < min_avg_task_time) {
-                min_avg_task_time = master_ctx->sio_state[i].metrics.avg_task_time;
+            if (master_ctx->sio_state[i].metrics.avg_task_time_per_empty_slot < min_avg_task_time) {
+                min_avg_task_time = master_ctx->sio_state[i].metrics.avg_task_time_per_empty_slot;
                 temp_best_idx_t1 = i;
             }
         }
     }
-
     if (temp_best_idx_t1 != -1) {
-        // Jika worker terbaik yang ditemukan memiliki avg_task_time > 0, langsung pilih dia.
         if (min_avg_task_time > 0.0L) {
             selected_worker_idx = temp_best_idx_t1;
             LOG_DEVEL_DEBUG("%sSelecting SIO worker %d based on lowest Avg Task Time: %Lf", 
                       label, selected_worker_idx, min_avg_task_time);
-            return selected_worker_idx; // Ditemukan worker terbaik berdasarkan metrik utama
+            return selected_worker_idx;
         }
-        // Jika min_avg_task_time == 0.0L, artinya semua worker yang tidak penuh memiliki avg_task_time 0.
-        // Lanjutkan ke tahap berikutnya (Longest Task Time).
         LOG_DEVEL_DEBUG("%sAll not-full SIO workers have 0 Avg Task Time. Falling back to Longest Task Time / Round Robin.", label);
     } else {
-        // Ini berarti semua worker SIO PENUH. Langsung fallback ke tahap berikutnya.
         LOG_DEVEL_DEBUG("%sNo not-full SIO workers found for Avg Task Time check. All might be full. Falling back.", label);
     }
-
-    // ====================================================================
-    // Tahap 2: Jika belum ada worker yang dipilih, cari berdasarkan Longest Task Time terendah
-    // (di antara worker yang tidak penuh)
-    // ====================================================================
-    // Kita hanya masuk ke sini jika selected_worker_idx masih -1 (Tahap 1 tidak menghasilkan pilihan definitif)
     int temp_best_idx_t2 = -1;
     for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-        // Hanya pertimbangkan worker yang TIDAK PENUH
         if (master_ctx->sio_state[i].task_count < MAX_CLIENTS_PER_SIO_WORKER) {
             if (master_ctx->sio_state[i].metrics.longest_task_time < min_longest_task_time) {
                 min_longest_task_time = master_ctx->sio_state[i].metrics.longest_task_time;
                 temp_best_idx_t2 = i;
             }
         }
-    }
-    
+    }   
     if (temp_best_idx_t2 != -1) {
-        // Jika worker terbaik yang ditemukan memiliki Longest Task Time > 0, langsung pilih dia.
         if (min_longest_task_time > 0ULL) {
             selected_worker_idx = temp_best_idx_t2;
             LOG_DEVEL_DEBUG("%sSelecting SIO worker %d based on lowest Longest Task Time: %" PRIu64, 
                       label, selected_worker_idx, min_longest_task_time);
             return selected_worker_idx; 
         }
-        // Jika min_longest_task_time == 0ULL, artinya semua worker yang tidak penuh memiliki Longest Task Time 0.
-        // Lanjut ke tahap berikutnya (Round Robin).
         LOG_DEVEL_DEBUG("%sAll not-full SIO workers have 0 Longest Task Time. Falling back to Round Robin.", label);
     } else {
-        // Ini berarti semua worker SIO PENUH ATAU tidak ada yang memenuhi kriteria di Tahap 2.
         LOG_DEVEL_DEBUG("%sNo not-full SIO workers found for Longest Task Time check. All might be full. Falling back to Round Robin.", label);
     }
-    
-    // ====================================================================
-    // Tahap 3: Fallback ke Round Robin (di antara worker yang tidak penuh)
-    // ====================================================================
-    // Kita hanya masuk ke sini jika selected_worker_idx masih -1 (Tahap 1 dan 2 tidak menghasilkan pilihan definitif)
     int temp_best_idx_t3 = -1;
     int start_rr_check_idx = master_ctx->last_sio_rr_idx; 
-
     for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
         int current_rr_idx = (start_rr_check_idx + i) % MAX_SIO_WORKERS;
-        // Hanya pilih worker yang TIDAK PENUH
         if (master_ctx->sio_state[current_rr_idx].task_count < MAX_CLIENTS_PER_SIO_WORKER) {
             temp_best_idx_t3 = current_rr_idx;
-            master_ctx->last_sio_rr_idx = (current_rr_idx + 1) % MAX_SIO_WORKERS; // Update index RR
-            break; // Found a suitable worker, exit loop
+            master_ctx->last_sio_rr_idx = (current_rr_idx + 1) % MAX_SIO_WORKERS;
+            break;
         }
     }
-
     if (temp_best_idx_t3 != -1) {
         selected_worker_idx = temp_best_idx_t3;
         LOG_DEVEL_DEBUG("%sSelecting SIO worker %d using Round Robin (fallback).", label, selected_worker_idx);
         return selected_worker_idx;
     } else {
-        // Skenario terburuk: semua worker SIO penuh (atau tidak ada sama sekali).
         LOG_ERROR("%sNo SIO worker available (all might be full).", label);
-        return -1; // Indicate failure to select a worker
+        return -1;
     }
 }
 
@@ -297,7 +266,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
             master_ctx->sio_state[sio_worker_idx].metrics.last_task_started,
             master_ctx->sio_state[sio_worker_idx].metrics.last_task_finished,
             master_ctx->sio_state[sio_worker_idx].metrics.longest_task_time,
-            master_ctx->sio_state[sio_worker_idx].metrics.avg_task_time
+            master_ctx->sio_state[sio_worker_idx].metrics.avg_task_time_per_empty_slot
         );
 //======================================================================
 		LOG_DEBUG("%sForwarding client FD %d from IP %s to Server IO Worker %d (UDS FD %d). Bytes sent: %zd.",

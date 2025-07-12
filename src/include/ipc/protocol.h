@@ -30,6 +30,7 @@ typedef struct {
 typedef struct {
     worker_type_t wot;
     uint8_t index;
+    double hbtime;
 } ipc_heartbeat_t;
 
 typedef struct {

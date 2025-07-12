@@ -10,11 +10,19 @@
 // new_avg = ((last_avg * count) + current_task_time) / (count + 1);
 //======================================================================
 typedef struct {
+    double hbtime;
+    double sum_hbtime;
+    double count_ack;
     uint64_t last_ack;
+    uint64_t last_checkhealthy;
+    double healthypct;
+    bool isactive;
+    bool ishealthy;
+    uint8_t first_check_healthy;
     uint64_t last_task_started;
     uint64_t last_task_finished;
     uint64_t longest_task_time;
-    long double avg_task_time;
+    long double avg_task_time_per_empty_slot;
 } worker_metrics_t;
 
 typedef struct {

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <stdint.h>
 
 #include "log.h"
 #include "utilities.h"
@@ -16,6 +17,8 @@
 #include "master/workers.h"
 #include "async.h"
 #include "master/process.h"
+#include "stdbool.h"
+#include "sessions/master_session.h"
 
 status_t close_worker(const char *label, master_context *master_ctx, worker_type_t wot, int index) {
 	if (wot == SIO) {
@@ -142,10 +145,40 @@ status_t create_socket_pair(const char *label, master_context *master_ctx, worke
 	return SUCCESS;
 }
 
+double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_type_t wot, int index) {
+    int worker_type_id = (int)wot;
+    const double MAX_INITIAL_DELAY_MS = (double)WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT * 1000.0;
+    double initial_delay_ms = (double)worker_type_id * index * INITIAL_MILISECONDS_PER_UNIT;
+    if (initial_delay_ms > MAX_INITIAL_DELAY_MS) {
+        initial_delay_ms = MAX_INITIAL_DELAY_MS;
+    }
+    uint64_t_status_t rt = get_realtime_time_ns(label);
+    metrics->sum_hbtime = (double)0;
+    metrics->hbtime = (double)0;
+    metrics->count_ack = (double)0;
+    metrics->last_ack = rt.r_uint64_t;
+    metrics->last_checkhealthy = rt.r_uint64_t;
+    metrics->healthypct = (double)100;
+    metrics->isactive = true;
+    metrics->ishealthy = true;
+    metrics->first_check_healthy = (uint8_t)0x01;
+    metrics->last_task_started = rt.r_uint64_t;
+    metrics->last_task_finished = rt.r_uint64_t;
+    metrics->longest_task_time = 0ULL;
+    metrics->avg_task_time_per_empty_slot = (long double)0;
+//======================================================================            
+    if (initial_delay_ms > 0) {
+        metrics->hbtime = (double)WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT + ((double)initial_delay_ms/1000.0);
+        metrics->sum_hbtime = metrics->hbtime;
+        metrics->count_ack = (double)0;
+    }
+    return initial_delay_ms;
+}
 
 status_t setup_fork_worker(const char* label, master_context *master_ctx, worker_type_t wot, int index) {
 	if (wot == SIO) {
 		const char *worker_name = "SIO";
+        double initial_delay_ms = (double)0;
 		master_ctx->sio[index].pid = fork();
         if (master_ctx->sio[index].pid == -1) {
             LOG_ERROR("%sfork (%s): %s", label, worker_name, strerror(errno));
@@ -166,15 +199,22 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
             for (int j = 0; j < MAX_LOGIC_WORKERS; ++j) { CLOSE_FD(&master_ctx->logic[j].uds[1]); }
             for (int j = 0; j < MAX_COW_WORKERS; ++j) { CLOSE_FD(&master_ctx->cow[j].uds[1]); }            
             for (int j = 0; j < MAX_DBR_WORKERS; ++j) { CLOSE_FD(&master_ctx->dbr[j].uds[1]); }
-            for (int j = 0; j < MAX_DBW_WORKERS; ++j) { CLOSE_FD(&master_ctx->dbw[j].uds[1]); }
-            run_sio_worker(wot, index, master_ctx->sio[index].uds[1]);
+            for (int j = 0; j < MAX_DBW_WORKERS; ++j) { CLOSE_FD(&master_ctx->dbw[j].uds[1]); }          
+            run_sio_worker(wot, index, initial_delay_ms, master_ctx->sio[index].uds[1]);
             exit(EXIT_SUCCESS);
         } else {
 			CLOSE_FD(&master_ctx->sio[index].uds[1]);
+//======================================================================
+// Hitung delay start dan inisialisasi metrics
+//======================================================================
+            master_ctx->sio_state[index].task_count = (uint16_t)0;
+            initial_delay_ms = initialize_metrics(label, &master_ctx->sio_state[index].metrics, wot, index);
+//======================================================================
             LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->sio[index].pid);
         }
 	} else if (wot == LOGIC) {
-		const char *worker_name = "Logic";		
+		const char *worker_name = "Logic";	
+        double initial_delay_ms = (double)0;	
 		master_ctx->logic[index].pid = fork();
         if (master_ctx->logic[index].pid == -1) {
             LOG_ERROR("%sfork (%s): %s", label, worker_name, strerror(errno));
@@ -196,14 +236,21 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
             for (int j = 0; j < MAX_COW_WORKERS; ++j) { CLOSE_FD(&master_ctx->cow[j].uds[1]); }
             for (int j = 0; j < MAX_DBR_WORKERS; ++j) { CLOSE_FD(&master_ctx->dbr[j].uds[1]); }
             for (int j = 0; j < MAX_DBW_WORKERS; ++j) { CLOSE_FD(&master_ctx->dbw[j].uds[1]); }
-            run_logic_worker(wot, index, master_ctx->logic[index].uds[1]);
+            run_logic_worker(wot, index, initial_delay_ms, master_ctx->logic[index].uds[1]);
             exit(EXIT_SUCCESS);
         } else {
 			CLOSE_FD(&master_ctx->logic[index].uds[1]);
+//======================================================================
+// Hitung delay start dan inisialisasi metrics
+//======================================================================
+            master_ctx->logic_state[index].task_count = (uint16_t)0;
+            initial_delay_ms = initialize_metrics(label, &master_ctx->logic_state[index].metrics, wot, index);
+//======================================================================
             LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->logic[index].pid);
         }
 	} else if (wot == COW) {
 		const char *worker_name = "COW";
+        double initial_delay_ms = (double)0;
 		master_ctx->cow[index].pid = fork();
         if (master_ctx->cow[index].pid == -1) {
             LOG_ERROR("%sfork (%s): %s", label, worker_name, strerror(errno));
@@ -225,14 +272,20 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
 			}
             for (int j = 0; j < MAX_DBR_WORKERS; ++j) { CLOSE_FD(&master_ctx->dbr[j].uds[1]); }
             for (int j = 0; j < MAX_DBW_WORKERS; ++j) { CLOSE_FD(&master_ctx->dbw[j].uds[1]); }
-            run_cow_worker(wot, index, master_ctx->cow[index].uds[1]);
+            run_cow_worker(wot, index, initial_delay_ms, master_ctx->cow[index].uds[1]);
             exit(EXIT_SUCCESS);
         } else {
 			CLOSE_FD(&master_ctx->cow[index].uds[1]);
+//======================================================================
+// Hitung delay start dan inisialisasi metrics
+//======================================================================
+            initial_delay_ms = initialize_metrics(label, &master_ctx->cow_state[index].metrics, wot, index);
+//======================================================================
             LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->cow[index].pid);
         }
 	} else if (wot == DBR) {
 		const char *worker_name = "DBR";
+        double initial_delay_ms = (double)0;
 		master_ctx->dbr[index].pid = fork();
         if (master_ctx->dbr[index].pid == -1) {
             LOG_ERROR("%sfork (%s): %s", label, worker_name, strerror(errno));
@@ -254,14 +307,21 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
                 }
             }
             for (int j = 0; j < MAX_DBW_WORKERS; ++j) { CLOSE_FD(&master_ctx->dbw[j].uds[1]); }
-            run_dbr_worker(wot, index, master_ctx->dbr[index].uds[1]);
+            run_dbr_worker(wot, index, initial_delay_ms, master_ctx->dbr[index].uds[1]);
             exit(EXIT_SUCCESS);
         } else {
 			CLOSE_FD(&master_ctx->dbr[index].uds[1]);
+//======================================================================
+// Hitung delay start dan inisialisasi metrics
+//======================================================================
+            master_ctx->dbr_state[index].task_count = (uint16_t)0;
+            initial_delay_ms = initialize_metrics(label, &master_ctx->dbr_state[index].metrics, wot, index);
+//======================================================================
             LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->dbr[index].pid);
         }
 	} else if (wot == DBW) {
 		const char *worker_name = "DBW";
+        double initial_delay_ms = (double)0;
 		master_ctx->dbw[index].pid = fork();
         if (master_ctx->dbw[index].pid == -1) {
             LOG_ERROR("%sfork (%s): %s", label, worker_name, strerror(errno));
@@ -283,10 +343,15 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
                     CLOSE_FD(&master_ctx->dbw[j].uds[1]);
                 }
             }
-            run_dbw_worker(wot, index, master_ctx->dbw[index].uds[1]);
+            run_dbw_worker(wot, index, initial_delay_ms, master_ctx->dbw[index].uds[1]);
             exit(EXIT_SUCCESS);
         } else {
 			CLOSE_FD(&master_ctx->dbw[index].uds[1]);
+//======================================================================
+// Hitung delay start dan inisialisasi metrics
+//======================================================================
+            initial_delay_ms = initialize_metrics(label, &master_ctx->dbw_state[index].metrics, wot, index);
+//======================================================================
             LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->dbw[index].pid);
         }
 	}
