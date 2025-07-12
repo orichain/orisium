@@ -15,6 +15,8 @@ typedef struct {
     double count_ack;
     uint64_t last_ack;
     uint64_t last_checkhealthy;
+    double carry_healthypct;
+    double prior_healthypct;
     double healthypct;
     bool isactive;
     bool ishealthy;

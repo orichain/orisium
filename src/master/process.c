@@ -232,7 +232,6 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
         m->healthypct = (double)0;
         m->ishealthy = false;
         m->last_checkhealthy = now_ns;
-        m->count_ack = (double)0;
         m->sum_hbtime = m->hbtime;
         LOG_DEVEL_DEBUG("%s[%s %d] health ratio: %.2f%% [%s]",
               label, worker_name, index, m->healthypct,
@@ -242,20 +241,40 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
     double ttl_delay_jitter = (m->sum_hbtime - m->hbtime)-((double)WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT * m->count_ack);
     double actual_elapsed_sec = (double)(now_ns - m->last_checkhealthy) / 1e9;
     double setup_elapsed_sec = (double)WORKER_HEARTBEATSEC_TIMEOUT + ttl_delay_jitter;
+    if (setup_elapsed_sec < 1e-3) setup_elapsed_sec = 1e-3;
     double setup_count_ack = setup_elapsed_sec / (double)WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT;
     double comp_elapsed_sec = actual_elapsed_sec / setup_elapsed_sec;
     double expected_count_ack = setup_count_ack * comp_elapsed_sec;
     double health_ratio = m->count_ack / expected_count_ack;
-    if (health_ratio > 1.0) health_ratio = 1.0;
-    if (health_ratio < 0.0) health_ratio = 0.0;
+    m->prior_healthypct = m->healthypct;
     m->healthypct = health_ratio * 100.0;
-    m->ishealthy = (health_ratio >= 0.75);
+    if (m->carry_healthypct != (double)0) {
+        m->healthypct += m->carry_healthypct;
+        m->carry_healthypct = (double)0;
+    }
+    if (m->healthypct > (double)100) {
+        m->carry_healthypct = m->healthypct - (double)100;
+        m->healthypct = (double)100;
+    }
+    double avg_healthypct = (m->prior_healthypct + m->healthypct) / (double)2;
+    if (m->healthypct != avg_healthypct) {
+        m->carry_healthypct += m->healthypct - avg_healthypct;
+        m->healthypct = avg_healthypct;
+    }
+    m->ishealthy = (m->healthypct >= (double)75);
     m->last_checkhealthy = now_ns;
+    double tmp_count_ack = m->count_ack;
     m->count_ack = (double)0;
     m->sum_hbtime = m->hbtime;
-    LOG_DEVEL_DEBUG("%s[%s %d] health ratio: %.2f%% [%s]",
-              label, worker_name, index, m->healthypct,
-              m->ishealthy ? "HEALTHY" : "UNHEALTHY");
+    LOG_DEVEL_DEBUG(
+        "%s[%s %d] act elpse: %.2f stp elpse: %.2f exp ack: %.2f act ack: %.2f cry: %.2f -> health: %.2f%% [%s]",
+        label, worker_name, index,
+        actual_elapsed_sec, setup_elapsed_sec,
+        expected_count_ack, tmp_count_ack,
+        m->carry_healthypct,
+        m->healthypct,
+        m->ishealthy ? "HEALTHY" : "UNHEALTHY"
+    );
     return SUCCESS;
 }
 
