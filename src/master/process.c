@@ -225,7 +225,7 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
         m->healthypct = 100.0;
         m->ishealthy = true;
         m->last_checkhealthy = now_ns;
-        LOG_DEBUG("%s[%s %d] First-time health check -> assumed healthy (100%%)", label, worker_name, index);
+        LOG_DEVEL_DEBUG("%s[%s %d] First-time health check -> assumed healthy (100%%)", label, worker_name, index);
         return SUCCESS;
     }
     if (m->count_ack == (double)0) {
@@ -233,7 +233,7 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
         m->ishealthy = false;
         m->last_checkhealthy = now_ns;
         m->sum_hbtime = m->hbtime;
-        LOG_DEBUG("%s[%s %d] health ratio: %.2f%% [%s]",
+        LOG_DEVEL_DEBUG("%s[%s %d] health ratio: %.2f%% [%s]",
               label, worker_name, index, m->healthypct,
               m->ishealthy ? "HEALTHY" : "UNHEALTHY");
         return SUCCESS;
@@ -260,12 +260,18 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
         m->carry_healthypct += m->healthypct - avg_healthypct;
         m->healthypct = avg_healthypct;
     }
+    if (m->carry_healthypct < (double)-250) {
+        m->carry_healthypct = (double)-250;
+    }
+    if (m->carry_healthypct > (double)250) {
+        m->carry_healthypct = (double)250;
+    }
     m->ishealthy = (m->healthypct >= (double)75);
     m->last_checkhealthy = now_ns;
     double tmp_count_ack = m->count_ack;
     m->count_ack = (double)0;
     m->sum_hbtime = m->hbtime;
-    LOG_DEBUG(
+    LOG_DEVEL_DEBUG(
         "%s[%s %d] act elpse: %.2f stp elpse: %.2f exp ack: %.2f act ack: %.2f cry: %.2f -> health: %.2f%% [%s]",
         label, worker_name, index,
         actual_elapsed_sec, setup_elapsed_sec,

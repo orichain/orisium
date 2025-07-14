@@ -5,6 +5,15 @@
 #include "constants.h"
 
 typedef struct {
+    uint8_t  version;
+    uint64_t timestamp;
+    uint8_t  kem_pubkey[MLKEM1024_PUBKEY_LEN];
+    uint8_t  sign_pubkey[FALCON_PUBKEY_LEN];
+    uint8_t  vrf_pubkey[VRF_PUBKEY_LEN];
+    uint8_t  signature[FALCON_SIGNATURE_LEN];
+} node_identity_t;
+
+typedef struct {
     uint8_t ip[IP_ADDRESS_LEN];
     int port;
 } node_info_t;
