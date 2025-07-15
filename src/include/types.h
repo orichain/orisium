@@ -2,9 +2,12 @@
 #define TYPES_H
 
 #include <stdint.h>
+#include <unistd.h>
 
 typedef enum {
     SUCCESS = (uint8_t)0x00,
+    FAILURE_OPNFL = (uint8_t)0xf1,
+    FAILURE_NDFLMGC = (uint8_t)0xf2,
     FAILURE_RATELIMIT = (uint8_t)0xf3,
     FAILURE_IVLDPORT = (uint8_t)0xf3,
     FAILURE_IVLDIP = (uint8_t)0xf4,

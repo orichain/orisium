@@ -35,4 +35,8 @@
 #define IPC_VERSION_MAJOR 0x00
 #define IPC_VERSION_MINOR 0x01
 
+#define NODE_VERSION 1
+#define NODE_FILE_MAGIC "NODEKEYS"
+#define NODE_KEYFILE_PATH "./database/NODE.keys"
+
 #endif

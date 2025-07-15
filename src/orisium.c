@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <netinet/in.h>
+#include <bits/types/sig_atomic_t.h>
 
 #include "log.h"
 #include "node.h"

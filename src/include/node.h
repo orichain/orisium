@@ -3,15 +3,22 @@
 
 #include "types.h"
 #include "constants.h"
+#include "pqc.h"
 
 typedef struct {
-    uint8_t  version;
+    uint8_t version;
     uint64_t timestamp;
-    uint8_t  kem_pubkey[MLKEM1024_PUBKEY_LEN];
-    uint8_t  sign_pubkey[FALCON_PUBKEY_LEN];
-    uint8_t  vrf_pubkey[VRF_PUBKEY_LEN];
-    uint8_t  signature[FALCON_SIGNATURE_LEN];
+    algo_type_t kem_algo;
+    algo_type_t sign_algo;
+    algo_type_t vrf_algo;
+    uint8_t *kem_pubkey;
+    uint8_t *sign_pubkey;
+    uint8_t *vrf_pubkey;
+    uint8_t *signature;
 } node_identity_t;
+
+status_t node_identity_init(const char *filepath, node_identity_t *out);
+void node_identity_free(node_identity_t *id);
 
 typedef struct {
     uint8_t ip[IP_ADDRESS_LEN];
