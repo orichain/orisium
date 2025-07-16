@@ -11,7 +11,7 @@ OBJ_DIR = obj
 
 CC = gcc
 GCC_INCLUDE_DIRS := $(shell echo '' | gcc -E -x c - -v 2>&1 | awk '/^ \/.*\/include/ { print "-I" $$1 }')
-INCLUDE_DIR = $(GCC_INCLUDE_DIRS) -I./$(SRC_DIR)/include -I./PQClean -I./PQClean/common -I./lmdb/libraries/liblmdb
+INCLUDE_DIR = $(GCC_INCLUDE_DIRS) -I./$(SRC_DIR)/include -I./blake3/c -I./PQClean -I./PQClean/common -I./lmdb/libraries/liblmdb
 COMMON_CFLAGS = -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration -pthread -mrdseed -ljson-c -lm $(INCLUDE_DIR)
 BUILD_MODE ?= DEVELOPMENT
 DEBUG_MODE ?= DEVELOPMENT
@@ -52,6 +52,15 @@ SRCS := $(shell find $(SRC_DIR) -name '*.c')
 OBJS := $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRCS))
 
 # =============================
+# BLAKE3 Configuration
+# =============================
+BLAKE3_DIR = blake3
+BLAKE3_C_DIR = c
+BLAKE3_BUILD_DIR = build
+BLAKE3_LIB_NAME = libblake3.a
+BLAKE3_LIB_PATH = $(BLAKE3_DIR)/$(BLAKE3_C_DIR)/$(BLAKE3_BUILD_DIR)/$(BLAKE3_LIB_NAME)
+
+# =============================
 # PQClean Libraries
 # =============================
 PQCLEAN_COMMON_DIR = PQClean/common
@@ -85,7 +94,7 @@ IWYU_BUILD := build
 IWYU_BUILD_PATH := $(IWYU_DIR)/$(IWYU_BUILD)
 IWYU_BIN_PATH := $(IWYU_BUILD_PATH)/bin/include-what-you-use
 
-EXCLUDED_DIRS := PQClean iwyu lmdb
+EXCLUDED_DIRS := PQClean iwyu lmdb blake3
 EXCLUDE_PATHS := $(foreach dir,$(EXCLUDED_DIRS),-path ./$(dir) -prune -o)
 CFILES := $(shell find . $(EXCLUDE_PATHS) -name '*.c' -print)
 
@@ -141,7 +150,8 @@ prod:
 	@echo "Executable: $(TARGET)"
 	@echo "-------------------------------------"
 	
-$(TARGET): $(OBJS) $(PQCLEAN_COMMON_OBJS) \
+$(TARGET): $(OBJS) $(BLAKE3_LIB_PATH) \
+		$(PQCLEAN_COMMON_OBJS) \
 		$(PQCLEAN_SIGN_MLDSA87_LIB_PATH) \
 		$(PQCLEAN_SIGN_FALCONPADDED512_LIB_PATH) \
 		$(PQCLEAN_KEM_LIB_PATH) \
@@ -160,6 +170,40 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 $(OBJ_DIR)/%.o: $(PQCLEAN_COMMON_DIR)/%.c
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(FINAL_CFLAGS) -c $< -o $@
+	
+# =============================
+# Bangun BLAKE3 (jika belum ada)
+# =============================
+$(BLAKE3_LIB_PATH):
+	@echo "🔧 Membangun BLAKE3..."
+	@if [ ! -f "$(BLAKE3_LIB_PATH)" ]; then \
+		echo "📥 Membangun dari sumber..."; \
+		echo "📥 Memeriksa dan menginstall dependensi BLAKE3 untuk distro $(DISTRO_ID) menggunakan $(PKG_MANAGER)..."; \
+		PKGS="cmake"; \
+		for pkg in $$PKGS; do \
+			if [ "$(PKG_MANAGER)" = "unsupported" ]; then \
+				echo "❌ Tidak bisa install $$pkg. Distribusi tidak didukung."; \
+				exit 1; \
+			elif [ "$(PKG_MANAGER)" = "apt" ]; then \
+				$(USE_SUDO) apt update && $(USE_SUDO) apt install -y cmake || true; \
+				break; \
+			elif [ "$(PKG_MANAGER)" = "dnf" ] || [ "$(PKG_MANAGER)" = "yum" ]; then \
+				$(USE_SUDO) $(PKG_MANAGER) install -y cmake || true; \
+				break; \
+			elif [ "$(PKG_MANAGER)" = "pacman" ]; then \
+				$(USE_SUDO) pacman -Syu --noconfirm cmake || true; \
+				break; \
+			elif [ "$(PKG_MANAGER)" = "zypper" ]; then \
+				$(USE_SUDO) zypper install -y cmake || true; \
+				break; \
+			fi; \
+		done; \
+		cd $(BLAKE3_DIR) && \
+		cmake -S c -B $(BLAKE3_C_DIR)/$(BLAKE3_BUILD_DIR) && \
+		cmake --build $(BLAKE3_C_DIR)/$(BLAKE3_BUILD_DIR); \
+	else \
+		echo "✅ BLAKE3 sudah tersedia."; \
+	fi
 
 # =============================
 # PQClean Build Rules

@@ -35,6 +35,26 @@
 #define IPC_VERSION_MAJOR 0x00
 #define IPC_VERSION_MINOR 0x01
 
+//======================================================================
+// OriLink
+//======================================================================
+#define MAX_SESSIONS 10
+#define MAX_EPOLL_EVENTS 10
+#define MAX_BUFFER_SIZE 1500
+#define PACKET_TIMEOUT_SEC 2
+#define CUBIC_BETA 0.7
+#define CUBIC_C 0.4
+#define NUM_STREAMS 2
+
+#define MAX_PAYLOAD_SIZE 1384
+#define KEEPALIVE_INTERVAL_SEC 15
+
+#define RTT_ALPHA 0.125
+#define RTT_BETA  0.25
+#define RTO_MIN   0.2
+#define RTO_MAX   60.0
+//======================================================================
+
 #define NODE_VERSION 1
 #define NODE_FILE_MAGIC "NODEKEYS"
 #define NODE_KEYFILE_PATH "./database/NODE.keys"

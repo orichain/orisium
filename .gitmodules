@@ -7,3 +7,6 @@
 [submodule "lmdb"]
 	path = lmdb
 	url = https://github.com/LMDB/lmdb.git
+[submodule "blake3"]
+	path = blake3
+	url = https://github.com/BLAKE3-team/BLAKE3.git
