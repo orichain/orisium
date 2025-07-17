@@ -124,9 +124,11 @@ static inline uint32_t orilink_hash32(const void* data, size_t len) {
     blake3_hasher_init(&hasher);
     blake3_hasher_update(&hasher, data, len);
     blake3_hasher_finalize(&hasher, out, 32);
-    // Ambil 4 byte pertama jadi uint32_t
-    return (uint32_t)out[0] << 24 | (uint32_t)out[1] << 16 |
-           (uint32_t)out[2] << 8  | (uint32_t)out[3];
+
+    // Ambil 4 byte pertama, perlakukan sebagai big-endian, dan konversi ke host byte order
+    uint32_t hash_val_be;
+    memcpy(&hash_val_be, out, sizeof(uint32_t)); // Salin 4 byte pertama dari output hash BLAKE3
+    return be32toh(hash_val_be);                 // Konversi dari big-endian (network byte order) ke host byte order
 }
 
 typedef struct {
