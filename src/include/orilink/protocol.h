@@ -2,6 +2,7 @@
 #define ORILINK_PROTOCOL_H
 
 #include <stdlib.h>
+#include <blake3.h>
 #include "types.h"
 #include "constants.h"
 
@@ -22,19 +23,16 @@ typedef enum {
 } orilink_mode_t;
 
 typedef struct {
-    uint32_t chksum;
     uint64_t id;
     uint32_t pktnum;
     orilink_mode_t mode;
 } orilink_syn_t;
 
 typedef struct {
-    uint32_t chksum;
     uint64_t id;
 } orilink_syn_ack_t;
 
 typedef struct {
-    uint32_t chksum;
     uint64_t id;
     uint32_t pktnum;
     uint32_t lackseq;
@@ -44,12 +42,10 @@ typedef struct {
 } orilink_reused_syn_ack_t;
 
 typedef struct {
-    uint32_t chksum;
     uint64_t id;
 } orilink_ack_t;
 
 typedef struct {
-    uint32_t chksum;
     uint64_t id;
     uint32_t seq;
     uint16_t sid;
@@ -59,17 +55,14 @@ typedef struct {
 } orilink_data_t;
 
 typedef struct {
-    uint32_t chksum;
     uint64_t id;
 } orilink_fin_t;
 
 typedef struct {
-    uint32_t chksum;
     uint64_t id;
 } orilink_heartbeat_t;
 
 typedef struct {
-    uint32_t chksum;
     uint64_t id;
     uint32_t arw;
     uint32_t lackseq;
@@ -80,6 +73,7 @@ typedef struct {
 typedef struct {
 	uint8_t version[ORILINK_VERSION_BYTES];
 	orilink_protocol_type_t type;
+    uint32_t chksum;
 	union {
 		orilink_syn_t *orilink_syn;
 		orilink_syn_ack_t *orilink_syn_ack;
@@ -122,6 +116,17 @@ static inline void CLOSE_ORILINK_PROTOCOL(orilink_protocol_t **protocol_ptr) {
         free(x);
         *protocol_ptr = NULL;
     }
+}
+
+static inline uint32_t orilink_hash32(const void* data, size_t len) {
+    uint8_t out[32]; // full BLAKE3 hash
+    blake3_hasher hasher;
+    blake3_hasher_init(&hasher);
+    blake3_hasher_update(&hasher, data, len);
+    blake3_hasher_finalize(&hasher, out, 32);
+    // Ambil 4 byte pertama jadi uint32_t
+    return (uint32_t)out[0] << 24 | (uint32_t)out[1] << 16 |
+           (uint32_t)out[2] << 8  | (uint32_t)out[3];
 }
 
 typedef struct {

@@ -18,10 +18,6 @@ status_t orilink_serialize_syn(const char *label, const orilink_syn_t* payload, 
         return FAILURE;
     }
     size_t current_offset_local = *offset;
-    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint32_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    uint32_t chksum_be = htobe32(payload->chksum);
-    memcpy(current_buffer + current_offset_local, &chksum_be, sizeof(uint32_t));
-    current_offset_local += sizeof(uint32_t);
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint64_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
     uint64_t id_be = htobe64(payload->id);
     memcpy(current_buffer + current_offset_local, &id_be, sizeof(uint64_t));
@@ -46,15 +42,6 @@ status_t orilink_deserialize_syn(const char *label, orilink_protocol_t *p, const
     size_t current_offset = *offset_ptr;
     const uint8_t *cursor = buffer + current_offset;
     orilink_syn_t *payload = p->payload.orilink_syn;
-    if (current_offset + sizeof(uint32_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading checksum.", label);
-        return FAILURE_OOBUF;
-    }
-    uint32_t chksum_be;
-    memcpy(&chksum_be, cursor, sizeof(uint32_t));
-    payload->chksum = be32toh(chksum_be);
-    cursor += sizeof(uint32_t);
-    current_offset += sizeof(uint32_t);
     if (current_offset + sizeof(uint64_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading id.", label);
         return FAILURE_OOBUF;
@@ -85,7 +72,7 @@ status_t orilink_deserialize_syn(const char *label, orilink_protocol_t *p, const
     return SUCCESS;
 }
 
-orilink_protocol_t_status_t orilink_prepare_cmd_syn(const char *label, uint32_t *chksum, uint64_t *id, uint32_t *pktnum, orilink_mode_t *mode) {
+orilink_protocol_t_status_t orilink_prepare_cmd_syn(const char *label, uint64_t *id, uint32_t *pktnum, orilink_mode_t *mode) {
 	orilink_protocol_t_status_t result;
 	result.r_orilink_protocol_t = (orilink_protocol_t *)malloc(sizeof(orilink_protocol_t));
 	result.status = FAILURE;
@@ -103,7 +90,6 @@ orilink_protocol_t_status_t orilink_prepare_cmd_syn(const char *label, uint32_t 
 		CLOSE_ORILINK_PROTOCOL(&result.r_orilink_protocol_t);
 		return result;
 	}
-	payload->chksum = *chksum;
     payload->id = *id;
     payload->pktnum = *pktnum;
     payload->mode = *mode;
