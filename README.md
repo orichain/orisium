@@ -12,13 +12,24 @@ Orisium adalah jaringan *peer-to-peer* (P2P) berperforma tinggi yang dirancang u
 
 ## Fitur Utama
 
-### **1. Arsitektur Jaringan Hierarkis Dinamis**
+### **1. Arsitektur Jaringan Hierarkis Dinamis dengan 313 Shard**
 
 Orisium mengadopsi struktur jaringan berlapis untuk skalabilitas dan ketahanan ekstrem. Tidak ada root tetap — root dapat digantikan secara otomatis berdasarkan evaluasi horizontal oleh root lain.
 
-* **Root Node (Maks. 40 Node)**: Titik pusat dalam jaringan untuk masing-masing *shard*. Dapat dijatuhkan oleh sesama root. Bertanggung jawab untuk manajemen upstream-downstream dan sinkronisasi global.
-* **Node Level-1 (Maks. 400 Node)**: Terhubung ke **1 upstream Root** dan memiliki **39 koneksi horizontal** ke sesama Level-1 dalam root yang sama. Dapat dijatuhkan oleh Level-1 lain melalui pernyataan resmi, bukan *gossip*.
-* **Node Level-2 hingga Level-4**: Meneruskan hierarki dengan pola yang sama. Setiap node memiliki **1 upstream**, **39 horizontal**, dan **hingga 10 downstream**.
+* **313 Shard = 313 Root Node**
+  * Setiap root memiliki:
+    - **25 downstream** (Level-1)
+    - **312 koneksi horizontal** ke root lain (mesh parsial)
+
+* **Node Level-1:**
+  - Terhubung ke **1 upstream Root**
+  - Memiliki **24 koneksi horizontal** ke Level-1 lain di dalam shard yang sama
+  - Dapat memiliki hingga **25 downstream** (Level-2)
+
+* **Node Level-2 hingga Level-4:**
+  - Struktur hierarki terus berlanjut dengan pola yang sama
+  - Setiap node:
+    - **1 upstream**, **24 horizontal**, dan **25 downstream** maksimum
 
 ### **2. Routing & Reconnect Deterministik**
 
@@ -42,11 +53,12 @@ Fungsi `find_or_create_session()` menyimpan info sesi termasuk `connection_id`, 
 
 ### **4. Sharding Berdasarkan Public Key (Hashing)**
 
-Pembagian *shard* tidak lagi berdasarkan zona waktu, melainkan menggunakan **hash dari public key/address**. Ini memberikan:
+Pembagian *shard* dilakukan dengan **hash dari public key/address**. Ini memberikan:
 
 * Sebaran merata
 * Kemampuan distribusi tanpa bergantung pada lokasi geografis
-* Direktori seperti:
+
+Struktur direktori:
 
 ```bash
 db/hash-prefix/ab/cd/<rest-of-pubkey>/...
@@ -60,9 +72,7 @@ address = prefix || pubkey || checksum
 
 -----
 
-### **5. Arsitektur Proses & Komunikasi Internal**
-
-Orisium menggunakan pemisahan proses berbasis modul dengan skema IPC efisien melalui Unix Domain Socket. Setiap proses bertanggung jawab atas satu tugas spesifik, mempermudah debugging dan penskalaan.
+## Arsitektur Modular
 
 ```
             w-lmdb[1]     r-lmdb[5]
@@ -74,23 +84,15 @@ sio[2] <─────>     master[1]      <─────> cow[45]
                       │
                       ▼
                    Logic[4]
+
+Komunikasi internal / IPC:
+Protocol IPC lewat Unix Domain Socket
 ```
 
-#### 📦 Komponen
-
-| Komponen    | Jumlah | Tugas Utama |
-|-------------|--------|-------------|
-| `logic`     | 4      | State machine protokol, kontrol koneksi, handshake, upstream/downstream, reliability |
-| `master`    | 1      | Listener UDP utama, membongkar header dan meneruskan ke `sio` |
-| `sio`       | 2      | Parsing awal, verifikasi checksum, routing internal paket |
-| `cow`       | 45     | Client outbound untuk koneksi horizontal dan upstream |
-| `r-lmdb`    | 5      | Pembaca database lokal (read-only) |
-| `w-lmdb`    | 1      | Penulis database lokal (write-heavy) |
-
-#### 🔌 Komunikasi Internal
-
-- **Unix Domain Socket (UDS)**: Digunakan untuk komunikasi antar proses (IPC), lebih cepat dan aman dibanding TCP/UDP lokal.
-- Desain ini menghindari shared memory, mengurangi potensi race condition dan mempermudah debugging tiap modul secara independen.
+* **master** menerima koneksi UDP dan mem-forward ke SIO
+* **sio** menangani parsing awal dan validasi message
+* **logic** menjalankan protokol inti dan semua state machine
+* **cow** adalah outbound client untuk horizontal dan upstream
 
 -----
 
