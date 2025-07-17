@@ -70,9 +70,9 @@ Struktur address:
 address = prefix || pubkey || checksum
 ```
 
------
+### **5. Arsitektur Proses & Komunikasi Internal**
 
-## Arsitektur Modular
+Orisium menggunakan pemisahan proses berbasis modul dengan skema IPC efisien melalui Unix Domain Socket. Setiap proses bertanggung jawab atas satu tugas spesifik, mempermudah debugging dan penskalaan.
 
 ```
             w-lmdb[1]     r-lmdb[5]
@@ -84,35 +84,23 @@ sio[2] <─────>     master[1]      <─────> cow[45]
                       │
                       ▼
                    Logic[4]
-
-Komunikasi internal / IPC:
-Protocol IPC lewat Unix Domain Socket
 ```
 
-* **master** menerima koneksi UDP dan mem-forward ke SIO
-* **sio** menangani parsing awal dan validasi message
-* **logic** menjalankan protokol inti dan semua state machine
-* **cow** adalah outbound client untuk horizontal dan upstream
+#### 📦 Komponen
 
------
+| Komponen    | Jumlah | Tugas Utama |
+|-------------|--------|-------------|
+| `logic`     | 4      | State machine protokol, kontrol koneksi, handshake, upstream/downstream, reliability |
+| `master`    | 1      | Listener UDP utama, membongkar header dan meneruskan ke `sio` |
+| `sio`       | 2      | Parsing awal, verifikasi checksum, routing internal paket |
+| `cow`       | 45     | Client outbound untuk koneksi horizontal dan upstream |
+| `r-lmdb`    | 5      | Pembaca database lokal (read-only) |
+| `w-lmdb`    | 1      | Penulis database lokal (write-heavy) |
 
-## Instalasi
+#### 🔌 Komunikasi Internal
 
-```bash
-git clone https://github.com/yourusername/orisium.git
-cd orisium
-make
-./orisium_master
-```
-
------
-
-## Penggunaan
-
-```bash
-./orisium_master --config master.json
-./orisium_node --config node1.json
-```
+- **Unix Domain Socket (UDS)**: Digunakan untuk komunikasi antar proses (IPC), lebih cepat dan aman dibanding TCP/UDP lokal.
+- Desain ini menghindari shared memory, mengurangi potensi race condition dan mempermudah debugging tiap modul secara independen.
 
 -----
 
