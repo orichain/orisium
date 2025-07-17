@@ -22,7 +22,7 @@
 
 void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd) {
     volatile sig_atomic_t sio_shutdown_requested = 0;
-    sio_c_state_t sio_c_state[MAX_CLIENTS_PER_SIO_WORKER];
+    sio_c_state_t sio_c_state[MAX_CONNECTION_PER_SIO_WORKER];
     async_type_t sio_async;
     sio_async.async_fd = -1;
     int sio_timer_fd = -1;
@@ -55,7 +55,7 @@ void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 	}
 	if (async_create_incoming_event(label, &sio_async, &sio_timer_fd) != SUCCESS) goto exit;
 //======================================================================	    
-    for (int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
+    for (int i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
         sio_c_state[i].in_use = false;
         sio_c_state[i].client_fd = -1;
         memset(sio_c_state[i].ip, 0, IP_ADDRESS_LEN);
@@ -155,7 +155,7 @@ void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 						continue;
 					}
 					int slot_found = -1;
-					for (int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
+					for (int i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
 						if (!sio_c_state[i].in_use) {
 							sio_c_state[i].in_use = true;
 							sio_c_state[i].client_fd = received_client_fd;
@@ -192,7 +192,7 @@ void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                         memset(disconnected_client_ip, 0, IP_ADDRESS_LEN);
 
                         int client_slot_idx = -1;
-                        for(int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
+                        for(int i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
                             if(sio_c_state[i].in_use && sio_c_state[i].client_fd == current_fd) {
                                 memcpy(disconnected_client_ip, sio_c_state[i].ip, IP_ADDRESS_LEN);
                                 client_slot_idx = i;
@@ -231,7 +231,7 @@ void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                 uint8_t client_ip_for_request[IP_ADDRESS_LEN];
                 memset(client_ip_for_request, 0, IP_ADDRESS_LEN);
 
-                for(int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) {
+                for(int i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
                     if(sio_c_state[i].in_use && sio_c_state[i].client_fd == current_fd) {
                         client_idx = i;
                         memcpy(client_ip_for_request, sio_c_state[i].ip, IP_ADDRESS_LEN);
@@ -268,7 +268,7 @@ void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 // SIO Cleanup
 //======================================================================    
 exit:
-	for (int i = 0; i < MAX_CLIENTS_PER_SIO_WORKER; ++i) { // Kebiasaann bagus = harus selalu ingat "CLOSE FD + HAPUS event"
+	for (int i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) { // Kebiasaann bagus = harus selalu ingat "CLOSE FD + HAPUS event"
 		if (sio_c_state[i].in_use) {
 			CLOSE_FD(&sio_c_state[i].client_fd);
 		}

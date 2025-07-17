@@ -156,8 +156,8 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
                                  label, sio_worker_idx, ip_str);
                     }
                     uint64_t current_task_count = master_ctx->sio_state[sio_worker_idx].task_count;
-                    uint64_t previous_slot_kosong = MAX_CLIENTS_PER_SIO_WORKER - previous_task_count;
-                    uint64_t current_slot_kosong = MAX_CLIENTS_PER_SIO_WORKER - current_task_count;
+                    uint64_t previous_slot_kosong = MAX_CONNECTION_PER_SIO_WORKER - previous_task_count;
+                    uint64_t current_slot_kosong = MAX_CONNECTION_PER_SIO_WORKER - current_task_count;
                     long double old_avg = master_ctx->sio_state[sio_worker_idx].metrics.avg_task_time_per_empty_slot;
                     long double new_avg = old_avg;
                     // Hitung rata-rata waktu pemrosesan per slot kosong

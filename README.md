@@ -51,6 +51,8 @@ Orisium tidak menggunakan TCP untuk koneksi antar-node. Seluruh komunikasi antar
 
 Fungsi `find_or_create_session()` menyimpan info sesi termasuk `connection_id`, `addr`, dan status handshaking, dengan window awal default misalnya 150000 byte.
 
+> Karena menggunakan UDP, satu proses `cow` dapat menangani banyak sesi melalui multiplexing `connection_id`, tanpa harus membuka banyak soket fisik.
+
 ### **4. Sharding Berdasarkan Public Key (Hashing)**
 
 Pembagian *shard* dilakukan dengan **hash dari public key/address**. Ini memberikan:
@@ -70,37 +72,60 @@ Struktur address:
 address = prefix || pubkey || checksum
 ```
 
-### **5. Arsitektur Proses & Komunikasi Internal**
+-----
 
-Orisium menggunakan pemisahan proses berbasis modul dengan skema IPC efisien melalui Unix Domain Socket. Setiap proses bertanggung jawab atas satu tugas spesifik, mempermudah debugging dan penskalaan.
+## Arsitektur Modular
 
 ```
             w-lmdb[1]     r-lmdb[5]
                 ▲             ▲
                 │             │
                 ▼             ▼ 
-sio[2] <─────>     master[1]      <─────> cow[45]
+sio[2] <─────>     master[1]      <─────> cow[5]
                       ▲
                       │
                       ▼
                    Logic[4]
+
+Komunikasi internal / IPC:
+Protocol IPC lewat Unix Domain Socket
 ```
 
 #### 📦 Komponen
 
-| Komponen    | Jumlah | Tugas Utama |
-|-------------|--------|-------------|
-| `logic`     | 4      | State machine protokol, kontrol koneksi, handshake, upstream/downstream, reliability |
-| `master`    | 1      | Listener UDP utama, membongkar header dan meneruskan ke `sio` |
-| `sio`       | 2      | Parsing awal, verifikasi checksum, routing internal paket |
-| `cow`       | 45     | Client outbound untuk koneksi horizontal dan upstream |
-| `r-lmdb`    | 5      | Pembaca database lokal (read-only) |
-| `w-lmdb`    | 1      | Penulis database lokal (write-heavy) |
+| Komponen    | Jumlah  | Tugas Utama |
+|-------------|---------|-------------|
+| `logic`     | 4       | State machine protokol, kontrol koneksi, handshake, upstream/downstream, reliability |
+| `master`    | 1       | Listener UDP utama, membongkar header dan meneruskan ke `sio` |
+| `sio`       | 2       | Parsing awal, verifikasi checksum, routing internal paket |
+| `cow`       | 5       | Outbound client untuk koneksi horizontal dan upstream. Root membutuhkan hingga 317 sesi aktif, dan satu proses `cow` dapat menangani hingga 65 sesi melalui multiplexing `connection_id`. |
+| `r-lmdb`    | 5       | Pembaca database lokal (read-only) |
+| `w-lmdb`    | 1       | Penulis database lokal (write-heavy) |
 
 #### 🔌 Komunikasi Internal
 
 - **Unix Domain Socket (UDS)**: Digunakan untuk komunikasi antar proses (IPC), lebih cepat dan aman dibanding TCP/UDP lokal.
 - Desain ini menghindari shared memory, mengurangi potensi race condition dan mempermudah debugging tiap modul secara independen.
+
+-----
+
+## Instalasi
+
+```bash
+git clone https://github.com/yourusername/orisium.git
+cd orisium
+make
+./orisium_master
+```
+
+-----
+
+## Penggunaan
+
+```bash
+./orisium_master --config master.json
+./orisium_node --config node1.json
+```
 
 -----
 
