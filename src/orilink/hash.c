@@ -1,6 +1,5 @@
 #include <stddef.h>
 #include <stdint.h>
-
 #include <blake3.h>
 
 uint32_t orilink_hash32(const void* data, size_t len) {

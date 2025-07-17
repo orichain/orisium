@@ -322,14 +322,26 @@ ssize_t_status_t send_ipc_protocol_message(const char *label, int *uds_fd, const
     result.r_ssize_t = sendmsg(*uds_fd, &msg, 0);
     if (result.r_ssize_t == -1) {
         LOG_ERROR("%ssend_ipc_protocol_message sendmsg. %s", label, strerror(errno));
+        free(final_send_buffer);
+        if (serialized_ipc_data_buffer) {
+            free(serialized_ipc_data_buffer);
+        }
+        return result;
     } else if (result.r_ssize_t != (ssize_t)total_message_len_to_send) {
         LOG_ERROR("%sendmsg hanya mengirim %zd dari %zu byte!",
                 label, result.r_ssize_t, total_message_len_to_send);
+        free(final_send_buffer);
+        if (serialized_ipc_data_buffer) {
+            free(serialized_ipc_data_buffer);
+        }
+        return result;
     } else {
         LOG_DEBUG("%sBerhasil mengirim %zd byte.\n", label, result.r_ssize_t);
     }
     free(final_send_buffer);
-    free(serialized_ipc_data_buffer);
+    if (serialized_ipc_data_buffer) {
+        free(serialized_ipc_data_buffer);
+    }
     result.status = SUCCESS;
     return result;
 }
@@ -357,7 +369,7 @@ ipc_protocol_t_status_t receive_and_deserialize_ipc_message(const char *label, i
     ssize_t bytes_read_prefix_and_fd = recvmsg(*uds_fd, &msg_prefix, MSG_WAITALL);
     if (bytes_read_prefix_and_fd == -1) {
         if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            LOG_ERROR("%sreceive_and_deserialize_ipc_message recvmsg (length prefix + FD)", label, strerror(errno));
+            LOG_ERROR("%sreceive_and_deserialize_ipc_message recvmsg (length prefix + FD). %s", label, strerror(errno));
         }
         return deserialized_result;
     }
@@ -386,7 +398,7 @@ ipc_protocol_t_status_t receive_and_deserialize_ipc_message(const char *label, i
     }
     uint8_t *full_ipc_payload_buffer = (uint8_t *)malloc(total_ipc_payload_len);
     if (!full_ipc_payload_buffer) {
-        LOG_ERROR("%sreceive_and_deserialize_ipc_message: malloc failed for full_ipc_payload_buffer", label, strerror(errno));
+        LOG_ERROR("%sreceive_and_deserialize_ipc_message: malloc failed for full_ipc_payload_buffer. %s", label, strerror(errno));
         deserialized_result.status = FAILURE_NOMEM;
         return deserialized_result;
     }
@@ -402,7 +414,7 @@ ipc_protocol_t_status_t receive_and_deserialize_ipc_message(const char *label, i
     ssize_t bytes_read_payload = recvmsg(*uds_fd, &msg_payload, MSG_WAITALL);
     if (bytes_read_payload == -1) {
         if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            LOG_ERROR("%sreceive_and_deserialize_ipc_message recvmsg (payload)", label, strerror(errno));
+            LOG_ERROR("%sreceive_and_deserialize_ipc_message recvmsg (payload). %s", label, strerror(errno));
         }
         free(full_ipc_payload_buffer);
         deserialized_result.status = FAILURE;
@@ -420,9 +432,13 @@ ipc_protocol_t_status_t receive_and_deserialize_ipc_message(const char *label, i
     deserialized_result = ipc_deserialize(label, (const uint8_t*)full_ipc_payload_buffer, total_ipc_payload_len);
     if (deserialized_result.status != SUCCESS) {
         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", label, deserialized_result.status);
+        free(full_ipc_payload_buffer);
+        deserialized_result.status = FAILURE;
+        return deserialized_result;
     } else {
         LOG_DEBUG("%sipc_deserialize BERHASIL.", label);
     }
     free(full_ipc_payload_buffer);
+    deserialized_result.status = SUCCESS;
     return deserialized_result;
 }

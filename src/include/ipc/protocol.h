@@ -1,7 +1,6 @@
 #ifndef IPC_PROTOCOL_H
 #define IPC_PROTOCOL_H
 
-#include <arpa/inet.h>
 #include <stdlib.h>
 #include "types.h"
 #include "constants.h"

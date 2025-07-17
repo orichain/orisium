@@ -39,6 +39,12 @@
 //======================================================================
 // OriLink
 //======================================================================
+
+#define ORILINK_VERSION_BYTES 2
+#define ORILINK_VERSION_MAJOR 0x00
+#define ORILINK_VERSION_MINOR 0x01
+#define ORILINK_MAX_PACKET_SIZE 1400
+
 #define MAX_SESSIONS 10
 #define MAX_EPOLL_EVENTS 10
 #define MAX_BUFFER_SIZE 1500

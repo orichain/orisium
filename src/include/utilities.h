@@ -15,6 +15,8 @@
 #include <sys/stat.h>
 #include <arpa/inet.h>
 #include <stdbool.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 
 #include "log.h"
 #include "types.h"
@@ -169,6 +171,27 @@ static inline double uint8_be_to_double(const uint8_t in[8]) {
     memcpy(&value, &host_u64, sizeof(double));
     return value;
 }
+
+static inline bool sockaddr_equal(const struct sockaddr *a, const struct sockaddr *b) {
+    if (a->sa_family != b->sa_family) {
+        return false;
+    }
+
+    if (a->sa_family == AF_INET) {
+        const struct sockaddr_in *a4 = (const struct sockaddr_in *)a;
+        const struct sockaddr_in *b4 = (const struct sockaddr_in *)b;
+        return (a4->sin_port == b4->sin_port) &&
+               (memcmp(&a4->sin_addr, &b4->sin_addr, sizeof(struct in_addr)) == 0);
+    } else if (a->sa_family == AF_INET6) {
+        const struct sockaddr_in6 *a6 = (const struct sockaddr_in6 *)a;
+        const struct sockaddr_in6 *b6 = (const struct sockaddr_in6 *)b;
+        return (a6->sin6_port == b6->sin6_port) &&
+               (memcmp(&a6->sin6_addr, &b6->sin6_addr, sizeof(struct in6_addr)) == 0);
+    }
+
+    return false;
+}
+
 //Huruf_besar biar selalu ingat karena akan sering digunakan
 static inline status_t CHECK_BUFFER_BOUNDS(size_t current_offset, size_t bytes_to_write, size_t total_buffer_size) {
     if (current_offset + bytes_to_write > total_buffer_size) {

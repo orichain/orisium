@@ -8,6 +8,8 @@
 
 typedef enum {
     SUCCESS = (uint8_t)0x00,
+    FAILURE_IVLDMODE = (uint8_t)0xef,
+    FAILURE_DPLCT = (uint8_t)0xf0,
     FAILURE_OPNFL = (uint8_t)0xf1,
     FAILURE_NDFLMGC = (uint8_t)0xf2,
     FAILURE_RATELIMIT = (uint8_t)0xf3,
@@ -37,11 +39,12 @@ typedef enum {
 
 typedef enum {
     PT_SYN = (uint8_t)0x00,
-    PT_SYN_ACK = (uint8_t)0x01,
-    PT_ACK = (uint8_t)0x02,
-    PT_DATA = (uint8_t)0x03,
-    PT_FIN = (uint8_t)0x04,
-    PT_KEEPALIVE = (uint8_t)0x05
+    PT_SYN_ACK = (uint8_t)0x02,
+    PT_REUSED_SYN_ACK = (uint8_t)0x03,
+    PT_ACK = (uint8_t)0x04,
+    PT_DATA = (uint8_t)0x05,
+    PT_FIN = (uint8_t)0x06,
+    PT_KEEPALIVE = (uint8_t)0x07
 } udp_packet_type_t;
 
 typedef enum {
@@ -145,5 +148,12 @@ typedef struct {
     int is_acked;
     uint64_t sent_time;
 } udp_sent_packet_t;
+
+typedef struct {
+	int sock_fd;
+    int timer_fd;
+    int retry_count;
+    uint64_t hstime;
+} udp_handshake_t;
 
 #endif
