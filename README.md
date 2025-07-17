@@ -6,7 +6,7 @@
 
 # Orisium
 
-Orisium adalah jaringan *peer-to-peer* (P2P) berperforma tinggi yang dirancang untuk skalabilitas global, ketahanan terhadap serangan, dan desentralisasi yang kuat. Dengan arsitektur hierarkis yang dinamis dan mekanisme keamanan berlapis, Orisium menciptakan fondasi tangguh untuk aplikasi terdesentralisasi masa depan.
+Orisium adalah jaringan *peer-to-peer* (P2P) berperforma tinggi yang dirancang untuk skalabilitas global, ketahanan terhadap serangan, dan desentralisasi yang kuat. Dengan arsitektur hierarkis dinamis dan protokol khusus berbasis UDP, Orisium menciptakan fondasi tangguh untuk aplikasi terdesentralisasi masa depan.
 
 -----
 
@@ -14,183 +14,87 @@ Orisium adalah jaringan *peer-to-peer* (P2P) berperforma tinggi yang dirancang u
 
 ### **1. Arsitektur Jaringan Hierarkis Dinamis**
 
-Orisium mengadopsi struktur jaringan berlapis yang unik untuk skalabilitas dan ketahanan. Jaringan Root didasarkan pada sekitar **40 *zona waktu* unik** di seluruh dunia, yang secara langsung memetakan ke *shard* data.
+Orisium mengadopsi struktur jaringan berlapis untuk skalabilitas dan ketahanan ekstrem. Tidak ada root tetap — root dapat digantikan secara otomatis berdasarkan evaluasi horizontal oleh root lain.
 
-* **Node Root Bootstrap (3 Node)**: Ini adalah **fondasi awal jaringan** yang stabil, di-*hardcode* untuk mewakili 3 *zona waktu* spesifik yang berdekatan. Mereka adalah bagian dari total 40 Node Root, memiliki konektivitas horizontal terluas (terhubung ke semua 39 Node Root lainnya), dan **harus menyimpan basis data lengkap setiap *shard* *zona waktu***. Meskipun krusial di awal, node Bootstrap ini **dapat turun level** jika tidak mampu, namun akan tetap **menyediakan daftar IP** untuk membantu node baru menemukan jaringan.
-* **Node Root (Maks. 40 Node)**: Ini adalah **tulang punggung utama *sharding* *zona waktu***. Setiap Node Root secara eksklusif **mewakili satu dari sekitar 40 *zona waktu* unik** dan **harus menyimpan basis data lengkap** untuk *shard* tersebut. Setiap Node Root **terhubung ke semua 39 Node Root lainnya** untuk konsensus yang cepat dan penyebaran informasi global. Setiap Node Root dapat mengelola hingga **10 koneksi *Downstream* ke Node Level-1**. Node Root mengelola sub-jaringan di bawahnya dan dapat menjatuhkan level *horizontalstream* yang melanggar syarat.
-* **Node Level-1 (Maks. 400 Node)**: Berperan sebagai perantara penting di dalam *shard* *zona waktu* mereka. Node Level-1 memiliki **satu koneksi *Upstream* ke sebuah Node Root** dan **39 koneksi *Horizontalstream* ke Node Level-1 lainnya yang memiliki Root *Upstream* yang sama**. Node Level-1 dapat mengelola hingga **10 koneksi *Downstream* ke Node Level-2**. Node Level-1 sangat vital karena mereka dapat **berpindah *Upstream* Root** jika tidak memenuhi syarat, dan bahkan **mempromosikan diri menjadi Root baru** untuk mengisi slot kosong atau menggantikan Root yang bermasalah.
-* **Node Level-2 (Maks. 4000 Node)**: Terhubung ke **satu *Upstream* Node Level-1** dan memiliki **39 koneksi *Horizontalstream* ke Node Level-2 lainnya yang memiliki Root *Upstream* yang sama**. Setiap Node Level-2 dapat mengelola hingga **10 koneksi *Downstream* ke Node Level-3**. Node ini berfungsi memperluas jangkauan jaringan.
-* **Node Level-3 (Maks. 40000 Node)**: Terhubung ke **satu *Upstream* Node Level-2** dan memiliki **39 koneksi *Horizontalstream* ke Node Level-3 lainnya yang memiliki Root *Upstream* yang sama**. Setiap Node Level-3 dapat mengelola hingga **10 koneksi *Downstream* ke Node Level-4**. Node ini lebih lanjut memperluas jangkauan jaringan.
-* **Node Level-4 (Maks. 400000 Node)**: Lapisan terluar jaringan, terhubung ke **satu *Upstream* Node Level-3** dan memiliki **39 koneksi *Horizontalstream* ke Node Level-4 lainnya yang memiliki Root *Upstream* yang sama**. Node Level-4 bertanggung jawab untuk jangkauan massal ke pengguna akhir dan **tidak memiliki koneksi *Downstream***.
+* **Root Node (Maks. 40 Node)**: Titik pusat dalam jaringan untuk masing-masing *shard*. Dapat dijatuhkan oleh sesama root. Bertanggung jawab untuk manajemen upstream-downstream dan sinkronisasi global.
+* **Node Level-1 (Maks. 400 Node)**: Terhubung ke **1 upstream Root** dan memiliki **39 koneksi horizontal** ke sesama Level-1 dalam root yang sama. Dapat dijatuhkan oleh Level-1 lain melalui pernyataan resmi, bukan *gossip*.
+* **Node Level-2 hingga Level-4**: Meneruskan hierarki dengan pola yang sama. Setiap node memiliki **1 upstream**, **39 horizontal**, dan **hingga 10 downstream**.
 
-### **2. *Sharding* Kombinasi *Zona Waktu* dan *Tanggal* pada *Public Key***
+### **2. Routing & Reconnect Deterministik**
 
-Orisium memanfaatkan strategi *sharding* dua dimensi berdasarkan **zona waktu** dan **tanggal pembuatan alamat** untuk skalabilitas tinggi dan pengarsipan efisien:
+Setiap node klien:
 
-* **Identitas Tersemat: Zona Waktu dan Tanggal**: Setiap *public key*/alamat menyematkan dua komponen penting:
+1. Pertama kali terkoneksi ke Root.
+2. Root mengarahkan ke upstream yang sesuai (misalnya Level-1).
+3. Node menyimpan info upstream ke file/DB lokal.
+4. Saat restart atau kegagalan, node mencoba reconnect ke upstream lama, dan fallback ke Root jika gagal.
+5. Upstream dapat mengarahkan node untuk mengganti upstream.
 
-  * `tz_code` → menunjukkan zona waktu geografis.
-  * `date_code` → menunjukkan tanggal pembuatan, digunakan sebagai dasar pembagian historis.
+### **3. Custom Protocol di atas UDP**
 
-* **Routing Deterministik**: Dengan menyematkan kode zona waktu dan tanggal, sistem dapat langsung merutekan transaksi ke *shard* spesifik dengan struktur direktori seperti:
+Orisium tidak menggunakan TCP untuk koneksi antar-node. Seluruh komunikasi antar-node dijalankan dengan protokol ringan custom-built di atas UDP, memungkinkan:
 
-  ```bash
-  db/YYYYMMDD/tz-XX/
-  # contoh: db/20250707/tz-07/
-  ```
+* Latensi sangat rendah
+* Tidak tergantung handshake TCP
+* Implementasi kontrol jendela (*window control*), urutan pesan, dan retransmisi secara manual.
 
-* **Optimasi Latensi + Pengarsipan Mudah**:
+Fungsi `find_or_create_session()` menyimpan info sesi termasuk `connection_id`, `addr`, dan status handshaking, dengan window awal default misalnya 150000 byte.
 
-  * Akses lokal cepat karena berdasarkan zona.
-  * Pemangkasan (pruning) sangat mudah dilakukan berdasarkan tanggal.
+### **4. Sharding Berdasarkan Public Key (Hashing)**
 
-* **Pencarian Transaksi Terakhir Efisien**: Karena zona waktu ditentukan secara eksplisit, pencarian *last transaction* hanya perlu dilakukan dalam *shard* zona waktu tertentu, dimulai dari tanggal terbaru ke lama.
+Pembagian *shard* tidak lagi berdasarkan zona waktu, melainkan menggunakan **hash dari public key/address**. Ini memberikan:
 
-* **Struktur Kombinasi**:
+* Sebaran merata
+* Kemampuan distribusi tanpa bergantung pada lokasi geografis
+* Direktori seperti:
 
-  ```
-  address = date_code || tz_code || pubkey || checksum
-  ```
-
-* **Skalabilitas Horizontal + Temporal**: Memungkinkan rotasi writer per hari/zona, sharding time-aware, dan distribusi beban lintas wilayah dan waktu.
-
-```
- root tmz-1  <─────>   root tmz-2
-     ▲                     ▲
-     │                     │
-     ▼                     ▼
-n-level1[10]           n-level1[10]
-     ▲                     ▲
-     │                     │
-     ▼                     ▼
-n-level2[100]          n-level2[100]
-     ▲                     ▲
-     │                     │
-     ▼                     ▼
-n-level3[1000]         n-level3[1000]
-     ▲                     ▲
-     │                     │
-     ▼                     ▼
-n-level4[10000]        n-level4[10000]
-
-Dalam Address/Publickey ada prefix `date_code` + `tz_code`
+```bash
+db/hash-prefix/ab/cd/<rest-of-pubkey>/...
 ```
 
-### **3. Mekanisme Keamanan dan Ketahanan Canggih**
+Struktur address:
 
-Orisium mengimplementasikan pertahanan berlapis terhadap serangan dan beban berlebih:
-
-  * **Manajemen Koneksi Efisien (`epoll`/`kqueue`)**: Menggunakan `epoll`\`kqueue` untuk I/O *non-blocking* yang efisien, memungkinkan penanganan ribuan koneksi secara bersamaan dengan *overhead* minimal.
-  * ***Rate Limiting* Agresif (5 Detik)**: Mencegah klien membanjiri server dengan permintaan koneksi berulang. Klien yang melanggar akan dikenai penalti perpanjangan waktu, membuat penyerang atau *bot* sederhana sulit untuk terhubung. Klien P2P yang terprogram dengan baik mengimplementasikan strategi *backoff* yang selaras dengan waktu *rate limit* ini untuk pengalaman yang mulus.
-  * ***Inactivity Timeout***: Secara proaktif membersihkan koneksi yang tidak aktif atau mati, mencegah *resource exhaustion* dan serangan *slowloris*.
-  * **Pencegahan Koneksi Ganda**: Menolak koneksi dari IP yang sudah memiliki sesi aktif, membatasi *resource* yang dapat dihabiskan oleh satu sumber.
-  * **Batas Sesi Global**: Menjaga jumlah sesi aktif maksimum untuk melindungi stabilitas server.
-
-### **4. Distribusi Beban Cerdas**
-
-Orisium memastikan alokasi beban kerja yang efisien untuk kinerja optimal:
-
-  * ***Load Balancing* Adaptif**: Pemilihan *worker* IO untuk koneksi baru tidak hanya berdasarkan *Round-Robin*, tetapi memprioritaskan *worker* yang **terakhir kali menyelesaikan tugas terlama**. Ini memastikan distribusi beban yang lebih adaptif dan efisien.
+```
+address = prefix || pubkey || checksum
+```
 
 -----
 
-## Arsitektur
-
-Arsitektur Orisium mengintegrasikan berbagai komponen dan level node untuk menciptakan jaringan yang kuat, dengan detail alur internal sebagai berikut:
+## Arsitektur Modular
 
 ```
-            w-lmdb[1]     r-lmdb[50]
-                ▲             ▲
-                │             │
-                ▼             ▼ 
-sio[2] <─────>     master[1]      <─────> cow[50]
-                      ▲
-                      │
-                      ▼
-                    Logic
-
-Komunikasi internal / IPC:
-Protocol IPC lewat Unix Domain Socket
+┌──────────┐   ┌─────────┐   ┌────────┐
+│  master  │◄─►│   sio   │◄─►│ logic  │◄─► cow
+└──────────┘   └─────────┘   └────────┘
+                  │
+                  ▼
+             storage/lmdb
 ```
 
-### **1. Master**
-
-**Master** adalah orkestrator utama dan titik masuk node. Perannya adalah mengelola koneksi masuk dan memantau kesehatan node secara keseluruhan.
-
-  * **Menerima Koneksi Masuk**: Master menerima koneksi jaringan baru dari *peer* atau klien.
-  * **Mengarahkan ke Sio**: Master secara langsung meneruskan koneksi yang baru diterima (biasanya sebagai *file descriptor*) ke **Sio** *worker* yang sesuai untuk penanganan I/O.
-  * **Menerima Laporan Konsolidasi**: Master menerima metrik kinerja, *event* penting, dan laporan status dari **Logic**, bukan dari Sio atau Cow secara langsung. Ini membantu Master mempertahankan pandangan tingkat tinggi untuk *load balancing* dan manajemen node.
-
-### **2. Sio (Server I/O Workers)**
-
-**Sio** *worker* adalah penangan jaringan **masuk** khusus node. Mereka bertanggung jawab atas semua data yang mengalir *ke dalam* node dari koneksi yang diterima oleh Master.
-
-  * **Menangani Data Masuk**: Sio *worker* melakukan operasi baca/tulis *non-blocking* pada koneksi yang mereka kelola. Mereka bertanggung jawab untuk penerimaan data mentah dan *parsing* awal pesan masuk.
-  * **Memberi Umpan ke Logic**: Setiap pesan atau data yang di-*parse* yang memerlukan pemahaman tingkat aplikasi, validasi, atau respons **harus** diteruskan ke **Logic**. Sio tidak memulai respons atau koneksi eksternal sendiri; ia bertindak sebagai jembatan ke Logic.
-  * **Melapor via Logic**: Semua pembaruan status, kesalahan, atau metrik operasional dari Sio harus terlebih dahulu melalui **Logic** sebelum berpotensi diteruskan ke Master.
-
-### **3. Logic**
-
-**Logic** adalah unit pemrosesan sentral node. Ini adalah satu-satunya komponen yang memiliki pemahaman komprehensif tentang protokol jaringan, status node, dan bagaimana node berinteraksi. Logic bertindak sebagai **perantara tunggal** untuk semua aliran data penting.
-
-  * **Eksekusi Protokol Inti**: Logic menerima pesan yang di-*parse* dari Sio, memvalidasinya terhadap aturan Orisium, memproses transaksi, mengkueri basis data node, dan berpartisipasi dalam mekanisme konsensus (khususnya untuk Node Root).
-  * **Mengarahkan Aliran Keluar**: Berdasarkan pemrosesannya, Logic mengorkestrasi semua komunikasi keluar:
-      * **Respons via Sio**: Jika sebuah respons perlu dikirim kembali melalui koneksi masuk awal, Logic mengirimkan data yang telah diproses kembali ke Sio *worker* yang relevan.
-      * **Koneksi Eksternal via Cow**: Jika node perlu memulai koneksi baru ke *peer* lain (misalnya, membuat koneksi horizontal) atau mengirim data melalui koneksi keluar yang sudah ada, Logic mengeluarkan perintah dan data ke **Cow**.
-  * **Mengkonsolidasikan Laporan untuk Master**: Logic mengumpulkan dan memproses berbagai laporan (dari Sio, Cow, dan status internalnya sendiri) dan kemudian **mengirimkan laporan yang terkonsolidasi ini ke Master**. Ini memastikan Master menerima informasi yang disaring dan relevan untuk tugas manajemen tingkat tingginya.
-
-### **4. Cow (Client Outbound Writer)**
-
-**Cow** didedikasikan khusus untuk mengelola dan mengeksekusi semua **koneksi jaringan keluar** serta transmisi data dari node Orisium ke *peer* lain dalam jaringan.
-
-  * **Mengelola Koneksi Keluar**: Cow membangun dan memelihara semua koneksi keluar yang diperlukan, seperti 39 koneksi horizontal ke Node Root lainnya, atau koneksi ke node *Upstream*.
-  * **Mengirim Data Keluar**: Cow menerima data dan perintah dari **Logic** dan secara efisien mengirimkannya melalui koneksi keluar yang relevan.
-  * **Melapor via Logic**: Mirip dengan Sio, setiap pembaruan status, kesalahan, atau pemutusan koneksi yang terkait dengan koneksi keluar dilaporkan dari Cow ke **Logic**. Cow tidak berkomunikasi langsung dengan Master.
-
-### **5. Mekanisme Penyimpanan Data Otomatis & Validasi Shard (Semua Level)**
-
-Setiap node Orisium (kecuali mungkin Level-4 yang bisa hanya menjadi klien murni) dirancang untuk secara cerdas mengelola penyimpanan data *shard* berdasarkan kapasitas sumber daya yang tersedia, serta memvalidasi dan melaporkan integritas data tersebut. Fitur ini sangat penting untuk efisiensi, keandalan, dan desentralisasi jaringan, terutama bagi node yang bercita-cita untuk promosi:
-
-  * **Pendeteksian Ruang Disk**: Node akan secara otomatis **mendeteksi ketersediaan ruang hard disk** saat beroperasi atau memulai ulang.
-  * **Penyimpanan Kondisional**:
-      * Jika node mendeteksi ada **ruang hard disk yang mencukupi** (sesuai ambang batas yang ditentukan sistem), node tersebut akan **mulai atau melanjutkan proses penyimpanan data *shard*** yang relevan dengan *zona waktu*-nya.
-      * Namun, jika ruang hard disk **tidak memenuhi syarat** atau mencapai batas minimum, node akan **menghentikan proses penyimpanan data *shard***. Ini mencegah *resource exhaustion* dan memastikan node tetap stabil untuk tugas-tugas vital lainnya.
-  * **Validasi Data Shard Lokal**: Saat node level bawah berhasil menyimpan atau memperbarui data *shard* secara lokal (misalnya, setelah menerima blok baru atau *snapshot* dari *Upstream* mereka), mereka akan melakukan **validasi internal** terhadap data tersebut. Ini mengurangi kebutuhan untuk selalu bertanya ke Root untuk data yang sudah dimiliki.
-  * **Pelaporan dan *Signature* Root**: Setelah validasi lokal sukses, node level bawah akan **memberi laporan ke Root *Upstream*** mereka. Root node, setelah memverifikasi keabsahan laporan tersebut, akan memberikan **tanda tangan digital (*signature*)** yang berfungsi sebagai "sertifikat kelengkapan data". *Signature* ini mengonfirmasi bahwa node level bawah memiliki salinan data *shard* yang otentik dan terkini dari Root.
-  * **Prasyarat Promosi**: Kemampuan untuk menyimpan data *shard* yang valid dan memiliki *signature* dari Root adalah **syarat penting** bagi node di Level-1, Level-2, Level-3, dan Level-4 yang ingin memenuhi syarat untuk dipromosikan ke level yang lebih tinggi. Ini memastikan node yang naik level sudah memiliki data yang diperlukan dan terverifikasi.
+* **master** menerima koneksi UDP dan mem-forward ke SIO
+* **sio** menangani parsing awal dan validasi message
+* **logic** menjalankan protokol inti dan semua state machine
+* **cow** adalah outbound client untuk horizontal dan upstream
 
 -----
 
 ## Instalasi
 
-(Bagian ini akan berisi petunjuk instalasi proyek Anda. Contoh: mengkompilasi dari sumber, dependensi.)
-
 ```bash
-# Contoh langkah-langkah instalasi
 git clone https://github.com/yourusername/orisium.git
 cd orisium
 make
-./orisium_server
+./orisium_master
 ```
 
 -----
 
 ## Penggunaan
 
-(Bagian ini akan berisi contoh cara menjalankan dan berinteraksi dengan proyek Anda, baik sebagai *master*, *worker*, atau *node* P2P lainnya.)
-
 ```bash
-# Contoh perintah penggunaan
-./orisium_server --role master --config master_config.json
-./orisium_worker --id 1 --config worker_config.json
-./orisium_p2p_client --address <public_key_anda> --connect <ip_root>
+./orisium_master --config master.json
+./orisium_node --config node1.json
 ```
-
------
-
-## Kontribusi
-
-Kami menyambut kontribusi\! Silakan baca panduan kontribusi kami dan ajukan *pull request*.
 
 -----
 

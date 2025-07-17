@@ -11,6 +11,7 @@
 
 #include "constants.h"
 #include "types.h"
+#include "log.h"
 #include "orilink/net.h"
 #include "orilink/hash.h"
 
@@ -31,12 +32,13 @@ udp_session_t* find_or_create_session(udp_context_t *ctx, uint32_t conn_id, cons
         new_session->client_addr = *addr;
         new_session->client_addr_len = len;
         new_session->next_expected_seq = 1;
-        new_session->available_receive_window = 150000; // Contoh window awal
+        new_session->max_recv_buffer_size = 64;
+        new_session->available_receive_window = new_session->max_recv_buffer_size * MAX_BUFFER_SIZE;
         new_session->last_active_time = time(NULL);
         new_session->is_handshake_complete = 0;
         new_session->is_fin_received = 0;
         
-        printf("Server: Sesi baru dibuat untuk ID: %u\n", conn_id);
+        LOG_INFO("[OLNK Server]: Sesi baru dibuat untuk ID: %u", conn_id);
         return new_session;
     }
     return NULL;
@@ -252,6 +254,7 @@ void orilink_handle_syn(int sockfd, udp_session_t *session, udp_packet_t *receiv
         session->total_packets = ntohl(syn_pkt->total_packets);
 
         session->max_recv_buffer_size = session->total_packets > 0 ? session->total_packets : 100;
+        session->available_receive_window = session->max_recv_buffer_size * MAX_BUFFER_SIZE;
         session->recv_buffer = (udp_received_packet_t**)malloc(session->max_recv_buffer_size * sizeof(udp_received_packet_t*));
         if (!session->recv_buffer) {
             perror("malloc failed for dynamic buffer");
