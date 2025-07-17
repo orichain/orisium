@@ -63,12 +63,18 @@ address = prefix || pubkey || checksum
 ## Arsitektur Modular
 
 ```
-┌──────────┐   ┌─────────┐   ┌────────┐
-│  master  │◄─►│   sio   │◄─►│ logic  │◄─► cow
-└──────────┘   └─────────┘   └────────┘
-                  │
-                  ▼
-             storage/lmdb
+            w-lmdb[1]     r-lmdb[5]
+                ▲             ▲
+                │             │
+                ▼             ▼ 
+sio[2] <─────>     master[1]      <─────> cow[45]
+                      ▲
+                      │
+                      ▼
+                   Logic[4]
+
+Komunikasi internal / IPC:
+Protocol IPC lewat Unix Domain Socket
 ```
 
 * **master** menerima koneksi UDP dan mem-forward ke SIO
