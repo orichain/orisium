@@ -72,11 +72,6 @@ typedef struct {
     status_t status;
 } ipc_protocol_t_status_t;
 
-#include "ipc/client_request_task.h"
-#include "ipc/client_disconnect_info.h"
-#include "ipc/shutdown.h"
-#include "ipc/heartbeat.h"
-
 ssize_t_status_t send_ipc_protocol_message(const char *label, int *uds_fd, const ipc_protocol_t* p, int *fd_to_pass);
 ipc_protocol_t_status_t receive_and_deserialize_ipc_message(const char *label, int *uds_fd, int *actual_fd_received);
 

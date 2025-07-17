@@ -134,8 +134,6 @@ typedef struct {
     status_t status;
 } orilink_protocol_t_status_t;
 
-#include "orilink/syn.h"
-
 ssize_t_status_t send_orilink_protocol_packet(const char *label, int *sock_fd, const struct sockaddr *dest_addr, socklen_t *dest_addr_len, const orilink_protocol_t* p);
 orilink_protocol_t_status_t receive_and_deserialize_orilink_packet(const char *label, int *sock_fd, struct sockaddr *source_addr, socklen_t *source_addr_len);
 

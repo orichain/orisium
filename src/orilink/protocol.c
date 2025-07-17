@@ -127,7 +127,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, const uint8_t
     result.status = FAILURE;
 
     if (!buffer || len < (ORILINK_VERSION_BYTES + sizeof(orilink_protocol_type_t) + sizeof(uint32_t))) {
-        LOG_ERROR("%sBuffer terlalu kecil untuk Version dan Type. Len: %zu", label, len);
+        LOG_ERROR("%sBuffer terlalu kecil untuk Version, Type dan Chksum. Len: %zu", label, len);
         result.status = FAILURE_OOBUF;
         return result;
     }
