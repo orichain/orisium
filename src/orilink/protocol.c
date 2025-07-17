@@ -4,7 +4,9 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <endian.h>
 #include <stdint.h>
+#include <sys/uio.h>
 
 #include "utilities.h"
 #include "orilink/protocol.h"
@@ -219,6 +221,7 @@ orilink_protocol_t_status_t receive_and_deserialize_orilink_packet(const char *l
     deserialized_result = orilink_deserialize(label, (const uint8_t*)recv_buffer, n);
     if (deserialized_result.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", label, deserialized_result.status);
+        deserialized_result.status = FAILURE;
         return deserialized_result;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", label);
