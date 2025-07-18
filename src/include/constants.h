@@ -36,6 +36,9 @@
 #define IPC_VERSION_MAJOR 0x00
 #define IPC_VERSION_MINOR 0x01
 
+#define KALMAN_CALIBRATION_SAMPLES 20
+#define HEALTHY_THRESHOLD 75
+
 //======================================================================
 // OriLink
 //======================================================================

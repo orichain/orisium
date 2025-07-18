@@ -9,7 +9,7 @@
 typedef enum {
     ORILINK_SYN = (uint8_t)0x00,
     ORILINK_SYN_ACK = (uint8_t)0x02,
-    ORILINK_REUSED_SYN_ACK = (uint8_t)0x03,
+    ORILINK_NACK = (uint8_t)0x03,
     ORILINK_ACK = (uint8_t)0x04,
     ORILINK_SACK = (uint8_t)0x05,
     ORILINK_HEARTBEAT = (uint8_t)0x06,
@@ -35,11 +35,9 @@ typedef struct {
 typedef struct {
     uint64_t id;
     uint32_t pktnum;
-    uint32_t lackseq;
-    orilink_mode_t mode;
     uint16_t len;
-    uint8_t data[];
-} orilink_reused_syn_ack_t;
+    uint32_t data[];
+} orilink_nack_t;
 
 typedef struct {
     uint64_t id;
@@ -77,7 +75,7 @@ typedef struct {
 	union {
 		orilink_syn_t *orilink_syn;
 		orilink_syn_ack_t *orilink_syn_ack;
-		orilink_reused_syn_ack_t *orilink_reused_syn_ack;
+		orilink_nack_t *orilink_nack;
         orilink_ack_t *orilink_ack;
         orilink_sack_t *orilink_sack;
         orilink_heartbeat_t *orilink_heartbeat;
@@ -100,8 +98,8 @@ static inline void CLOSE_ORILINK_PROTOCOL(orilink_protocol_t **protocol_ptr) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_syn);
         } else if (x->type == ORILINK_SYN_ACK) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_syn_ack);
-        } else if (x->type == ORILINK_REUSED_SYN_ACK) {
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_reused_syn_ack);
+        } else if (x->type == ORILINK_NACK) {
+            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_nack);
         } else if (x->type == ORILINK_ACK) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_ack);
         } else if (x->type == ORILINK_SACK) {

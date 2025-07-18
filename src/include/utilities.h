@@ -47,6 +47,25 @@ static inline status_t set_nonblocking(const char* label, int fd) {
     return SUCCESS;
 }
 
+static inline float calculate_average(const float* data, int num_elements) {
+    if (num_elements == 0) return 0.0f;
+    float sum = 0.0f;
+    for (int i = 0; i < num_elements; ++i) {
+        sum += data[i];
+    }
+    return sum / (float)num_elements;
+}
+
+static inline float calculate_variance(const float* data, int num_elements, float mean) {
+    if (num_elements <= 1) return 0.0f;
+    float sum_squared_diff = 0.0f;
+    for (int i = 0; i < num_elements; ++i) {
+        float diff = data[i] - mean;
+        sum_squared_diff += diff * diff;
+    }
+    return sum_squared_diff / (float)(num_elements - 1);
+}
+
 static inline status_t convert_str_to_ipv6_bin(const char *ip_str, uint8_t out_ipv6[IP_ADDRESS_LEN]) {
     struct in_addr ipv4;
     struct in6_addr ipv6;

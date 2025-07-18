@@ -10,6 +10,7 @@
 #include "async.h"
 #include "globals.h"
 #include "utilities.h"
+#include "kalman.h"
 #include "types.h"
 #include "master/socket_listenner.h"
 #include "master/ipc.h"
@@ -18,6 +19,7 @@
 #include "ipc/protocol.h"
 #include "ipc/shutdown.h"
 #include "sessions/master_session.h"
+
 
 status_t setup_master(master_context *master_ctx) {
     const char *label = "[Master]: ";
@@ -220,63 +222,72 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
     }
     uint64_t_status_t rt = get_realtime_time_ns(label);
     uint64_t now_ns = rt.r_uint64_t;
+
     if (m->first_check_healthy == (uint8_t)0x01) {
         m->first_check_healthy = (uint8_t)0x00;
+        kalman_init(&m->health_kalman_filter, 0.5f, 5.0f, 100.0f, 100.0f);
         m->healthypct = 100.0;
         m->ishealthy = true;
         m->last_checkhealthy = now_ns;
+        m->kalman_initialized_count = 0;
+        m->count_ack = 0;
+        m->sum_hbtime = m->hbtime;
         LOG_DEVEL_DEBUG("%s[%s %d] First-time health check -> assumed healthy (100%%)", label, worker_name, index);
         return SUCCESS;
     }
-    if (m->count_ack == (double)0) {
-        m->healthypct = (double)0;
-        m->ishealthy = false;
-        m->last_checkhealthy = now_ns;
-        m->sum_hbtime = m->hbtime;
-        LOG_DEVEL_DEBUG("%s[%s %d] health ratio: %.2f%% [%s]",
-              label, worker_name, index, m->healthypct,
-              m->ishealthy ? "HEALTHY" : "UNHEALTHY");
-        return SUCCESS;
-    }
-    double ttl_delay_jitter = (m->sum_hbtime - m->hbtime)-((double)WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT * m->count_ack);
     double actual_elapsed_sec = (double)(now_ns - m->last_checkhealthy) / 1e9;
+    double ttl_delay_jitter = (m->sum_hbtime - m->hbtime) - ((double)WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT * m->count_ack);
     double setup_elapsed_sec = (double)WORKER_HEARTBEATSEC_TIMEOUT + ttl_delay_jitter;
     double setup_count_ack = setup_elapsed_sec / (double)WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT;
     double comp_elapsed_sec = actual_elapsed_sec / setup_elapsed_sec;
     double expected_count_ack = setup_count_ack * comp_elapsed_sec;
-    double health_ratio = m->count_ack / expected_count_ack;
-    m->prior_healthypct = m->healthypct;
-    m->healthypct = health_ratio * 100.0;
-    if (m->carry_healthypct != (double)0) {
-        m->healthypct += m->carry_healthypct;
-        m->carry_healthypct = (double)0;
+    float current_health_ratio_measurement;
+    if (expected_count_ack == (double)0) {
+        current_health_ratio_measurement = 0.0f;
+    } else {
+        current_health_ratio_measurement = (float)(m->count_ack / expected_count_ack);
     }
-    if (m->healthypct > (double)100) {
-        m->carry_healthypct = m->healthypct - (double)100;
-        m->healthypct = (double)100;
+    current_health_ratio_measurement *= 100.0f;
+    if (current_health_ratio_measurement < 0.0f) current_health_ratio_measurement = 0.0f;
+    if (current_health_ratio_measurement > 1000.0f) current_health_ratio_measurement = 1000.0f;
+    if (m->kalman_initialized_count < KALMAN_CALIBRATION_SAMPLES) {
+        m->kalman_calibration_samples[m->kalman_initialized_count] = current_health_ratio_measurement;
+        m->kalman_initialized_count++;
+        if (m->kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
+            float avg_health = calculate_average(m->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
+            float var_health = calculate_variance(m->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_health);
+            if (var_health < 0.1f) var_health = 0.1f;
+            float kalman_q = 1.0f;
+            float kalman_r = var_health;
+            float kalman_p0 = var_health * 2.0f;
+            kalman_init(&m->health_kalman_filter, kalman_q, kalman_r, kalman_p0, avg_health);
+            LOG_DEVEL_DEBUG("%s[%s %d] Kalman Health Filter initialized. Avg: %.2f, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
+                            label, worker_name, index, avg_health, var_health, kalman_q, kalman_r, kalman_p0);
+        } else {
+            //m->healthypct = current_health_ratio_measurement;
+            //m->ishealthy = (m->healthypct >= HEALTHY_THRESHOLD);
+            m->healthypct = 100.0;
+            m->ishealthy = true;
+            m->last_checkhealthy = now_ns;
+            m->count_ack = (double)0;
+            m->sum_hbtime = m->hbtime;
+            LOG_DEVEL_DEBUG("%s[%s %d] Calibrating health... (%d/%d) -> %.2f%% [%s]",
+                            label, worker_name, index, m->kalman_initialized_count, KALMAN_CALIBRATION_SAMPLES,
+                            m->healthypct, m->ishealthy ? "HEALTHY" : "UNHEALTHY");
+            return SUCCESS;
+        }
     }
-    double avg_healthypct = (m->prior_healthypct + m->healthypct) / (double)2;
-    if (m->healthypct != avg_healthypct) {
-        m->carry_healthypct += m->healthypct - avg_healthypct;
-        m->healthypct = avg_healthypct;
-    }
-    if (m->carry_healthypct < (double)-250) {
-        m->carry_healthypct = (double)-250;
-    }
-    if (m->carry_healthypct > (double)250) {
-        m->carry_healthypct = (double)250;
-    }
-    m->ishealthy = (m->healthypct >= (double)75);
+    m->healthypct = kalman_filter(&m->health_kalman_filter, current_health_ratio_measurement);
+    if (m->healthypct < 0.0f) m->healthypct = 0.0f;
+    if (m->healthypct > 100.0f) m->healthypct = 100.0f;
+    m->ishealthy = (m->healthypct >= HEALTHY_THRESHOLD);
     m->last_checkhealthy = now_ns;
-    double tmp_count_ack = m->count_ack;
     m->count_ack = (double)0;
     m->sum_hbtime = m->hbtime;
     LOG_DEVEL_DEBUG(
-        "%s[%s %d] act elpse: %.2f stp elpse: %.2f exp ack: %.2f act ack: %.2f cry: %.2f -> health: %.2f%% [%s]",
+        "%s[%s %d] Meas health: %.2f%% -> Est health: %.2f%% [%s]",
         label, worker_name, index,
-        actual_elapsed_sec, setup_elapsed_sec,
-        expected_count_ack, tmp_count_ack,
-        m->carry_healthypct,
+        current_health_ratio_measurement,
         m->healthypct,
         m->ishealthy ? "HEALTHY" : "UNHEALTHY"
     );

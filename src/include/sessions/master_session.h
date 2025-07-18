@@ -5,6 +5,7 @@
 
 #include "types.h"
 #include "constants.h"
+#include "kalman.h"
 
 //======================================================================
 // new_avg = ((last_avg * count) + current_task_time) / (count + 1);
@@ -15,6 +16,11 @@ typedef struct {
     double count_ack;
     uint64_t last_ack;
     uint64_t last_checkhealthy;
+    
+    kalman_t health_kalman_filter;
+    int kalman_initialized_count;
+    float kalman_calibration_samples[KALMAN_CALIBRATION_SAMPLES];
+    
     double carry_healthypct;
     double prior_healthypct;
     double healthypct;
