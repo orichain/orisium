@@ -8,13 +8,19 @@
 
 typedef enum {
     ORILINK_SYN = (uint8_t)0x00,
-    ORILINK_SYN_ACK = (uint8_t)0x02,
-    ORILINK_NACK = (uint8_t)0x03,
-    ORILINK_ACK = (uint8_t)0x04,
-    ORILINK_SACK = (uint8_t)0x05,
-    ORILINK_HEARTBEAT = (uint8_t)0x06,
-    ORILINK_DATA = (uint8_t)0x07,
-    ORILINK_FIN = (uint8_t)0x08
+    ORILINK_SYN_ACK = (uint8_t)0x01,
+    ORILINK_HEARTBEAT = (uint8_t)0x02,
+    ORILINK_HEARTBEAT_ACK = (uint8_t)0x03,
+    ORILINK_STARTDT = (uint8_t)0x04,
+    ORILINK_STARTDT_ACK = (uint8_t)0x05,    
+    ORILINK_STATUSDT = (uint8_t)0x06,
+    ORILINK_STATUSDT_NACK = (uint8_t)0x07,
+    ORILINK_DATA = (uint8_t)0x08,
+    ORILINK_DATA_SACK = (uint8_t)0x09,
+    ORILINK_FINISHDT = (uint8_t)0x01,
+    ORILINK_FINISHDT_ACK = (uint8_t)0x0b,
+    ORILINK_FIN = (uint8_t)0x0c,
+    ORILINK_FIN_ACK = (uint8_t)0x0d
 } orilink_protocol_type_t;
 
 typedef enum {
@@ -24,8 +30,6 @@ typedef enum {
 
 typedef struct {
     uint64_t id;
-    uint32_t pktnum;
-    orilink_mode_t mode;
 } orilink_syn_t;
 
 typedef struct {
@@ -75,12 +79,6 @@ typedef struct {
 	union {
 		orilink_syn_t *orilink_syn;
 		orilink_syn_ack_t *orilink_syn_ack;
-		orilink_nack_t *orilink_nack;
-        orilink_ack_t *orilink_ack;
-        orilink_sack_t *orilink_sack;
-        orilink_heartbeat_t *orilink_heartbeat;
-        orilink_data_t *orilink_data;
-        orilink_fin_t *orilink_fin;
 	} payload;
 } orilink_protocol_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan
@@ -98,18 +96,6 @@ static inline void CLOSE_ORILINK_PROTOCOL(orilink_protocol_t **protocol_ptr) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_syn);
         } else if (x->type == ORILINK_SYN_ACK) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_syn_ack);
-        } else if (x->type == ORILINK_NACK) {
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_nack);
-        } else if (x->type == ORILINK_ACK) {
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_ack);
-        } else if (x->type == ORILINK_SACK) {
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_sack);
-        } else if (x->type == ORILINK_HEARTBEAT) {
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat);
-        } else if (x->type == ORILINK_DATA) {
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_data);
-        } else if (x->type == ORILINK_FIN) {
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_fin);
         }
         free(x);
         *protocol_ptr = NULL;

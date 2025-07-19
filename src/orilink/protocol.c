@@ -10,6 +10,7 @@
 #include "utilities.h"
 #include "orilink/protocol.h"
 #include "orilink/syn.h"
+#include "orilink/syn_ack.h"
 #include "types.h"
 #include "log.h"
 #include "constants.h"
@@ -28,7 +29,17 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                 result.status = FAILURE;
                 return result;
             }
-            payload_fixed_size = sizeof(uint64_t) + sizeof(uint32_t) + sizeof(orilink_mode_t);
+            payload_fixed_size = sizeof(uint64_t);
+            payload_dynamic_size = 0;
+            break;
+        }
+        case ORILINK_SYN_ACK: {
+            if (!p->payload.orilink_syn_ack) {
+                LOG_ERROR("%sORILINK_SYN_ACK payload is NULL.", label);
+                result.status = FAILURE;
+                return result;
+            }
+            payload_fixed_size = sizeof(uint64_t);
             payload_dynamic_size = 0;
             break;
         }
@@ -104,6 +115,9 @@ ssize_t_status_t orilink_serialize(const char *label, const orilink_protocol_t* 
         case ORILINK_SYN:
             result_pyld = orilink_serialize_syn(label, p->payload.orilink_syn, current_buffer, *buffer_size, &offset);
             break;
+        case ORILINK_SYN_ACK:
+            result_pyld = orilink_serialize_syn_ack(label, p->payload.orilink_syn_ack, current_buffer, *buffer_size, &offset);
+            break;
         default:
             LOG_ERROR("%sUnknown protocol type for serialization: 0x%02x", label, p->type);
             result.status = FAILURE_OPYLD;
@@ -150,7 +164,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, const uint8_t
     status_t result_pyld = FAILURE;
     switch (p->type) {
 		case ORILINK_SYN: {
-			if (current_buffer_offset + sizeof(uint64_t) + sizeof(uint32_t) + sizeof(orilink_mode_t) > len) {
+			if (current_buffer_offset + sizeof(uint64_t) > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_SYN fixed header.", label);
                 CLOSE_ORILINK_PROTOCOL(&p);
                 result.status = FAILURE_OOBUF;
@@ -165,6 +179,24 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, const uint8_t
             }
             p->payload.orilink_syn = task_payload;
             result_pyld = orilink_deserialize_syn(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case ORILINK_SYN_ACK: {
+			if (current_buffer_offset + sizeof(uint64_t) > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_SYN_ACK fixed header.", label);
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            orilink_syn_ack_t *task_payload = (orilink_syn_ack_t*) calloc(1, sizeof(orilink_syn_ack_t));
+            if (!task_payload) {
+                LOG_ERROR("%sFailed to allocate orilink_syn_ack_t without FAM. %s", label, strerror(errno));
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.orilink_syn_ack = task_payload;
+            result_pyld = orilink_deserialize_syn_ack(label, p, buffer, len, &current_buffer_offset);
             break;
 		}
         default:
