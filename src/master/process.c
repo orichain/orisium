@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <bits/types/sig_atomic_t.h>
+#include <stdlib.h>
 
 #include "log.h"
 #include "constants.h"
@@ -226,15 +227,15 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
     if (m->first_check_healthy == (uint8_t)0x01) {
         m->first_check_healthy = (uint8_t)0x00;
         kalman_init(&m->health_kalman_filter, 0.5f, 5.0f, 100.0f, 100.0f);
-        m->kalman_calibration_samples = (float *)malloc(KALMAN_CALIBRATION_SAMPLES * sizeof(float));
-        if (!m->kalman_calibration_samples) {
+        m->health_kalman_calibration_samples = (float *)malloc(KALMAN_CALIBRATION_SAMPLES * sizeof(float));
+        if (!m->health_kalman_calibration_samples) {
             LOG_ERROR("%s[%s %d] Failed to allocate calibration samples", label, worker_name, index);
             return FAILURE;
         }
         m->healthypct = 100.0;
         m->ishealthy = true;
         m->last_checkhealthy = now_ns;
-        m->kalman_initialized_count = 0;
+        m->health_kalman_initialized_count = 0;
         m->count_ack = 0;
         m->sum_hbtime = m->hbtime;
         LOG_DEVEL_DEBUG("%s[%s %d] First-time health check -> assumed healthy (100%%)", label, worker_name, index);
@@ -255,14 +256,14 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
     current_health_ratio_measurement *= 100.0f;
     if (current_health_ratio_measurement < 0.0f) current_health_ratio_measurement = 0.0f;
     if (current_health_ratio_measurement > 1000.0f) current_health_ratio_measurement = 1000.0f;
-    if (m->kalman_initialized_count < KALMAN_CALIBRATION_SAMPLES) {
-        memcpy(m->kalman_calibration_samples + m->kalman_initialized_count, &current_health_ratio_measurement, sizeof(float));
-        m->kalman_initialized_count++;
-        if (m->kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
-            float avg_health = calculate_average(m->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
-            float var_health = calculate_variance(m->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_health);
-            free(m->kalman_calibration_samples);
-            m->kalman_calibration_samples = NULL;
+    if (m->health_kalman_initialized_count < KALMAN_CALIBRATION_SAMPLES) {
+        memcpy(m->health_kalman_calibration_samples + m->health_kalman_initialized_count, &current_health_ratio_measurement, sizeof(float));
+        m->health_kalman_initialized_count++;
+        if (m->health_kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
+            float avg_health = calculate_average(m->health_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
+            float var_health = calculate_variance(m->health_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_health);
+            free(m->health_kalman_calibration_samples);
+            m->health_kalman_calibration_samples = NULL;
             if (var_health < 0.1f) var_health = 0.1f;
             float kalman_q = 1.0f;
             float kalman_r = var_health;
@@ -279,7 +280,7 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
             m->count_ack = (double)0;
             m->sum_hbtime = m->hbtime;
             LOG_DEVEL_DEBUG("%s[%s %d] Calibrating health... (%d/%d) -> %.2f%% [%s]",
-                            label, worker_name, index, m->kalman_initialized_count, KALMAN_CALIBRATION_SAMPLES,
+                            label, worker_name, index, m->health_kalman_initialized_count, KALMAN_CALIBRATION_SAMPLES,
                             m->healthypct, m->ishealthy ? "HEALTHY" : "UNHEALTHY");
             return SUCCESS;
         }

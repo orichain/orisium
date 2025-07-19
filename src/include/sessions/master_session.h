@@ -16,9 +16,15 @@ typedef struct {
     double count_ack;
     uint64_t last_ack;
     uint64_t last_checkhealthy;    
+    
     kalman_t health_kalman_filter;
-    int kalman_initialized_count;
-    float *kalman_calibration_samples; 
+    int health_kalman_initialized_count;
+    float *health_kalman_calibration_samples; 
+    
+    kalman_t avgtt_kalman_filter;
+    int avgtt_kalman_initialized_count;
+    float *avgtt_kalman_calibration_samples;
+    
     double healthypct;
     bool isactive;
     bool ishealthy;
