@@ -15,14 +15,10 @@ typedef struct {
     double sum_hbtime;
     double count_ack;
     uint64_t last_ack;
-    uint64_t last_checkhealthy;
-    
+    uint64_t last_checkhealthy;    
     kalman_t health_kalman_filter;
     int kalman_initialized_count;
-    float kalman_calibration_samples[KALMAN_CALIBRATION_SAMPLES];
-    
-    double carry_healthypct;
-    double prior_healthypct;
+    float *kalman_calibration_samples; 
     double healthypct;
     bool isactive;
     bool ishealthy;

@@ -153,13 +153,12 @@ double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_t
         initial_delay_ms = MAX_INITIAL_DELAY_MS;
     }
     uint64_t_status_t rt = get_realtime_time_ns(label);
+    metrics->kalman_calibration_samples = NULL;
     metrics->sum_hbtime = (double)0;
     metrics->hbtime = (double)0;
     metrics->count_ack = (double)0;
     metrics->last_ack = rt.r_uint64_t;
     metrics->last_checkhealthy = rt.r_uint64_t;
-    metrics->carry_healthypct = (double)0;
-    metrics->prior_healthypct = (double)100;
     metrics->healthypct = (double)100;
     metrics->isactive = true;
     metrics->ishealthy = true;
@@ -363,30 +362,35 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
 void workers_cleanup(master_context *master_ctx) {
     LOG_INFO("[Master]: Performing cleanup...");
     for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
+        if (master_ctx->sio_state[i].metrics.kalman_calibration_samples) free(master_ctx->sio_state[i].metrics.kalman_calibration_samples);
 		async_delete_event("[Master]: ", &master_ctx->master_async, &master_ctx->sio[i].uds[0]);
         CLOSE_UDS(&master_ctx->sio[i].uds[0]);
 		CLOSE_UDS(&master_ctx->sio[i].uds[1]);
 		CLOSE_PID(&master_ctx->sio[i].pid);
     }
     for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
+        if (master_ctx->logic_state[i].metrics.kalman_calibration_samples) free(master_ctx->logic_state[i].metrics.kalman_calibration_samples);
 		async_delete_event("[Master]: ", &master_ctx->master_async, &master_ctx->logic[i].uds[0]);
         CLOSE_UDS(&master_ctx->logic[i].uds[0]);
 		CLOSE_UDS(&master_ctx->logic[i].uds[1]);
 		CLOSE_PID(&master_ctx->logic[i].pid);
     }
     for (int i = 0; i < MAX_COW_WORKERS; ++i) {
+        if (master_ctx->cow_state[i].metrics.kalman_calibration_samples) free(master_ctx->cow_state[i].metrics.kalman_calibration_samples);
 		async_delete_event("[Master]: ", &master_ctx->master_async, &master_ctx->cow[i].uds[0]);
         CLOSE_UDS(&master_ctx->cow[i].uds[0]);
 		CLOSE_UDS(&master_ctx->cow[i].uds[1]);
 		CLOSE_PID(&master_ctx->cow[i].pid);
     }
     for (int i = 0; i < MAX_DBR_WORKERS; ++i) {
+        if (master_ctx->dbr_state[i].metrics.kalman_calibration_samples) free(master_ctx->dbr_state[i].metrics.kalman_calibration_samples);
 		async_delete_event("[Master]: ", &master_ctx->master_async, &master_ctx->dbr[i].uds[0]);
         CLOSE_UDS(&master_ctx->dbr[i].uds[0]);
 		CLOSE_UDS(&master_ctx->dbr[i].uds[1]);
 		CLOSE_PID(&master_ctx->dbr[i].pid);
     }
     for (int i = 0; i < MAX_DBW_WORKERS; ++i) {
+        if (master_ctx->dbw_state[i].metrics.kalman_calibration_samples) free(master_ctx->dbw_state[i].metrics.kalman_calibration_samples);
 		async_delete_event("[Master]: ", &master_ctx->master_async, &master_ctx->dbw[i].uds[0]);
         CLOSE_UDS(&master_ctx->dbw[i].uds[0]);
 		CLOSE_UDS(&master_ctx->dbw[i].uds[1]);
