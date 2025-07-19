@@ -153,8 +153,14 @@ double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_t
         initial_delay_ms = MAX_INITIAL_DELAY_MS;
     }
     uint64_t_status_t rt = get_realtime_time_ns(label);
+    metrics->first_check_healthy = (uint8_t)0x01;
     metrics->health_kalman_calibration_samples = NULL;
+    metrics->health_kalman_initialized_count = 0;
+    metrics->health_temp_ewma_value = (float)0;
+    metrics->first_check_avgtt = (uint8_t)0x01;
     metrics->avgtt_kalman_calibration_samples = NULL;
+    metrics->avgtt_kalman_initialized_count = 0;
+    metrics->avgtt_temp_ewma_value = (float)0;
     metrics->sum_hbtime = (double)0;
     metrics->hbtime = (double)0;
     metrics->count_ack = (double)0;
@@ -163,7 +169,6 @@ double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_t
     metrics->healthypct = (double)100;
     metrics->isactive = true;
     metrics->ishealthy = true;
-    metrics->first_check_healthy = (uint8_t)0x01;
     metrics->last_task_started = rt.r_uint64_t;
     metrics->last_task_finished = rt.r_uint64_t;
     metrics->longest_task_time = 0ULL;

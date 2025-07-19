@@ -223,23 +223,20 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
     }
     uint64_t_status_t rt = get_realtime_time_ns(label);
     uint64_t now_ns = rt.r_uint64_t;
-
     if (m->first_check_healthy == (uint8_t)0x01) {
         m->first_check_healthy = (uint8_t)0x00;
-        kalman_init(&m->health_kalman_filter, 0.5f, 5.0f, 100.0f, 100.0f);
-        m->health_kalman_calibration_samples = (float *)malloc(KALMAN_CALIBRATION_SAMPLES * sizeof(float));
-        if (!m->health_kalman_calibration_samples) {
-            LOG_ERROR("%s[%s %d] Failed to allocate calibration samples", label, worker_name, index);
-            return FAILURE;
-        }
-        m->healthypct = 100.0;
+        m->healthypct = 100.0f;
         m->ishealthy = true;
         m->last_checkhealthy = now_ns;
-        m->health_kalman_initialized_count = 0;
         m->count_ack = 0;
         m->sum_hbtime = m->hbtime;
+        m->health_kalman_filter.is_initialized = false;
+        m->health_kalman_initialized_count = 0;
+        if (m->health_kalman_calibration_samples != NULL) {
+            free(m->health_kalman_calibration_samples);
+            m->health_kalman_calibration_samples = NULL;
+        }
         LOG_DEVEL_DEBUG("%s[%s %d] First-time health check -> assumed healthy (100%%)", label, worker_name, index);
-        return SUCCESS;
     }
     double actual_elapsed_sec = (double)(now_ns - m->last_checkhealthy) / 1e9;
     double ttl_delay_jitter = (m->sum_hbtime - m->hbtime) - ((double)WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT * m->count_ack);
@@ -248,49 +245,67 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
     double comp_elapsed_sec = actual_elapsed_sec / setup_elapsed_sec;
     double expected_count_ack = setup_count_ack * comp_elapsed_sec;
     float current_health_ratio_measurement;
-    if (expected_count_ack == (double)0) {
-        current_health_ratio_measurement = 0.0f;
+    if (expected_count_ack <= 0.0) {
+        current_health_ratio_measurement = 100.0f;
     } else {
         current_health_ratio_measurement = (float)(m->count_ack / expected_count_ack);
     }
     current_health_ratio_measurement *= 100.0f;
     if (current_health_ratio_measurement < 0.0f) current_health_ratio_measurement = 0.0f;
-    if (current_health_ratio_measurement > 1000.0f) current_health_ratio_measurement = 1000.0f;
-    if (m->health_kalman_initialized_count < KALMAN_CALIBRATION_SAMPLES) {
-        memcpy(m->health_kalman_calibration_samples + m->health_kalman_initialized_count, &current_health_ratio_measurement, sizeof(float));
-        m->health_kalman_initialized_count++;
-        if (m->health_kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
-            float avg_health = calculate_average(m->health_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
-            float var_health = calculate_variance(m->health_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_health);
-            free(m->health_kalman_calibration_samples);
-            m->health_kalman_calibration_samples = NULL;
-            if (var_health < 0.1f) var_health = 0.1f;
-            float kalman_q = 1.0f;
-            float kalman_r = var_health;
-            float kalman_p0 = var_health * 2.0f;
-            kalman_init(&m->health_kalman_filter, kalman_q, kalman_r, kalman_p0, avg_health);
-            LOG_DEVEL_DEBUG("%s[%s %d] Kalman Health Filter initialized. Avg: %.2f, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
-                            label, worker_name, index, avg_health, var_health, kalman_q, kalman_r, kalman_p0);
-        } else {
-            //m->healthypct = current_health_ratio_measurement;
-            //m->ishealthy = (m->healthypct >= HEALTHY_THRESHOLD);
-            m->healthypct = 100.0;
-            m->ishealthy = true;
-            m->last_checkhealthy = now_ns;
-            m->count_ack = (double)0;
-            m->sum_hbtime = m->hbtime;
-            LOG_DEVEL_DEBUG("%s[%s %d] Calibrating health... (%d/%d) -> %.2f%% [%s]",
-                            label, worker_name, index, m->health_kalman_initialized_count, KALMAN_CALIBRATION_SAMPLES,
-                            m->healthypct, m->ishealthy ? "HEALTHY" : "UNHEALTHY");
-            return SUCCESS;
+    if (current_health_ratio_measurement > 200.0f) current_health_ratio_measurement = 200.0f;
+    if (!m->health_kalman_filter.is_initialized) {
+        if (m->health_kalman_calibration_samples == NULL) {
+            m->health_kalman_calibration_samples = (float *)malloc(KALMAN_CALIBRATION_SAMPLES * sizeof(float));
+            if (!m->health_kalman_calibration_samples) {
+                m->healthypct = current_health_ratio_measurement;
+                m->ishealthy = (m->healthypct >= HEALTHY_THRESHOLD);
+                m->last_checkhealthy = now_ns;
+                m->count_ack = 0;
+                m->sum_hbtime = m->hbtime;
+                LOG_ERROR("%s[%s %d] Failed to allocate health calibration samples. Fallback to raw measurement.", label, worker_name, index);
+                return FAILURE;
+            }
+            m->health_temp_ewma_value = current_health_ratio_measurement;
         }
+        if (m->health_kalman_initialized_count < KALMAN_CALIBRATION_SAMPLES) {
+            m->health_kalman_calibration_samples[m->health_kalman_initialized_count] = current_health_ratio_measurement;
+            m->health_kalman_initialized_count++;
+            if (m->health_kalman_initialized_count > 1) {
+                m->health_temp_ewma_value = KALMAN_ALPHA_EWMA * current_health_ratio_measurement + (1.0f - KALMAN_ALPHA_EWMA) * m->health_temp_ewma_value;
+            }
+            if (m->health_kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
+                float avg_health = calculate_average(m->health_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
+                float var_health = calculate_variance(m->health_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_health);
+                free(m->health_kalman_calibration_samples);
+                m->health_kalman_calibration_samples = NULL;
+                if (var_health < 0.1f) var_health = 0.1f;               
+                float kalman_q = 1.0f;
+                float kalman_r = var_health;
+                float kalman_p0 = var_health * 2.0f;
+                kalman_init(&m->health_kalman_filter, kalman_q, kalman_r, kalman_p0, avg_health);
+                m->health_kalman_filter.is_initialized = true;
+                m->healthypct = m->health_kalman_filter.state_estimate;
+                LOG_DEVEL_DEBUG("%s[%s %d] Kalman Health Filter fully initialized. Avg: %.2f, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
+                                label, worker_name, index, avg_health, var_health, kalman_q, kalman_r, kalman_p0);
+            } else {
+                m->healthypct = m->health_temp_ewma_value;
+                LOG_DEVEL_DEBUG("Calibrating health... (%d/%d) -> Meas: %.2f -> EWMA: %.2f",
+                                m->health_kalman_initialized_count, KALMAN_CALIBRATION_SAMPLES,
+                                current_health_ratio_measurement, m->health_temp_ewma_value);
+            }
+        }
+        m->ishealthy = (m->healthypct >= HEALTHY_THRESHOLD);
+        m->last_checkhealthy = now_ns;
+        m->count_ack = 0;
+        m->sum_hbtime = m->hbtime;
+        return SUCCESS;
     }
     m->healthypct = kalman_filter(&m->health_kalman_filter, current_health_ratio_measurement);
     if (m->healthypct < 0.0f) m->healthypct = 0.0f;
     if (m->healthypct > 100.0f) m->healthypct = 100.0f;
     m->ishealthy = (m->healthypct >= HEALTHY_THRESHOLD);
     m->last_checkhealthy = now_ns;
-    m->count_ack = (double)0;
+    m->count_ack = 0;
     m->sum_hbtime = m->hbtime;
     LOG_DEVEL_DEBUG(
         "%s[%s %d] Meas health: %.2f%% -> Est health: %.2f%% [%s]",
@@ -299,6 +314,7 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
         m->healthypct,
         m->ishealthy ? "HEALTHY" : "UNHEALTHY"
     );
+
     return SUCCESS;
 }
 

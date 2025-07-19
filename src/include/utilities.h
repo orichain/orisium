@@ -51,7 +51,7 @@ static inline float calculate_average(const float* data, int num_elements) {
     if (num_elements == 0) return 0.0f;
     float sum = 0.0f;
     for (int i = 0; i < num_elements; ++i) {
-        sum += *(data+i);
+        sum += data[i];
     }
     return sum / (float)num_elements;
 }
@@ -60,7 +60,7 @@ static inline float calculate_variance(const float* data, int num_elements, floa
     if (num_elements <= 1) return 0.0f;
     float sum_squared_diff = 0.0f;
     for (int i = 0; i < num_elements; ++i) {
-        float diff = *(data+i) - mean;
+        float diff = data[i] - mean;
         sum_squared_diff += diff * diff;
     }
     return sum_squared_diff / (float)(num_elements - 1);

@@ -15,20 +15,22 @@ typedef struct {
     double sum_hbtime;
     double count_ack;
     uint64_t last_ack;
-    uint64_t last_checkhealthy;    
     
+    uint8_t first_check_healthy;
     kalman_t health_kalman_filter;
     int health_kalman_initialized_count;
     float *health_kalman_calibration_samples; 
+    float health_temp_ewma_value;
+    bool isactive;
+    bool ishealthy;
+    uint64_t last_checkhealthy;  
+    double healthypct;  
     
+    uint8_t first_check_avgtt;
     kalman_t avgtt_kalman_filter;
     int avgtt_kalman_initialized_count;
     float *avgtt_kalman_calibration_samples;
-    
-    double healthypct;
-    bool isactive;
-    bool ishealthy;
-    uint8_t first_check_healthy;
+    float avgtt_temp_ewma_value;    
     uint64_t last_task_started;
     uint64_t last_task_finished;
     uint64_t longest_task_time;
