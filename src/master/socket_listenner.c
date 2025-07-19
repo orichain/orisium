@@ -122,7 +122,7 @@ int select_best_sio_worker(const char *label, master_context *master_ctx) {
     for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
         int current_rr_idx = (start_rr_check_idx + i) % MAX_SIO_WORKERS;
         if (master_ctx->sio_state[current_rr_idx].task_count < MAX_CONNECTION_PER_SIO_WORKER) {
-            if (master_ctx->sio_state[i].metrics.isactive && master_ctx->sio_state[i].metrics.ishealthy) {
+            if (master_ctx->sio_state[current_rr_idx].metrics.isactive && master_ctx->sio_state[current_rr_idx].metrics.ishealthy) {
                 temp_best_idx_t3 = current_rr_idx;
                 master_ctx->last_sio_rr_idx = (current_rr_idx + 1) % MAX_SIO_WORKERS;
                 break;
