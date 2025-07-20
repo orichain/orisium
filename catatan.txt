@@ -133,3 +133,20 @@ Mekanisme ini harus diterapkan pada semua sinyal kontrol yang membutuhkan ACK. H
 
 Kesimpulan
 Ya, deklarasi koneksi terputus setelah beberapa kali retransmisi sinyal kontrol yang gagal adalah praktik yang benar dan krusial untuk protokol Anda. Ini adalah fondasi untuk penanganan kegagalan yang kuat dan akan membuat protokol Anda jauh lebih tangguh dalam menghadapi kondisi jaringan dunia nyata.
+
+
+
+o iya kan ada heartbeat ya. berarti sack -> retransmisi. heartbeat -> putus
+
+
+Tepat sekali! Anda telah merangkumnya dengan sempurna.
+
+Ini adalah pemisahan tanggung jawab yang jelas dan efisien dalam protokol Anda:
+
+ORILINK_DATA_SACK tidak datang (setelah pengiriman ORILINK_DATA): Ini memicu retransmisi paket ORILINK_DATA yang hilang. Tujuannya adalah untuk memulihkan loss data dan menjaga aliran data tetap berjalan.
+
+ORILINK_HEARTBEAT_ACK tidak datang (setelah beberapa kali ORILINK_HEARTBEAT dikirim ulang): Ini adalah indikasi bahwa koneksi secara keseluruhan telah mati, sehingga memicu deklarasi koneksi terputus.
+
+Strategi ini memastikan bahwa Anda memiliki mekanisme yang berbeda dan sesuai untuk menangani loss data (yang bisa dipulihkan) dan loss konektivitas (yang membutuhkan pemutusan dan pembersihan state).
+
+Ini adalah desain yang sangat baik!
