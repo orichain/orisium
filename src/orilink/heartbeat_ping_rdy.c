@@ -9,10 +9,10 @@
 #include "orilink/protocol.h"
 #include "types.h"
 #include "log.h"
-#include "orilink/syn.h"
+#include "orilink/heartbeat_ping_rdy.h"
 #include "constants.h"
 
-status_t orilink_serialize_syn(const char *label, const orilink_syn_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
+status_t orilink_serialize_heartbeat_ping_rdy(const char *label, const orilink_heartbeat_ping_rdy_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
     if (!payload || !current_buffer || !offset) {
         LOG_ERROR("%sInvalid input pointers.", label);
         return FAILURE;
@@ -26,14 +26,14 @@ status_t orilink_serialize_syn(const char *label, const orilink_syn_t* payload, 
     return SUCCESS;
 }
 
-status_t orilink_deserialize_syn(const char *label, orilink_protocol_t *p, const uint8_t *buffer, size_t total_buffer_len, size_t *offset_ptr) {
-    if (!p || !buffer || !offset_ptr || !p->payload.orilink_syn) {
+status_t orilink_deserialize_heartbeat_ping_rdy(const char *label, orilink_protocol_t *p, const uint8_t *buffer, size_t total_buffer_len, size_t *offset_ptr) {
+    if (!p || !buffer || !offset_ptr || !p->payload.orilink_heartbeat_ping_rdy) {
         LOG_ERROR("%sInvalid input pointers.", label);
         return FAILURE;
     }
     size_t current_offset = *offset_ptr;
     const uint8_t *cursor = buffer + current_offset;
-    orilink_syn_t *payload = p->payload.orilink_syn;
+    orilink_heartbeat_ping_rdy_t *payload = p->payload.orilink_heartbeat_ping_rdy;
     if (current_offset + sizeof(uint64_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading id.", label);
         return FAILURE_OOBUF;
@@ -47,7 +47,7 @@ status_t orilink_deserialize_syn(const char *label, orilink_protocol_t *p, const
     return SUCCESS;
 }
 
-orilink_protocol_t_status_t orilink_prepare_cmd_syn(const char *label, uint64_t id) {
+orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_ping_rdy(const char *label, uint64_t id) {
 	orilink_protocol_t_status_t result;
 	result.r_orilink_protocol_t = (orilink_protocol_t *)malloc(sizeof(orilink_protocol_t));
 	result.status = FAILURE;
@@ -58,15 +58,15 @@ orilink_protocol_t_status_t orilink_prepare_cmd_syn(const char *label, uint64_t 
 	memset(result.r_orilink_protocol_t, 0, sizeof(orilink_protocol_t));
 	result.r_orilink_protocol_t->version[0] = ORILINK_VERSION_MAJOR;
 	result.r_orilink_protocol_t->version[1] = ORILINK_VERSION_MINOR;
-	result.r_orilink_protocol_t->type = ORILINK_SYN;
-	orilink_syn_t *payload = (orilink_syn_t *)calloc(1, sizeof(orilink_syn_t));
+	result.r_orilink_protocol_t->type = ORILINK_HEARTBEAT_PING_RDY;
+	orilink_heartbeat_ping_rdy_t *payload = (orilink_heartbeat_ping_rdy_t *)calloc(1, sizeof(orilink_heartbeat_ping_rdy_t));
 	if (!payload) {
-		LOG_ERROR("%sFailed to allocate orilink_syn_t payload. %s", label, strerror(errno));
+		LOG_ERROR("%sFailed to allocate orilink_heartbeat_ping_rdy_t payload. %s", label, strerror(errno));
 		CLOSE_ORILINK_PROTOCOL(&result.r_orilink_protocol_t);
 		return result;
 	}
     payload->id = id;
-	result.r_orilink_protocol_t->payload.orilink_syn = payload;
+	result.r_orilink_protocol_t->payload.orilink_heartbeat_ping_rdy = payload;
 	result.status = SUCCESS;
 	return result;
 }

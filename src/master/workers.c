@@ -166,7 +166,7 @@ double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_t
     metrics->count_ack = (double)0;
     metrics->last_ack = rt.r_uint64_t;
     metrics->last_checkhealthy = rt.r_uint64_t;
-    metrics->healthypct = (double)100;
+    metrics->healthypct = (float)100;
     metrics->isactive = true;
     metrics->ishealthy = true;
     metrics->last_task_started = rt.r_uint64_t;

@@ -40,6 +40,10 @@
 #define KALMAN_ALPHA_EWMA 0.2f
 #define HEALTHY_THRESHOLD 75
 #define MAX_TASK_TIME_NS (60ULL * 1000ULL * 1000ULL * 1000ULL) // 60 seconds in nanoseconds
+//======================================================================
+// ORILINK MAX PAKET SIZE
+//======================================================================
+#define ORILINK_MBPP 1400
 
 //======================================================================
 // OriLink
@@ -52,7 +56,6 @@
 
 #define MAX_SESSIONS 10
 #define MAX_EPOLL_EVENTS 10
-#define MAX_BUFFER_SIZE 1500
 #define PACKET_TIMEOUT_SEC 2
 #define CUBIC_BETA 0.7
 #define CUBIC_C 0.4

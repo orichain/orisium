@@ -121,7 +121,7 @@ typedef struct {
     uint32_t global_sequence_number;
     uint16_t stream_id;
     uint32_t stream_sequence_number;
-    uint8_t data[MAX_BUFFER_SIZE];
+    uint8_t data[ORILINK_MBPP];
     size_t data_len;
 } udp_received_packet_t;
 

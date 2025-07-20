@@ -2,7 +2,6 @@
 #define SESSIONS_MASTER_SESSION_H
 
 #include <stdbool.h>
-
 #include "types.h"
 #include "constants.h"
 #include "kalman.h"
@@ -24,7 +23,7 @@ typedef struct {
     bool isactive;
     bool ishealthy;
     uint64_t last_checkhealthy;  
-    double healthypct;  
+    float healthypct;  
     
     uint8_t first_check_avgtt;
     kalman_t avgtt_kalman_filter;

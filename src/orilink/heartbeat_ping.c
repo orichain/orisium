@@ -60,7 +60,7 @@ status_t orilink_deserialize_heartbeat_ping(const char *label, orilink_protocol_
     return SUCCESS;
 }
 
-orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_ping(const char *label, uint64_t *id, uint64_t *pid) {
+orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_ping(const char *label, uint64_t id, uint64_t pid) {
 	orilink_protocol_t_status_t result;
 	result.r_orilink_protocol_t = (orilink_protocol_t *)malloc(sizeof(orilink_protocol_t));
 	result.status = FAILURE;
@@ -78,8 +78,8 @@ orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_ping(const char *label
 		CLOSE_ORILINK_PROTOCOL(&result.r_orilink_protocol_t);
 		return result;
 	}
-    payload->id = *id;
-    payload->pid = *pid;
+    payload->id = id;
+    payload->pid = pid;
 	result.r_orilink_protocol_t->payload.orilink_heartbeat_ping = payload;
 	result.status = SUCCESS;
 	return result;

@@ -324,7 +324,7 @@ static inline status_t check_workers_healthy(master_context *master_ctx) {
 		if (check_worker_healthy(label, SIO, i, &master_ctx->sio_state[i].metrics) != SUCCESS) {
             return FAILURE;
         }
-        if (master_ctx->sio_state[i].metrics.healthypct < (double)25) {
+        if (master_ctx->sio_state[i].metrics.healthypct < (float)25) {
             master_ctx->sio_state[i].metrics.isactive = false;
             if (close_worker(label, master_ctx, SIO, i) != SUCCESS) {
                 return FAILURE;
@@ -341,7 +341,7 @@ static inline status_t check_workers_healthy(master_context *master_ctx) {
 		if (check_worker_healthy(label, LOGIC, i, &master_ctx->logic_state[i].metrics) != SUCCESS) {
             return FAILURE;
         }
-        if (master_ctx->logic_state[i].metrics.healthypct < (double)25) {
+        if (master_ctx->logic_state[i].metrics.healthypct < (float)25) {
             master_ctx->logic_state[i].metrics.isactive = false;
             if (close_worker(label, master_ctx, LOGIC, i) != SUCCESS) {
                 return FAILURE;
@@ -358,7 +358,7 @@ static inline status_t check_workers_healthy(master_context *master_ctx) {
 		if (check_worker_healthy(label, COW, i, &master_ctx->cow_state[i].metrics) != SUCCESS) {
             return FAILURE;
         }
-        if (master_ctx->cow_state[i].metrics.healthypct < (double)25) {
+        if (master_ctx->cow_state[i].metrics.healthypct < (float)25) {
             master_ctx->cow_state[i].metrics.isactive = false;
             if (close_worker(label, master_ctx, COW, i) != SUCCESS) {
                 return FAILURE;
@@ -375,7 +375,7 @@ static inline status_t check_workers_healthy(master_context *master_ctx) {
 		if (check_worker_healthy(label, DBR, i, &master_ctx->dbr_state[i].metrics) != SUCCESS) {
             return FAILURE;
         }
-        if (master_ctx->dbr_state[i].metrics.healthypct < (double)25) {
+        if (master_ctx->dbr_state[i].metrics.healthypct < (float)25) {
             master_ctx->dbr_state[i].metrics.isactive = false;
             if (close_worker(label, master_ctx, DBR, i) != SUCCESS) {
                 return FAILURE;
@@ -392,7 +392,7 @@ static inline status_t check_workers_healthy(master_context *master_ctx) {
 		if (check_worker_healthy(label, DBW, i, &master_ctx->dbw_state[i].metrics) != SUCCESS) {
             return FAILURE;
         }
-        if (master_ctx->dbw_state[i].metrics.healthypct < (double)25) {
+        if (master_ctx->dbw_state[i].metrics.healthypct < (float)25) {
             master_ctx->dbw_state[i].metrics.isactive = false;
             if (close_worker(label, master_ctx, DBW, i) != SUCCESS) {
                 return FAILURE;

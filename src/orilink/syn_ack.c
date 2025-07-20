@@ -47,7 +47,7 @@ status_t orilink_deserialize_syn_ack(const char *label, orilink_protocol_t *p, c
     return SUCCESS;
 }
 
-orilink_protocol_t_status_t orilink_prepare_cmd_syn_ack(const char *label, uint64_t *id) {
+orilink_protocol_t_status_t orilink_prepare_cmd_syn_ack(const char *label, uint64_t id) {
 	orilink_protocol_t_status_t result;
 	result.r_orilink_protocol_t = (orilink_protocol_t *)malloc(sizeof(orilink_protocol_t));
 	result.status = FAILURE;
@@ -65,7 +65,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_syn_ack(const char *label, uint6
 		CLOSE_ORILINK_PROTOCOL(&result.r_orilink_protocol_t);
 		return result;
 	}
-    payload->id = *id;
+    payload->id = id;
 	result.r_orilink_protocol_t->payload.orilink_syn_ack = payload;
 	result.status = SUCCESS;
 	return result;

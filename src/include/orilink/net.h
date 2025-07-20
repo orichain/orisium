@@ -8,7 +8,7 @@ typedef struct {
     udp_session_t sessions[MAX_SESSIONS];
     int session_count;
 
-    udp_sent_packet_t *send_buffer[MAX_BUFFER_SIZE];
+    udp_sent_packet_t *send_buffer[ORILINK_MBPP];
     int buffer_count;
     uint32_t next_global_seq_to_send;
     uint32_t last_acked_global_seq;
