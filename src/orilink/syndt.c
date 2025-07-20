@@ -35,7 +35,7 @@ status_t orilink_serialize_syndt(const char *label, const orilink_syndt_t* paylo
     memcpy(current_buffer + current_offset_local, &dtsize_be, sizeof(uint16_t));
     current_offset_local += sizeof(uint16_t);
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint16_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    if ((uint16_t)payload->mbpp > (uint16_t)ORILINK_MBPP) return FAILURE_MAXREACHD;
+    if ((uint16_t)payload->mbpp > (uint16_t)ORILINK_MAX_PACKET_SIZE) return FAILURE_MAXREACHD;
     uint16_t mbpp_be = htobe16(payload->mbpp);
     memcpy(current_buffer + current_offset_local, &mbpp_be, sizeof(uint16_t));
     current_offset_local += sizeof(uint16_t);
@@ -97,7 +97,7 @@ status_t orilink_deserialize_syndt(const char *label, orilink_protocol_t *p, con
     uint16_t mbpp_be;
     memcpy(&mbpp_be, cursor, sizeof(uint16_t));
     payload->mbpp = be16toh(mbpp_be);
-    if ((uint16_t)payload->mbpp > (uint16_t)ORILINK_MBPP) return FAILURE_MAXREACHD;
+    if ((uint16_t)payload->mbpp > (uint16_t)ORILINK_MAX_PACKET_SIZE) return FAILURE_MAXREACHD;
     cursor += sizeof(uint16_t);
     current_offset += sizeof(uint16_t);
     if (current_offset + sizeof(uint16_t) > total_buffer_len) {

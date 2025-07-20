@@ -221,8 +221,8 @@ ssize_t_status_t orilink_serialize(const char *label, const orilink_protocol_t* 
 		return result;
 	}
     size_t total_required_size = psize.r_size_t;
-    if (total_required_size > ORILINK_MBPP) {
-        LOG_ERROR("%sorilink_serialize error. Total_required_size: %d, ORILINK_MBPP %d.", label, total_required_size, ORILINK_MBPP);
+    if (total_required_size > ORILINK_MAX_PACKET_SIZE) {
+        LOG_ERROR("%sorilink_serialize error. Total_required_size: %d, ORILINK_MAX_PACKET_SIZE %d.", label, total_required_size, ORILINK_MAX_PACKET_SIZE);
         result.status = FAILURE;
         return result;
     }
@@ -346,8 +346,8 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, const uint8_t
         result.status = FAILURE_OOBUF;
         return result;
     }
-    if (len > ORILINK_MBPP) {
-        LOG_ERROR("%sorilink_deserialize error. Len: %d, ORILINK_MBPP %d.", label, len, ORILINK_MBPP);
+    if (len > ORILINK_MAX_PACKET_SIZE) {
+        LOG_ERROR("%sorilink_deserialize error. Len: %d, ORILINK_MAX_PACKET_SIZE %d.", label, len, ORILINK_MAX_PACKET_SIZE);
         result.status = FAILURE;
         return result;
     }

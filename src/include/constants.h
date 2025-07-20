@@ -41,14 +41,8 @@
 #define HEALTHY_THRESHOLD 75
 #define MAX_TASK_TIME_NS (60ULL * 1000ULL * 1000ULL * 1000ULL) // 60 seconds in nanoseconds
 //======================================================================
-// ORILINK MAX PAKET SIZE
-//======================================================================
-#define ORILINK_MBPP 1400
-
-//======================================================================
 // OriLink
 //======================================================================
-
 #define ORILINK_VERSION_BYTES 2
 #define ORILINK_VERSION_MAJOR 0x00
 #define ORILINK_VERSION_MINOR 0x01

@@ -42,7 +42,7 @@ udp_session_t_status_t orilink_find_or_create_session(udp_context_t *ctx, uint32
         new_session->client_addr_len = len;
         new_session->next_expected_seq = 1;
         new_session->max_recv_buffer_size = 64;
-        new_session->available_receive_window = new_session->max_recv_buffer_size * ORILINK_MBPP;
+        new_session->available_receive_window = new_session->max_recv_buffer_size * ORILINK_MAX_PACKET_SIZE;
         new_session->last_active_time = time(NULL);
         new_session->is_handshake_complete = 0;
         new_session->is_fin_received = 0;
@@ -101,7 +101,7 @@ status_t orilink_process_data_packet(int sockfd, udp_session_t* session, udp_pac
     uint32_t stream_seq = be32toh(pkt->header.stream_sequence_number);
     uint16_t payload_len = be16toh(pkt->header.payload_length);
     
-    if (payload_len > ORILINK_MBPP) {
+    if (payload_len > ORILINK_MAX_PACKET_SIZE) {
         LOG_WARN("[ORILINK]: Payload terlalu besar (%u), abaikan.", payload_len);
         return FAILURE_OOBUF;
     }
@@ -291,7 +291,7 @@ status_t orilink_handle_syn(int sockfd, udp_session_t *session, udp_packet_t *re
             return FAILURE;
         }
         session->max_recv_buffer_size = session->total_packets > 0 ? session->total_packets : 100;
-        session->available_receive_window = session->max_recv_buffer_size * ORILINK_MBPP;
+        session->available_receive_window = session->max_recv_buffer_size * ORILINK_MAX_PACKET_SIZE;
         session->recv_buffer = (udp_received_packet_t**)malloc(session->max_recv_buffer_size * sizeof(udp_received_packet_t*));
         if (!session->recv_buffer) {
             LOG_ERROR("[ORILINK]: malloc failed for dynamic buffer. %s", strerror(errno));
@@ -456,7 +456,7 @@ udp_handshake_t_status_t orilink_handshake(async_type_t *cow_async, udp_context_
     syn_pkt->header.stream_id = 0;
     syn_pkt->header.stream_sequence_number = 0;
     syn_pkt->total_packets = htonl(ctx->total_packets_to_send);
-    ctx->send_window_credit = ctx->total_packets_to_send * ORILINK_MBPP;
+    ctx->send_window_credit = ctx->total_packets_to_send * ORILINK_MAX_PACKET_SIZE;
     syn_pkt->header.checksum = 0;
     syn_pkt->header.checksum = htonl(orilink_hash32(syn_pkt, total_size));
     
@@ -492,7 +492,7 @@ status_t orilink_retry_handshake(async_type_t *cow_async, udp_handshake_t *hs, u
         syn_pkt->header.stream_id = 0;
         syn_pkt->header.stream_sequence_number = 0;
         syn_pkt->total_packets = htonl(ctx->total_packets_to_send);
-        ctx->send_window_credit = ctx->total_packets_to_send * ORILINK_MBPP;
+        ctx->send_window_credit = ctx->total_packets_to_send * ORILINK_MAX_PACKET_SIZE;
         syn_pkt->header.checksum = 0;
         syn_pkt->header.checksum = htonl(orilink_hash32(syn_pkt, total_size));
         
@@ -513,7 +513,7 @@ status_t orilink_retry_handshake(async_type_t *cow_async, udp_handshake_t *hs, u
 
 status_t orilink_handle_handshake(async_type_t *cow_async, udp_handshake_t *hs, udp_context_t *ctx, int sockfd, const struct sockaddr *server_addr, socklen_t server_addr_len) {
     if (!ctx->is_syn_acked) {
-        uint8_t recv_buffer[ORILINK_MBPP];
+        uint8_t recv_buffer[ORILINK_MAX_PACKET_SIZE];
         struct sockaddr_in6 from_addr;
         socklen_t from_len = sizeof(from_addr);
         ssize_t n = recvfrom(sockfd, recv_buffer, sizeof(recv_buffer), 0, (struct sockaddr *)&from_addr, &from_len);
