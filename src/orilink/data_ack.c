@@ -39,9 +39,12 @@ status_t orilink_serialize_data_ack(const char *label, const orilink_data_ack_t*
     memcpy(current_buffer + current_offset_local, &len_be, sizeof(uint16_t));
     current_offset_local += sizeof(uint16_t);
     if (payload->len > 0) {
-        if (CHECK_BUFFER_BOUNDS(current_offset_local, payload->len, buffer_size) != SUCCESS) return FAILURE_OOBUF;
-        memcpy(current_buffer + current_offset_local, payload->data, payload->len);
-        current_offset_local += payload->len;
+        if (CHECK_BUFFER_BOUNDS(current_offset_local, (2 * (payload->len * sizeof(uint16_t))), buffer_size) != SUCCESS) return FAILURE_OOBUF;
+        for (uint32_t i=0;i<(2 * (payload->len * sizeof(uint16_t)));++i) {
+            uint16_t dt_be = htobe16(payload->data[i]);
+            memcpy(current_buffer + current_offset_local, &dt_be, sizeof(uint16_t));
+            current_offset_local += sizeof(uint16_t);
+        }
     }
     *offset = current_offset_local;
     return SUCCESS;
@@ -101,14 +104,18 @@ status_t orilink_deserialize_data_ack(const char *label, orilink_protocol_t *p, 
     cursor += sizeof(uint16_t);
     current_offset += sizeof(uint16_t);
     if (payload->len > 0) {
-        if (current_offset + payload->len > total_buffer_len) {
+        if (current_offset + (2 * (payload->len * sizeof(uint16_t))) > total_buffer_len) {
             LOG_ERROR("%sInsufficient buffer for actual data. Expected %hu, available %zu.",
                     label, payload->len, total_buffer_len - current_offset);
             return FAILURE_OOBUF;
         }
-        memcpy(payload->data, cursor, payload->len);
-        cursor += payload->len;
-        current_offset += payload->len;
+        for (uint32_t i=0;i<(2 * (payload->len * sizeof(uint16_t)));++i) {
+            uint16_t dt_be;
+            memcpy(&dt_be, cursor, sizeof(uint16_t));
+            payload->data[i] = be16toh(dt_be);
+            cursor += sizeof(uint16_t);
+            current_offset += sizeof(uint16_t);
+        }
     }
     *offset_ptr = current_offset;
     return SUCCESS;
@@ -126,7 +133,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_data_ack(const char *label, uint
 	result.r_orilink_protocol_t->version[0] = ORILINK_VERSION_MAJOR;
 	result.r_orilink_protocol_t->version[1] = ORILINK_VERSION_MINOR;
 	result.r_orilink_protocol_t->type = ORILINK_DATA_ACK;
-	orilink_data_ack_t *payload = (orilink_data_ack_t *)calloc(1, sizeof(orilink_data_ack_t) + data_len);
+	orilink_data_ack_t *payload = (orilink_data_ack_t *)calloc(1, sizeof(orilink_data_ack_t) + (2 * (data_len * sizeof(uint16_t))));
 	if (!payload) {
 		LOG_ERROR("%sFailed to allocate orilink_data_ack_t payload. %s", label, strerror(errno));
 		CLOSE_ORILINK_PROTOCOL(&result.r_orilink_protocol_t);
@@ -137,7 +144,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_data_ack(const char *label, uint
     payload->spktnum = spktnum;
     payload->arw = arw;
     payload->len = data_len;
-    if (data_len > 0 && data) memcpy(payload->data, data, data_len);   
+    if (data_len > 0 && data) memcpy(payload->data, data, (2 * (data_len * sizeof(uint16_t))));   
 	result.r_orilink_protocol_t->payload.orilink_data_ack = payload;
 	result.status = SUCCESS;
 	return result;
