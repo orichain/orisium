@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <netinet/in.h>
 #include <time.h>
-#include <bits/types/sig_atomic_t.h>
+#include <signal.h>
 
 #include "log.h"
 #include "async.h"

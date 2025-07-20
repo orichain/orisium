@@ -9,18 +9,19 @@
 typedef enum {
     ORILINK_SYN = (uint8_t)0x00,
     ORILINK_SYN_ACK = (uint8_t)0x01,
-    ORILINK_HEARTBEAT = (uint8_t)0x02,
-    ORILINK_HEARTBEAT_ACK = (uint8_t)0x03,
-    ORILINK_STARTDT = (uint8_t)0x04,
-    ORILINK_STARTDT_ACK = (uint8_t)0x05,    
-    ORILINK_STATUSDT = (uint8_t)0x06,
-    ORILINK_STATUSDT_NACK = (uint8_t)0x07,
-    ORILINK_DATA = (uint8_t)0x08,
-    ORILINK_DATA_SACK = (uint8_t)0x09,
-    ORILINK_FINISHDT = (uint8_t)0x01,
-    ORILINK_FINISHDT_ACK = (uint8_t)0x0b,
-    ORILINK_FIN = (uint8_t)0x0c,
-    ORILINK_FIN_ACK = (uint8_t)0x0d
+    ORILINK_HEARTBEAT_PING = (uint8_t)0x02,
+    ORILINK_HEARTBEAT_PONG = (uint8_t)0x03,
+    ORILINK_HEARTBEAT_PONG_ACK = (uint8_t)0x04,
+    ORILINK_SYNDT = (uint8_t)0x05,
+    ORILINK_SYNDT_ACK = (uint8_t)0x06,    
+    ORILINK_STATDT = (uint8_t)0x07,
+    ORILINK_STATDT_ACK = (uint8_t)0x08,
+    ORILINK_DATA = (uint8_t)0x09,
+    ORILINK_DATA_ACK = (uint8_t)0x0a,
+    ORILINK_FINDT = (uint8_t)0x0b,
+    ORILINK_FINDT_ACK = (uint8_t)0x0c,
+    ORILINK_FIN = (uint8_t)0x0d,
+    ORILINK_FIN_ACK = (uint8_t)0x0e
 } orilink_protocol_type_t;
 
 typedef enum {
@@ -38,23 +39,18 @@ typedef struct {
 
 typedef struct {
     uint64_t id;
-    uint32_t pktnum;
-    uint16_t len;
-    uint32_t data[];
-} orilink_nack_t;
+    uint64_t pid;
+} orilink_heartbeat_ping_t;
 
 typedef struct {
     uint64_t id;
-} orilink_ack_t;
+    uint64_t pid;
+} orilink_heartbeat_pong_t;
 
 typedef struct {
     uint64_t id;
-    uint32_t seq;
-    uint16_t sid;
-    uint32_t sseq;
-    uint16_t len;
-    uint8_t data[];
-} orilink_data_t;
+    uint64_t pid;
+} orilink_heartbeat_pong_ack_t;
 
 typedef struct {
     uint64_t id;
@@ -62,15 +58,7 @@ typedef struct {
 
 typedef struct {
     uint64_t id;
-} orilink_heartbeat_t;
-
-typedef struct {
-    uint64_t id;
-    uint32_t arw;
-    uint32_t lackseq;
-    uint16_t len;
-    uint8_t data[];
-} orilink_sack_t;
+} orilink_fin_ack_t;
 
 typedef struct {
 	uint8_t version[ORILINK_VERSION_BYTES];
@@ -79,6 +67,11 @@ typedef struct {
 	union {
 		orilink_syn_t *orilink_syn;
 		orilink_syn_ack_t *orilink_syn_ack;
+        orilink_heartbeat_ping_t *orilink_heartbeat_ping;
+        orilink_heartbeat_pong_t *orilink_heartbeat_pong;
+        orilink_heartbeat_pong_ack_t *orilink_heartbeat_pong_ack;
+        orilink_fin_t *orilink_fin;
+        orilink_fin_ack_t *orilink_fin_ack;
 	} payload;
 } orilink_protocol_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan
@@ -96,6 +89,16 @@ static inline void CLOSE_ORILINK_PROTOCOL(orilink_protocol_t **protocol_ptr) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_syn);
         } else if (x->type == ORILINK_SYN_ACK) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_syn_ack);
+        } else if (x->type == ORILINK_HEARTBEAT_PING) {
+            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat_ping);
+        } else if (x->type == ORILINK_HEARTBEAT_PONG) {
+            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat_pong);
+        } else if (x->type == ORILINK_HEARTBEAT_PONG_ACK) {
+            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat_pong_ack);
+        } else if (x->type == ORILINK_FIN) {
+            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_fin);
+        } else if (x->type == ORILINK_FIN_ACK) {
+            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_fin_ack);
         }
         free(x);
         *protocol_ptr = NULL;

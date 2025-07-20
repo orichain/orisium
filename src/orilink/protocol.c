@@ -11,6 +11,11 @@
 #include "orilink/protocol.h"
 #include "orilink/syn.h"
 #include "orilink/syn_ack.h"
+#include "orilink/heartbeat_ping.h"
+#include "orilink/heartbeat_pong.h"
+#include "orilink/heartbeat_pong_ack.h"
+#include "orilink/fin.h"
+#include "orilink/fin_ack.h"
 #include "types.h"
 #include "log.h"
 #include "constants.h"
@@ -36,6 +41,56 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
         case ORILINK_SYN_ACK: {
             if (!p->payload.orilink_syn_ack) {
                 LOG_ERROR("%sORILINK_SYN_ACK payload is NULL.", label);
+                result.status = FAILURE;
+                return result;
+            }
+            payload_fixed_size = sizeof(uint64_t);
+            payload_dynamic_size = 0;
+            break;
+        }
+        case ORILINK_HEARTBEAT_PING: {
+            if (!p->payload.orilink_heartbeat_ping) {
+                LOG_ERROR("%sORILINK_HEARTBEAT_PING payload is NULL.", label);
+                result.status = FAILURE;
+                return result;
+            }
+            payload_fixed_size = sizeof(uint64_t) + sizeof(uint64_t);
+            payload_dynamic_size = 0;
+            break;
+        }
+        case ORILINK_HEARTBEAT_PONG: {
+            if (!p->payload.orilink_heartbeat_pong) {
+                LOG_ERROR("%sORILINK_HEARTBEAT_PONG payload is NULL.", label);
+                result.status = FAILURE;
+                return result;
+            }
+            payload_fixed_size = sizeof(uint64_t) + sizeof(uint64_t);
+            payload_dynamic_size = 0;
+            break;
+        }
+        case ORILINK_HEARTBEAT_PONG_ACK: {
+            if (!p->payload.orilink_heartbeat_pong_ack) {
+                LOG_ERROR("%ORILINK_HEARTBEAT_PONG_ACK payload is NULL.", label);
+                result.status = FAILURE;
+                return result;
+            }
+            payload_fixed_size = sizeof(uint64_t) + sizeof(uint64_t);
+            payload_dynamic_size = 0;
+            break;
+        }
+        case ORILINK_FIN: {
+            if (!p->payload.orilink_fin) {
+                LOG_ERROR("%sORILINK_FIN payload is NULL.", label);
+                result.status = FAILURE;
+                return result;
+            }
+            payload_fixed_size = sizeof(uint64_t);
+            payload_dynamic_size = 0;
+            break;
+        }
+        case ORILINK_FIN_ACK: {
+            if (!p->payload.orilink_fin_ack) {
+                LOG_ERROR("%ORILINK_FIN_ACK payload is NULL.", label);
                 result.status = FAILURE;
                 return result;
             }
@@ -118,6 +173,21 @@ ssize_t_status_t orilink_serialize(const char *label, const orilink_protocol_t* 
         case ORILINK_SYN_ACK:
             result_pyld = orilink_serialize_syn_ack(label, p->payload.orilink_syn_ack, current_buffer, *buffer_size, &offset);
             break;
+        case ORILINK_HEARTBEAT_PING:
+            result_pyld = orilink_serialize_heartbeat_ping(label, p->payload.orilink_heartbeat_ping, current_buffer, *buffer_size, &offset);
+            break;
+        case ORILINK_HEARTBEAT_PONG:
+            result_pyld = orilink_serialize_heartbeat_pong(label, p->payload.orilink_heartbeat_pong, current_buffer, *buffer_size, &offset);
+            break;
+        case ORILINK_HEARTBEAT_PONG_ACK:
+            result_pyld = orilink_serialize_heartbeat_pong_ack(label, p->payload.orilink_heartbeat_pong_ack, current_buffer, *buffer_size, &offset);
+            break;
+        case ORILINK_FIN:
+            result_pyld = orilink_serialize_fin(label, p->payload.orilink_fin, current_buffer, *buffer_size, &offset);
+            break;
+        case ORILINK_FIN_ACK:
+            result_pyld = orilink_serialize_fin_ack(label, p->payload.orilink_fin_ack, current_buffer, *buffer_size, &offset);
+            break;
         default:
             LOG_ERROR("%sUnknown protocol type for serialization: 0x%02x", label, p->type);
             result.status = FAILURE_OPYLD;
@@ -197,6 +267,96 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, const uint8_t
             }
             p->payload.orilink_syn_ack = task_payload;
             result_pyld = orilink_deserialize_syn_ack(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case ORILINK_HEARTBEAT_PING: {
+			if (current_buffer_offset + sizeof(uint64_t) + sizeof(uint64_t) > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HEARTBEAT_PING fixed header.", label);
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            orilink_heartbeat_ping_t *task_payload = (orilink_heartbeat_ping_t*) calloc(1, sizeof(orilink_heartbeat_ping_t));
+            if (!task_payload) {
+                LOG_ERROR("%sFailed to allocate orilink_heartbeat_ping_t without FAM. %s", label, strerror(errno));
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.orilink_heartbeat_ping = task_payload;
+            result_pyld = orilink_deserialize_heartbeat_ping(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case ORILINK_HEARTBEAT_PONG: {
+			if (current_buffer_offset + sizeof(uint64_t) + sizeof(uint64_t) > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HEARTBEAT_PONG fixed header.", label);
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            orilink_heartbeat_pong_t *task_payload = (orilink_heartbeat_pong_t*) calloc(1, sizeof(orilink_heartbeat_pong_t));
+            if (!task_payload) {
+                LOG_ERROR("%sFailed to allocate orilink_heartbeat_pong_t without FAM. %s", label, strerror(errno));
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.orilink_heartbeat_pong = task_payload;
+            result_pyld = orilink_deserialize_heartbeat_pong(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case ORILINK_HEARTBEAT_PONG_ACK: {
+			if (current_buffer_offset + sizeof(uint64_t) + sizeof(uint64_t) > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HEARTBEAT_PONG_ACK fixed header.", label);
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            orilink_heartbeat_pong_ack_t *task_payload = (orilink_heartbeat_pong_ack_t*) calloc(1, sizeof(orilink_heartbeat_pong_ack_t));
+            if (!task_payload) {
+                LOG_ERROR("%sFailed to allocate orilink_heartbeat_pong_ack_t without FAM. %s", label, strerror(errno));
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.orilink_heartbeat_pong_ack = task_payload;
+            result_pyld = orilink_deserialize_heartbeat_pong_ack(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case ORILINK_FIN: {
+			if (current_buffer_offset + sizeof(uint64_t) > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_FIN fixed header.", label);
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            orilink_fin_t *task_payload = (orilink_fin_t*) calloc(1, sizeof(orilink_fin_t));
+            if (!task_payload) {
+                LOG_ERROR("%sFailed to allocate orilink_fin_t without FAM. %s", label, strerror(errno));
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.orilink_fin = task_payload;
+            result_pyld = orilink_deserialize_fin(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case ORILINK_FIN_ACK: {
+			if (current_buffer_offset + sizeof(uint64_t) > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_FIN_ACK fixed header.", label);
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            orilink_fin_ack_t *task_payload = (orilink_fin_ack_t*) calloc(1, sizeof(orilink_fin_ack_t));
+            if (!task_payload) {
+                LOG_ERROR("%sFailed to allocate orilink_fin_ack_t without FAM. %s", label, strerror(errno));
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.orilink_fin_ack = task_payload;
+            result_pyld = orilink_deserialize_fin_ack(label, p, buffer, len, &current_buffer_offset);
             break;
 		}
         default:

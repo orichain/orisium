@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <time.h>
-#include <bits/types/sig_atomic_t.h>
+#include <signal.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
