@@ -11,7 +11,7 @@
 #include "async.h"
 #include "utilities.h"
 #include "constants.h"
-#include "ipc/heartbeat.h"
+#include "ipc/worker_master_heartbeat.h"
 
 void run_logic_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd) {
 	volatile sig_atomic_t logic_shutdown_requested = 0;
@@ -65,40 +65,38 @@ void run_logic_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, 
 				read(logic_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
 //======================================================				
 				double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * HEARTBEAT_JITTER_PERCENTAGE * 2) - HEARTBEAT_JITTER_PERCENTAGE;
-                double new_heartbeat_interval_double = WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT * (1.0 + jitter_amount);
-                if (new_heartbeat_interval_double < 0.1) {
-                    new_heartbeat_interval_double = 0.1;
+                double new_worker_master_heartbeat_interval_double = WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT * (1.0 + jitter_amount);
+                if (new_worker_master_heartbeat_interval_double < 0.1) {
+                    new_worker_master_heartbeat_interval_double = 0.1;
                 }
                 if (async_set_timerfd_time(label, &logic_timer_fd,
-					(time_t)new_heartbeat_interval_double,
-                    (long)((new_heartbeat_interval_double - (time_t)new_heartbeat_interval_double) * 1e9),
-                    (time_t)new_heartbeat_interval_double,
-                    (long)((new_heartbeat_interval_double - (time_t)new_heartbeat_interval_double) * 1e9)) != SUCCESS)
+					(time_t)new_worker_master_heartbeat_interval_double,
+                    (long)((new_worker_master_heartbeat_interval_double - (time_t)new_worker_master_heartbeat_interval_double) * 1e9),
+                    (time_t)new_worker_master_heartbeat_interval_double,
+                    (long)((new_worker_master_heartbeat_interval_double - (time_t)new_worker_master_heartbeat_interval_double) * 1e9)) != SUCCESS)
                 {
                     logic_shutdown_requested = 1;
 					LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
 					continue;
                 }
 //======================================================================
-// 1. if => "piggybacking"/"implicit heartbeat" kalau sudah ada ipc lain yang dikirim < interval. lewati pengiriman heartbeat.
+// 1. if => "piggybacking"/"implicit worker_master_heartbeat" kalau sudah ada ipc lain yang dikirim < interval. lewati pengiriman worker_master_heartbeat.
 // 2. Kirim IPC Hertbeat ke Master
 //======================================================================
-                int not_used_fd = -1;
-                ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_heartbeat(label, &not_used_fd, wot, worker_idx, new_heartbeat_interval_double);
+                ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_master_heartbeat(label, wot, worker_idx, new_worker_master_heartbeat_interval_double);
                 if (cmd_result.status != SUCCESS) {
                     continue;
                 }
-                ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_uds_fd, cmd_result.r_ipc_protocol_t, &not_used_fd);
+                ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_uds_fd, cmd_result.r_ipc_protocol_t);
                 if (send_result.status != SUCCESS) {
-                    LOG_ERROR("%sFailed to sent heartbeat to Master.", label);
+                    LOG_ERROR("%sFailed to sent worker_master_heartbeat to Master.", label);
                 } else {
-                    LOG_DEBUG("%sSent heartbeat to Master.", label);
+                    LOG_DEBUG("%sSent worker_master_heartbeat to Master.", label);
                 }
                 CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
 //======================================================================
 			} else if (current_fd == master_uds_fd) {
-				int received_client_fd = -1;
-				ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(label, &master_uds_fd, &received_client_fd);
+				ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(label, &master_uds_fd);
 				if (deserialized_result.status != SUCCESS) {
 					if (async_event_is_EPOLLHUP(current_events) ||
 						async_event_is_EPOLLERR(current_events) ||
@@ -113,8 +111,7 @@ void run_logic_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, 
 				}
 				ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;
 				LOG_DEBUG("%sReceived message type: 0x%02x", label, received_protocol->type);
-				LOG_DEBUG("%sReceived FD: %d", label, received_client_fd);
-                if (received_protocol->type == IPC_SHUTDOWN) {
+                if (received_protocol->type == IPC_MASTER_WORKER_SHUTDOWN) {
 					LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
 					logic_shutdown_requested = 1;
 					CLOSE_IPC_PROTOCOL(&received_protocol);

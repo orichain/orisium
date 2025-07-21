@@ -1,19 +1,14 @@
 #include <stdbool.h>     // for false, bool, true
 #include <string.h>      // for memset, strncpy
-#include <netinet/in.h>
 #include <errno.h>
-#include <inttypes.h>
-#include <stdlib.h>
 
 #include "log.h"
 #include "constants.h"
 #include "ipc/protocol.h"
-#include "sessions/master_session.h"
 #include "types.h"
 #include "utilities.h"
 #include "master/ipc.h"
 #include "master/process.h"
-#include "kalman.h"
 
 worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context *master_ctx, int *current_fd) {
 	worker_type_t_status_t result;
@@ -84,17 +79,16 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
 	return result;
 }
 
-status_t handle_ipc_event(const char *label, master_context *master_ctx, int *current_fd) {	
-	int received_fd = -1;
-	ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(label, current_fd, &received_fd);
+status_t handle_ipc_event(const char *label, master_context *master_ctx, int *current_fd) {
+	ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(label, current_fd);
 	if (deserialized_result.status != SUCCESS) {
 		LOG_ERROR("%srecv_ipc_message from worker. %s", label, strerror(errno));
 		return deserialized_result.status;
 	}
 	ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;                
 	switch (received_protocol->type) {
-		case IPC_HEARTBEAT: {
-            ipc_heartbeat_t *hbt = received_protocol->payload.ipc_heartbeat;
+		case IPC_WORKER_MASTER_HEARTBEAT: {
+            ipc_worker_master_heartbeat_t *hbt = received_protocol->payload.ipc_worker_master_heartbeat;
             uint64_t_status_t rt = get_realtime_time_ns("[Master]: ");
             if (hbt->wot == SIO) {
                 LOG_DEBUG("[Master]: SIO %d set last_ack to %llu.", hbt->index, rt.r_uint64_t);
@@ -129,6 +123,7 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
             }
 			break;
 		}
+        /*
 		case IPC_CLIENT_DISCONNECTED: {
             ipc_client_disconnect_info_t *disconnect_info = received_protocol->payload.ipc_client_disconnect_info;
             add_master_sio_dc_session("[Master]: ", &master_ctx->sio_dc_session, disconnect_info->ip);
@@ -261,6 +256,7 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
             }
             break;
         }
+        */
 		default:
 			LOG_ERROR("[Master]: Unknown protocol type %d from UDS FD %d. Ignoring.", received_protocol->type, *current_fd);
 			break;
