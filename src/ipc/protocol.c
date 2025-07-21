@@ -33,7 +33,7 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
                     return result;
                 }
             }
-            payload_fixed_size = sizeof(shutdown_type_t);
+            payload_fixed_size = sizeof(uint8_t);
             payload_dynamic_size = 0;
             break;
         }
@@ -45,7 +45,7 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
                     return result;
                 }
             }
-            payload_fixed_size = sizeof(worker_type_t) + sizeof(uint8_t) + DOUBLE_ARRAY_SIZE;
+            payload_fixed_size = sizeof(uint8_t) + sizeof(uint8_t) + DOUBLE_ARRAY_SIZE;
             payload_dynamic_size = 0;
             break;
         }
@@ -57,7 +57,7 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
     if (checkfixheader) {
         result.r_size_t = payload_fixed_size;
     } else {
-        result.r_size_t = IPC_VERSION_BYTES + sizeof(ipc_protocol_type_t) + payload_fixed_size + payload_dynamic_size;
+        result.r_size_t = IPC_VERSION_BYTES + sizeof(uint8_t) + payload_fixed_size + payload_dynamic_size;
     }
     result.status = SUCCESS;
     return result;
@@ -104,12 +104,12 @@ ssize_t_status_t ipc_serialize(const char *label, const ipc_protocol_t* p, uint8
     }
     memcpy(current_buffer + offset, p->version, IPC_VERSION_BYTES);
     offset += IPC_VERSION_BYTES;
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(ipc_protocol_type_t), *buffer_size) != SUCCESS) {
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
     }
-    current_buffer[offset] = (uint8_t)p->type;
-    offset += sizeof(ipc_protocol_type_t);
+    memcpy(current_buffer + offset, (uint8_t *)&p->type, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
     status_t result_pyld = FAILURE;
     switch (p->type) {
         case IPC_MASTER_WORKER_SHUTDOWN:
@@ -130,6 +130,7 @@ ssize_t_status_t ipc_serialize(const char *label, const ipc_protocol_t* p, uint8
     }
     result.r_ssize_t = (ssize_t)offset;
     result.status = SUCCESS;
+    print_hex("DEBUG SEND: ", *ptr_buffer, result.r_ssize_t, true);
     return result;
 }
 
@@ -138,7 +139,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, const uint8_t* buffer
     result.r_ipc_protocol_t = NULL;
     result.status = FAILURE;
 
-    if (!buffer || len < (IPC_VERSION_BYTES + sizeof(ipc_protocol_type_t))) {
+    if (!buffer || len < (IPC_VERSION_BYTES + sizeof(uint8_t))) {
         LOG_ERROR("%sBuffer terlalu kecil untuk Version dan Type. Len: %zu", label, len);
         result.status = FAILURE_OOBUF;
         return result;
@@ -151,8 +152,8 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, const uint8_t* buffer
     }
     LOG_DEBUG("%sAllocating ipc_protocol_t struct: %zu bytes.", label, sizeof(ipc_protocol_t));
     memcpy(p->version, buffer, IPC_VERSION_BYTES);
-    p->type = (ipc_protocol_type_t)buffer[IPC_VERSION_BYTES];
-    size_t current_buffer_offset = IPC_VERSION_BYTES + sizeof(ipc_protocol_type_t);
+    memcpy((uint8_t *)&p->type, buffer + IPC_VERSION_BYTES, sizeof(uint8_t));
+    size_t current_buffer_offset = IPC_VERSION_BYTES + sizeof(uint8_t);
     size_t_status_t psize = calculate_ipc_payload_size(label, p, true);
     if (psize.status != SUCCESS) {
 		result.status = psize.status;
@@ -351,7 +352,7 @@ ssize_t_status_t send_ipc_protocol_message(const char *label, int *uds_fd, const
         return result;
     } else {
         LOG_DEBUG("%sBerhasil mengirim %zd byte.\n", label, result.r_ssize_t);
-    }
+    }    
     free(final_send_buffer);
     if (serialized_ipc_data_buffer) {
         free(serialized_ipc_data_buffer);

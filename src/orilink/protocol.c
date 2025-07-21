@@ -133,7 +133,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                     return result;
                 }
             }
-            payload_fixed_size = sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint8_t) + sizeof(orilink_mode_t) + sizeof(uint16_t) + sizeof(uint16_t);
+            payload_fixed_size = sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint16_t);
             payload_dynamic_size = 0;
             break;
         }
@@ -277,7 +277,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
     if (checkfixheader) {
         result.r_size_t = payload_fixed_size;
     } else {
-        result.r_size_t = ORILINK_VERSION_BYTES + sizeof(orilink_protocol_type_t) + sizeof(uint32_t) + payload_fixed_size + payload_dynamic_size;
+        result.r_size_t = ORILINK_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint32_t) + payload_fixed_size + payload_dynamic_size;
     }
     result.status = SUCCESS;
     return result;
@@ -331,12 +331,12 @@ ssize_t_status_t orilink_serialize(const char *label, const orilink_protocol_t* 
     }
     memcpy(current_buffer + offset, p->version, ORILINK_VERSION_BYTES);
     offset += ORILINK_VERSION_BYTES;
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(orilink_protocol_type_t), *buffer_size) != SUCCESS) {
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
     }
-    current_buffer[offset] = (uint8_t)p->type;
-    offset += sizeof(orilink_protocol_type_t);
+    memcpy(current_buffer + offset, (uint8_t *)&p->type, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
     if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint32_t), *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
@@ -426,7 +426,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, const uint8_t
     result.r_orilink_protocol_t = NULL;
     result.status = FAILURE;
 
-    if (!buffer || len < (ORILINK_VERSION_BYTES + sizeof(orilink_protocol_type_t) + sizeof(uint32_t))) {
+    if (!buffer || len < (ORILINK_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint32_t))) {
         LOG_ERROR("%sBuffer terlalu kecil untuk Version, Type dan Chksum. Len: %zu", label, len);
         result.status = FAILURE_OOBUF;
         return result;
@@ -444,8 +444,8 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, const uint8_t
     }
     LOG_DEBUG("%sAllocating orilink_protocol_t struct: %zu bytes.", label, sizeof(orilink_protocol_t));
     memcpy(p->version, buffer, ORILINK_VERSION_BYTES);
-    p->type = (orilink_protocol_type_t)buffer[ORILINK_VERSION_BYTES];    
-    size_t current_buffer_offset = ORILINK_VERSION_BYTES + sizeof(orilink_protocol_type_t);
+    memcpy((uint8_t *)&p->type, buffer + ORILINK_VERSION_BYTES, sizeof(uint8_t));
+    size_t current_buffer_offset = ORILINK_VERSION_BYTES + sizeof(uint8_t);
     uint32_t chksum_be;
     memcpy(&chksum_be, buffer + current_buffer_offset, sizeof(uint32_t));
     p->chksum = be32toh(chksum_be);

@@ -27,7 +27,7 @@ status_t orilink_serialize_syndt_ack(const char *label, const orilink_syndt_ack_
     memcpy(current_buffer + current_offset_local, &sid_be, sizeof(uint64_t));
     current_offset_local += sizeof(uint64_t);
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    current_buffer[current_offset_local] = (uint8_t)payload->trycount;
+    memcpy(current_buffer + current_offset_local, (uint8_t *)&payload->trycount, sizeof(uint8_t));
     current_offset_local += sizeof(uint8_t);
     *offset = current_offset_local;
     return SUCCESS;
@@ -63,7 +63,7 @@ status_t orilink_deserialize_syndt_ack(const char *label, orilink_protocol_t *p,
         LOG_ERROR("%sOut of bounds reading trycount.", label);
         return FAILURE_OOBUF;
     }
-    payload->trycount = *cursor;
+    memcpy((uint8_t *)&payload->trycount, cursor, sizeof(uint8_t));
     cursor += sizeof(uint8_t);
     current_offset += sizeof(uint8_t);
     *offset_ptr = current_offset;

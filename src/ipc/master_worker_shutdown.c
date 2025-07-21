@@ -17,9 +17,9 @@ status_t ipc_serialize_master_worker_shutdown(const char *label, const ipc_maste
         return FAILURE;
     }
     size_t current_offset_local = *offset;
-    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(shutdown_type_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    current_buffer[current_offset_local] = (uint8_t)payload->flag;
-    current_offset_local += sizeof(shutdown_type_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(current_buffer + current_offset_local, (uint8_t *)&payload->flag, sizeof(uint8_t));
+    current_offset_local += sizeof(uint8_t);
     *offset = current_offset_local;
     return SUCCESS;
 }
@@ -32,13 +32,13 @@ status_t ipc_deserialize_master_worker_shutdown(const char *label, ipc_protocol_
     size_t current_offset = *offset_ptr;
     const uint8_t *cursor = buffer + current_offset;
     ipc_master_worker_shutdown_t *payload = p->payload.ipc_master_worker_shutdown;
-    if (current_offset + sizeof(shutdown_type_t) > total_buffer_len) {
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading flag.", label);
         return FAILURE_OOBUF;
     }
-    payload->flag = *cursor;
-    cursor += sizeof(shutdown_type_t);
-    current_offset += sizeof(shutdown_type_t);
+    memcpy((uint8_t *)&payload->flag, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
     *offset_ptr = current_offset;
     return SUCCESS;
 }

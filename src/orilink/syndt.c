@@ -27,12 +27,12 @@ status_t orilink_serialize_syndt(const char *label, const orilink_syndt_t* paylo
     memcpy(current_buffer + current_offset_local, &sid_be, sizeof(uint64_t));
     current_offset_local += sizeof(uint64_t);
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    current_buffer[current_offset_local] = (uint8_t)payload->trycount;
+    memcpy(current_buffer + current_offset_local, (uint8_t *)&payload->trycount, sizeof(uint8_t));
     current_offset_local += sizeof(uint8_t);
-    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(orilink_mode_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
     if ((uint8_t)payload->mode > (uint8_t)ORILINK_STREAMING) return FAILURE_IVLDMODE;
-    current_buffer[current_offset_local] = (uint8_t)payload->mode;
-    current_offset_local += sizeof(orilink_mode_t);
+    memcpy(current_buffer + current_offset_local, (uint8_t *)&payload->mode, sizeof(uint8_t));
+    current_offset_local += sizeof(uint8_t);
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint16_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
     uint16_t dtsize_be = htobe16(payload->dtsize);
     memcpy(current_buffer + current_offset_local, &dtsize_be, sizeof(uint16_t));
@@ -76,17 +76,17 @@ status_t orilink_deserialize_syndt(const char *label, orilink_protocol_t *p, con
         LOG_ERROR("%sOut of bounds reading trycount.", label);
         return FAILURE_OOBUF;
     }
-    payload->trycount = *cursor;
+    memcpy((uint8_t *)&payload->trycount, cursor, sizeof(uint8_t));
     cursor += sizeof(uint8_t);
     current_offset += sizeof(uint8_t);
-    if (current_offset + sizeof(orilink_mode_t) > total_buffer_len) {
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading mode.", label);
         return FAILURE_OOBUF;
     }
-    payload->mode = *cursor;
+    memcpy((uint8_t *)&payload->mode, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
     if ((uint8_t)payload->mode > (uint8_t)ORILINK_STREAMING) return FAILURE_IVLDMODE;
-    cursor += sizeof(orilink_mode_t);
-    current_offset += sizeof(orilink_mode_t);
     if (current_offset + sizeof(uint16_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading dtsize.", label);
         return FAILURE_OOBUF;

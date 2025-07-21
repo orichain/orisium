@@ -50,7 +50,7 @@ typedef enum {
 } udp_packet_type_t;
 
 typedef enum {
-	IMMEDIATELY = (uint8_t)0xfe
+	IMMEDIATELY = (uint8_t)0x00
 } shutdown_type_t;
 
 typedef struct {

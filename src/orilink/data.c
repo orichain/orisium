@@ -27,11 +27,11 @@ status_t orilink_serialize_data(const char *label, const orilink_data_t* payload
     memcpy(current_buffer + current_offset_local, &sid_be, sizeof(uint64_t));
     current_offset_local += sizeof(uint64_t);
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint16_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    uint16_t spktnum_be = htobe16(payload->sid);
+    uint16_t spktnum_be = htobe16(payload->spktnum);
     memcpy(current_buffer + current_offset_local, &spktnum_be, sizeof(uint16_t));
     current_offset_local += sizeof(uint16_t);
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    current_buffer[current_offset_local] = (uint8_t)payload->trycount;
+    memcpy(current_buffer + current_offset_local, (uint8_t *)&payload->trycount, sizeof(uint8_t));
     current_offset_local += sizeof(uint8_t);
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint16_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
     uint16_t len_be = htobe16(payload->len);
@@ -85,7 +85,7 @@ status_t orilink_deserialize_data(const char *label, orilink_protocol_t *p, cons
         LOG_ERROR("%sOut of bounds reading trycount.", label);
         return FAILURE_OOBUF;
     }
-    payload->trycount = *cursor;
+    memcpy((uint8_t *)&payload->trycount, cursor, sizeof(uint8_t));
     cursor += sizeof(uint8_t);
     current_offset += sizeof(uint8_t);
     if (current_offset + sizeof(uint16_t) > total_buffer_len) {

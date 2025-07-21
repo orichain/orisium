@@ -14,11 +14,22 @@ typedef enum {
     IPC_MASTER_LOGIC_BOOTSTRAP = (uint8_t)0x10,
     IPC_LOGIC_COW_CONNECT = (uint8_t)0x11,
     IPC_LOGIC_COW_DATA = (uint8_t)0x12,
-    IPC_COW_LOGIC_CONNECTION = (uint8_t)0x13,
+    IPC_COW_LOGIC_DATA = (uint8_t)0x13,
+    IPC_COW_LOGIC_CONNECTION = (uint8_t)0x14,
     
     IPC_WORKER_MASTER_HEARTBEAT = (uint8_t)0xfe,
     IPC_MASTER_WORKER_SHUTDOWN = (uint8_t)0xff
 } ipc_protocol_type_t;
+
+typedef struct {
+//======================================================================    
+// uint8_t ip[IP_ADDRESS_LEN];
+// uint16_t port;
+// len = 1 => IP_ADDRESS_LEN + sizeof(uint16_t)
+//======================================================================    
+    uint16_t len;
+    uint8_t data[];
+} ipc_master_logic_bootstrap_t;
 
 typedef struct {
     shutdown_type_t flag;

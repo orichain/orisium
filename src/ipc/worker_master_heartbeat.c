@@ -17,11 +17,11 @@ status_t ipc_serialize_worker_master_heartbeat(const char *label, const ipc_work
         return FAILURE;
     }
     size_t current_offset_local = *offset;
-    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(worker_type_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    current_buffer[current_offset_local] = (uint8_t)payload->wot;
-    current_offset_local += sizeof(worker_type_t);
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    current_buffer[current_offset_local] = (uint8_t)payload->index;
+    memcpy(current_buffer + current_offset_local, (uint8_t *)&payload->wot, sizeof(uint8_t));
+    current_offset_local += sizeof(uint8_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(current_buffer + current_offset_local, (uint8_t *)&payload->index, sizeof(uint8_t));
     current_offset_local += sizeof(uint8_t);
     if (CHECK_BUFFER_BOUNDS(current_offset_local, DOUBLE_ARRAY_SIZE, buffer_size) != SUCCESS) return FAILURE_OOBUF;
     uint8_t hbtime_be[8];
@@ -40,18 +40,18 @@ status_t ipc_deserialize_worker_master_heartbeat(const char *label, ipc_protocol
     size_t current_offset = *offset_ptr;
     const uint8_t *cursor = buffer + current_offset;
     ipc_worker_master_heartbeat_t *payload = p->payload.ipc_worker_master_heartbeat;
-    if (current_offset + sizeof(worker_type_t) > total_buffer_len) {
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading wot.", label);
         return FAILURE_OOBUF;
     }
-    payload->wot = *cursor;
-    cursor += sizeof(worker_type_t);
-    current_offset += sizeof(worker_type_t);
+    memcpy((uint8_t *)&payload->wot, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
     if (current_offset + sizeof(uint8_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading index.", label);
         return FAILURE_OOBUF;
     }
-    payload->index = *cursor;
+    memcpy((uint8_t *)&payload->index, cursor, sizeof(uint8_t));
     cursor += sizeof(uint8_t);
     current_offset += sizeof(uint8_t);
     if (current_offset + DOUBLE_ARRAY_SIZE > total_buffer_len) {
