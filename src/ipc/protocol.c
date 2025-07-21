@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <endian.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <sys/uio.h>
 
 #include "utilities.h"
@@ -18,7 +19,7 @@
 #include "ipc/heartbeat.h"
 #include "constants.h"
 
-static inline size_t_status_t calculate_ipc_payload_size(const char *label, const ipc_protocol_t* p) {
+static inline size_t_status_t calculate_ipc_payload_size(const char *label, const ipc_protocol_t* p, bool checkfixheader) {
 	size_t_status_t result;
     result.r_size_t = 0;
     result.status = FAILURE;
@@ -27,40 +28,48 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
     
     switch (p->type) {
         case IPC_CLIENT_REQUEST_TASK: {
-            if (!p->payload.ipc_client_request_task) {
-                LOG_ERROR("%sIPC_CLIENT_REQUEST_TASK payload is NULL.", label);
-                result.status = FAILURE;
-                return result;
+            if (!checkfixheader) {
+                if (!p->payload.ipc_client_request_task) {
+                    LOG_ERROR("%sIPC_CLIENT_REQUEST_TASK payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
             }
             payload_fixed_size = IP_ADDRESS_LEN + sizeof(uint16_t);
             payload_dynamic_size = p->payload.ipc_client_request_task->len;
             break;
         }
         case IPC_CLIENT_DISCONNECTED: {
-			if (!p->payload.ipc_client_disconnect_info) {
-                LOG_ERROR("%sIPC_CLIENT_DISCONNECTED payload is NULL.", label);
-                result.status = FAILURE;
-                return result;
+            if (!checkfixheader) {
+                if (!p->payload.ipc_client_disconnect_info) {
+                    LOG_ERROR("%sIPC_CLIENT_DISCONNECTED payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
             }
             payload_fixed_size = IP_ADDRESS_LEN;
             payload_dynamic_size = 0;
             break;
 		}
 		case IPC_SHUTDOWN: {
-            if (!p->payload.ipc_shutdown) {
-                LOG_ERROR("%sIPC_SHUTDOWN payload is NULL.", label);
-                result.status = FAILURE;
-                return result;
+            if (!checkfixheader) {
+                if (!p->payload.ipc_shutdown) {
+                    LOG_ERROR("%sIPC_SHUTDOWN payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
             }
             payload_fixed_size = sizeof(shutdown_type_t);
             payload_dynamic_size = 0;
             break;
         }
         case IPC_HEARTBEAT: {
-            if (!p->payload.ipc_heartbeat) {
-                LOG_ERROR("%sIPC_HEARTBEAT payload is NULL.", label);
-                result.status = FAILURE;
-                return result;
+            if (!checkfixheader) {
+                if (!p->payload.ipc_heartbeat) {
+                    LOG_ERROR("%sIPC_HEARTBEAT payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
             }
             payload_fixed_size = sizeof(worker_type_t) + sizeof(uint8_t) + DOUBLE_ARRAY_SIZE;
             payload_dynamic_size = 0;
@@ -71,7 +80,11 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
             result.status = FAILURE_IPYLD;
             return result;
     }
-    result.r_size_t = IPC_VERSION_BYTES + sizeof(ipc_protocol_type_t) + payload_fixed_size + payload_dynamic_size;
+    if (checkfixheader) {
+        result.r_size_t = payload_fixed_size;
+    } else {
+        result.r_size_t = IPC_VERSION_BYTES + sizeof(ipc_protocol_type_t) + payload_fixed_size + payload_dynamic_size;
+    }
     result.status = SUCCESS;
     return result;
 }
@@ -84,7 +97,7 @@ ssize_t_status_t ipc_serialize(const char *label, const ipc_protocol_t* p, uint8
     if (!p || !ptr_buffer || !buffer_size) {
         return result;
     }
-    size_t_status_t psize = calculate_ipc_payload_size(label, p);
+    size_t_status_t psize = calculate_ipc_payload_size(label, p, false);
     if (psize.status != SUCCESS) {
 		result.status = psize.status;
 		return result;
@@ -172,32 +185,39 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, const uint8_t* buffer
     memcpy(p->version, buffer, IPC_VERSION_BYTES);
     p->type = (ipc_protocol_type_t)buffer[IPC_VERSION_BYTES];
     size_t current_buffer_offset = IPC_VERSION_BYTES + sizeof(ipc_protocol_type_t);
+    size_t_status_t psize = calculate_ipc_payload_size(label, p, true);
+    if (psize.status != SUCCESS) {
+		result.status = psize.status;
+		return result;
+	}
+    size_t fixed_header_size = psize.r_size_t;
     LOG_DEBUG("%sDeserializing type 0x%02x. Current offset: %zu", label, p->type, current_buffer_offset);
     status_t result_pyld = FAILURE;
     switch (p->type) {
         case IPC_CLIENT_REQUEST_TASK: {
-            if (current_buffer_offset + IP_ADDRESS_LEN + sizeof(uint16_t) > len) {
+            if (current_buffer_offset + fixed_header_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_CLIENT_REQUEST_TASK fixed header.");
                 CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
+            size_t fixed_header_blen_size = fixed_header_size - sizeof(uint16_t);
             uint16_t raw_data_len_be;
-            memcpy(&raw_data_len_be, buffer + current_buffer_offset + IP_ADDRESS_LEN, sizeof(uint16_t));
+            memcpy(&raw_data_len_be, buffer + current_buffer_offset + fixed_header_blen_size, sizeof(uint16_t));
             uint16_t actual_data_len = be16toh(raw_data_len_be);
-            ipc_client_request_task_t *task_payload = (ipc_client_request_task_t*) calloc(1, sizeof(ipc_client_request_task_t) + actual_data_len);
-            if (!task_payload) {
+            ipc_client_request_task_t *payload = (ipc_client_request_task_t*) calloc(1, sizeof(ipc_client_request_task_t) + actual_data_len);
+            if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_client_request_task_t with FAM. %s", label, strerror(errno));
                 CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
-            p->payload.ipc_client_request_task = task_payload;
+            p->payload.ipc_client_request_task = payload;
             result_pyld = ipc_deserialize_client_request_task(label, p, buffer, len, &current_buffer_offset);
             break;
         }
         case IPC_CLIENT_DISCONNECTED: {
-			if (current_buffer_offset + IP_ADDRESS_LEN > len) {
+            if (current_buffer_offset + fixed_header_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_CLIENT_DISCONNECTED fixed header.", label);
                 CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_OOBUF;
@@ -215,38 +235,38 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, const uint8_t* buffer
             break;
 		}
 		case IPC_SHUTDOWN: {
-			if (current_buffer_offset + sizeof(shutdown_type_t) > len) {
+            if (current_buffer_offset + fixed_header_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_SHUTDOWN fixed header.", label);
                 CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_shutdown_t *task_payload = (ipc_shutdown_t*) calloc(1, sizeof(ipc_shutdown_t));
-            if (!task_payload) {
+            ipc_shutdown_t *payload = (ipc_shutdown_t*) calloc(1, sizeof(ipc_shutdown_t));
+            if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_shutdown_t without FAM. %s", label, strerror(errno));
                 CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
-            p->payload.ipc_shutdown = task_payload;
+            p->payload.ipc_shutdown = payload;
             result_pyld = ipc_deserialize_shutdown(label, p, buffer, len, &current_buffer_offset);
             break;
 		}
         case IPC_HEARTBEAT: {
-			if (current_buffer_offset + sizeof(worker_type_t) + sizeof(uint8_t) + DOUBLE_ARRAY_SIZE > len) {
+            if (current_buffer_offset + fixed_header_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_HEARTBEAT fixed header.", label);
                 CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_heartbeat_t *task_payload = (ipc_heartbeat_t*) calloc(1, sizeof(ipc_heartbeat_t));
-            if (!task_payload) {
+            ipc_heartbeat_t *payload = (ipc_heartbeat_t*) calloc(1, sizeof(ipc_heartbeat_t));
+            if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_heartbeat_t without FAM. %s", label, strerror(errno));
                 CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
-            p->payload.ipc_heartbeat = task_payload;
+            p->payload.ipc_heartbeat = payload;
             result_pyld = ipc_deserialize_heartbeat(label, p, buffer, len, &current_buffer_offset);
             break;
 		}

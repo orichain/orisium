@@ -26,6 +26,9 @@ status_t orilink_serialize_heartbeat_pong(const char *label, const orilink_heart
     uint64_t pid_be = htobe64(payload->pid);
     memcpy(current_buffer + current_offset_local, &pid_be, sizeof(uint64_t));
     current_offset_local += sizeof(uint64_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    current_buffer[current_offset_local] = (uint8_t)payload->trycount;
+    current_offset_local += sizeof(uint8_t);
     *offset = current_offset_local;
     return SUCCESS;
 }
@@ -56,11 +59,18 @@ status_t orilink_deserialize_heartbeat_pong(const char *label, orilink_protocol_
     payload->pid = be64toh(pid_be);
     cursor += sizeof(uint64_t);
     current_offset += sizeof(uint64_t);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading trycount.", label);
+        return FAILURE_OOBUF;
+    }
+    payload->trycount = *cursor;
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
     *offset_ptr = current_offset;
     return SUCCESS;
 }
 
-orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_pong(const char *label, uint64_t id, uint64_t pid) {
+orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_pong(const char *label, uint64_t id, uint64_t pid, uint8_t trycount) {
 	orilink_protocol_t_status_t result;
 	result.r_orilink_protocol_t = (orilink_protocol_t *)malloc(sizeof(orilink_protocol_t));
 	result.status = FAILURE;
@@ -80,6 +90,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_pong(const char *label
 	}
     payload->id = id;
     payload->pid = pid;
+    payload->trycount = trycount;
 	result.r_orilink_protocol_t->payload.orilink_heartbeat_pong = payload;
 	result.status = SUCCESS;
 	return result;

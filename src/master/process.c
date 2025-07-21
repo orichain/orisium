@@ -236,7 +236,7 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
             free(m->health_kalman_calibration_samples);
             m->health_kalman_calibration_samples = NULL;
         }
-        LOG_DEVEL_DEBUG("%s[%s %d] First-time health check -> assumed healthy (100%%)", label, worker_name, index);
+        LOG_DEBUG("%s[%s %d] First-time health check -> assumed healthy (100%%)", label, worker_name, index);
     }
     double actual_elapsed_sec = (double)(now_ns - m->last_checkhealthy) / 1e9;
     double ttl_delay_jitter = (m->sum_hbtime - m->hbtime) - ((double)WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT * m->count_ack);
@@ -285,11 +285,11 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
                 kalman_init(&m->health_kalman_filter, kalman_q, kalman_r, kalman_p0, avg_health);
                 m->health_kalman_filter.is_initialized = true;
                 m->healthypct = m->health_kalman_filter.state_estimate;
-                LOG_DEVEL_DEBUG("%s[%s %d] Kalman Health Filter fully initialized. Avg: %.2f, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
+                LOG_DEBUG("%s[%s %d] Kalman Health Filter fully initialized. Avg: %.2f, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
                                 label, worker_name, index, avg_health, var_health, kalman_q, kalman_r, kalman_p0);
             } else {
                 m->healthypct = m->health_temp_ewma_value;
-                LOG_DEVEL_DEBUG("Calibrating health... (%d/%d) -> Meas: %.2f -> EWMA: %.2f",
+                LOG_DEBUG("Calibrating health... (%d/%d) -> Meas: %.2f -> EWMA: %.2f",
                                 m->health_kalman_initialized_count, KALMAN_CALIBRATION_SAMPLES,
                                 current_health_ratio_measurement, m->health_temp_ewma_value);
             }
@@ -307,7 +307,7 @@ static inline status_t check_worker_healthy(const char* label, worker_type_t wot
     m->last_checkhealthy = now_ns;
     m->count_ack = 0;
     m->sum_hbtime = m->hbtime;
-    LOG_DEVEL_DEBUG(
+    LOG_DEBUG(
         "%s[%s %d] Meas health: %.2f%% -> Est health: %.2f%% [%s]",
         label, worker_name, index,
         current_health_ratio_measurement,
@@ -413,7 +413,7 @@ void run_master_process(master_context *master_ctx) {
 	volatile sig_atomic_t master_shutdown_requested = 0;
 	uint64_t client_num = 1ULL;
     
-    LOG_INFO("%sPID %d TCP Server listening on port %d.", label, master_ctx->master_pid, node_config.listen_port);
+    LOG_INFO("%sPID %d UDP Server listening on port %d.", label, master_ctx->master_pid, node_config.listen_port);
     while (!master_shutdown_requested) {
 		int_status_t snfds = async_wait(label, &master_ctx->master_async);
 		if (snfds.status != SUCCESS) continue;

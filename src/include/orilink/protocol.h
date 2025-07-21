@@ -5,24 +5,29 @@
 #include <blake3.h>
 #include "types.h"
 #include "constants.h"
-
+//======================================================================
+// Desain protocol dengan kemampuan mengukur rtt di kedua sisi
+//======================================================================
 typedef enum {
     ORILINK_SYN = (uint8_t)0x00,
     ORILINK_SYN_ACK = (uint8_t)0x01,
-    ORILINK_HEARTBEAT_PING = (uint8_t)0x02,
-    ORILINK_HEARTBEAT_PONG = (uint8_t)0x03,
-    ORILINK_HEARTBEAT_PONG_ACK = (uint8_t)0x04,
-    ORILINK_HEARTBEAT_PING_RDY = (uint8_t)0x05,
-    ORILINK_SYNDT = (uint8_t)0x06,
-    ORILINK_SYNDT_ACK = (uint8_t)0x07,    
-    ORILINK_STATDT = (uint8_t)0x08,
-    ORILINK_STATDT_ACK = (uint8_t)0x09,
+    ORILINK_SYN_END = (uint8_t)0x02,
+    ORILINK_HEARTBEAT_PING = (uint8_t)0x03,
+    ORILINK_HEARTBEAT_PONG = (uint8_t)0x04,
+    ORILINK_HEARTBEAT_PONG_ACK = (uint8_t)0x05,
+    ORILINK_HEARTBEAT_PING_END = (uint8_t)0x06,
+    ORILINK_SYNDT = (uint8_t)0x07,
+    ORILINK_SYNDT_ACK = (uint8_t)0x08,
+    ORILINK_SYNDT_END = (uint8_t)0x09,
     ORILINK_DATA = (uint8_t)0x0a,
     ORILINK_DATA_ACK = (uint8_t)0x0b,
-    ORILINK_FINDT = (uint8_t)0x0c,
-    ORILINK_FINDT_ACK = (uint8_t)0x0d,
-    ORILINK_FIN = (uint8_t)0x0e,
-    ORILINK_FIN_ACK = (uint8_t)0x0f
+    ORILINK_DATA_END = (uint8_t)0x0c,
+    ORILINK_FINDT = (uint8_t)0x0d,
+    ORILINK_FINDT_ACK = (uint8_t)0x0e,
+    ORILINK_FINDT_END = (uint8_t)0x0f,
+    ORILINK_FIN = (uint8_t)0x10,
+    ORILINK_FIN_ACK = (uint8_t)0x11,
+    ORILINK_FIN_END = (uint8_t)0x12
 } orilink_protocol_type_t;
 
 typedef enum {
@@ -32,11 +37,18 @@ typedef enum {
 
 typedef struct {
     uint64_t id;
+    uint8_t trycount;
 } orilink_syn_t;
 
 typedef struct {
     uint64_t id;
+    uint8_t trycount;
 } orilink_syn_ack_t;
+
+typedef struct {
+    uint64_t id;
+    uint8_t trycount;
+} orilink_syn_end_t;
 
 typedef struct {
     uint64_t id;
@@ -44,6 +56,7 @@ typedef struct {
 // id ping
 //======================================================================        
     uint64_t pid;
+    uint8_t trycount;
 } orilink_heartbeat_ping_t;
 
 typedef struct {
@@ -52,6 +65,7 @@ typedef struct {
 // id ping
 //======================================================================      
     uint64_t pid;
+    uint8_t trycount;
 } orilink_heartbeat_pong_t;
 
 typedef struct {
@@ -60,11 +74,17 @@ typedef struct {
 // id ping
 //======================================================================      
     uint64_t pid;
+    uint8_t trycount;
 } orilink_heartbeat_pong_ack_t;
 
 typedef struct {
     uint64_t id;
-} orilink_heartbeat_ping_rdy_t;
+//======================================================================
+// id ping
+//======================================================================      
+    uint64_t pid;
+    uint8_t trycount;
+} orilink_heartbeat_ping_end_t;
 
 typedef struct {
     uint64_t id;
@@ -72,6 +92,7 @@ typedef struct {
 // id stream
 //======================================================================      
     uint64_t sid;
+    uint8_t trycount;
     orilink_mode_t mode;
 //======================================================================
 // data size dalam byte
@@ -81,37 +102,19 @@ typedef struct {
 // max buffer per 1 paket
 //======================================================================      
     uint16_t mbpp;
-//======================================================================
-// available receive window buffer
-//======================================================================      
-    uint16_t arw;
 } orilink_syndt_t;
 
 typedef struct {
     uint64_t id;
     uint64_t sid;
-    uint16_t arw;
+    uint8_t trycount;
 } orilink_syndt_ack_t;
 
 typedef struct {
     uint64_t id;
     uint64_t sid;
-    uint16_t arw;
-} orilink_statdt_t;
-
-typedef struct {
-    uint64_t id;
-    uint64_t sid;
-    uint16_t arw;
-//======================================================================
-// jumlah blok spktnum
-//======================================================================    
-    uint16_t len;
-//======================================================================
-// FAM spktnum yg belum ada/msh dibutuhkan isinya blok. misal 1-10,15-16,19-25    
-//======================================================================    
-    uint16_t data[];
-} orilink_statdt_ack_t;
+    uint8_t trycount;
+} orilink_syndt_end_t;
 
 typedef struct {
     uint64_t id;
@@ -124,7 +127,6 @@ typedef struct {
 // retry count per nomor paket
 //======================================================================          
     uint8_t trycount;
-    uint16_t arw;
 //======================================================================
 // jumlah data per spktnum dalam byte
 //======================================================================
@@ -139,34 +141,48 @@ typedef struct {
     uint64_t id;
     uint64_t sid;
     uint16_t spktnum;
-    uint16_t arw;
-//======================================================================
-// jumlah blok spktnum
-//======================================================================
-    uint16_t len;
-//======================================================================
-// FAM spktnum yg sudah diakui isinya blok. misal 1-10,15-16,19-25    
-//======================================================================
-    uint16_t data[];
+    uint8_t trycount;
 } orilink_data_ack_t;
 
 typedef struct {
     uint64_t id;
     uint64_t sid;
+    uint16_t spktnum;
+    uint8_t trycount;
+} orilink_data_end_t;
+
+typedef struct {
+    uint64_t id;
+    uint64_t sid;
+    uint8_t trycount;
 } orilink_findt_t;
 
 typedef struct {
     uint64_t id;
     uint64_t sid;
+    uint8_t trycount;
 } orilink_findt_ack_t;
 
 typedef struct {
     uint64_t id;
+    uint64_t sid;
+    uint8_t trycount;
+} orilink_findt_end_t;
+
+typedef struct {
+    uint64_t id;
+    uint8_t trycount;
 } orilink_fin_t;
 
 typedef struct {
     uint64_t id;
+    uint8_t trycount;
 } orilink_fin_ack_t;
+
+typedef struct {
+    uint64_t id;
+    uint8_t trycount;
+} orilink_fin_end_t;
 
 typedef struct {
 	uint8_t version[ORILINK_VERSION_BYTES];
@@ -175,20 +191,23 @@ typedef struct {
 	union {
 		orilink_syn_t *orilink_syn;
 		orilink_syn_ack_t *orilink_syn_ack;
+        orilink_syn_end_t *orilink_syn_end;
         orilink_heartbeat_ping_t *orilink_heartbeat_ping;
         orilink_heartbeat_pong_t *orilink_heartbeat_pong;
         orilink_heartbeat_pong_ack_t *orilink_heartbeat_pong_ack;
-        orilink_heartbeat_ping_rdy_t *orilink_heartbeat_ping_rdy;
+        orilink_heartbeat_ping_end_t *orilink_heartbeat_ping_end;
         orilink_syndt_t *orilink_syndt;
         orilink_syndt_ack_t *orilink_syndt_ack;
-        orilink_statdt_t *orilink_statdt;
-        orilink_statdt_ack_t *orilink_statdt_ack;
+        orilink_syndt_end_t *orilink_syndt_end;
         orilink_data_t *orilink_data;
         orilink_data_ack_t *orilink_data_ack;
+        orilink_data_end_t *orilink_data_end;
         orilink_findt_t *orilink_findt;
         orilink_findt_ack_t *orilink_findt_ack;
+        orilink_findt_end_t *orilink_findt_end;
         orilink_fin_t *orilink_fin;
         orilink_fin_ack_t *orilink_fin_ack;
+        orilink_fin_end_t *orilink_fin_end;
 	} payload;
 } orilink_protocol_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan
@@ -206,34 +225,40 @@ static inline void CLOSE_ORILINK_PROTOCOL(orilink_protocol_t **protocol_ptr) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_syn);
         } else if (x->type == ORILINK_SYN_ACK) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_syn_ack);
+        } else if (x->type == ORILINK_SYN_END) {
+            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_syn_end);
         } else if (x->type == ORILINK_HEARTBEAT_PING) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat_ping);
         } else if (x->type == ORILINK_HEARTBEAT_PONG) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat_pong);
         } else if (x->type == ORILINK_HEARTBEAT_PONG_ACK) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat_pong_ack);
-        } else if (x->type == ORILINK_HEARTBEAT_PING_RDY) {
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat_ping_rdy);
+        } else if (x->type == ORILINK_HEARTBEAT_PING_END) {
+            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat_ping_end);
         } else if (x->type == ORILINK_SYNDT) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_syndt);
         } else if (x->type == ORILINK_SYNDT_ACK) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_syndt_ack);
-        } else if (x->type == ORILINK_STATDT) {
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_statdt);
-        } else if (x->type == ORILINK_STATDT_ACK) {
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_statdt_ack);
+        } else if (x->type == ORILINK_SYNDT_END) {
+            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_syndt_end);
         } else if (x->type == ORILINK_DATA) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_data);
         } else if (x->type == ORILINK_DATA_ACK) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_data_ack);
+        } else if (x->type == ORILINK_DATA_END) {
+            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_data_end);
         } else if (x->type == ORILINK_FINDT) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_findt);
         } else if (x->type == ORILINK_FINDT_ACK) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_findt_ack);
+        } else if (x->type == ORILINK_FINDT_END) {
+            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_findt_end);
         } else if (x->type == ORILINK_FIN) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_fin);
         } else if (x->type == ORILINK_FIN_ACK) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_fin_ack);
+        } else if (x->type == ORILINK_FIN_END) {
+            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_fin_end);
         }
         free(x);
         *protocol_ptr = NULL;

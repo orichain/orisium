@@ -26,6 +26,9 @@ status_t orilink_serialize_findt_ack(const char *label, const orilink_findt_ack_
     uint64_t sid_be = htobe64(payload->sid);
     memcpy(current_buffer + current_offset_local, &sid_be, sizeof(uint64_t));
     current_offset_local += sizeof(uint64_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    current_buffer[current_offset_local] = (uint8_t)payload->trycount;
+    current_offset_local += sizeof(uint8_t);
     *offset = current_offset_local;
     return SUCCESS;
 }
@@ -56,11 +59,18 @@ status_t orilink_deserialize_findt_ack(const char *label, orilink_protocol_t *p,
     payload->sid = be64toh(sid_be);
     cursor += sizeof(uint64_t);
     current_offset += sizeof(uint64_t);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading trycount.", label);
+        return FAILURE_OOBUF;
+    }
+    payload->trycount = *cursor;
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
     *offset_ptr = current_offset;
     return SUCCESS;
 }
 
-orilink_protocol_t_status_t orilink_prepare_cmd_findt_ack(const char *label, uint64_t id, uint64_t sid) {
+orilink_protocol_t_status_t orilink_prepare_cmd_findt_ack(const char *label, uint64_t id, uint64_t sid, uint8_t trycount) {
 	orilink_protocol_t_status_t result;
 	result.r_orilink_protocol_t = (orilink_protocol_t *)malloc(sizeof(orilink_protocol_t));
 	result.status = FAILURE;
@@ -80,6 +90,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_findt_ack(const char *label, uin
 	}
     payload->id = id;
     payload->sid = sid;
+    payload->trycount = trycount;
 	result.r_orilink_protocol_t->payload.orilink_findt_ack = payload;
 	result.status = SUCCESS;
 	return result;

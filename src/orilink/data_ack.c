@@ -30,22 +30,9 @@ status_t orilink_serialize_data_ack(const char *label, const orilink_data_ack_t*
     uint16_t spktnum_be = htobe16(payload->sid);
     memcpy(current_buffer + current_offset_local, &spktnum_be, sizeof(uint16_t));
     current_offset_local += sizeof(uint16_t);    
-    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint16_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    uint16_t arw_be = htobe16(payload->arw);
-    memcpy(current_buffer + current_offset_local, &arw_be, sizeof(uint16_t));
-    current_offset_local += sizeof(uint16_t);
-    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint16_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    uint16_t len_be = htobe16(payload->len);
-    memcpy(current_buffer + current_offset_local, &len_be, sizeof(uint16_t));
-    current_offset_local += sizeof(uint16_t);
-    if (payload->len > 0) {
-        if (CHECK_BUFFER_BOUNDS(current_offset_local, (2 * (payload->len * sizeof(uint16_t))), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-        for (uint32_t i=0;i<(2 * (payload->len * sizeof(uint16_t)));++i) {
-            uint16_t dt_be = htobe16(payload->data[i]);
-            memcpy(current_buffer + current_offset_local, &dt_be, sizeof(uint16_t));
-            current_offset_local += sizeof(uint16_t);
-        }
-    }
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    current_buffer[current_offset_local] = (uint8_t)payload->trycount;
+    current_offset_local += sizeof(uint8_t);
     *offset = current_offset_local;
     return SUCCESS;
 }
@@ -85,43 +72,18 @@ status_t orilink_deserialize_data_ack(const char *label, orilink_protocol_t *p, 
     payload->spktnum = be16toh(spktnum_be);
     cursor += sizeof(uint16_t);
     current_offset += sizeof(uint16_t);
-    if (current_offset + sizeof(uint16_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading arw.", label);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading trycount.", label);
         return FAILURE_OOBUF;
     }
-    uint16_t arw_be;
-    memcpy(&arw_be, cursor, sizeof(uint16_t));
-    payload->arw = be16toh(arw_be);
-    cursor += sizeof(uint16_t);
-    current_offset += sizeof(uint16_t);
-    if (current_offset + sizeof(uint16_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading len.", label);
-        return FAILURE_OOBUF;
-    }
-    uint16_t len_be;
-    memcpy(&len_be, cursor, sizeof(uint16_t));
-    payload->len = be16toh(len_be);
-    cursor += sizeof(uint16_t);
-    current_offset += sizeof(uint16_t);
-    if (payload->len > 0) {
-        if (current_offset + (2 * (payload->len * sizeof(uint16_t))) > total_buffer_len) {
-            LOG_ERROR("%sInsufficient buffer for actual data. Expected %hu, available %zu.",
-                    label, payload->len, total_buffer_len - current_offset);
-            return FAILURE_OOBUF;
-        }
-        for (uint32_t i=0;i<(2 * (payload->len * sizeof(uint16_t)));++i) {
-            uint16_t dt_be;
-            memcpy(&dt_be, cursor, sizeof(uint16_t));
-            payload->data[i] = be16toh(dt_be);
-            cursor += sizeof(uint16_t);
-            current_offset += sizeof(uint16_t);
-        }
-    }
+    payload->trycount = *cursor;
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
     *offset_ptr = current_offset;
     return SUCCESS;
 }
 
-orilink_protocol_t_status_t orilink_prepare_cmd_data_ack(const char *label, uint64_t id, uint64_t sid, uint16_t spktnum, uint16_t arw, uint16_t data_len, uint8_t *data) {
+orilink_protocol_t_status_t orilink_prepare_cmd_data_ack(const char *label, uint64_t id, uint64_t sid, uint16_t spktnum, uint8_t trycount) {
 	orilink_protocol_t_status_t result;
 	result.r_orilink_protocol_t = (orilink_protocol_t *)malloc(sizeof(orilink_protocol_t));
 	result.status = FAILURE;
@@ -133,7 +95,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_data_ack(const char *label, uint
 	result.r_orilink_protocol_t->version[0] = ORILINK_VERSION_MAJOR;
 	result.r_orilink_protocol_t->version[1] = ORILINK_VERSION_MINOR;
 	result.r_orilink_protocol_t->type = ORILINK_DATA_ACK;
-	orilink_data_ack_t *payload = (orilink_data_ack_t *)calloc(1, sizeof(orilink_data_ack_t) + (2 * (data_len * sizeof(uint16_t))));
+	orilink_data_ack_t *payload = (orilink_data_ack_t *)calloc(1, sizeof(orilink_data_ack_t));
 	if (!payload) {
 		LOG_ERROR("%sFailed to allocate orilink_data_ack_t payload. %s", label, strerror(errno));
 		CLOSE_ORILINK_PROTOCOL(&result.r_orilink_protocol_t);
@@ -142,9 +104,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_data_ack(const char *label, uint
     payload->id = id;
     payload->sid = sid;
     payload->spktnum = spktnum;
-    payload->arw = arw;
-    payload->len = data_len;
-    if (data_len > 0 && data) memcpy(payload->data, data, (2 * (data_len * sizeof(uint16_t))));   
+    payload->trycount = trycount;   
 	result.r_orilink_protocol_t->payload.orilink_data_ack = payload;
 	result.status = SUCCESS;
 	return result;

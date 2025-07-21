@@ -18,6 +18,10 @@ typedef struct orilink_heartbeat_client_session_t {
     bool pong_ack_sent;
     int pong_ack_sent_try_count;
     uint64_t pong_ack_sent_time;
+    int pong_ack_fd;
+    int pong_ack_timer_fd;
+    bool ping_rdy_rcvd;
+    uint64_t ping_rdy_rcvd_time;
     struct orilink_heartbeat_client_session_t *next;
 } orilink_heartbeat_client_session_t;
 
@@ -35,7 +39,7 @@ typedef struct {
 //======================================================================
     bool heartbeat_rdy;
     int heartbeat_timer_fd;
-    orilink_heartbeat_session_t *heartbeat;
+    orilink_heartbeat_client_session_t *heartbeat;
 //======================================================================    
     bool fin_sent;
     int fin_sent_try_count;

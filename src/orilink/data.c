@@ -34,10 +34,6 @@ status_t orilink_serialize_data(const char *label, const orilink_data_t* payload
     current_buffer[current_offset_local] = (uint8_t)payload->trycount;
     current_offset_local += sizeof(uint8_t);
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint16_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    uint16_t arw_be = htobe16(payload->arw);
-    memcpy(current_buffer + current_offset_local, &arw_be, sizeof(uint16_t));
-    current_offset_local += sizeof(uint16_t);
-    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint16_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
     uint16_t len_be = htobe16(payload->len);
     memcpy(current_buffer + current_offset_local, &len_be, sizeof(uint16_t));
     current_offset_local += sizeof(uint16_t);
@@ -93,15 +89,6 @@ status_t orilink_deserialize_data(const char *label, orilink_protocol_t *p, cons
     cursor += sizeof(uint8_t);
     current_offset += sizeof(uint8_t);
     if (current_offset + sizeof(uint16_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading arw.", label);
-        return FAILURE_OOBUF;
-    }
-    uint16_t arw_be;
-    memcpy(&arw_be, cursor, sizeof(uint16_t));
-    payload->arw = be16toh(arw_be);
-    cursor += sizeof(uint16_t);
-    current_offset += sizeof(uint16_t);
-    if (current_offset + sizeof(uint16_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading len.", label);
         return FAILURE_OOBUF;
     }
@@ -124,7 +111,7 @@ status_t orilink_deserialize_data(const char *label, orilink_protocol_t *p, cons
     return SUCCESS;
 }
 
-orilink_protocol_t_status_t orilink_prepare_cmd_data(const char *label, uint64_t id, uint64_t sid, uint16_t spktnum, uint8_t trycount, uint16_t arw, uint16_t data_len, uint8_t *data) {
+orilink_protocol_t_status_t orilink_prepare_cmd_data(const char *label, uint64_t id, uint64_t sid, uint16_t spktnum, uint8_t trycount, uint16_t data_len, uint8_t *data) {
 	orilink_protocol_t_status_t result;
 	result.r_orilink_protocol_t = (orilink_protocol_t *)malloc(sizeof(orilink_protocol_t));
 	result.status = FAILURE;
@@ -146,7 +133,6 @@ orilink_protocol_t_status_t orilink_prepare_cmd_data(const char *label, uint64_t
     payload->sid = sid;
     payload->spktnum = spktnum;
     payload->trycount = trycount;
-    payload->arw = arw;
     payload->len = data_len;
     if (data_len > 0 && data) memcpy(payload->data, data, data_len);   
 	result.r_orilink_protocol_t->payload.orilink_data = payload;

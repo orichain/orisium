@@ -9,10 +9,10 @@
 #include "orilink/protocol.h"
 #include "types.h"
 #include "log.h"
-#include "orilink/fin_ack.h"
+#include "orilink/syn_end.h"
 #include "constants.h"
 
-status_t orilink_serialize_fin_ack(const char *label, const orilink_fin_ack_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
+status_t orilink_serialize_syn_end(const char *label, const orilink_syn_end_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
     if (!payload || !current_buffer || !offset) {
         LOG_ERROR("%sInvalid input pointers.", label);
         return FAILURE;
@@ -29,14 +29,14 @@ status_t orilink_serialize_fin_ack(const char *label, const orilink_fin_ack_t* p
     return SUCCESS;
 }
 
-status_t orilink_deserialize_fin_ack(const char *label, orilink_protocol_t *p, const uint8_t *buffer, size_t total_buffer_len, size_t *offset_ptr) {
-    if (!p || !buffer || !offset_ptr || !p->payload.orilink_fin_ack) {
+status_t orilink_deserialize_syn_end(const char *label, orilink_protocol_t *p, const uint8_t *buffer, size_t total_buffer_len, size_t *offset_ptr) {
+    if (!p || !buffer || !offset_ptr || !p->payload.orilink_syn_end) {
         LOG_ERROR("%sInvalid input pointers.", label);
         return FAILURE;
     }
     size_t current_offset = *offset_ptr;
     const uint8_t *cursor = buffer + current_offset;
-    orilink_fin_ack_t *payload = p->payload.orilink_fin_ack;
+    orilink_syn_end_t *payload = p->payload.orilink_syn_end;
     if (current_offset + sizeof(uint64_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading id.", label);
         return FAILURE_OOBUF;
@@ -57,7 +57,7 @@ status_t orilink_deserialize_fin_ack(const char *label, orilink_protocol_t *p, c
     return SUCCESS;
 }
 
-orilink_protocol_t_status_t orilink_prepare_cmd_fin_ack(const char *label, uint64_t id, uint8_t trycount) {
+orilink_protocol_t_status_t orilink_prepare_cmd_syn_end(const char *label, uint64_t id, uint8_t trycount) {
 	orilink_protocol_t_status_t result;
 	result.r_orilink_protocol_t = (orilink_protocol_t *)malloc(sizeof(orilink_protocol_t));
 	result.status = FAILURE;
@@ -68,16 +68,16 @@ orilink_protocol_t_status_t orilink_prepare_cmd_fin_ack(const char *label, uint6
 	memset(result.r_orilink_protocol_t, 0, sizeof(orilink_protocol_t));
 	result.r_orilink_protocol_t->version[0] = ORILINK_VERSION_MAJOR;
 	result.r_orilink_protocol_t->version[1] = ORILINK_VERSION_MINOR;
-	result.r_orilink_protocol_t->type = ORILINK_FIN_ACK;
-	orilink_fin_ack_t *payload = (orilink_fin_ack_t *)calloc(1, sizeof(orilink_fin_ack_t));
+	result.r_orilink_protocol_t->type = ORILINK_SYN_END;
+	orilink_syn_end_t *payload = (orilink_syn_end_t *)calloc(1, sizeof(orilink_syn_end_t));
 	if (!payload) {
-		LOG_ERROR("%sFailed to allocate orilink_fin_ack_t payload. %s", label, strerror(errno));
+		LOG_ERROR("%sFailed to allocate orilink_syn_end_t payload. %s", label, strerror(errno));
 		CLOSE_ORILINK_PROTOCOL(&result.r_orilink_protocol_t);
 		return result;
 	}
     payload->id = id;
     payload->trycount = trycount;
-	result.r_orilink_protocol_t->payload.orilink_fin_ack = payload;
+	result.r_orilink_protocol_t->payload.orilink_syn_end = payload;
 	result.status = SUCCESS;
 	return result;
 }
