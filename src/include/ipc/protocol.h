@@ -6,6 +6,16 @@
 #include "constants.h"
 
 typedef enum {
+    IPC_MASTER_SIO_CONNECT = (uint8_t)0x00,
+    IPC_MASTER_SIO_DATA = (uint8_t)0x01,
+    IPC_SIO_LOGIC_DATA = (uint8_t)0x02,
+    IPC_SIO_LOGIC_CONNECTION = (uint8_t)0x03,
+    
+    IPC_MASTER_LOGIC_BOOTSTRAP = (uint8_t)0x10,
+    IPC_LOGIC_COW_CONNECT = (uint8_t)0x11,
+    IPC_LOGIC_COW_DATA = (uint8_t)0x12,
+    IPC_COW_LOGIC_CONNECTION = (uint8_t)0x13,
+    
     IPC_WORKER_MASTER_HEARTBEAT = (uint8_t)0xfe,
     IPC_MASTER_WORKER_SHUTDOWN = (uint8_t)0xff
 } ipc_protocol_type_t;
