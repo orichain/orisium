@@ -40,6 +40,12 @@ typedef enum {
 } worker_type_t;
 
 typedef enum {
+    IP_UNKNOWN = (uint8_t)0x00,
+    IP_V4 = (uint8_t)0x01,
+    IP_V6 = (uint8_t)0x02
+} ip_type_t;
+
+typedef enum {
     PT_SYN = (uint8_t)0x00,
     PT_SYN_ACK = (uint8_t)0x02,
     PT_REUSED_SYN_ACK = (uint8_t)0x03,

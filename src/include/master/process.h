@@ -23,8 +23,9 @@ typedef struct {
     int shutdown_event_fd;
     async_type_t master_async;
     uds_pair_pid_t sio[MAX_SIO_WORKERS];
-    master_sio_c_session_t sio_c_session[MAX_MASTER_CONCURRENT_SESSIONS];
+    master_sio_c_session_t sio_c_session[MAX_MASTER_SIO_SESSIONS];
     master_sio_dc_session_t *sio_dc_session;
+    master_cow_c_session_t cow_c_session[MAX_MASTER_COW_SESSIONS];
     int last_sio_rr_idx;
     uds_pair_pid_t logic[MAX_LOGIC_WORKERS];
     int last_cow_rr_idx;

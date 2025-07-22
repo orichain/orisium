@@ -5,8 +5,6 @@
 #include <json-c/json_object.h>
 #include <json-c/json_tokener.h>
 #include <json-c/json_types.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <time.h>
@@ -86,13 +84,6 @@ status_t read_listen_port_and_bootstrap_nodes_from_json(const char* label, const
         strncpy(iptmp, json_object_get_string(ip_obj), INET6_ADDRSTRLEN - 1);
         iptmp[INET6_ADDRSTRLEN - 1] = '\0';
         
-        if (convert_str_to_ipv6_bin(iptmp, bootstrap_nodes->data[bootstrap_nodes->len].ip) != SUCCESS) {
-			LOG_ERROR("%sIP tidak valid %s.", iptmp);
-            continue;
-		}
-        
-        inet_pton(AF_INET6, iptmp, bootstrap_nodes->data[bootstrap_nodes->len].ip);
-                
         if (!json_object_object_get_ex(node_obj, "port", &port_obj) || !json_object_is_type(port_obj, json_type_int)) {
             LOG_DEBUG("%sKunci 'port' tidak ditemukan atau bukan integer pada node indeks %d. Melewatkan.", label, i);
             continue;
@@ -104,7 +95,10 @@ status_t read_listen_port_and_bootstrap_nodes_from_json(const char* label, const
             continue;
 		}
         
-        bootstrap_nodes->data[bootstrap_nodes->len].port = json_object_get_int(port_obj);
+        if (convert_str_to_sockaddr_in6(iptmp, port, &bootstrap_nodes->addr[bootstrap_nodes->len]) != SUCCESS) {
+            LOG_ERROR("%sIP tidak valid %s.", iptmp);
+            continue;
+        }
 
         bootstrap_nodes->len++;
     }

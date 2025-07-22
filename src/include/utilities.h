@@ -47,6 +47,63 @@ static inline status_t set_nonblocking(const char* label, int fd) {
     return SUCCESS;
 }
 
+static inline status_t convert_str_to_sockaddr_in6(const char *ip_str, uint16_t port, struct sockaddr_in6 *addr) {
+    struct in_addr ipv4;
+    struct in6_addr ipv6;
+    uint8_t out_ipv6[IPV6_ADDRESS_LEN];
+    
+    memset(addr, 0, sizeof(struct sockaddr_in6));
+    addr->sin6_family = AF_INET6;
+    addr->sin6_port = htobe16(port);
+    addr->sin6_flowinfo = 0;
+    addr->sin6_scope_id = 0;
+    if (inet_pton(AF_INET6, ip_str, &ipv6) == 1) {
+        memcpy(out_ipv6, &ipv6, IPV6_ADDRESS_LEN);
+        memcpy(&(addr->sin6_addr), out_ipv6, IPV6_ADDRESS_LEN);
+        return SUCCESS;
+    }
+    if (inet_pton(AF_INET, ip_str, &ipv4) == 1) {
+        memset(out_ipv6, 0, 10);
+        out_ipv6[10] = 0xff;
+        out_ipv6[11] = 0xff;
+        memcpy(&out_ipv6[12], &ipv4, IPV4_ADDRESS_LEN);
+        memcpy(&(addr->sin6_addr), out_ipv6, IPV6_ADDRESS_LEN);
+        return SUCCESS;
+    }
+    return FAILURE;
+}
+
+static inline void serialize_sockaddr_in6(const struct sockaddr_in6 *addr, uint8_t *buffer) {
+    uint16_t family_be = htobe16(addr->sin6_family);
+    uint16_t port_be = htobe16(addr->sin6_port);
+    uint32_t flowinfo_be = htobe32(addr->sin6_flowinfo);
+    uint32_t scopeid_be = htobe32(addr->sin6_scope_id);
+    size_t offset = 0;
+    memcpy(buffer + offset, &family_be, sizeof(family_be)); offset += sizeof(family_be);
+    memcpy(buffer + offset, &port_be, sizeof(port_be)); offset += sizeof(port_be);
+    memcpy(buffer + offset, &flowinfo_be, sizeof(flowinfo_be)); offset += sizeof(flowinfo_be);
+    memcpy(buffer + offset, &(addr->sin6_addr), IPV6_ADDRESS_LEN); offset += IPV6_ADDRESS_LEN;
+    memcpy(buffer + offset, &scopeid_be, sizeof(scopeid_be)); offset += sizeof(scopeid_be);
+}
+
+static inline void deserialize_sockaddr_in6(const uint8_t *buffer, struct sockaddr_in6 *addr) {
+    memset(addr, 0, sizeof(struct sockaddr_in6));
+    size_t offset = 0;
+    uint16_t family_be;
+    uint16_t port_be;
+    uint32_t flowinfo_be;
+    uint32_t scopeid_be;
+    memcpy(&family_be, buffer + offset, sizeof(uint16_t)); offset += sizeof(uint16_t);
+    memcpy(&port_be, buffer + offset, sizeof(uint16_t)); offset += sizeof(uint16_t);
+    memcpy(&flowinfo_be, buffer + offset, sizeof(uint32_t)); offset += sizeof(uint32_t);
+    memcpy(&(addr->sin6_addr), buffer + offset, IPV6_ADDRESS_LEN); offset += IPV6_ADDRESS_LEN;
+    memcpy(&scopeid_be, buffer + offset, sizeof(uint32_t)); offset += sizeof(uint32_t);
+    addr->sin6_family = be16toh(family_be);
+    addr->sin6_port = be16toh(port_be);
+    addr->sin6_flowinfo = be32toh(flowinfo_be);
+    addr->sin6_scope_id = be32toh(scopeid_be);
+}
+
 static inline float calculate_average(const float* data, int num_elements) {
     if (num_elements == 0) return 0.0f;
     float sum = 0.0f;
@@ -64,49 +121,6 @@ static inline float calculate_variance(const float* data, int num_elements, floa
         sum_squared_diff += diff * diff;
     }
     return sum_squared_diff / (float)(num_elements - 1);
-}
-
-static inline status_t convert_str_to_ipv6_bin(const char *ip_str, uint8_t out_ipv6[IP_ADDRESS_LEN]) {
-    struct in_addr ipv4;
-    struct in6_addr ipv6;
-
-    if (inet_pton(AF_INET6, ip_str, &ipv6) == 1) {
-        memcpy(out_ipv6, &ipv6, IP_ADDRESS_LEN);
-        return SUCCESS;
-    }
-    if (inet_pton(AF_INET, ip_str, &ipv4) == 1) {
-        memset(out_ipv6, 0, 10);
-        out_ipv6[10] = 0xff;
-        out_ipv6[11] = 0xff;
-        memcpy(&out_ipv6[12], &ipv4, 4);
-        return SUCCESS;
-    }
-    return FAILURE;
-}
-
-static inline status_t convert_ipv6_bin_to_str(const uint8_t in_ipv6[IP_ADDRESS_LEN], char out_ip_str[INET6_ADDRSTRLEN]) {
-    static const uint8_t prefix_ipv4_mapped[12] = {
-        0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0xff, 0xff
-    };
-    
-    if (memcmp(in_ipv6, prefix_ipv4_mapped, 12) == 0) {
-        struct in_addr ipv4_part;
-        memcpy(&ipv4_part, &in_ipv6[12], 4);
-        if (inet_ntop(AF_INET, &ipv4_part, out_ip_str, INET6_ADDRSTRLEN) != NULL) {
-			return SUCCESS;
-		} else {
-			return FAILURE;
-		}
-    } else {
-        struct in6_addr ipv6;
-        memcpy(&ipv6, in_ipv6, 16);
-        if (inet_ntop(AF_INET6, &ipv6, out_ip_str, INET6_ADDRSTRLEN) != NULL) {
-			return SUCCESS;
-		} else {
-			return FAILURE;
-		}
-    }
 }
 
 static inline status_t sleep_ns(long nanoseconds) {

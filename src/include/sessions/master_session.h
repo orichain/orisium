@@ -65,11 +65,17 @@ typedef struct {
 typedef struct {
 	int sio_index;
     bool in_use;
-    uint8_t ip[IP_ADDRESS_LEN];
+    struct sockaddr_in6 addr;
 } master_sio_c_session_t;
 
+typedef struct {
+	int cow_index;
+    bool in_use;
+    struct sockaddr_in6 addr;
+} master_cow_c_session_t;
+
 typedef struct master_sio_dc_session_t {
-    uint8_t ip[IP_ADDRESS_LEN];
+    struct sockaddr_in6 addr;
     uint64_t dc_time;
     struct master_sio_dc_session_t *next;
 } master_sio_dc_session_t;
@@ -79,10 +85,10 @@ typedef struct {
 	status_t status;
 } master_sio_dc_session_t_status_t;
 
-status_t add_master_sio_dc_session(const char *label, master_sio_dc_session_t **head, uint8_t ip[]);
-status_t delete_master_sio_dc_session(const char *label, master_sio_dc_session_t **head, uint8_t ip[]);
-master_sio_dc_session_t_status_t find_master_sio_dc_session(const char *label, master_sio_dc_session_t *head, uint8_t ip[]);
-master_sio_dc_session_t_status_t find_first_ratelimited_master_sio_dc_session(const char *label, master_sio_dc_session_t *head, uint8_t ip[]);
+status_t add_master_sio_dc_session(const char *label, master_sio_dc_session_t **head, struct sockaddr_in6 *addr);
+status_t delete_master_sio_dc_session(const char *label, master_sio_dc_session_t **head, struct sockaddr_in6 *addr);
+master_sio_dc_session_t_status_t find_master_sio_dc_session(const char *label, master_sio_dc_session_t *head, struct sockaddr_in6 *addr);
+master_sio_dc_session_t_status_t find_first_ratelimited_master_sio_dc_session(const char *label, master_sio_dc_session_t *head, struct sockaddr_in6 *addr);
 int_status_t count_master_sio_dc_sessions(const char *label, master_sio_dc_session_t *head);
 void display_master_sio_dc_sessions(const char *label, master_sio_dc_session_t *head);
 void free_master_sio_dc_sessions(const char *label, master_sio_dc_session_t **head);

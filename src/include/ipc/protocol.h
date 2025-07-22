@@ -21,8 +21,7 @@ typedef enum {
 } ipc_protocol_type_t;
 
 typedef struct {  
-    uint8_t ip[IP_ADDRESS_LEN];
-    uint16_t port;
+    struct sockaddr_in6 addr;
 } ipc_master_cow_connect_t;
 
 typedef struct {

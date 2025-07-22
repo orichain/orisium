@@ -1,7 +1,5 @@
-#include <stdbool.h>     // for false, bool, true
 #include <stdio.h>       // for printf, perror, fprintf, NULL, stderr
 #include <stdlib.h>      // for exit, EXIT_FAILURE, atoi, EXIT_SUCCESS, malloc, free
-#include <string.h>      // for memset, strncpy
 #include <unistd.h>      // for close, fork, getpid
 #include <stdint.h>
 #include <time.h>
@@ -12,13 +10,12 @@
 #include "constants.h"
 #include "utilities.h"
 #include "ipc/protocol.h"
-#include "sessions/workers_session.h"
 #include "types.h"
 #include "ipc/worker_master_heartbeat.h"
 
 void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd) {
     volatile sig_atomic_t sio_shutdown_requested = 0;
-    sio_c_state_t sio_c_state[MAX_CONNECTION_PER_SIO_WORKER];
+    //sio_c_state_t sio_c_state[MAX_CONNECTION_PER_SIO_WORKER];
     async_type_t sio_async;
     sio_async.async_fd = -1;
     int sio_timer_fd = -1;
@@ -52,9 +49,9 @@ void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 	if (async_create_incoming_event(label, &sio_async, &sio_timer_fd) != SUCCESS) goto exit;
 //======================================================================	    
     for (int i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
-        sio_c_state[i].in_use = false;
-        sio_c_state[i].client_fd = -1;
-        memset(sio_c_state[i].ip, 0, IP_ADDRESS_LEN);
+        //sio_c_state[i].in_use = false;
+        //sio_c_state[i].client_fd = -1;
+        //memset(sio_c_state[i].ip, 0, IP_ADDRESS_LEN);
     }    
     while (!sio_shutdown_requested) {
 		int_status_t snfds = async_wait(label, &sio_async);
@@ -139,11 +136,6 @@ void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 // SIO Cleanup
 //======================================================================    
 exit:
-	for (int i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) { // Kebiasaann bagus = harus selalu ingat "CLOSE FD + HAPUS event"
-		if (sio_c_state[i].in_use) {
-			CLOSE_FD(&sio_c_state[i].client_fd);
-		}
-	}
 	async_delete_event(label, &sio_async, &master_uds_fd);
     CLOSE_FD(&master_uds_fd);
 	async_delete_event(label, &sio_async, &sio_timer_fd);

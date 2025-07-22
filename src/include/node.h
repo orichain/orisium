@@ -21,13 +21,8 @@ status_t node_identity_init(const char *filepath, node_identity_t *out);
 void node_identity_free(node_identity_t *id);
 
 typedef struct {
-    uint8_t ip[IP_ADDRESS_LEN];
-    uint16_t port;
-} bootstrap_t;
-
-typedef struct {
     uint16_t len;
-    bootstrap_t data[MAX_BOOTSTRAP_NODES];
+    struct sockaddr_in6 addr[MAX_BOOTSTRAP_NODES];
 } bootstrap_nodes_t;
 
 status_t read_listen_port_and_bootstrap_nodes_from_json(const char* label, const char* filename, uint16_t *listen_port, bootstrap_nodes_t* bootstrap_nodes);

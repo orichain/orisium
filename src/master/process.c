@@ -1,5 +1,4 @@
 #include <stdbool.h>
-#include <string.h>
 #include <unistd.h>
 #include <stdint.h>
 #include <signal.h>
@@ -19,10 +18,16 @@
 
 status_t setup_master(master_context *master_ctx, uint16_t *listen_port) {
     const char *label = "[Master]: ";
-    for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
+    for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
         master_ctx->sio_c_session[i].sio_index = -1;
         master_ctx->sio_c_session[i].in_use = false;
-        memset(master_ctx->sio_c_session[i].ip, 0, IP_ADDRESS_LEN);
+        //memset(master_ctx->sio_c_session[i].ip, 0, IPV6_ADDRESS_LEN);
+    }
+    for (int i = 0; i < MAX_MASTER_COW_SESSIONS; ++i) {
+        master_ctx->cow_c_session[i].cow_index = -1;
+        master_ctx->cow_c_session[i].in_use = false;
+        //memset(master_ctx->cow_c_session[i].ip, 0, IPV6_ADDRESS_LEN);
+        //master_ctx->cow_c_session[i].port = -1;
     }
     master_ctx->last_sio_rr_idx = 0;
     master_ctx->last_cow_rr_idx = 0;
@@ -57,7 +62,6 @@ status_t setup_master(master_context *master_ctx, uint16_t *listen_port) {
 void run_master_process(master_context *master_ctx, uint16_t *listen_port, bootstrap_nodes_t *bootstrap_nodes) {
 	const char *label = "[Master]: ";
 	volatile sig_atomic_t master_shutdown_requested = 0;
-	uint64_t client_num = 1ULL;
     
     if (setup_workers(master_ctx) != SUCCESS) goto exit;
     LOG_INFO("%sPID %d UDP Server listening on port %d.", label, master_ctx->master_pid, *listen_port);
@@ -98,7 +102,7 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
 				continue;
 			} else if (current_fd == master_ctx->listen_sock) {
 				if (async_event_is_EPOLLIN(current_events)) {
-					if (handle_listen_sock_event(label, master_ctx, &client_num) != SUCCESS) {
+					if (handle_listen_sock_event(label, master_ctx) != SUCCESS) {
 						continue;
 					}
 				} else {

@@ -2,12 +2,14 @@
 	#include <pthread.h>
 #endif
 
-#include <stdio.h>
-#include <string.h>
-#include <signal.h>
-#include <unistd.h>
-#include <stdint.h>
+#include <errno.h>
+#include <netdb.h>
 #include <netinet/in.h>
+#include <string.h>
+#include <inttypes.h>
+#include <signal.h>
+#include <stdio.h>
+#include <unistd.h>
 
 #include "log.h"
 #include "node.h"
@@ -54,9 +56,18 @@ int main() {
     LOG_INFO("[Orisium]: Listen Port: %d", listen_port);
     LOG_INFO("[Orisium]: Bootstrap Nodes (%d):", bootstrap_nodes.len);
     for (int i = 0; i < bootstrap_nodes.len; i++) {
-		char ip_str[INET6_ADDRSTRLEN];
-		if (convert_ipv6_bin_to_str(bootstrap_nodes.data[i].ip, ip_str) != SUCCESS)goto exit;
-        LOG_INFO("[Orisium]:   - Node %d: IP %s, Port %d", i + 1, ip_str, bootstrap_nodes.data[i].port);
+        char host_str[NI_MAXHOST];
+        char port_str[NI_MAXSERV];
+        int getname_res = getnameinfo((struct sockaddr *)&bootstrap_nodes.addr[i], sizeof(bootstrap_nodes.addr[i]),
+                            host_str, NI_MAXHOST,
+                            port_str, NI_MAXSERV,
+                            NI_NUMERICHOST | NI_NUMERICSERV
+                          );
+        if (getname_res != 0) {
+            LOG_ERROR("[Orisium]: getnameinfo failed. %s", strerror(errno));
+            goto exit;
+        }
+        LOG_INFO("[Orisium]:   - Node %d: IP %s, Port %s", i + 1, host_str, port_str);
     }
     LOG_INFO("[Orisium]: -------------------------");
 //======================================================================

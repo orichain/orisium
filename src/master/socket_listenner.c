@@ -67,8 +67,8 @@ status_t setup_socket_listenner(const char *label, master_context *master_ctx, u
     return SUCCESS;
 }
 
-status_t handle_listen_sock_event(const char *label, master_context *master_ctx, uint64_t *client_num) {
-    struct sockaddr_storage client_addr;
+status_t handle_listen_sock_event(const char *label, master_context *master_ctx) {
+    struct sockaddr_in6 client_addr;
 	socklen_t client_addr_len = sizeof(client_addr);
 	char host_str[NI_MAXHOST];
     char port_str[NI_MAXSERV];
@@ -101,70 +101,53 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
         return FAILURE_IVLDPORT;
     }
     
-    uint8_t host_ip_bin[IP_ADDRESS_LEN];	
-	if (convert_str_to_ipv6_bin(host_str, host_ip_bin) != SUCCESS) {
-		LOG_ERROR("%sIP tidak valid %s.", label, host_str);
-		return FAILURE_IVLDIP;
-	}
-    
-	bool ip_already_connected = false;
-	for (int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
+    bool ip_already_connected = false;
+	for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
 		if (master_ctx->sio_c_session[i].in_use &&
-			memcmp(master_ctx->sio_c_session[i].ip, host_ip_bin, IP_ADDRESS_LEN) == 0) {
+			sockaddr_equal((const struct sockaddr *)&master_ctx->sio_c_session[i].addr, (const struct sockaddr *)&client_addr)) {
 			ip_already_connected = true;
 			break;
 		}
 	}
 	
-	char ip_str[INET6_ADDRSTRLEN];
-	convert_ipv6_bin_to_str(host_ip_bin, ip_str);
-	
 	if (ip_already_connected) {
-		LOG_WARN("%sKoneksi ditolak dari IP %s. Sudah ada koneksi aktif dari IP ini.", label, ip_str);
+		LOG_WARN("%sKoneksi ditolak dari IP %s. Sudah ada koneksi aktif dari IP ini.", label, host_str);
 		return FAILURE_ALRDYCONTD;
 	}
-	LOG_DEBUG("%sNew client connected from IP %s.", label, ip_str);
+	LOG_DEBUG("%sNew client connected from IP %s.", label, host_str);
 	
-	master_sio_dc_session_t_status_t ccid_result = find_first_ratelimited_master_sio_dc_session("[Master]: ", master_ctx->sio_dc_session, host_ip_bin);
+	master_sio_dc_session_t_status_t ccid_result = find_first_ratelimited_master_sio_dc_session("[Master]: ", master_ctx->sio_dc_session, &client_addr);
 	if (ccid_result.status == SUCCESS) {
-		status_t ccid_del_result = delete_master_sio_dc_session("[Master]: ", &master_ctx->sio_dc_session, host_ip_bin);
-		if (ccid_del_result != SUCCESS) {
-			*client_num += 1ULL;
-		}
+		status_t ccid_del_result = delete_master_sio_dc_session("[Master]: ", &master_ctx->sio_dc_session, &client_addr);
+		if (ccid_del_result != SUCCESS) return FAILURE;
 	} else {
 		if (ccid_result.status == FAILURE_RATELIMIT) {
-			LOG_WARN("%sKoneksi ditolak dari IP %s. ratelimit mungkin ddoser.", label, ip_str);
+			LOG_WARN("%sKoneksi ditolak dari IP %s. ratelimit mungkin ddoser.", label, host_str);
 			return FAILURE_ALRDYCONTD;
 		} else {
-			*client_num += 1ULL;
+			return FAILURE;
 		}
 	}
     
-	if (*client_num > MAX_MASTER_CONCURRENT_SESSIONS) {
-		*client_num -= 1ULL;
-		LOG_ERROR("%sWARNING: MAX_MASTER_CONCURRENT_SESSIONS reached. Rejecting client IP %s.", label, ip_str);
-		return FAILURE_MAXREACHD;
-	}
-    
-    int sio_worker_idx = select_best_worker(label, master_ctx, SIO);
+	int sio_worker_idx = select_best_worker(label, master_ctx, SIO);
     if (sio_worker_idx == -1) {
-        LOG_ERROR("%sFailed to select an SIO worker for new client IP %s. Rejecting.", label, ip_str);
+        LOG_ERROR("%sFailed to select an SIO worker for new client IP %s. Rejecting.", label, host_str);
         return FAILURE_NOSLOT;
     }
 	//int sio_worker_uds_fd = master_ctx->sio[sio_worker_idx].uds[0];
     
 	int slot_found = -1;
-	for(int i = 0; i < MAX_MASTER_CONCURRENT_SESSIONS; ++i) {
+	for(int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
 		if(!master_ctx->sio_c_session[i].in_use) {
             master_ctx->sio_c_session[i].sio_index = sio_worker_idx;
 			master_ctx->sio_c_session[i].in_use = true;
-			memcpy(master_ctx->sio_c_session[i].ip, host_ip_bin, IP_ADDRESS_LEN);
+            memcpy(&master_ctx->sio_c_session[i].addr, &client_addr, sizeof(client_addr));
 			slot_found = i;
 			break;
 		}
 	}
 	if (slot_found == -1) {
-		LOG_ERROR("%sWARNING: No free session slots in master_ctx->sio_c_session. Rejecting client IP %s.", label, ip_str);
+		LOG_ERROR("%sWARNING: No free session slots in master_ctx->sio_c_session. Rejecting client IP %s.", label, host_str);
 		return FAILURE_NOSLOT;
 	}
 	/*
@@ -182,7 +165,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
                     label, sio_worker_idx);
         } else {
             LOG_DEBUG("%sForwarding client FD %d from IP %s to Server IO Worker %d (UDS FD %d). Bytes sent: %zd.",
-                    label, client_sock, ip_str, sio_worker_idx, sio_worker_uds_fd, send_result.r_ssize_t);
+                    label, client_sock, host_str, sio_worker_idx, sio_worker_uds_fd, send_result.r_ssize_t);
         }
 	}
 	CLOSE_FD(&client_sock); // Menghindari kebocoran FD jika send_ipc gagal => biarkan client reconnect

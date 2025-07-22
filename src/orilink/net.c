@@ -34,7 +34,7 @@ udp_session_t_status_t orilink_find_or_create_session(udp_context_t *ctx, uint32
     }
 
     // Jika belum ada, buat sesi baru
-    if (ctx->session_count < MAX_MASTER_CONCURRENT_SESSIONS) {
+    if (ctx->session_count < MAX_MASTER_SIO_SESSIONS) {
         udp_session_t* new_session = &ctx->sessions[ctx->session_count++];
         memset(new_session, 0, sizeof(udp_session_t));
         new_session->connection_id = conn_id;
