@@ -6,8 +6,6 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <inttypes.h>
-#include <float.h>
-#include <limits.h>
 
 #include "log.h"
 #include "constants.h"
@@ -18,6 +16,7 @@
 #include "master/socket_listenner.h"
 #include "stdbool.h"
 #include "master/process.h"
+#include "master/worker_selector.h"
 
 status_t setup_socket_listenner(const char *label, master_context *master_ctx, uint16_t *listen_port) {
     struct sockaddr_in6 addr;
@@ -66,77 +65,6 @@ status_t setup_socket_listenner(const char *label, master_context *master_ctx, u
     }
     */
     return SUCCESS;
-}
-
-int select_best_sio_worker(const char *label, master_context *master_ctx) {
-    int selected_worker_idx = -1;
-    long double min_avg_task_time = LDBL_MAX;
-    uint64_t min_longest_task_time = ULLONG_MAX;
-    
-    int temp_best_idx_t1 = -1;
-    for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-        if (master_ctx->sio_state[i].task_count < MAX_CONNECTION_PER_SIO_WORKER) {
-            if (master_ctx->sio_state[i].metrics.isactive && master_ctx->sio_state[i].metrics.ishealthy) {
-                if (master_ctx->sio_state[i].metrics.avg_task_time_per_empty_slot < min_avg_task_time) {
-                    min_avg_task_time = master_ctx->sio_state[i].metrics.avg_task_time_per_empty_slot;
-                    temp_best_idx_t1 = i;
-                }
-            }
-        }
-    }
-    if (temp_best_idx_t1 != -1) {
-        if (min_avg_task_time > 0.0L) {
-            selected_worker_idx = temp_best_idx_t1;
-            LOG_DEVEL_DEBUG("%sSelecting SIO worker %d based on lowest Avg Task Time: %Lf", 
-                      label, selected_worker_idx, min_avg_task_time);
-            return selected_worker_idx;
-        }
-        LOG_DEVEL_DEBUG("%sAll not-full SIO workers have 0 Avg Task Time. Falling back to Longest Task Time / Round Robin.", label);
-    } else {
-        LOG_DEVEL_DEBUG("%sNo not-full SIO workers found for Avg Task Time check. All might be full. Falling back.", label);
-    }
-    int temp_best_idx_t2 = -1;
-    for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-        if (master_ctx->sio_state[i].task_count < MAX_CONNECTION_PER_SIO_WORKER) {
-            if (master_ctx->sio_state[i].metrics.isactive && master_ctx->sio_state[i].metrics.ishealthy) {
-                if (master_ctx->sio_state[i].metrics.longest_task_time < min_longest_task_time) {
-                    min_longest_task_time = master_ctx->sio_state[i].metrics.longest_task_time;
-                    temp_best_idx_t2 = i;
-                }
-            }
-        }
-    }   
-    if (temp_best_idx_t2 != -1) {
-        if (min_longest_task_time > 0ULL) {
-            selected_worker_idx = temp_best_idx_t2;
-            LOG_DEVEL_DEBUG("%sSelecting SIO worker %d based on lowest Longest Task Time: %" PRIu64, 
-                      label, selected_worker_idx, min_longest_task_time);
-            return selected_worker_idx; 
-        }
-        LOG_DEVEL_DEBUG("%sAll not-full SIO workers have 0 Longest Task Time. Falling back to Round Robin.", label);
-    } else {
-        LOG_DEVEL_DEBUG("%sNo not-full SIO workers found for Longest Task Time check. All might be full. Falling back to Round Robin.", label);
-    }
-    int temp_best_idx_t3 = -1;
-    int start_rr_check_idx = master_ctx->last_sio_rr_idx; 
-    for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-        int current_rr_idx = (start_rr_check_idx + i) % MAX_SIO_WORKERS;
-        if (master_ctx->sio_state[current_rr_idx].task_count < MAX_CONNECTION_PER_SIO_WORKER) {
-            if (master_ctx->sio_state[current_rr_idx].metrics.isactive && master_ctx->sio_state[current_rr_idx].metrics.ishealthy) {
-                temp_best_idx_t3 = current_rr_idx;
-                master_ctx->last_sio_rr_idx = (current_rr_idx + 1) % MAX_SIO_WORKERS;
-                break;
-            }
-        }
-    }
-    if (temp_best_idx_t3 != -1) {
-        selected_worker_idx = temp_best_idx_t3;
-        LOG_DEVEL_DEBUG("%sSelecting SIO worker %d using Round Robin (fallback).", label, selected_worker_idx);
-        return selected_worker_idx;
-    } else {
-        LOG_ERROR("%sNo SIO worker available (all might be full/unhealthy/nonactive).", label);
-        return -1;
-    }
 }
 
 status_t handle_listen_sock_event(const char *label, master_context *master_ctx, uint64_t *client_num) {
@@ -218,7 +146,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 		return FAILURE_MAXREACHD;
 	}
     
-    int sio_worker_idx = select_best_sio_worker(label, master_ctx);
+    int sio_worker_idx = select_best_worker(label, master_ctx, SIO);
     if (sio_worker_idx == -1) {
         LOG_ERROR("%sFailed to select an SIO worker for new client IP %s. Rejecting.", label, ip_str);
         return FAILURE_NOSLOT;
