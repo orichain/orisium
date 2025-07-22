@@ -22,18 +22,14 @@ void node_identity_free(node_identity_t *id);
 
 typedef struct {
     uint8_t ip[IP_ADDRESS_LEN];
-    int port;
-} node_info_t;
+    uint16_t port;
+} bootstrap_t;
 
 typedef struct {
-    char node_id[20];
-    int listen_port;
-    node_info_t bootstrap_nodes[MAX_NODES];
-    int num_bootstrap_nodes;
-} node_config_t;
+    uint16_t len;
+    bootstrap_t data[MAX_BOOTSTRAP_NODES];
+} bootstrap_nodes_t;
 
-extern node_config_t node_config;
-
-status_t read_network_config_from_json(const char* label, const char* filename, node_config_t* config_out);
+status_t read_listen_port_and_bootstrap_nodes_from_json(const char* label, const char* filename, uint16_t *listen_port, bootstrap_nodes_t* bootstrap_nodes);
 
 #endif

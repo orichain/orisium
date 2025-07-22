@@ -12,7 +12,6 @@
 #include "log.h"
 #include "constants.h"
 #include "utilities.h"
-#include "node.h"
 #include "orilink/protocol.h"
 #include "sessions/master_session.h"
 #include "types.h"
@@ -20,7 +19,7 @@
 #include "stdbool.h"
 #include "master/process.h"
 
-status_t setup_socket_listenner(const char *label, master_context *master_ctx) {
+status_t setup_socket_listenner(const char *label, master_context *master_ctx, uint16_t *listen_port) {
     struct sockaddr_in6 addr;
     int opt = 1;
     int v6only = 0;
@@ -53,7 +52,7 @@ status_t setup_socket_listenner(const char *label, master_context *master_ctx) {
     }
     memset(&addr, 0, sizeof(addr));
     addr.sin6_family = AF_INET6;
-    addr.sin6_port = htons(node_config.listen_port);
+    addr.sin6_port = htons(*listen_port);
     addr.sin6_addr = in6addr_any;
     if (bind(master_ctx->listen_sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         LOG_ERROR("%sbind failed. %s", label, strerror(errno));

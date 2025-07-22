@@ -15,10 +15,9 @@
 #include "workers/dbr.h"
 #include "workers/dbw.h"
 #include "master/workers.h"
+#include "master/workermetrics.h"
 #include "async.h"
 #include "master/process.h"
-#include "stdbool.h"
-#include "sessions/master_session.h"
 
 status_t close_worker(const char *label, master_context *master_ctx, worker_type_t wot, int index) {
 	if (wot == SIO) {
@@ -143,43 +142,6 @@ status_t create_socket_pair(const char *label, master_context *master_ctx, worke
 		LOG_DEBUG("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, master_ctx->dbw[index].uds[0], master_ctx->dbw[index].uds[1]);
 	}
 	return SUCCESS;
-}
-
-double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_type_t wot, int index) {
-    int worker_type_id = (int)wot;
-    const double MAX_INITIAL_DELAY_MS = (double)WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT * 1000.0;
-    double initial_delay_ms = (double)worker_type_id * index * INITIAL_MILISECONDS_PER_UNIT;
-    if (initial_delay_ms > MAX_INITIAL_DELAY_MS) {
-        initial_delay_ms = MAX_INITIAL_DELAY_MS;
-    }
-    uint64_t_status_t rt = get_realtime_time_ns(label);
-    metrics->first_check_healthy = (uint8_t)0x01;
-    metrics->health_kalman_calibration_samples = NULL;
-    metrics->health_kalman_initialized_count = 0;
-    metrics->health_temp_ewma_value = (float)0;
-    metrics->first_check_avgtt = (uint8_t)0x01;
-    metrics->avgtt_kalman_calibration_samples = NULL;
-    metrics->avgtt_kalman_initialized_count = 0;
-    metrics->avgtt_temp_ewma_value = (float)0;
-    metrics->sum_hbtime = (double)0;
-    metrics->hbtime = (double)0;
-    metrics->count_ack = (double)0;
-    metrics->last_ack = rt.r_uint64_t;
-    metrics->last_checkhealthy = rt.r_uint64_t;
-    metrics->healthypct = (float)100;
-    metrics->isactive = true;
-    metrics->ishealthy = true;
-    metrics->last_task_started = rt.r_uint64_t;
-    metrics->last_task_finished = rt.r_uint64_t;
-    metrics->longest_task_time = 0ULL;
-    metrics->avg_task_time_per_empty_slot = (long double)0;
-//======================================================================            
-    if (initial_delay_ms > 0) {
-        metrics->hbtime = (double)WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT + ((double)initial_delay_ms/1000.0);
-        metrics->sum_hbtime = metrics->hbtime;
-        metrics->count_ack = (double)0;
-    }
-    return initial_delay_ms;
 }
 
 status_t setup_fork_worker(const char* label, master_context *master_ctx, worker_type_t wot, int index) {
@@ -408,4 +370,87 @@ void workers_cleanup(master_context *master_ctx) {
 		CLOSE_PID(&master_ctx->dbw[i].pid);
     }
     LOG_INFO("[Master]: Cleanup complete.");
+}
+
+status_t setup_workers(master_context *master_ctx) {
+	const char *label = "[Master]: ";
+//======================================================================
+// Setup uds and socketpair for workers
+//======================================================================
+    for (int i = 0; i < MAX_SIO_WORKERS; ++i) { 
+		master_ctx->sio[i].uds[0] = 0; 
+		master_ctx->sio[i].uds[1] = 0; 
+	}
+    for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) { 
+		master_ctx->logic[i].uds[0] = 0; 
+		master_ctx->logic[i].uds[1] = 0; 
+	}
+    for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
+		master_ctx->cow[i].uds[0] = 0; 
+		master_ctx->cow[i].uds[1] = 0; 
+	}
+    for (int i = 0; i < MAX_DBR_WORKERS; ++i) { 
+		master_ctx->dbr[i].uds[0] = 0; 
+		master_ctx->dbr[i].uds[1] = 0; 
+	}
+    for (int i = 0; i < MAX_DBW_WORKERS; ++i) { 
+		master_ctx->dbw[i].uds[0] = 0; 
+		master_ctx->dbw[i].uds[1] = 0; 
+	}
+    for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
+		if (create_socket_pair(label, master_ctx, SIO, i) != SUCCESS) return FAILURE;
+    }
+    for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
+		if (create_socket_pair(label, master_ctx, LOGIC, i) != SUCCESS) return FAILURE;
+    }
+    for (int i = 0; i < MAX_COW_WORKERS; ++i) {
+		if (create_socket_pair(label, master_ctx, COW, i) != SUCCESS) return FAILURE;
+    }
+    for (int i = 0; i < MAX_DBR_WORKERS; ++i) {
+		if (create_socket_pair(label, master_ctx, DBR, i) != SUCCESS) return FAILURE;
+    }
+    for (int i = 0; i < MAX_DBW_WORKERS; ++i) {
+		if (create_socket_pair(label, master_ctx, DBW, i) != SUCCESS) return FAILURE;
+    }    
+	for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
+		if (setup_fork_worker(label, master_ctx, SIO, i) != SUCCESS) {
+			return FAILURE;
+		}
+    }
+//======================================================================    
+    for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
+		if (setup_fork_worker(label, master_ctx, LOGIC, i) != SUCCESS) {
+			return FAILURE;
+		}
+    }
+    for (int i = 0; i < MAX_COW_WORKERS; ++i) {
+		if (setup_fork_worker(label, master_ctx, COW, i) != SUCCESS) {
+			return FAILURE;
+		}
+    }
+    for (int i = 0; i < MAX_DBR_WORKERS; ++i) {
+		if (setup_fork_worker(label, master_ctx, DBR, i) != SUCCESS) {
+			return FAILURE;
+		}
+    }
+    for (int i = 0; i < MAX_DBW_WORKERS; ++i) {
+		if (setup_fork_worker(label, master_ctx, DBW, i) != SUCCESS) {
+			return FAILURE;
+		}
+    }
+//======================================================================	
+	if (async_create_timerfd(label, &master_ctx->master_timer_fd) != SUCCESS) {
+		return FAILURE;
+	}
+	if (async_set_timerfd_time(label, &master_ctx->master_timer_fd,
+		1, 0,
+        1, 0) != SUCCESS)
+    {
+		return FAILURE;
+	}
+    if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->master_timer_fd) != SUCCESS) {
+		return FAILURE;
+	}
+//======================================================================	    
+    return SUCCESS;
 }

@@ -4,7 +4,7 @@
 #include "master/process.h"
 #include "sessions/master_session.h"
 
-status_t setup_socket_listenner(const char *label, master_context *master_ctx);
+status_t setup_socket_listenner(const char *label, master_context *master_ctx, uint16_t *listen_port);
 status_t handle_listen_sock_event(const char *label, master_context *master_ctx, uint64_t *client_num);
 
 #endif

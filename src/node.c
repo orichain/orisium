@@ -18,9 +18,9 @@
 #include "utilities.h"
 #include "pqc.h"
 
-status_t read_network_config_from_json(const char* label, const char* filename, node_config_t* config_out) {
+status_t read_listen_port_and_bootstrap_nodes_from_json(const char* label, const char* filename, uint16_t *listen_port, bootstrap_nodes_t* bootstrap_nodes) {
     FILE *fp = NULL;
-    char buffer[MAX_FILE_SIZE];
+    uint8_t buffer[MAX_BOOTSTRAP_FILE_SIZE];
     struct json_object *parsed_json = NULL;
     struct json_object *listen_port_obj = NULL;
     struct json_object *bootstrap_nodes_array = NULL;
@@ -31,16 +31,16 @@ status_t read_network_config_from_json(const char* label, const char* filename, 
         return FAILURE;
     }
 
-    size_t bytes_read = fread(buffer, 1, sizeof(buffer) - 1, fp);
+    memset(buffer, 0, MAX_BOOTSTRAP_FILE_SIZE);
+    size_t bytes_read = fread(buffer, 1, MAX_BOOTSTRAP_FILE_SIZE, fp);
     if (bytes_read == 0 && !feof(fp)) {
         LOG_ERROR("%sGagal membaca file atau file kosong: %s", label, filename);
         fclose(fp);
         return FAILURE;
     }
-    buffer[bytes_read] = '\0';
     fclose(fp);
 
-    parsed_json = json_tokener_parse(buffer);
+    parsed_json = json_tokener_parse((const char *)buffer);
     if (parsed_json == NULL) {
         LOG_ERROR("%sGagal mem-parsing JSON dari file: %s", label, filename);
         return FAILURE;
@@ -51,7 +51,7 @@ status_t read_network_config_from_json(const char* label, const char* filename, 
         json_object_put(parsed_json);
         return FAILURE;
     }
-    config_out->listen_port = json_object_get_int(listen_port_obj);
+    *listen_port = json_object_get_int(listen_port_obj);
 
     if (!json_object_object_get_ex(parsed_json, "bootstrap_nodes", &bootstrap_nodes_array) || !json_object_is_type(bootstrap_nodes_array, json_type_array)) {
         LOG_ERROR("%sKunci 'bootstrap_nodes' tidak ditemukan atau tidak valid.", label);
@@ -60,13 +60,13 @@ status_t read_network_config_from_json(const char* label, const char* filename, 
     }
 
     int array_len = json_object_array_length(bootstrap_nodes_array);
-    if (array_len > MAX_NODES) {
-        LOG_DEBUG("%sJumlah bootstrap nodes (%d) melebihi MAX_NODES (%d). Hanya %d yang akan dibaca.",
-                label, array_len, MAX_NODES, MAX_NODES);
-        array_len = MAX_NODES;
+    if (array_len > MAX_BOOTSTRAP_NODES) {
+        LOG_DEBUG("%sJumlah bootstrap nodes (%d) melebihi MAX_BOOTSTRAP_NODES (%d). Hanya %d yang akan dibaca.",
+                label, array_len, MAX_BOOTSTRAP_NODES, MAX_BOOTSTRAP_NODES);
+        array_len = MAX_BOOTSTRAP_NODES;
     }
 
-    config_out->num_bootstrap_nodes = 0;
+    bootstrap_nodes->len = 0;
     for (int i = 0; i < array_len; i++) {
         struct json_object *node_obj = json_object_array_get_idx(bootstrap_nodes_array, i);
         if (!json_object_is_type(node_obj, json_type_object)) {
@@ -86,12 +86,12 @@ status_t read_network_config_from_json(const char* label, const char* filename, 
         strncpy(iptmp, json_object_get_string(ip_obj), INET6_ADDRSTRLEN - 1);
         iptmp[INET6_ADDRSTRLEN - 1] = '\0';
         
-        if (convert_str_to_ipv6_bin(iptmp, config_out->bootstrap_nodes[config_out->num_bootstrap_nodes].ip) != SUCCESS) {
+        if (convert_str_to_ipv6_bin(iptmp, bootstrap_nodes->data[bootstrap_nodes->len].ip) != SUCCESS) {
 			LOG_ERROR("%sIP tidak valid %s.", iptmp);
             continue;
 		}
         
-        inet_pton(AF_INET6, iptmp, config_out->bootstrap_nodes[config_out->num_bootstrap_nodes].ip);
+        inet_pton(AF_INET6, iptmp, bootstrap_nodes->data[bootstrap_nodes->len].ip);
                 
         if (!json_object_object_get_ex(node_obj, "port", &port_obj) || !json_object_is_type(port_obj, json_type_int)) {
             LOG_DEBUG("%sKunci 'port' tidak ditemukan atau bukan integer pada node indeks %d. Melewatkan.", label, i);
@@ -104,9 +104,9 @@ status_t read_network_config_from_json(const char* label, const char* filename, 
             continue;
 		}
         
-        config_out->bootstrap_nodes[config_out->num_bootstrap_nodes].port = json_object_get_int(port_obj);
+        bootstrap_nodes->data[bootstrap_nodes->len].port = json_object_get_int(port_obj);
 
-        config_out->num_bootstrap_nodes++;
+        bootstrap_nodes->len++;
     }
 
     json_object_put(parsed_json);

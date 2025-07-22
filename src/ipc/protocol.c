@@ -130,7 +130,6 @@ ssize_t_status_t ipc_serialize(const char *label, const ipc_protocol_t* p, uint8
     }
     result.r_ssize_t = (ssize_t)offset;
     result.status = SUCCESS;
-    print_hex("DEBUG SEND: ", *ptr_buffer, result.r_ssize_t, true);
     return result;
 }
 

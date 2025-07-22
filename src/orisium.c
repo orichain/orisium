@@ -17,7 +17,6 @@
 #include "types.h"
 
 volatile sig_atomic_t shutdown_requested = 0;
-node_config_t node_config;
 int *shutdown_event_fd = NULL;
 
 void sigint_handler(int signum) {
@@ -43,22 +42,21 @@ int main() {
 // Configuring node and bootstrap
 //======================================================================
 	if (ensure_directory_exists("[Orisium]: ", "./database") != SUCCESS) goto exit;
-//======================================================================    
-	memset(&node_config, 0, sizeof(node_config_t));
-    strncpy(node_config.node_id, "Node1", sizeof(node_config.node_id) - 1);
-    node_config.node_id[sizeof(node_config.node_id) - 1] = '\0';
-    if (read_network_config_from_json("[Orisium]: ", "config.json", &node_config) != SUCCESS) {
+//====================================================================== 
+    uint16_t listen_port = 0;
+    bootstrap_nodes_t bootstrap_nodes;
+    memset(&bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
+    if (read_listen_port_and_bootstrap_nodes_from_json("[Orisium]: ", "config.json", &listen_port, &bootstrap_nodes) != SUCCESS) {
         LOG_ERROR("[Orisium]: Gagal membaca konfigurasi dari %s.", "config.json");
         goto exit;
     }    
     LOG_INFO("[Orisium]: --- Node Configuration ---");
-    LOG_INFO("[Orisium]: Node ID: %s", node_config.node_id);
-    LOG_INFO("[Orisium]: Listen Port: %d", node_config.listen_port);
-    LOG_INFO("[Orisium]: Bootstrap Nodes (%d):", node_config.num_bootstrap_nodes);
-    for (int i = 0; i < node_config.num_bootstrap_nodes; i++) {
+    LOG_INFO("[Orisium]: Listen Port: %d", listen_port);
+    LOG_INFO("[Orisium]: Bootstrap Nodes (%d):", bootstrap_nodes.len);
+    for (int i = 0; i < bootstrap_nodes.len; i++) {
 		char ip_str[INET6_ADDRSTRLEN];
-		if (convert_ipv6_bin_to_str(node_config.bootstrap_nodes[i].ip, ip_str) != SUCCESS)goto exit;
-        LOG_INFO("[Orisium]:   - Node %d: IP %s, Port %d", i + 1, ip_str, node_config.bootstrap_nodes[i].port);
+		if (convert_ipv6_bin_to_str(bootstrap_nodes.data[i].ip, ip_str) != SUCCESS)goto exit;
+        LOG_INFO("[Orisium]:   - Node %d: IP %s, Port %d", i + 1, ip_str, bootstrap_nodes.data[i].port);
     }
     LOG_INFO("[Orisium]: -------------------------");
 //======================================================================
@@ -74,15 +72,15 @@ int main() {
 //======================================================================
 	master_context master_ctx;
     master_ctx.sio_dc_session = NULL;
-    if (setup_master(&master_ctx) != SUCCESS) goto exit;
+    if (setup_master(&master_ctx, &listen_port) != SUCCESS) goto exit;
     shutdown_event_fd = &master_ctx.shutdown_event_fd;
-    if (setup_workers(&master_ctx) != SUCCESS) goto exit;
-	run_master_process(&master_ctx);
+	run_master_process(&master_ctx, &listen_port, &bootstrap_nodes);
 //======================================================================
 // Cleanup
 //======================================================================
 exit:
 	free_master_sio_dc_sessions("[Orisium]: ", &master_ctx.sio_dc_session);
+    memset(&bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
 #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))    
 	pthread_join(cleaner_thread, NULL);
     log_close();

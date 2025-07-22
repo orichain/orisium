@@ -6,6 +6,7 @@
 #include "async.h"
 #include "constants.h"
 #include "types.h"
+#include "node.h"
 #include "sessions/master_session.h"
 
 typedef int uds_pair[2];
@@ -36,8 +37,7 @@ typedef struct {
     master_dbw_state_t dbw_state[MAX_DBW_WORKERS];    
 } master_context;
 
-void run_master_process(master_context *master_ctx);
-status_t setup_master(master_context *master_ctx);
-status_t setup_workers(master_context *master_ctx);
+void run_master_process(master_context *master_ctx, uint16_t *listen_port, bootstrap_nodes_t *bootstrap_nodes);
+status_t setup_master(master_context *master_ctx, uint16_t *listen_port);
 
 #endif
