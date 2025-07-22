@@ -177,24 +177,13 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 		LOG_ERROR("%sFailed to forward client FD %d to Server IO Worker %d.",
 				  label, client_sock, sio_worker_idx);
 	} else {
-//======================================================================
-// Mengisi metrics sio_state
-//======================================================================
-        uint64_t_status_t rt = get_realtime_time_ns(label);
-        master_ctx->sio_state[sio_worker_idx].task_count += 1;
-        master_ctx->sio_state[sio_worker_idx].metrics.last_task_started = rt.r_uint64_t;
-        LOG_DEVEL_DEBUG("%sSIO_STATE:\nTask Count: %" PRIu64 "\nLast Ack: %" PRIu64 "\nLast Started: %" PRIu64 "\nLast Finished: %" PRIu64 "\nLongest Task Time: %" PRIu64 "\nAvg Task Time: %Lf",
-            label,
-            master_ctx->sio_state[sio_worker_idx].task_count,
-            master_ctx->sio_state[sio_worker_idx].metrics.last_ack,
-            master_ctx->sio_state[sio_worker_idx].metrics.last_task_started,
-            master_ctx->sio_state[sio_worker_idx].metrics.last_task_finished,
-            master_ctx->sio_state[sio_worker_idx].metrics.longest_task_time,
-            master_ctx->sio_state[sio_worker_idx].metrics.avg_task_time_per_empty_slot
-        );
-//======================================================================
-		LOG_DEBUG("%sForwarding client FD %d from IP %s to Server IO Worker %d (UDS FD %d). Bytes sent: %zd.",
-				 label, client_sock, ip_str, sio_worker_idx, sio_worker_uds_fd, send_result.r_ssize_t);
+        if (new_task_metrics(label, master_ctx, SIO, sio_worker_idx) != SUCCESS) {
+            LOG_ERROR("%sFailed to input new task in SIO %d metrics.",
+                    label, sio_worker_idx);
+        } else {
+            LOG_DEBUG("%sForwarding client FD %d from IP %s to Server IO Worker %d (UDS FD %d). Bytes sent: %zd.",
+                    label, client_sock, ip_str, sio_worker_idx, sio_worker_uds_fd, send_result.r_ssize_t);
+        }
 	}
 	CLOSE_FD(&client_sock); // Menghindari kebocoran FD jika send_ipc gagal => biarkan client reconnect
 	CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);

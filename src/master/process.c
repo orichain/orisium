@@ -25,6 +25,7 @@ status_t setup_master(master_context *master_ctx, uint16_t *listen_port) {
         memset(master_ctx->sio_c_session[i].ip, 0, IP_ADDRESS_LEN);
     }
     master_ctx->last_sio_rr_idx = 0;
+    master_ctx->last_cow_rr_idx = 0;
 	master_ctx->master_pid = -1;
 	master_ctx->shutdown_event_fd = -1;
     master_ctx->listen_sock = -1;

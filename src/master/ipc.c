@@ -135,10 +135,10 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
                 if (master_ctx->sio_c_session[i].in_use &&
                     memcmp(master_ctx->sio_c_session[i].ip, disconnect_info->ip, IP_ADDRESS_LEN) == 0) {
                     int sio_worker_idx = master_ctx->sio_c_session[i].sio_index;
-                    uint64_t_status_t rt = get_realtime_time_ns(label);
 //======================================================================
 // Update metrics for SIO state
-//======================================================================
+//======================================================================                    
+                    uint64_t_status_t rt = get_realtime_time_ns(label);
                     if (master_ctx->sio_state[sio_worker_idx].metrics.first_check_avgtt == (uint8_t)0x01) {
                         master_ctx->sio_state[sio_worker_idx].metrics.first_check_avgtt = (uint8_t)0x00;
                         master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_filter.is_initialized = false;

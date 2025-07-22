@@ -37,7 +37,6 @@
 #define KALMAN_CALIBRATION_SAMPLES 20
 #define KALMAN_ALPHA_EWMA 0.2f
 #define HEALTHY_THRESHOLD 75
-#define MAX_TASK_TIME_NS (60ULL * 1000ULL * 1000ULL * 1000ULL) // 60 seconds in nanoseconds
 //======================================================================
 // OriLink
 //======================================================================

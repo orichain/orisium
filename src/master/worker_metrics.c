@@ -1,6 +1,6 @@
 #include <stdbool.h>
-#include <stdint.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 #include "log.h"
 #include "constants.h"
@@ -46,6 +46,169 @@ double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_t
         metrics->count_ack = (double)0;
     }
     return initial_delay_ms;
+}
+
+status_t new_task_metrics(const char *label, master_context *master_ctx, worker_type_t wot, int index) {
+    const char *worker_name = "Unknown";
+    switch (wot) {
+        case SIO: { worker_name = "SIO"; break; }
+        case LOGIC: { worker_name = "Logic"; break; }
+        case COW: { worker_name = "COW"; break; }
+        case DBR: { worker_name = "DBR"; break; }
+        case DBW: { worker_name = "DBW"; break; }
+        default: { worker_name = "Unknown"; break; }
+    }
+    uint64_t_status_t rt = get_realtime_time_ns(label);
+    if (rt.status != SUCCESS) return rt.status;
+    worker_metrics_t *metrics = NULL;
+    uint16_t *task_count = NULL;
+    if (wot == SIO) {
+        metrics = &master_ctx->sio_state[index].metrics;
+        task_count = &master_ctx->sio_state[index].task_count;
+    } else if (wot == COW) {
+        metrics = &master_ctx->cow_state[index].metrics;
+        task_count = &master_ctx->cow_state[index].task_count;
+    }
+    if (!task_count || !metrics) return FAILURE;
+    *task_count += 1;
+    metrics->last_task_started = rt.r_uint64_t;
+    LOG_DEBUG("%s%s_STATE:\nTask Count: %" PRIu64 "\nLast Ack: %" PRIu64 "\nLast Started: %" PRIu64 "\nLast Finished: %" PRIu64 "\nLongest Task Time: %" PRIu64 "\nAvg Task Time: %Lf",
+        label,
+        worker_name,
+        *task_count,
+        metrics->last_ack,
+        metrics->last_task_started,
+        metrics->last_task_finished,
+        metrics->longest_task_time,
+        metrics->avg_task_time_per_empty_slot
+    );
+    return SUCCESS;
+}
+
+status_t calculate_avg_task_time_metrics(const char *label, master_context *master_ctx, worker_type_t wot, int index) {
+    const char *worker_name = "Unknown";
+    switch (wot) {
+        case SIO: { worker_name = "SIO"; break; }
+        case LOGIC: { worker_name = "Logic"; break; }
+        case COW: { worker_name = "COW"; break; }
+        case DBR: { worker_name = "DBR"; break; }
+        case DBW: { worker_name = "DBW"; break; }
+        default: { worker_name = "Unknown"; break; }
+    }
+    uint64_t_status_t rt = get_realtime_time_ns(label);
+    if (rt.status != SUCCESS) return rt.status;
+    worker_metrics_t *metrics = NULL;
+    uint16_t *task_count = NULL;
+    if (wot == SIO) {
+        metrics = &master_ctx->sio_state[index].metrics;
+        task_count = &master_ctx->sio_state[index].task_count;
+    } else if (wot == COW) {
+        metrics = &master_ctx->cow_state[index].metrics;
+        task_count = &master_ctx->cow_state[index].task_count;
+    }
+    if (!task_count || !metrics) return FAILURE;
+    if (metrics->first_check_avgtt == (uint8_t)0x01) {
+        metrics->first_check_avgtt = (uint8_t)0x00;
+        metrics->avgtt_kalman_filter.is_initialized = false;
+        metrics->avgtt_kalman_initialized_count = 0;
+        if (metrics->avgtt_kalman_calibration_samples != NULL) {
+            free(metrics->avgtt_kalman_calibration_samples);
+            metrics->avgtt_kalman_calibration_samples = NULL;
+        }
+        metrics->longest_task_time = 0;
+        metrics->avg_task_time_per_empty_slot = 0.0L;
+        LOG_DEBUG("%s%s Worker %d: First-time setup for Avg Task Time metrics.", label, worker_name, index);
+    }
+    metrics->last_ack = rt.r_uint64_t;
+    metrics->last_task_finished = rt.r_uint64_t;
+    uint64_t task_time;
+    if (metrics->last_task_started == 0 ||
+        rt.r_uint64_t < metrics->last_task_started) {
+        task_time = 0;
+        LOG_WARN("%s%s Worker %d: Invalid last_task_started detected. Resetting task_time to 0.", label, worker_name, index);
+    } else {
+        task_time = rt.r_uint64_t - metrics->last_task_started;
+    }
+    if (metrics->longest_task_time < task_time) {
+        metrics->longest_task_time = task_time;
+    }
+    uint64_t previous_task_count = *task_count;
+    if (previous_task_count > 0) {
+        *task_count -= 1;
+    } else {
+        LOG_WARN("%sTask count for %s worker %d is already zero. Possible logic error.",
+                 label, worker_name, index);
+        *task_count = 0;
+    }
+    uint64_t current_task_count = *task_count;
+    uint64_t previous_slot_kosong = MAX_CONNECTION_PER_SIO_WORKER - previous_task_count;
+    uint64_t current_slot_kosong = MAX_CONNECTION_PER_SIO_WORKER - current_task_count;
+    long double current_avg_task_time_measurement;
+    if (current_slot_kosong > 0 && previous_slot_kosong > 0) {
+        current_avg_task_time_measurement = ((metrics->avg_task_time_per_empty_slot * previous_slot_kosong) + task_time) / (long double)current_slot_kosong;
+    } else if (previous_slot_kosong == 0 && current_slot_kosong > 0) {
+        current_avg_task_time_measurement = (long double)task_time;
+    } else {
+        current_avg_task_time_measurement = 0.0L;
+    }
+    if (current_avg_task_time_measurement < 0.0L) current_avg_task_time_measurement = 0.0L;
+    if (!metrics->avgtt_kalman_filter.is_initialized) {
+        if (metrics->avgtt_kalman_calibration_samples == NULL) {
+            metrics->avgtt_kalman_calibration_samples =
+                (float *)malloc(KALMAN_CALIBRATION_SAMPLES * sizeof(float));
+            if (!metrics->avgtt_kalman_calibration_samples) {
+                LOG_ERROR("%s Failed to allocate avgtt calibration samples for %s worker %d. Fallback to raw measurement.",
+                          label, worker_name, index);
+                metrics->avg_task_time_per_empty_slot = current_avg_task_time_measurement;
+            }
+        }
+        if (metrics->avgtt_kalman_initialized_count < KALMAN_CALIBRATION_SAMPLES) {
+            metrics->avgtt_kalman_calibration_samples[metrics->avgtt_kalman_initialized_count] =
+                (float)current_avg_task_time_measurement;
+            metrics->avgtt_kalman_initialized_count++;
+            if (metrics->avgtt_kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
+                float avg_value = calculate_average(metrics->avgtt_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
+                float var_value = calculate_variance(metrics->avgtt_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_value);
+                free(metrics->avgtt_kalman_calibration_samples);
+                metrics->avgtt_kalman_calibration_samples = NULL;
+                if (var_value < 0.1f) var_value = 0.1f;
+                float kalman_q_avg_task = 1.0f;
+                float kalman_r_avg_task = var_value;
+                float kalman_p0_avg_task = var_value * 2.0f;
+                kalman_init(&metrics->avgtt_kalman_filter,
+                            kalman_q_avg_task, kalman_r_avg_task, kalman_p0_avg_task, avg_value);
+                metrics->avgtt_kalman_filter.is_initialized = true;                                
+                metrics->avg_task_time_per_empty_slot = (long double)metrics->avgtt_kalman_filter.state_estimate;
+                LOG_DEBUG("%s%s Worker %d: Kalman Avg Task Time Filter initialized. Avg: %.2Lf, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
+                                label, worker_name, index, (long double)avg_value, var_value, kalman_q_avg_task, kalman_r_avg_task, kalman_p0_avg_task);
+            } else {
+                metrics->avg_task_time_per_empty_slot = current_avg_task_time_measurement;
+                LOG_DEBUG("%s%s Worker %d: Calibrating Avg Task Time... (%d/%d) -> Meas: %.2Lf",
+                                label, worker_name, index, metrics->avgtt_kalman_initialized_count,
+                                KALMAN_CALIBRATION_SAMPLES, current_avg_task_time_measurement);
+            }
+        }
+    } else {
+        metrics->avg_task_time_per_empty_slot =
+            kalman_filter(&metrics->avgtt_kalman_filter, (float)current_avg_task_time_measurement);
+        if (metrics->avg_task_time_per_empty_slot < 0.0L) {
+            metrics->avg_task_time_per_empty_slot = 0.0L;
+        }
+    }
+    LOG_DEBUG("%s%s_STATE:\nTask Count: %" PRIu64 "\nLast Ack: %" PRIu64
+                    "\nLast Started: %" PRIu64 "\nLast Finished: %" PRIu64
+                    "\nLongest Task Time: %" PRIu64
+                    "\nMeas Avg Task Time per Empty Slot: %.2Lf -> Est Avg Task Time per Empty Slot: %.2Lf",
+                    label,
+                    worker_name,
+                    *task_count,
+                    metrics->last_ack,
+                    metrics->last_task_started,
+                    metrics->last_task_finished,
+                    metrics->longest_task_time,
+                    current_avg_task_time_measurement,
+                    metrics->avg_task_time_per_empty_slot);
+    return SUCCESS;
 }
 
 status_t check_worker_healthy(const char* label, worker_type_t wot, int index, worker_metrics_t* m) {

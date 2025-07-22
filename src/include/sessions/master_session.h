@@ -6,15 +6,11 @@
 #include "constants.h"
 #include "kalman.h"
 
-//======================================================================
-// new_avg = ((last_avg * count) + current_task_time) / (count + 1);
-//======================================================================
 typedef struct {
     double hbtime;
     double sum_hbtime;
     double count_ack;
     uint64_t last_ack;
-    
     uint8_t first_check_healthy;
     kalman_t health_kalman_filter;
     int health_kalman_initialized_count;
@@ -24,7 +20,6 @@ typedef struct {
     bool ishealthy;
     uint64_t last_checkhealthy;  
     float healthypct;  
-    
     uint8_t first_check_avgtt;
     kalman_t avgtt_kalman_filter;
     int avgtt_kalman_initialized_count;
@@ -63,7 +58,7 @@ typedef struct {
 } master_dbw_state_t;
 
 typedef struct {
-    bool in_use;
+    uint16_t task_count;
     worker_metrics_t metrics;
 } master_cow_state_t;
 
