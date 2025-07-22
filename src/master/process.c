@@ -13,8 +13,8 @@
 #include "master/ipc.h"
 #include "master/workers.h"
 #include "master/process.h"
-#include "master/workermetrics.h"
-#include "master/workercmds.h"
+#include "master/worker_metrics.h"
+#include "master/worker_cmds.h"
 #include "node.h"
 
 status_t setup_master(master_context *master_ctx, uint16_t *listen_port) {

@@ -1,5 +1,5 @@
-#ifndef MASTER_WORKERMETRICS_H
-#define MASTER_WORKERMETRICS_H
+#ifndef MASTER_WORKER_METRICS_H
+#define MASTER_WORKER_METRICS_H
 
 #include "master/process.h"
 

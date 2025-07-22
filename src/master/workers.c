@@ -15,7 +15,7 @@
 #include "workers/dbr.h"
 #include "workers/dbw.h"
 #include "master/workers.h"
-#include "master/workermetrics.h"
+#include "master/worker_metrics.h"
 #include "async.h"
 #include "master/process.h"
 
