@@ -206,22 +206,39 @@ static inline double uint8_be_to_double(const uint8_t in[8]) {
 }
 
 static inline bool sockaddr_equal(const struct sockaddr *a, const struct sockaddr *b) {
+    if (a == NULL || b == NULL) {
+        return false;
+    }
     if (a->sa_family != b->sa_family) {
         return false;
     }
-
     if (a->sa_family == AF_INET) {
         const struct sockaddr_in *a4 = (const struct sockaddr_in *)a;
         const struct sockaddr_in *b4 = (const struct sockaddr_in *)b;
-        return (a4->sin_port == b4->sin_port) &&
-               (memcmp(&a4->sin_addr, &b4->sin_addr, sizeof(struct in_addr)) == 0);
+        if (a4->sin_port != b4->sin_port) {
+            return false;
+        }
+        if (memcmp(&a4->sin_addr, &b4->sin_addr, sizeof(struct in_addr)) != 0) {
+            return false;
+        }
+        return true;
     } else if (a->sa_family == AF_INET6) {
         const struct sockaddr_in6 *a6 = (const struct sockaddr_in6 *)a;
         const struct sockaddr_in6 *b6 = (const struct sockaddr_in6 *)b;
-        return (a6->sin6_port == b6->sin6_port) &&
-               (memcmp(&a6->sin6_addr, &b6->sin6_addr, sizeof(struct in6_addr)) == 0);
+        if (a6->sin6_port != b6->sin6_port) {
+            return false;
+        }
+        if (memcmp(&a6->sin6_addr, &b6->sin6_addr, sizeof(struct in6_addr)) != 0) {
+            return false;
+        }
+        if (a6->sin6_flowinfo != b6->sin6_flowinfo) {
+            return false;
+        }
+        if (a6->sin6_scope_id != b6->sin6_scope_id) {
+            return false;
+        }
+        return true;
     }
-
     return false;
 }
 

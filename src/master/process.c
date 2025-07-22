@@ -64,6 +64,7 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
 	volatile sig_atomic_t master_shutdown_requested = 0;
     
     if (setup_workers(master_ctx) != SUCCESS) goto exit;
+    
     LOG_INFO("%sPID %d UDP Server listening on port %d.", label, master_ctx->master_pid, *listen_port);
     while (!master_shutdown_requested) {
 		int_status_t snfds = async_wait(label, &master_ctx->master_async);
