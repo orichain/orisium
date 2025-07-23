@@ -21,6 +21,11 @@
 
 status_t close_worker(const char *label, master_context *master_ctx, worker_type_t wot, int index) {
 	if (wot == SIO) {
+        if (master_ctx->sio_session[index].metrics.health_kalman_calibration_samples) free(master_ctx->sio_session[index].metrics.health_kalman_calibration_samples);
+        if (master_ctx->sio_session[index].metrics.avgtt_kalman_calibration_samples) free(master_ctx->sio_session[index].metrics.avgtt_kalman_calibration_samples);
+        master_ctx->sio_c_session[index].sio_index = -1;
+        master_ctx->sio_c_session[index].in_use = false;
+        memset(&master_ctx->sio_c_session[index].addr, 0, sizeof(struct sockaddr_in6));
 		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->sio[index].uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
@@ -28,6 +33,8 @@ status_t close_worker(const char *label, master_context *master_ctx, worker_type
 		CLOSE_UDS(&master_ctx->sio[index].uds[1]);
 		CLOSE_PID(&master_ctx->sio[index].pid);
 	} else if (wot == LOGIC) {
+        if (master_ctx->logic_session[index].metrics.health_kalman_calibration_samples) free(master_ctx->logic_session[index].metrics.health_kalman_calibration_samples);
+        if (master_ctx->logic_session[index].metrics.avgtt_kalman_calibration_samples) free(master_ctx->logic_session[index].metrics.avgtt_kalman_calibration_samples);
 		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->logic[index].uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
@@ -35,6 +42,11 @@ status_t close_worker(const char *label, master_context *master_ctx, worker_type
 		CLOSE_UDS(&master_ctx->logic[index].uds[1]);
 		CLOSE_PID(&master_ctx->logic[index].pid);
 	} else if (wot == COW) {
+        if (master_ctx->cow_session[index].metrics.health_kalman_calibration_samples) free(master_ctx->cow_session[index].metrics.health_kalman_calibration_samples);
+        if (master_ctx->cow_session[index].metrics.avgtt_kalman_calibration_samples) free(master_ctx->cow_session[index].metrics.avgtt_kalman_calibration_samples);
+        master_ctx->cow_c_session[index].cow_index = -1;
+        master_ctx->cow_c_session[index].in_use = false;
+        memset(&master_ctx->cow_c_session[index].addr, 0, sizeof(struct sockaddr_in6));
 		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->cow[index].uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
@@ -42,6 +54,8 @@ status_t close_worker(const char *label, master_context *master_ctx, worker_type
 		CLOSE_UDS(&master_ctx->cow[index].uds[1]);
 		CLOSE_PID(&master_ctx->cow[index].pid);
 	} else if (wot == DBR) {
+        if (master_ctx->dbr_session[index].metrics.health_kalman_calibration_samples) free(master_ctx->dbr_session[index].metrics.health_kalman_calibration_samples);
+        if (master_ctx->dbr_session[index].metrics.avgtt_kalman_calibration_samples) free(master_ctx->dbr_session[index].metrics.avgtt_kalman_calibration_samples);
 		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->dbr[index].uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
@@ -49,6 +63,8 @@ status_t close_worker(const char *label, master_context *master_ctx, worker_type
 		CLOSE_UDS(&master_ctx->dbr[index].uds[1]);
 		CLOSE_PID(&master_ctx->dbr[index].pid);
 	} else if (wot == DBW) {
+        if (master_ctx->dbw_session[index].metrics.health_kalman_calibration_samples) free(master_ctx->dbw_session[index].metrics.health_kalman_calibration_samples);
+        if (master_ctx->dbw_session[index].metrics.avgtt_kalman_calibration_samples) free(master_ctx->dbw_session[index].metrics.avgtt_kalman_calibration_samples);
 		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->dbw[index].uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
@@ -176,8 +192,8 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
 //======================================================================
 // Hitung delay start dan inisialisasi metrics
 //======================================================================
-            master_ctx->sio_state[index].task_count = (uint16_t)0;
-            initial_delay_ms = initialize_metrics(label, &master_ctx->sio_state[index].metrics, wot, index);
+            master_ctx->sio_session[index].task_count = (uint16_t)0;
+            initial_delay_ms = initialize_metrics(label, &master_ctx->sio_session[index].metrics, wot, index);
 //======================================================================
             LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->sio[index].pid);
         }
@@ -212,8 +228,8 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
 //======================================================================
 // Hitung delay start dan inisialisasi metrics
 //======================================================================
-            master_ctx->logic_state[index].task_count = (uint16_t)0;
-            initial_delay_ms = initialize_metrics(label, &master_ctx->logic_state[index].metrics, wot, index);
+            master_ctx->logic_session[index].task_count = (uint16_t)0;
+            initial_delay_ms = initialize_metrics(label, &master_ctx->logic_session[index].metrics, wot, index);
 //======================================================================
             LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->logic[index].pid);
         }
@@ -248,7 +264,7 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
 //======================================================================
 // Hitung delay start dan inisialisasi metrics
 //======================================================================
-            initial_delay_ms = initialize_metrics(label, &master_ctx->cow_state[index].metrics, wot, index);
+            initial_delay_ms = initialize_metrics(label, &master_ctx->cow_session[index].metrics, wot, index);
 //======================================================================
             LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->cow[index].pid);
         }
@@ -283,8 +299,8 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
 //======================================================================
 // Hitung delay start dan inisialisasi metrics
 //======================================================================
-            master_ctx->dbr_state[index].task_count = (uint16_t)0;
-            initial_delay_ms = initialize_metrics(label, &master_ctx->dbr_state[index].metrics, wot, index);
+            master_ctx->dbr_session[index].task_count = (uint16_t)0;
+            initial_delay_ms = initialize_metrics(label, &master_ctx->dbr_session[index].metrics, wot, index);
 //======================================================================
             LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->dbr[index].pid);
         }
@@ -319,7 +335,7 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
 //======================================================================
 // Hitung delay start dan inisialisasi metrics
 //======================================================================
-            initial_delay_ms = initialize_metrics(label, &master_ctx->dbw_state[index].metrics, wot, index);
+            initial_delay_ms = initialize_metrics(label, &master_ctx->dbw_session[index].metrics, wot, index);
 //======================================================================
             LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->dbw[index].pid);
         }
@@ -330,40 +346,46 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
 void workers_cleanup(master_context *master_ctx) {
     LOG_INFO("[Master]: Performing cleanup...");
     for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-        if (master_ctx->sio_state[i].metrics.health_kalman_calibration_samples) free(master_ctx->sio_state[i].metrics.health_kalman_calibration_samples);
-        if (master_ctx->sio_state[i].metrics.avgtt_kalman_calibration_samples) free(master_ctx->sio_state[i].metrics.avgtt_kalman_calibration_samples);
+        if (master_ctx->sio_session[i].metrics.health_kalman_calibration_samples) free(master_ctx->sio_session[i].metrics.health_kalman_calibration_samples);
+        if (master_ctx->sio_session[i].metrics.avgtt_kalman_calibration_samples) free(master_ctx->sio_session[i].metrics.avgtt_kalman_calibration_samples);
+        master_ctx->sio_c_session[i].sio_index = -1;
+        master_ctx->sio_c_session[i].in_use = false;
+        memset(&master_ctx->sio_c_session[i].addr, 0, sizeof(struct sockaddr_in6));
 		async_delete_event("[Master]: ", &master_ctx->master_async, &master_ctx->sio[i].uds[0]);
         CLOSE_UDS(&master_ctx->sio[i].uds[0]);
 		CLOSE_UDS(&master_ctx->sio[i].uds[1]);
 		CLOSE_PID(&master_ctx->sio[i].pid);
     }
     for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-        if (master_ctx->logic_state[i].metrics.health_kalman_calibration_samples) free(master_ctx->logic_state[i].metrics.health_kalman_calibration_samples);
-        if (master_ctx->logic_state[i].metrics.avgtt_kalman_calibration_samples) free(master_ctx->logic_state[i].metrics.avgtt_kalman_calibration_samples);
+        if (master_ctx->logic_session[i].metrics.health_kalman_calibration_samples) free(master_ctx->logic_session[i].metrics.health_kalman_calibration_samples);
+        if (master_ctx->logic_session[i].metrics.avgtt_kalman_calibration_samples) free(master_ctx->logic_session[i].metrics.avgtt_kalman_calibration_samples);
 		async_delete_event("[Master]: ", &master_ctx->master_async, &master_ctx->logic[i].uds[0]);
         CLOSE_UDS(&master_ctx->logic[i].uds[0]);
 		CLOSE_UDS(&master_ctx->logic[i].uds[1]);
 		CLOSE_PID(&master_ctx->logic[i].pid);
     }
     for (int i = 0; i < MAX_COW_WORKERS; ++i) {
-        if (master_ctx->cow_state[i].metrics.health_kalman_calibration_samples) free(master_ctx->cow_state[i].metrics.health_kalman_calibration_samples);
-        if (master_ctx->cow_state[i].metrics.avgtt_kalman_calibration_samples) free(master_ctx->cow_state[i].metrics.avgtt_kalman_calibration_samples);
+        if (master_ctx->cow_session[i].metrics.health_kalman_calibration_samples) free(master_ctx->cow_session[i].metrics.health_kalman_calibration_samples);
+        if (master_ctx->cow_session[i].metrics.avgtt_kalman_calibration_samples) free(master_ctx->cow_session[i].metrics.avgtt_kalman_calibration_samples);
+        master_ctx->cow_c_session[i].cow_index = -1;
+        master_ctx->cow_c_session[i].in_use = false;
+        memset(&master_ctx->cow_c_session[i].addr, 0, sizeof(struct sockaddr_in6));
 		async_delete_event("[Master]: ", &master_ctx->master_async, &master_ctx->cow[i].uds[0]);
         CLOSE_UDS(&master_ctx->cow[i].uds[0]);
 		CLOSE_UDS(&master_ctx->cow[i].uds[1]);
 		CLOSE_PID(&master_ctx->cow[i].pid);
     }
     for (int i = 0; i < MAX_DBR_WORKERS; ++i) {
-        if (master_ctx->dbr_state[i].metrics.health_kalman_calibration_samples) free(master_ctx->dbr_state[i].metrics.health_kalman_calibration_samples);
-        if (master_ctx->dbr_state[i].metrics.avgtt_kalman_calibration_samples) free(master_ctx->dbr_state[i].metrics.avgtt_kalman_calibration_samples);
+        if (master_ctx->dbr_session[i].metrics.health_kalman_calibration_samples) free(master_ctx->dbr_session[i].metrics.health_kalman_calibration_samples);
+        if (master_ctx->dbr_session[i].metrics.avgtt_kalman_calibration_samples) free(master_ctx->dbr_session[i].metrics.avgtt_kalman_calibration_samples);
 		async_delete_event("[Master]: ", &master_ctx->master_async, &master_ctx->dbr[i].uds[0]);
         CLOSE_UDS(&master_ctx->dbr[i].uds[0]);
 		CLOSE_UDS(&master_ctx->dbr[i].uds[1]);
 		CLOSE_PID(&master_ctx->dbr[i].pid);
     }
     for (int i = 0; i < MAX_DBW_WORKERS; ++i) {
-        if (master_ctx->dbw_state[i].metrics.health_kalman_calibration_samples) free(master_ctx->dbw_state[i].metrics.health_kalman_calibration_samples);
-        if (master_ctx->dbw_state[i].metrics.avgtt_kalman_calibration_samples) free(master_ctx->dbw_state[i].metrics.avgtt_kalman_calibration_samples);
+        if (master_ctx->dbw_session[i].metrics.health_kalman_calibration_samples) free(master_ctx->dbw_session[i].metrics.health_kalman_calibration_samples);
+        if (master_ctx->dbw_session[i].metrics.avgtt_kalman_calibration_samples) free(master_ctx->dbw_session[i].metrics.avgtt_kalman_calibration_samples);
 		async_delete_event("[Master]: ", &master_ctx->master_async, &master_ctx->dbw[i].uds[0]);
         CLOSE_UDS(&master_ctx->dbw[i].uds[0]);
 		CLOSE_UDS(&master_ctx->dbw[i].uds[1]);

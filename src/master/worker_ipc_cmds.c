@@ -4,6 +4,9 @@
 #include "master/process.h"
 #include "ipc/protocol.h"
 #include "ipc/master_worker_shutdown.h"
+#include "ipc/master_cow_connect.h"
+
+struct sockaddr_in6;
 
 status_t broadcast_shutdown(master_context *master_ctx) {
 	const char *label = "[Master]: ";
@@ -72,5 +75,21 @@ status_t broadcast_shutdown(master_context *master_ctx) {
 		}
 		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
 	}
+	return SUCCESS;
+}
+
+status_t cow_connect(master_context *master_ctx, struct sockaddr_in6 *addr, int index) {
+	const char *label = "[Master]: ";
+	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_cow_connect(label, addr);
+    if (cmd_result.status != SUCCESS) {
+        return FAILURE;
+    }
+    ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->cow[index].uds[0], cmd_result.r_ipc_protocol_t);
+    if (send_result.status != SUCCESS) {
+        LOG_ERROR("%sFailed to sent master_cow_connect to COW %ld.", label, index);
+    } else {
+        LOG_DEBUG("%sSent master_cow_connect to COW %ld.", label, index);
+    }
+    CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t); 
 	return SUCCESS;
 }

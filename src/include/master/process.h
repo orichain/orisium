@@ -32,11 +32,11 @@ typedef struct {
     uds_pair_pid_t cow[MAX_COW_WORKERS];
     uds_pair_pid_t dbr[MAX_DBR_WORKERS];
     uds_pair_pid_t dbw[MAX_DBW_WORKERS];
-    master_sio_state_t sio_state[MAX_SIO_WORKERS];
-    master_logic_state_t logic_state[MAX_LOGIC_WORKERS];
-    master_cow_state_t cow_state[MAX_COW_WORKERS];
-    master_dbr_state_t dbr_state[MAX_DBR_WORKERS];
-    master_dbw_state_t dbw_state[MAX_DBW_WORKERS];    
+    master_sio_session_t sio_session[MAX_SIO_WORKERS];
+    master_logic_session_t logic_session[MAX_LOGIC_WORKERS];
+    master_cow_session_t cow_session[MAX_COW_WORKERS];
+    master_dbr_session_t dbr_session[MAX_DBR_WORKERS];
+    master_dbw_session_t dbw_session[MAX_DBW_WORKERS];    
 } master_context;
 
 void run_master_process(master_context *master_ctx, uint16_t *listen_port, bootstrap_nodes_t *bootstrap_nodes);

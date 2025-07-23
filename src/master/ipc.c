@@ -92,34 +92,34 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
             uint64_t_status_t rt = get_realtime_time_ns("[Master]: ");
             if (hbt->wot == SIO) {
                 LOG_DEBUG("[Master]: SIO %d set last_ack to %llu.", hbt->index, rt.r_uint64_t);
-                master_ctx->sio_state[hbt->index].metrics.last_ack = rt.r_uint64_t;
-                master_ctx->sio_state[hbt->index].metrics.count_ack += (long)1;
-                master_ctx->sio_state[hbt->index].metrics.sum_hbtime += hbt->hbtime;
-                master_ctx->sio_state[hbt->index].metrics.hbtime = hbt->hbtime;
+                master_ctx->sio_session[hbt->index].metrics.last_ack = rt.r_uint64_t;
+                master_ctx->sio_session[hbt->index].metrics.count_ack += (long)1;
+                master_ctx->sio_session[hbt->index].metrics.sum_hbtime += hbt->hbtime;
+                master_ctx->sio_session[hbt->index].metrics.hbtime = hbt->hbtime;
             } else if (hbt->wot == LOGIC) {
                 LOG_DEBUG("[Master]: Logic %d set last_ack to %llu.", hbt->index, rt.r_uint64_t);
-                master_ctx->logic_state[hbt->index].metrics.last_ack = rt.r_uint64_t;
-                master_ctx->logic_state[hbt->index].metrics.count_ack += (long)1;
-                master_ctx->logic_state[hbt->index].metrics.sum_hbtime += hbt->hbtime;
-                master_ctx->logic_state[hbt->index].metrics.hbtime = hbt->hbtime;
+                master_ctx->logic_session[hbt->index].metrics.last_ack = rt.r_uint64_t;
+                master_ctx->logic_session[hbt->index].metrics.count_ack += (long)1;
+                master_ctx->logic_session[hbt->index].metrics.sum_hbtime += hbt->hbtime;
+                master_ctx->logic_session[hbt->index].metrics.hbtime = hbt->hbtime;
             } else if (hbt->wot == COW) {
                 LOG_DEBUG("[Master]: COW %d set last_ack to %llu.", hbt->index, rt.r_uint64_t);
-                master_ctx->cow_state[hbt->index].metrics.last_ack = rt.r_uint64_t;
-                master_ctx->cow_state[hbt->index].metrics.count_ack += (long)1;
-                master_ctx->cow_state[hbt->index].metrics.sum_hbtime += hbt->hbtime;
-                master_ctx->cow_state[hbt->index].metrics.hbtime = hbt->hbtime;
+                master_ctx->cow_session[hbt->index].metrics.last_ack = rt.r_uint64_t;
+                master_ctx->cow_session[hbt->index].metrics.count_ack += (long)1;
+                master_ctx->cow_session[hbt->index].metrics.sum_hbtime += hbt->hbtime;
+                master_ctx->cow_session[hbt->index].metrics.hbtime = hbt->hbtime;
             } else if (hbt->wot == DBR) {
                 LOG_DEBUG("[Master]: DBR %d set last_ack to %llu.", hbt->index, rt.r_uint64_t);
-                master_ctx->dbr_state[hbt->index].metrics.last_ack = rt.r_uint64_t;
-                master_ctx->dbr_state[hbt->index].metrics.count_ack += (long)1;
-                master_ctx->dbr_state[hbt->index].metrics.sum_hbtime += hbt->hbtime;
-                master_ctx->dbr_state[hbt->index].metrics.hbtime = hbt->hbtime;
+                master_ctx->dbr_session[hbt->index].metrics.last_ack = rt.r_uint64_t;
+                master_ctx->dbr_session[hbt->index].metrics.count_ack += (long)1;
+                master_ctx->dbr_session[hbt->index].metrics.sum_hbtime += hbt->hbtime;
+                master_ctx->dbr_session[hbt->index].metrics.hbtime = hbt->hbtime;
             } else if (hbt->wot == DBW) {
                 LOG_DEBUG("[Master]: DBW %d set last_ack to %llu.", hbt->index, rt.r_uint64_t);
-                master_ctx->dbw_state[hbt->index].metrics.last_ack = rt.r_uint64_t;
-                master_ctx->dbw_state[hbt->index].metrics.count_ack += (long)1;
-                master_ctx->dbw_state[hbt->index].metrics.sum_hbtime += hbt->hbtime;
-                master_ctx->dbw_state[hbt->index].metrics.hbtime = hbt->hbtime;
+                master_ctx->dbw_session[hbt->index].metrics.last_ack = rt.r_uint64_t;
+                master_ctx->dbw_session[hbt->index].metrics.count_ack += (long)1;
+                master_ctx->dbw_session[hbt->index].metrics.sum_hbtime += hbt->hbtime;
+                master_ctx->dbw_session[hbt->index].metrics.hbtime = hbt->hbtime;
             }
 			break;
 		}
@@ -136,100 +136,100 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
                     memcmp(master_ctx->sio_c_session[i].ip, disconnect_info->ip, IP_ADDRESS_LEN) == 0) {
                     int sio_worker_idx = master_ctx->sio_c_session[i].sio_index;
 //======================================================================
-// Update metrics for SIO state
+// Update metrics for SIO session
 //======================================================================                    
                     uint64_t_status_t rt = get_realtime_time_ns(label);
-                    if (master_ctx->sio_state[sio_worker_idx].metrics.first_check_avgtt == (uint8_t)0x01) {
-                        master_ctx->sio_state[sio_worker_idx].metrics.first_check_avgtt = (uint8_t)0x00;
-                        master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_filter.is_initialized = false;
-                        master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_initialized_count = 0;
-                        if (master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_calibration_samples != NULL) {
-                            free(master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_calibration_samples);
-                            master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_calibration_samples = NULL;
+                    if (master_ctx->sio_session[sio_worker_idx].metrics.first_check_avgtt == (uint8_t)0x01) {
+                        master_ctx->sio_session[sio_worker_idx].metrics.first_check_avgtt = (uint8_t)0x00;
+                        master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_filter.is_initialized = false;
+                        master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_initialized_count = 0;
+                        if (master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_calibration_samples != NULL) {
+                            free(master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_calibration_samples);
+                            master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_calibration_samples = NULL;
                         }
-                        master_ctx->sio_state[sio_worker_idx].metrics.longest_task_time = 0;
-                        master_ctx->sio_state[sio_worker_idx].metrics.avg_task_time_per_empty_slot = 0.0L;
+                        master_ctx->sio_session[sio_worker_idx].metrics.longest_task_time = 0;
+                        master_ctx->sio_session[sio_worker_idx].metrics.avg_task_time_per_empty_slot = 0.0L;
                         LOG_DEVEL_DEBUG("%sSIO Worker %d: First-time setup for Avg Task Time metrics.", label, sio_worker_idx);
                     }
-                    master_ctx->sio_state[sio_worker_idx].metrics.last_ack = rt.r_uint64_t;
-                    master_ctx->sio_state[sio_worker_idx].metrics.last_task_finished = rt.r_uint64_t;
+                    master_ctx->sio_session[sio_worker_idx].metrics.last_ack = rt.r_uint64_t;
+                    master_ctx->sio_session[sio_worker_idx].metrics.last_task_finished = rt.r_uint64_t;
                     uint64_t task_time;
-                    if (master_ctx->sio_state[sio_worker_idx].metrics.last_task_started == 0 ||
-                        rt.r_uint64_t < master_ctx->sio_state[sio_worker_idx].metrics.last_task_started) {
+                    if (master_ctx->sio_session[sio_worker_idx].metrics.last_task_started == 0 ||
+                        rt.r_uint64_t < master_ctx->sio_session[sio_worker_idx].metrics.last_task_started) {
                         task_time = 0;
                         LOG_WARN("%sSIO Worker %d: Invalid last_task_started detected. Resetting task_time to 0.", label, sio_worker_idx);
                     } else {
-                        task_time = rt.r_uint64_t - master_ctx->sio_state[sio_worker_idx].metrics.last_task_started;
+                        task_time = rt.r_uint64_t - master_ctx->sio_session[sio_worker_idx].metrics.last_task_started;
                     }
                     if (task_time > MAX_TASK_TIME_NS) {
                         LOG_WARN("%sSIO Worker %d: Task time (%" PRIu64 " ns) exceeded MAX_TASK_TIME_NS (%" PRIu64 " ns). Capping for calculation.",
                                  label, sio_worker_idx, task_time, MAX_TASK_TIME_NS);
                         task_time = MAX_TASK_TIME_NS;
                     }
-                    if (master_ctx->sio_state[sio_worker_idx].metrics.longest_task_time < task_time) {
-                        master_ctx->sio_state[sio_worker_idx].metrics.longest_task_time = task_time;
+                    if (master_ctx->sio_session[sio_worker_idx].metrics.longest_task_time < task_time) {
+                        master_ctx->sio_session[sio_worker_idx].metrics.longest_task_time = task_time;
                     }
-                    uint64_t previous_task_count = master_ctx->sio_state[sio_worker_idx].task_count;
+                    uint64_t previous_task_count = master_ctx->sio_session[sio_worker_idx].task_count;
                     if (previous_task_count > 0) {
-                        master_ctx->sio_state[sio_worker_idx].task_count -= 1;
+                        master_ctx->sio_session[sio_worker_idx].task_count -= 1;
                     } else {
                         LOG_WARN("%sTask count for SIO worker %d is already zero when client %s disconnected. Possible logic error.",
                                  label, sio_worker_idx, ip_str);
-                        master_ctx->sio_state[sio_worker_idx].task_count = 0;
+                        master_ctx->sio_session[sio_worker_idx].task_count = 0;
                     }
-                    uint64_t current_task_count = master_ctx->sio_state[sio_worker_idx].task_count;
+                    uint64_t current_task_count = master_ctx->sio_session[sio_worker_idx].task_count;
                     uint64_t previous_slot_kosong = MAX_CONNECTION_PER_SIO_WORKER - previous_task_count;
                     uint64_t current_slot_kosong = MAX_CONNECTION_PER_SIO_WORKER - current_task_count;
                     long double current_avg_task_time_measurement;
                     if (current_slot_kosong > 0 && previous_slot_kosong > 0) {
-                        current_avg_task_time_measurement = ((master_ctx->sio_state[sio_worker_idx].metrics.avg_task_time_per_empty_slot * previous_slot_kosong) + task_time) / (long double)current_slot_kosong;
+                        current_avg_task_time_measurement = ((master_ctx->sio_session[sio_worker_idx].metrics.avg_task_time_per_empty_slot * previous_slot_kosong) + task_time) / (long double)current_slot_kosong;
                     } else if (previous_slot_kosong == 0 && current_slot_kosong > 0) {
                         current_avg_task_time_measurement = (long double)task_time;
                     } else {
                         current_avg_task_time_measurement = 0.0L;
                     }
                     if (current_avg_task_time_measurement < 0.0L) current_avg_task_time_measurement = 0.0L;
-                    if (!master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_filter.is_initialized) {
-                        if (master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_calibration_samples == NULL) {
-                            master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_calibration_samples =
+                    if (!master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_filter.is_initialized) {
+                        if (master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_calibration_samples == NULL) {
+                            master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_calibration_samples =
                                 (float *)malloc(KALMAN_CALIBRATION_SAMPLES * sizeof(float));
-                            if (!master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_calibration_samples) {
+                            if (!master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_calibration_samples) {
                                 LOG_ERROR("%s Failed to allocate avgtt calibration samples for SIO worker %d. Fallback to raw measurement.",
                                           label, sio_worker_idx);
-                                master_ctx->sio_state[sio_worker_idx].metrics.avg_task_time_per_empty_slot = current_avg_task_time_measurement;
+                                master_ctx->sio_session[sio_worker_idx].metrics.avg_task_time_per_empty_slot = current_avg_task_time_measurement;
                             }
                         }
-                        if (master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_initialized_count < KALMAN_CALIBRATION_SAMPLES) {
-                            master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_calibration_samples[master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_initialized_count] =
+                        if (master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_initialized_count < KALMAN_CALIBRATION_SAMPLES) {
+                            master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_calibration_samples[master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_initialized_count] =
                                 (float)current_avg_task_time_measurement;
-                            master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_initialized_count++;
-                            if (master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
-                                float avg_value = calculate_average(master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
-                                float var_value = calculate_variance(master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_value);
-                                free(master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_calibration_samples);
-                                master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_calibration_samples = NULL;
+                            master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_initialized_count++;
+                            if (master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
+                                float avg_value = calculate_average(master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
+                                float var_value = calculate_variance(master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_value);
+                                free(master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_calibration_samples);
+                                master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_calibration_samples = NULL;
                                 if (var_value < 0.1f) var_value = 0.1f;
                                 float kalman_q_avg_task = 1.0f;
                                 float kalman_r_avg_task = var_value;
                                 float kalman_p0_avg_task = var_value * 2.0f;
-                                kalman_init(&master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_filter,
+                                kalman_init(&master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_filter,
                                             kalman_q_avg_task, kalman_r_avg_task, kalman_p0_avg_task, avg_value);
-                                master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_filter.is_initialized = true;                                
-                                master_ctx->sio_state[sio_worker_idx].metrics.avg_task_time_per_empty_slot = (long double)master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_filter.state_estimate;
+                                master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_filter.is_initialized = true;                                
+                                master_ctx->sio_session[sio_worker_idx].metrics.avg_task_time_per_empty_slot = (long double)master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_filter.session_estimate;
                                 LOG_DEVEL_DEBUG("%sSIO Worker %d: Kalman Avg Task Time Filter initialized. Avg: %.2Lf, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
                                                 label, sio_worker_idx, (long double)avg_value, var_value, kalman_q_avg_task, kalman_r_avg_task, kalman_p0_avg_task);
                             } else {
-                                master_ctx->sio_state[sio_worker_idx].metrics.avg_task_time_per_empty_slot = current_avg_task_time_measurement;
+                                master_ctx->sio_session[sio_worker_idx].metrics.avg_task_time_per_empty_slot = current_avg_task_time_measurement;
                                 LOG_DEVEL_DEBUG("%sSIO Worker %d: Calibrating Avg Task Time... (%d/%d) -> Meas: %.2Lf",
-                                                label, sio_worker_idx, master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_initialized_count,
+                                                label, sio_worker_idx, master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_initialized_count,
                                                 KALMAN_CALIBRATION_SAMPLES, current_avg_task_time_measurement);
                             }
                         }
                     } else {
-                        master_ctx->sio_state[sio_worker_idx].metrics.avg_task_time_per_empty_slot =
-                            kalman_filter(&master_ctx->sio_state[sio_worker_idx].metrics.avgtt_kalman_filter, (float)current_avg_task_time_measurement);
-                        if (master_ctx->sio_state[sio_worker_idx].metrics.avg_task_time_per_empty_slot < 0.0L) {
-                            master_ctx->sio_state[sio_worker_idx].metrics.avg_task_time_per_empty_slot = 0.0L;
+                        master_ctx->sio_session[sio_worker_idx].metrics.avg_task_time_per_empty_slot =
+                            kalman_filter(&master_ctx->sio_session[sio_worker_idx].metrics.avgtt_kalman_filter, (float)current_avg_task_time_measurement);
+                        if (master_ctx->sio_session[sio_worker_idx].metrics.avg_task_time_per_empty_slot < 0.0L) {
+                            master_ctx->sio_session[sio_worker_idx].metrics.avg_task_time_per_empty_slot = 0.0L;
                         }
                     }
                     LOG_DEVEL_DEBUG("%sSIO_STATE:\nTask Count: %" PRIu64 "\nLast Ack: %" PRIu64
@@ -237,13 +237,13 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
                                     "\nLongest Task Time: %" PRIu64
                                     "\nMeas Avg Task Time per Empty Slot: %.2Lf -> Est Avg Task Time per Empty Slot: %.2Lf",
                                     label,
-                                    master_ctx->sio_state[sio_worker_idx].task_count,
-                                    master_ctx->sio_state[sio_worker_idx].metrics.last_ack,
-                                    master_ctx->sio_state[sio_worker_idx].metrics.last_task_started,
-                                    master_ctx->sio_state[sio_worker_idx].metrics.last_task_finished,
-                                    master_ctx->sio_state[sio_worker_idx].metrics.longest_task_time,
+                                    master_ctx->sio_session[sio_worker_idx].task_count,
+                                    master_ctx->sio_session[sio_worker_idx].metrics.last_ack,
+                                    master_ctx->sio_session[sio_worker_idx].metrics.last_task_started,
+                                    master_ctx->sio_session[sio_worker_idx].metrics.last_task_finished,
+                                    master_ctx->sio_session[sio_worker_idx].metrics.longest_task_time,
                                     current_avg_task_time_measurement,
-                                    master_ctx->sio_state[sio_worker_idx].metrics.avg_task_time_per_empty_slot);
+                                    master_ctx->sio_session[sio_worker_idx].metrics.avg_task_time_per_empty_slot);
 //======================================================================
 // Bersihkan sesi koneksi
 //======================================================================

@@ -2,6 +2,8 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <signal.h>
+#include <netinet/in.h>
+#include <string.h>
 
 #include "log.h"
 #include "constants.h"
@@ -13,7 +15,8 @@
 #include "master/workers.h"
 #include "master/process.h"
 #include "master/worker_metrics.h"
-#include "master/worker_cmds.h"
+#include "master/worker_ipc_cmds.h"
+#include "master/worker_selector.h"
 #include "node.h"
 
 status_t setup_master(master_context *master_ctx, uint16_t *listen_port) {
@@ -21,13 +24,12 @@ status_t setup_master(master_context *master_ctx, uint16_t *listen_port) {
     for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
         master_ctx->sio_c_session[i].sio_index = -1;
         master_ctx->sio_c_session[i].in_use = false;
-        //memset(master_ctx->sio_c_session[i].ip, 0, IPV6_ADDRESS_LEN);
+        memset(&master_ctx->sio_c_session[i].addr, 0, sizeof(struct sockaddr_in6));
     }
     for (int i = 0; i < MAX_MASTER_COW_SESSIONS; ++i) {
         master_ctx->cow_c_session[i].cow_index = -1;
         master_ctx->cow_c_session[i].in_use = false;
-        //memset(master_ctx->cow_c_session[i].ip, 0, IPV6_ADDRESS_LEN);
-        //master_ctx->cow_c_session[i].port = -1;
+        memset(&master_ctx->cow_c_session[i].addr, 0, sizeof(struct sockaddr_in6));
     }
     master_ctx->last_sio_rr_idx = 0;
     master_ctx->last_cow_rr_idx = 0;
@@ -64,7 +66,29 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
 	volatile sig_atomic_t master_shutdown_requested = 0;
     
     if (setup_workers(master_ctx) != SUCCESS) goto exit;
-    
+    if (sleep_s(1) != SUCCESS) goto exit;
+    for (int ic = 0; ic < bootstrap_nodes->len; ic++) {
+        int cow_worker_idx = select_best_worker(label, master_ctx, COW);
+        if (cow_worker_idx == -1) {
+            LOG_ERROR("%sFailed to select an COW worker for new task.", label);
+            goto exit;
+        }
+        int slot_found = -1;
+        for(int i = 0; i < MAX_MASTER_COW_SESSIONS; ++i) {
+            if(!master_ctx->cow_c_session[i].in_use) {
+                master_ctx->cow_c_session[i].cow_index = cow_worker_idx;
+                master_ctx->cow_c_session[i].in_use = true;
+                memcpy(&master_ctx->cow_c_session[i].addr, &bootstrap_nodes->addr[ic], sizeof(bootstrap_nodes->addr[ic]));
+                slot_found = i;
+                break;
+            }
+        }
+        if (slot_found == -1) {
+            LOG_ERROR("%sWARNING: No free session slots in master_ctx->cow_c_session.", label);
+            goto exit;
+        }
+        if (cow_connect(master_ctx, &bootstrap_nodes->addr[ic], cow_worker_idx) != SUCCESS) goto exit;
+    }
     LOG_INFO("%sPID %d UDP Server listening on port %d.", label, master_ctx->master_pid, *listen_port);
     while (!master_shutdown_requested) {
 		int_status_t snfds = async_wait(label, &master_ctx->master_async);

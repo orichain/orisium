@@ -63,11 +63,11 @@ status_t new_task_metrics(const char *label, master_context *master_ctx, worker_
     worker_metrics_t *metrics = NULL;
     uint16_t *task_count = NULL;
     if (wot == SIO) {
-        metrics = &master_ctx->sio_state[index].metrics;
-        task_count = &master_ctx->sio_state[index].task_count;
+        metrics = &master_ctx->sio_session[index].metrics;
+        task_count = &master_ctx->sio_session[index].task_count;
     } else if (wot == COW) {
-        metrics = &master_ctx->cow_state[index].metrics;
-        task_count = &master_ctx->cow_state[index].task_count;
+        metrics = &master_ctx->cow_session[index].metrics;
+        task_count = &master_ctx->cow_session[index].task_count;
     }
     if (!task_count || !metrics) return FAILURE;
     *task_count += 1;
@@ -100,11 +100,11 @@ status_t calculate_avg_task_time_metrics(const char *label, master_context *mast
     worker_metrics_t *metrics = NULL;
     uint16_t *task_count = NULL;
     if (wot == SIO) {
-        metrics = &master_ctx->sio_state[index].metrics;
-        task_count = &master_ctx->sio_state[index].task_count;
+        metrics = &master_ctx->sio_session[index].metrics;
+        task_count = &master_ctx->sio_session[index].task_count;
     } else if (wot == COW) {
-        metrics = &master_ctx->cow_state[index].metrics;
-        task_count = &master_ctx->cow_state[index].task_count;
+        metrics = &master_ctx->cow_session[index].metrics;
+        task_count = &master_ctx->cow_session[index].task_count;
     }
     if (!task_count || !metrics) return FAILURE;
     if (metrics->first_check_avgtt == (uint8_t)0x01) {
@@ -321,11 +321,11 @@ status_t check_worker_healthy(const char* label, worker_type_t wot, int index, w
 status_t check_workers_healthy(master_context *master_ctx) {
 	const char *label = "[Master]: ";
 	for (int i = 0; i < MAX_SIO_WORKERS; ++i) { 
-		if (check_worker_healthy(label, SIO, i, &master_ctx->sio_state[i].metrics) != SUCCESS) {
+		if (check_worker_healthy(label, SIO, i, &master_ctx->sio_session[i].metrics) != SUCCESS) {
             return FAILURE;
         }
-        if (master_ctx->sio_state[i].metrics.healthypct < (float)25) {
-            master_ctx->sio_state[i].metrics.isactive = false;
+        if (master_ctx->sio_session[i].metrics.healthypct < (float)25) {
+            master_ctx->sio_session[i].metrics.isactive = false;
             if (close_worker(label, master_ctx, SIO, i) != SUCCESS) {
                 return FAILURE;
             }
@@ -338,11 +338,11 @@ status_t check_workers_healthy(master_context *master_ctx) {
         }
 	}
 	for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-		if (check_worker_healthy(label, LOGIC, i, &master_ctx->logic_state[i].metrics) != SUCCESS) {
+		if (check_worker_healthy(label, LOGIC, i, &master_ctx->logic_session[i].metrics) != SUCCESS) {
             return FAILURE;
         }
-        if (master_ctx->logic_state[i].metrics.healthypct < (float)25) {
-            master_ctx->logic_state[i].metrics.isactive = false;
+        if (master_ctx->logic_session[i].metrics.healthypct < (float)25) {
+            master_ctx->logic_session[i].metrics.isactive = false;
             if (close_worker(label, master_ctx, LOGIC, i) != SUCCESS) {
                 return FAILURE;
             }
@@ -355,11 +355,11 @@ status_t check_workers_healthy(master_context *master_ctx) {
         }
 	}
 	for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
-		if (check_worker_healthy(label, COW, i, &master_ctx->cow_state[i].metrics) != SUCCESS) {
+		if (check_worker_healthy(label, COW, i, &master_ctx->cow_session[i].metrics) != SUCCESS) {
             return FAILURE;
         }
-        if (master_ctx->cow_state[i].metrics.healthypct < (float)25) {
-            master_ctx->cow_state[i].metrics.isactive = false;
+        if (master_ctx->cow_session[i].metrics.healthypct < (float)25) {
+            master_ctx->cow_session[i].metrics.isactive = false;
             if (close_worker(label, master_ctx, COW, i) != SUCCESS) {
                 return FAILURE;
             }
@@ -372,11 +372,11 @@ status_t check_workers_healthy(master_context *master_ctx) {
         }
 	}
     for (int i = 0; i < MAX_DBR_WORKERS; ++i) { 
-		if (check_worker_healthy(label, DBR, i, &master_ctx->dbr_state[i].metrics) != SUCCESS) {
+		if (check_worker_healthy(label, DBR, i, &master_ctx->dbr_session[i].metrics) != SUCCESS) {
             return FAILURE;
         }
-        if (master_ctx->dbr_state[i].metrics.healthypct < (float)25) {
-            master_ctx->dbr_state[i].metrics.isactive = false;
+        if (master_ctx->dbr_session[i].metrics.healthypct < (float)25) {
+            master_ctx->dbr_session[i].metrics.isactive = false;
             if (close_worker(label, master_ctx, DBR, i) != SUCCESS) {
                 return FAILURE;
             }
@@ -389,11 +389,11 @@ status_t check_workers_healthy(master_context *master_ctx) {
         }
 	}
     for (int i = 0; i < MAX_DBW_WORKERS; ++i) { 
-		if (check_worker_healthy(label, DBW, i, &master_ctx->dbw_state[i].metrics) != SUCCESS) {
+		if (check_worker_healthy(label, DBW, i, &master_ctx->dbw_session[i].metrics) != SUCCESS) {
             return FAILURE;
         }
-        if (master_ctx->dbw_state[i].metrics.healthypct < (float)25) {
-            master_ctx->dbw_state[i].metrics.isactive = false;
+        if (master_ctx->dbw_session[i].metrics.healthypct < (float)25) {
+            master_ctx->dbw_session[i].metrics.isactive = false;
             if (close_worker(label, master_ctx, DBW, i) != SUCCESS) {
                 return FAILURE;
             }

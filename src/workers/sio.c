@@ -10,12 +10,14 @@
 #include "constants.h"
 #include "utilities.h"
 #include "ipc/protocol.h"
+#include "sessions/workers_session.h"
 #include "types.h"
 #include "ipc/worker_master_heartbeat.h"
+#include "workers/master_ipc_cmds.h"
 
 void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd) {
     volatile sig_atomic_t sio_shutdown_requested = 0;
-    //sio_c_state_t sio_c_state[MAX_CONNECTION_PER_SIO_WORKER];
+    sio_c_session_t sio_c_session[MAX_CONNECTION_PER_SIO_WORKER];
     async_type_t sio_async;
     sio_async.async_fd = -1;
     int sio_timer_fd = -1;
@@ -49,9 +51,8 @@ void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 	if (async_create_incoming_event(label, &sio_async, &sio_timer_fd) != SUCCESS) goto exit;
 //======================================================================	    
     for (int i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
-        //sio_c_state[i].in_use = false;
-        //sio_c_state[i].client_fd = -1;
-        //memset(sio_c_state[i].ip, 0, IP_ADDRESS_LEN);
+        sio_c_session[i].in_use = false;
+        memset(&sio_c_session[i].addr, 0, sizeof(struct sockaddr_in6));
     }    
     while (!sio_shutdown_requested) {
 		int_status_t snfds = async_wait(label, &sio_async);
@@ -71,37 +72,23 @@ void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 				read(sio_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
 //======================================================				
 				double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * HEARTBEAT_JITTER_PERCENTAGE * 2) - HEARTBEAT_JITTER_PERCENTAGE;
-                double new_worker_master_heartbeat_interval_double = WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT * (1.0 + jitter_amount);
-                if (new_worker_master_heartbeat_interval_double < 0.1) {
-                    new_worker_master_heartbeat_interval_double = 0.1;
+                double new_heartbeat_interval_double = WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT * (1.0 + jitter_amount);
+                if (new_heartbeat_interval_double < 0.1) {
+                    new_heartbeat_interval_double = 0.1;
                 }
                 if (async_set_timerfd_time(label, &sio_timer_fd,
-					(time_t)new_worker_master_heartbeat_interval_double,
-                    (long)((new_worker_master_heartbeat_interval_double - (time_t)new_worker_master_heartbeat_interval_double) * 1e9),
-                    (time_t)new_worker_master_heartbeat_interval_double,
-                    (long)((new_worker_master_heartbeat_interval_double - (time_t)new_worker_master_heartbeat_interval_double) * 1e9)) != SUCCESS)
+					(time_t)new_heartbeat_interval_double,
+                    (long)((new_heartbeat_interval_double - (time_t)new_heartbeat_interval_double) * 1e9),
+                    (time_t)new_heartbeat_interval_double,
+                    (long)((new_heartbeat_interval_double - (time_t)new_heartbeat_interval_double) * 1e9)) != SUCCESS)
                 {
                     sio_shutdown_requested = 1;
 					LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
 					continue;
                 }
+                if (master_heartbeat(label, wot, worker_idx, new_heartbeat_interval_double, &master_uds_fd) != SUCCESS) continue;
 //======================================================================
-// 1. if => "piggybacking"/"implicit worker_master_heartbeat" kalau sudah ada ipc lain yang dikirim < interval. lewati pengiriman worker_master_heartbeat.
-// 2. Kirim IPC Hertbeat ke Master
-//======================================================================
-                ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_master_heartbeat(label, wot, worker_idx, new_worker_master_heartbeat_interval_double);
-                if (cmd_result.status != SUCCESS) {
-                    continue;
-                }
-                ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_uds_fd, cmd_result.r_ipc_protocol_t);
-                if (send_result.status != SUCCESS) {
-                    LOG_ERROR("%sFailed to sent worker_master_heartbeat to Master.", label);
-                } else {
-                    LOG_DEBUG("%sSent worker_master_heartbeat to Master.", label);
-                }
-                CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
-//======================================================================
-// 3. Tutup koneksi dr sio_c_state yang tidak ada aktifitas > WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT detik
+// 1. Tutup koneksi dr sio_c_session yang tidak ada aktifitas > WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT detik
 //======================================================================
 			} else if (current_fd == master_uds_fd) {
 				ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(label, &master_uds_fd);

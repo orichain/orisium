@@ -1,6 +1,8 @@
 #ifndef SESSIONS_WORKERS_SESSION_H
 #define SESSIONS_WORKERS_SESSION_H
 
+#include "kalman.h"
+
 typedef struct {
     uint64_t pid;
 //======================================================================
@@ -25,8 +27,8 @@ typedef struct {
 
 typedef struct {
     bool in_use;
-    struct sockaddr_storage client_addr;
-	socklen_t client_addr_len;
+    struct sockaddr_storage addr;
+	socklen_t addr_len;
 	uint64_t id;
 //======================================================================
 // SYN
@@ -72,7 +74,7 @@ typedef struct {
     int retry_kalman_initialized_count;
     float *retry_kalman_calibration_samples; 
     float retry_temp_ewma_value;
-} sio_c_state_t; //Server
+} sio_c_session_t; //Server
 
 typedef struct {
     uint64_t pid;
@@ -100,8 +102,8 @@ typedef struct {
 
 typedef struct {
     bool in_use;
-    struct sockaddr_storage client_addr;
-	socklen_t client_addr_len;
+    struct sockaddr_storage addr;
+	socklen_t addr_len;
 	uint64_t id;
 //======================================================================
 // SYN

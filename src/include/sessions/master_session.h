@@ -34,17 +34,17 @@ typedef struct {
 typedef struct {
     uint16_t task_count;
 	worker_metrics_t metrics;
-} master_sio_state_t;
+} master_sio_session_t;
 
 typedef struct {
     uint16_t task_count;
 	worker_metrics_t metrics;
-} master_logic_state_t;
+} master_logic_session_t;
 
 typedef struct {
     uint16_t task_count;
 	worker_metrics_t metrics;
-} master_dbr_state_t;
+} master_dbr_session_t;
 //======================================================================
 // hanya ada 1 writer
 // LMDB tidak bisa multi writer
@@ -55,12 +55,12 @@ typedef struct {
 typedef struct {
 	bool in_use;
 	worker_metrics_t metrics;
-} master_dbw_state_t;
+} master_dbw_session_t;
 
 typedef struct {
     uint16_t task_count;
     worker_metrics_t metrics;
-} master_cow_state_t;
+} master_cow_session_t;
 
 typedef struct {
 	int sio_index;

@@ -17,10 +17,103 @@
 #include <stdbool.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <immintrin.h>
 
 #include "log.h"
 #include "types.h"
 #include "constants.h"
+
+static uint64_t xoshiro_s[4];
+
+static inline uint64_t rotl(const uint64_t x, int k) {
+    return (x << k) | (x >> (64 - k));
+}
+
+static inline uint64_t xoshiro256plusplus() {
+    const uint64_t s0 = xoshiro_s[0];
+    uint64_t s1 = xoshiro_s[1];
+    const uint64_t s2 = xoshiro_s[2];
+    const uint64_t s3 = xoshiro_s[3];
+    const uint64_t result = rotl(s0 + s3, 23) + s0;
+    s1 ^= s0;
+    xoshiro_s[0] = rotl(s0, 17) ^ s2 ^ (s1 << 49);
+    xoshiro_s[1] = s1;
+    xoshiro_s[2] = rotl(s2, 21);
+    xoshiro_s[3] = s3;
+    return result;
+}
+
+static inline void seed_xoshiro256plusplus(const char* label) {
+    static bool seeded = false;
+    if (seeded) return;
+    FILE *urandom_seed = fopen("/dev/urandom", "rb");
+    if (urandom_seed) {
+        size_t bytes_read = fread(xoshiro_s, 1, sizeof(xoshiro_s), urandom_seed);
+        fclose(urandom_seed);
+        if (bytes_read == sizeof(xoshiro_s)) {
+            if (xoshiro_s[0] == 0 && xoshiro_s[1] == 0 && xoshiro_s[2] == 0 && xoshiro_s[3] == 0) {
+                 goto seed_time_fallback;
+            }
+            seeded = true;
+            return;
+        }
+    }
+seed_time_fallback:
+    LOG_WARN("%sWarning: Failed to seed Xoshiro256++ from /dev/urandom. Falling back to time-based seeding.", label);
+    struct timespec ts;
+    if (clock_gettime(CLOCK_REALTIME, &ts) == 0) {
+        xoshiro_s[0] = (uint64_t)ts.tv_sec ^ (uint64_t)ts.tv_nsec;
+        xoshiro_s[1] = (uint64_t)time(NULL) * 0x9e3779b97f4a7c13ULL;
+        xoshiro_s[2] = (uint64_t)&ts ^ (uint64_t)clock();
+        xoshiro_s[3] = (uint64_t)getpid() ^ (uint64_t)getppid();
+    } else {
+        xoshiro_s[0] = (uint64_t)time(NULL);
+        xoshiro_s[1] = (uint64_t)clock();
+        xoshiro_s[2] = (uint64_t)getpid();
+        xoshiro_s[3] = (uint64_t)time(NULL) * 2;
+    }
+    if (xoshiro_s[0] == 0 && xoshiro_s[1] == 0 && xoshiro_s[2] == 0 && xoshiro_s[3] == 0) {
+        xoshiro_s[0] = 0x82a2b2c2d2e2f2a2ULL;
+    }
+    seeded = true;
+}
+
+static inline status_t generate_connection_id(const char* label, uint64_t *out_id) {
+    if (out_id == NULL) {
+        LOG_ERROR("%sError: out_id cannot be NULL.", label);
+        return FAILURE;
+    }
+    if (_rdseed64_step((unsigned long long *)out_id)) {
+        return SUCCESS;
+    }
+    FILE *urandom = fopen("/dev/urandom", "rb");
+    if (urandom) {
+        size_t bytes_read = fread(out_id, 1, sizeof(uint64_t), urandom);
+        fclose(urandom);
+        if (bytes_read == sizeof(uint64_t)) {
+            return SUCCESS;
+        }
+        LOG_WARN("%sWarning: Failed to read %zu bytes from /dev/urandom, read %zu. Falling back.", label, sizeof(uint64_t), bytes_read);
+    } else {
+        LOG_WARN("%sWarning: Could not open /dev/urandom: %s. Falling back.", label, strerror(errno));
+    }
+    seed_xoshiro256plusplus(label);
+    *out_id = xoshiro256plusplus();
+    LOG_WARN("%sWarning: Falling back to Xoshiro256++ PRNG for ID generation. This is NOT cryptographically secure if seeded only by system time/PIDs.", label);
+    return FAILURE;
+}
+
+static inline status_t generate_heartbeat_id(const char* label, uint64_t *out_id) {
+    seed_xoshiro256plusplus(label);
+    *out_id = xoshiro256plusplus();
+    return SUCCESS;
+}
+
+static inline status_t generate_stream_id(const char* label, uint64_t *out_id) {
+    seed_xoshiro256plusplus(label);
+    *out_id = xoshiro256plusplus();
+    return SUCCESS;
+}
 
 static inline void print_hex(const char* label, const uint8_t* data, size_t len, int uppercase) {
     if (label)
