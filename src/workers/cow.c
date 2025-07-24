@@ -1,9 +1,17 @@
-#include <stdio.h>       // for printf, perror, fprintf, NULL, stderr
-#include <stdlib.h>      // for exit, EXIT_FAILURE, atoi, EXIT_SUCCESS, malloc, free
-#include <stdint.h>
-#include <unistd.h>
-#include <time.h>
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netdb.h>
 #include <signal.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/epoll.h>
+#include <sys/socket.h>
+#include <sys/timerfd.h>
+#include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
 #include <inttypes.h>
 
 #include "log.h"
@@ -15,6 +23,7 @@
 #include "sessions/workers_session.h"
 #include "ipc/worker_master_heartbeat.h"
 #include "workers/master_ipc_cmds.h"
+#include "workers/master_orilink_cmds.h"
 
 void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd) {
     volatile sig_atomic_t cow_shutdown_requested = 0;
@@ -53,7 +62,8 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 //======================================================================
     for (int i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
         cow_c_session[i].in_use = false;
-        memset(&cow_c_session[i].addr, 0, sizeof(struct sockaddr_in6));
+        CLOSE_FD(&cow_c_session[i].sock_fd);
+        memset(&cow_c_session[i].server_addr, 0, sizeof(struct sockaddr_in6));
     }    
     while (!cow_shutdown_requested) {
         int_status_t snfds = async_wait(label, &cow_async);
@@ -115,8 +125,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                     for (int i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
                         if (!cow_c_session[i].in_use) {
                             cow_c_session[i].in_use = true;
-                            memcpy(&cow_c_session[i].addr, &cc->addr, sizeof(cc->addr));
-                            cow_c_session[i].addr_len = sizeof(cow_c_session[i].addr);
+                            memcpy(&cow_c_session[i].server_addr, &cc->server_addr, sizeof(cc->server_addr));
                             slot_found = i;
                             break;
                         }
@@ -127,18 +136,118 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
-                    uint64_t id;
-                    generate_connection_id(label, &id);
-                    cow_c_session[slot_found].syn_fd = -1;
-                    cow_c_session[slot_found].syn_timer_fd = -1;
-                    cow_c_session[slot_found].heartbeat.ping_fd = -1;
-                    cow_c_session[slot_found].heartbeat.ping_timer_fd = -1;
-                    cow_c_session[slot_found].heartbeat.pong_ack_fd = -1;
-                    cow_c_session[slot_found].heartbeat.pong_ack_timer_fd = -1;
-                    cow_c_session[slot_found].fin_fd = -1;
-                    cow_c_session[slot_found].fin_timer_fd = -1;
-                    
-					CLOSE_IPC_PROTOCOL(&received_protocol);
+                    //uint64_t id;
+                    //generate_connection_id(label, &id);
+                    cow_c_session_t *session;
+                    session = &cow_c_session[slot_found];
+                    //session->id = id;
+//======================================================================
+// Init All FD                    
+//======================================================================
+                    session->sock_fd = -1;
+                    session->hello1_timer_fd = -1;
+                    session->hello2_timer_fd = -1;
+                    session->hello3_timer_fd = -1;
+                    session->hello_end_timer_fd = -1;
+                    session->syn_timer_fd = -1;
+                    session->heartbeat.ping_timer_fd = -1;
+                    session->heartbeat.pong_ack_timer_fd = -1;
+                    session->fin_timer_fd = -1;
+//======================================================================
+                    struct addrinfo hints, *res, *rp;
+                    memset(&hints, 0, sizeof(hints));
+                    hints.ai_family = AF_UNSPEC;
+                    hints.ai_socktype = SOCK_DGRAM;
+                    hints.ai_protocol = IPPROTO_UDP;
+                    char host_str[NI_MAXHOST];
+                    char port_str[NI_MAXSERV];
+                    int getname_res = getnameinfo((struct sockaddr *)&session->server_addr, sizeof(struct sockaddr_in6),
+                                        host_str, NI_MAXHOST,
+                                        port_str, NI_MAXSERV,
+                                        NI_NUMERICHOST | NI_NUMERICSERV
+                                      );
+                    if (getname_res != 0) {
+                        LOG_ERROR("%sgetnameinfo failed. %s", label, strerror(errno));
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        continue;
+                    }
+                    int gai_err = getaddrinfo(host_str, port_str, &hints, &res);
+                    if (gai_err != 0) {
+                        LOG_ERROR("%sgetaddrinfo error for UDP %s:%s: %s", label, host_str, port_str, gai_strerror(gai_err));
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        continue;
+                    }
+                    for (rp = res; rp != NULL; rp = rp->ai_next) {
+                        session->sock_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+                        if (session->sock_fd == -1) {
+                            LOG_ERROR("%sUDP Socket creation failed: %s", label, strerror(errno));
+                            continue;
+                        }
+                        LOG_DEBUG("%sUDP Socket FD %d created.", label, session->sock_fd);
+                        status_t r_snbkg = set_nonblocking(label, session->sock_fd);
+                        if (r_snbkg != SUCCESS) {
+                            LOG_ERROR("%sset_nonblocking failed.", label);
+                            continue;
+                        }
+                        LOG_DEBUG("%sUDP Socket FD %d set to non-blocking.", label, session->sock_fd);
+                        int conn_res = connect(session->sock_fd, rp->ai_addr, rp->ai_addrlen);
+                        if (conn_res == 0) {
+                            LOG_INFO("%sUDP socket 'connected' to %s:%s (FD %d).", label, host_str, port_str, session->sock_fd);
+                            break;
+                        } else {
+                            LOG_ERROR("%sUDP 'connect' failed for %s:%s (FD %d): %s", label, host_str, port_str, session->sock_fd, strerror(errno));
+                            CLOSE_FD(&session->sock_fd);
+                            continue;
+                        }
+                    }
+                    freeaddrinfo(res);
+                    if (session->sock_fd == -1) {
+                        LOG_ERROR("%sFailed to set up any UDP socket for %s:%s.", label, host_str, port_str);
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        continue;
+                    }
+                    if (async_create_incoming_event(label, &cow_async, &session->sock_fd) != SUCCESS) {
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        continue;
+                    }
+//======================================================================
+// Init HELLO Timeout
+//======================================================================
+                    session->interval_hello1_timer_fd = (double)1;
+//======================================================================
+                    if (async_create_timerfd(label, &session->hello1_timer_fd) != SUCCESS) {
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        continue;
+                    }
+                    if (async_set_timerfd_time(label, &session->hello1_timer_fd,
+                        (time_t)session->interval_hello1_timer_fd,
+                        (long)((session->interval_hello1_timer_fd - (time_t)session->interval_hello1_timer_fd) * 1e9),
+                        (time_t)session->interval_hello1_timer_fd,
+                        (long)((session->interval_hello1_timer_fd - (time_t)session->interval_hello1_timer_fd) * 1e9)) != SUCCESS)
+                    {
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        continue;
+                    }
+                    if (async_create_incoming_event(label, &cow_async, &session->hello1_timer_fd) != SUCCESS) {
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        continue;
+                    }
+//======================================================================
+// Send HELLO                    
+//======================================================================
+                    uint64_t_status_t rt = get_realtime_time_ns(label);
+                    if (rt.status != SUCCESS) {
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        continue;
+                    }
+                    session->syn_sent_try_count = 1;
+                    session->syn_sent_time = rt.r_uint64_t;
+                    if (master_hello1(label, session) != SUCCESS) {
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        continue;
+                    }
+//======================================================================                    
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
 					continue;
 				}
 				CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -153,27 +262,31 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 //======================================================================    
 exit:    
     for (int i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
-        if (cow_c_session[i].in_use) {
-            cow_c_session[i].in_use = false;
-            memset(&cow_c_session[i].addr, 0, sizeof(struct sockaddr_in6));
-            if (cow_c_session[i].rtt_kalman_calibration_samples) free(cow_c_session[i].rtt_kalman_calibration_samples);
-            if (cow_c_session[i].retry_kalman_calibration_samples) free(cow_c_session[i].retry_kalman_calibration_samples);
-            async_delete_event(label, &cow_async, &cow_c_session[i].syn_fd);
-            async_delete_event(label, &cow_async, &cow_c_session[i].syn_timer_fd);
-            async_delete_event(label, &cow_async, &cow_c_session[i].heartbeat.ping_fd);
-            async_delete_event(label, &cow_async, &cow_c_session[i].heartbeat.ping_timer_fd);
-            async_delete_event(label, &cow_async, &cow_c_session[i].heartbeat.pong_ack_fd);
-            async_delete_event(label, &cow_async, &cow_c_session[i].heartbeat.pong_ack_timer_fd);
-            async_delete_event(label, &cow_async, &cow_c_session[i].fin_fd);
-            async_delete_event(label, &cow_async, &cow_c_session[i].fin_timer_fd);
-            CLOSE_FD(&cow_c_session[i].syn_fd);
-            CLOSE_FD(&cow_c_session[i].syn_timer_fd);
-            CLOSE_FD(&cow_c_session[i].heartbeat.ping_fd);
-            CLOSE_FD(&cow_c_session[i].heartbeat.ping_timer_fd);
-            CLOSE_FD(&cow_c_session[i].heartbeat.pong_ack_fd);
-            CLOSE_FD(&cow_c_session[i].heartbeat.pong_ack_timer_fd);
-            CLOSE_FD(&cow_c_session[i].fin_fd);
-            CLOSE_FD(&cow_c_session[i].fin_timer_fd);
+        cow_c_session_t *session;
+        session = &cow_c_session[i];
+        if (session->in_use) {
+            session->in_use = false;
+            memset(&session->server_addr, 0, sizeof(struct sockaddr_in6));
+            if (session->rtt_kalman_calibration_samples) free(session->rtt_kalman_calibration_samples);
+            if (session->retry_kalman_calibration_samples) free(session->retry_kalman_calibration_samples);
+            async_delete_event(label, &cow_async, &session->sock_fd);
+            async_delete_event(label, &cow_async, &session->hello1_timer_fd);
+            async_delete_event(label, &cow_async, &session->hello2_timer_fd);
+            async_delete_event(label, &cow_async, &session->hello3_timer_fd);
+            async_delete_event(label, &cow_async, &session->hello_end_timer_fd);
+            async_delete_event(label, &cow_async, &session->syn_timer_fd);
+            async_delete_event(label, &cow_async, &session->heartbeat.ping_timer_fd);
+            async_delete_event(label, &cow_async, &session->heartbeat.pong_ack_timer_fd);
+            async_delete_event(label, &cow_async, &session->fin_timer_fd);
+            CLOSE_FD(&session->sock_fd);
+            CLOSE_FD(&session->hello1_timer_fd);
+            CLOSE_FD(&session->hello2_timer_fd);
+            CLOSE_FD(&session->hello3_timer_fd);
+            CLOSE_FD(&session->hello_end_timer_fd);
+            CLOSE_FD(&session->syn_timer_fd);
+            CLOSE_FD(&session->heartbeat.ping_timer_fd);
+            CLOSE_FD(&session->heartbeat.pong_ack_timer_fd);
+            CLOSE_FD(&session->fin_timer_fd);
         }
     }
 	async_delete_event(label, &cow_async, &master_uds_fd);

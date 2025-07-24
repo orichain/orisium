@@ -10,6 +10,14 @@
 
 #include "utilities.h"
 #include "orilink/protocol.h"
+#include "orilink/hello1.h"
+#include "orilink/hello1_ack.h"
+#include "orilink/hello2.h"
+#include "orilink/hello2_ack.h"
+#include "orilink/hello3.h"
+#include "orilink/hello3_ack.h"
+#include "orilink/hello_end.h"
+#include "orilink/sock_ready.h"
 #include "orilink/syn.h"
 #include "orilink/syn_ack.h"
 #include "orilink/syn_end.h"
@@ -41,6 +49,102 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
     size_t payload_dynamic_size = 0;
     
     switch (p->type) {
+        case ORILINK_HELLO1: {
+            if (!checkfixheader) {
+                if (!p->payload.orilink_hello1) {
+                    LOG_ERROR("%sORILINK_HELLO1 payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
+            }
+            payload_fixed_size = sizeof(uint64_t) + (PQCLEAN_MLKEM1024_CLEAN_CRYPTO_PUBLICKEYBYTES / 2) + sizeof(uint8_t);
+            payload_dynamic_size = 0;
+            break;
+        }
+        case ORILINK_HELLO1_ACK: {
+            if (!checkfixheader) {
+                if (!p->payload.orilink_hello1_ack) {
+                    LOG_ERROR("%sORILINK_HELLO1_ACK payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
+            }
+            payload_fixed_size = sizeof(uint64_t) + sizeof(uint8_t);
+            payload_dynamic_size = 0;
+            break;
+        }
+        case ORILINK_HELLO2: {
+            if (!checkfixheader) {
+                if (!p->payload.orilink_hello2) {
+                    LOG_ERROR("%sORILINK_HELLO2 payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
+            }
+            payload_fixed_size = sizeof(uint64_t) + (PQCLEAN_MLKEM1024_CLEAN_CRYPTO_PUBLICKEYBYTES / 2) + sizeof(uint8_t);
+            payload_dynamic_size = 0;
+            break;
+        }
+        case ORILINK_HELLO2_ACK: {
+            if (!checkfixheader) {
+                if (!p->payload.orilink_hello2_ack) {
+                    LOG_ERROR("%sORILINK_HELLO2_ACK payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
+            }
+            payload_fixed_size = sizeof(uint64_t) + (PQCLEAN_MLKEM1024_CLEAN_CRYPTO_CIPHERTEXTBYTES / 2) + sizeof(uint8_t);
+            payload_dynamic_size = 0;
+            break;
+        }
+        case ORILINK_HELLO3: {
+            if (!checkfixheader) {
+                if (!p->payload.orilink_hello3) {
+                    LOG_ERROR("%sORILINK_HELLO3 payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
+            }
+            payload_fixed_size = sizeof(uint64_t) + sizeof(uint8_t);
+            payload_dynamic_size = 0;
+            break;
+        }
+        case ORILINK_HELLO3_ACK: {
+            if (!checkfixheader) {
+                if (!p->payload.orilink_hello3_ack) {
+                    LOG_ERROR("%sORILINK_HELLO3_ACK payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
+            }
+            payload_fixed_size = sizeof(uint64_t) + (PQCLEAN_MLKEM1024_CLEAN_CRYPTO_CIPHERTEXTBYTES / 2) + (AESNONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t) + AESTAG_BYTES) + sizeof(uint8_t);
+            payload_dynamic_size = 0;
+            break;
+        }
+        case ORILINK_HELLO_END: {
+            if (!checkfixheader) {
+                if (!p->payload.orilink_hello_end) {
+                    LOG_ERROR("%sORILINK_HELLO_END payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
+            }
+            payload_fixed_size = sizeof(uint64_t) + (AESNONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t) + AESTAG_BYTES) + sizeof(uint8_t);
+            payload_dynamic_size = 0;
+            break;
+        }
+        case ORILINK_SOCK_READY: {
+            if (!checkfixheader) {
+                if (!p->payload.orilink_sock_ready) {
+                    LOG_ERROR("%sORILINK_SOCK_READY payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
+            }
+            payload_fixed_size = sizeof(uint64_t) + (AESNONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t) + AESTAG_BYTES) + sizeof(uint8_t);
+            payload_dynamic_size = 0;
+            break;
+        }
 		case ORILINK_SYN: {
             if (!checkfixheader) {
                 if (!p->payload.orilink_syn) {
@@ -347,6 +451,30 @@ ssize_t_status_t orilink_serialize(const char *label, const orilink_protocol_t* 
     offset_payload = offset;
     status_t result_pyld = FAILURE;
     switch (p->type) {
+        case ORILINK_HELLO1:
+            result_pyld = orilink_serialize_hello1(label, p->payload.orilink_hello1, current_buffer, *buffer_size, &offset);
+            break;
+        case ORILINK_HELLO1_ACK:
+            result_pyld = orilink_serialize_hello1_ack(label, p->payload.orilink_hello1_ack, current_buffer, *buffer_size, &offset);
+            break;            
+        case ORILINK_HELLO2:
+            result_pyld = orilink_serialize_hello2(label, p->payload.orilink_hello2, current_buffer, *buffer_size, &offset);
+            break;
+        case ORILINK_HELLO2_ACK:
+            result_pyld = orilink_serialize_hello2_ack(label, p->payload.orilink_hello2_ack, current_buffer, *buffer_size, &offset);
+            break;
+        case ORILINK_HELLO3:
+            result_pyld = orilink_serialize_hello3(label, p->payload.orilink_hello3, current_buffer, *buffer_size, &offset);
+            break;
+        case ORILINK_HELLO3_ACK:
+            result_pyld = orilink_serialize_hello3_ack(label, p->payload.orilink_hello3_ack, current_buffer, *buffer_size, &offset);
+            break;            
+        case ORILINK_HELLO_END:
+            result_pyld = orilink_serialize_hello_end(label, p->payload.orilink_hello_end, current_buffer, *buffer_size, &offset);
+            break;
+        case ORILINK_SOCK_READY:
+            result_pyld = orilink_serialize_sock_ready(label, p->payload.orilink_sock_ready, current_buffer, *buffer_size, &offset);
+            break;
         case ORILINK_SYN:
             result_pyld = orilink_serialize_syn(label, p->payload.orilink_syn, current_buffer, *buffer_size, &offset);
             break;
@@ -460,6 +588,150 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, const uint8_t
     LOG_DEBUG("%sDeserializing type 0x%02x. Current offset: %zu", label, p->type, current_buffer_offset);
     status_t result_pyld = FAILURE;
     switch (p->type) {
+        case ORILINK_HELLO1: {
+			if (current_buffer_offset + fixed_header_size > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HELLO1 fixed header.", label);
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            orilink_hello1_t *payload = (orilink_hello1_t*) calloc(1, sizeof(orilink_hello1_t));
+            if (!payload) {
+                LOG_ERROR("%sFailed to allocate orilink_hello1_t without FAM. %s", label, strerror(errno));
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.orilink_hello1 = payload;
+            result_pyld = orilink_deserialize_hello1(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case ORILINK_HELLO1_ACK: {
+			if (current_buffer_offset + fixed_header_size > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HELLO1_ACK fixed header.", label);
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            orilink_hello1_ack_t *payload = (orilink_hello1_ack_t*) calloc(1, sizeof(orilink_hello1_ack_t));
+            if (!payload) {
+                LOG_ERROR("%sFailed to allocate orilink_hello1_ack_t without FAM. %s", label, strerror(errno));
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.orilink_hello1_ack = payload;
+            result_pyld = orilink_deserialize_hello1_ack(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case ORILINK_HELLO2: {
+			if (current_buffer_offset + fixed_header_size > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HELLO2 fixed header.", label);
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            orilink_hello2_t *payload = (orilink_hello2_t*) calloc(1, sizeof(orilink_hello2_t));
+            if (!payload) {
+                LOG_ERROR("%sFailed to allocate orilink_hello2_t without FAM. %s", label, strerror(errno));
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.orilink_hello2 = payload;
+            result_pyld = orilink_deserialize_hello2(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case ORILINK_HELLO2_ACK: {
+			if (current_buffer_offset + fixed_header_size > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HELLO2_ACK fixed header.", label);
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            orilink_hello2_ack_t *payload = (orilink_hello2_ack_t*) calloc(1, sizeof(orilink_hello2_ack_t));
+            if (!payload) {
+                LOG_ERROR("%sFailed to allocate orilink_hello2_ack_t without FAM. %s", label, strerror(errno));
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.orilink_hello2_ack = payload;
+            result_pyld = orilink_deserialize_hello2_ack(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case ORILINK_HELLO3: {
+			if (current_buffer_offset + fixed_header_size > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HELLO3 fixed header.", label);
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            orilink_hello3_t *payload = (orilink_hello3_t*) calloc(1, sizeof(orilink_hello3_t));
+            if (!payload) {
+                LOG_ERROR("%sFailed to allocate orilink_hello3_t without FAM. %s", label, strerror(errno));
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.orilink_hello3 = payload;
+            result_pyld = orilink_deserialize_hello3(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case ORILINK_HELLO3_ACK: {
+			if (current_buffer_offset + fixed_header_size > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HELLO3_ACK fixed header.", label);
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            orilink_hello3_ack_t *payload = (orilink_hello3_ack_t*) calloc(1, sizeof(orilink_hello3_ack_t));
+            if (!payload) {
+                LOG_ERROR("%sFailed to allocate orilink_hello3_ack_t without FAM. %s", label, strerror(errno));
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.orilink_hello3_ack = payload;
+            result_pyld = orilink_deserialize_hello3_ack(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case ORILINK_HELLO_END: {
+			if (current_buffer_offset + fixed_header_size > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HELLO_END fixed header.", label);
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            orilink_hello_end_t *payload = (orilink_hello_end_t*) calloc(1, sizeof(orilink_hello_end_t));
+            if (!payload) {
+                LOG_ERROR("%sFailed to allocate orilink_hello_end_t without FAM. %s", label, strerror(errno));
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.orilink_hello_end = payload;
+            result_pyld = orilink_deserialize_hello_end(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case ORILINK_SOCK_READY: {
+			if (current_buffer_offset + fixed_header_size > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_SOCK_READY fixed header.", label);
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            orilink_sock_ready_t *payload = (orilink_sock_ready_t*) calloc(1, sizeof(orilink_sock_ready_t));
+            if (!payload) {
+                LOG_ERROR("%sFailed to allocate orilink_sock_ready_t without FAM. %s", label, strerror(errno));
+                CLOSE_ORILINK_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.orilink_sock_ready = payload;
+            result_pyld = orilink_deserialize_sock_ready(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
 		case ORILINK_SYN: {
 			if (current_buffer_offset + fixed_header_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_SYN fixed header.", label);
@@ -833,13 +1105,12 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, const uint8_t
     return result;
 }
 
-ssize_t_status_t send_orilink_protocol_packet(const char *label, int *sock_fd, const struct sockaddr *dest_addr, socklen_t *dest_addr_len, const orilink_protocol_t* p) {
+ssize_t_status_t send_orilink_protocol_packet(const char *label, int *sock_fd, const struct sockaddr *dest_addr, const orilink_protocol_t* p) {
 	ssize_t_status_t result;
     result.r_ssize_t = 0;
     result.status = FAILURE;
     uint8_t* serialized_orilink_data_buffer = NULL;
     size_t serialized_orilink_data_len = 0;
-
     ssize_t_status_t serialize_result = orilink_serialize(label, p, &serialized_orilink_data_buffer, &serialized_orilink_data_len);
     if (serialize_result.status != SUCCESS) {
         LOG_ERROR("%sError serializing ORILINK protocol: %d", label, serialize_result.status);
@@ -856,7 +1127,8 @@ ssize_t_status_t send_orilink_protocol_packet(const char *label, int *sock_fd, c
         return result;
     }
     LOG_DEBUG("%sTotal pesan untuk dikirim: %zu byte.", label, serialized_orilink_data_len);
-    result.r_ssize_t = sendto(*sock_fd, serialized_orilink_data_buffer, serialized_orilink_data_len, 0, dest_addr, *dest_addr_len);
+    socklen_t dest_addr_len = sizeof(struct sockaddr_in6);
+    result.r_ssize_t = sendto(*sock_fd, serialized_orilink_data_buffer, serialized_orilink_data_len, 0, dest_addr, dest_addr_len);
     if (result.r_ssize_t != (ssize_t)serialized_orilink_data_len) {
         LOG_ERROR("%ssendto failed to send_orilink_protocol_packet. %s", label, strerror(errno));
         if (serialized_orilink_data_buffer) {
@@ -872,12 +1144,13 @@ ssize_t_status_t send_orilink_protocol_packet(const char *label, int *sock_fd, c
     return result;
 }
 
-orilink_protocol_t_status_t receive_and_deserialize_orilink_packet(const char *label, int *sock_fd, struct sockaddr *source_addr, socklen_t *source_addr_len) {
+orilink_protocol_t_status_t receive_and_deserialize_orilink_packet(const char *label, int *sock_fd, struct sockaddr *source_addr) {
     orilink_protocol_t_status_t deserialized_result;
     deserialized_result.r_orilink_protocol_t = NULL;
     deserialized_result.status = FAILURE;
     uint8_t recv_buffer[ORILINK_MAX_PACKET_SIZE];
-    ssize_t n = recvfrom(*sock_fd, recv_buffer, ORILINK_MAX_PACKET_SIZE, 0, source_addr, source_addr_len);
+    socklen_t source_addr_len = sizeof(struct sockaddr_in6);
+    ssize_t n = recvfrom(*sock_fd, recv_buffer, ORILINK_MAX_PACKET_SIZE, 0, source_addr, &source_addr_len);
     if (n < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             deserialized_result.status = FAILURE_EAGNEWBLK;

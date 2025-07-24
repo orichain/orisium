@@ -25,7 +25,7 @@ status_t close_worker(const char *label, master_context *master_ctx, worker_type
         if (master_ctx->sio_session[index].metrics.avgtt_kalman_calibration_samples) free(master_ctx->sio_session[index].metrics.avgtt_kalman_calibration_samples);
         master_ctx->sio_c_session[index].sio_index = -1;
         master_ctx->sio_c_session[index].in_use = false;
-        memset(&master_ctx->sio_c_session[index].addr, 0, sizeof(struct sockaddr_in6));
+        memset(&master_ctx->sio_c_session[index].client_addr, 0, sizeof(struct sockaddr_in6));
 		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->sio[index].uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
@@ -46,7 +46,7 @@ status_t close_worker(const char *label, master_context *master_ctx, worker_type
         if (master_ctx->cow_session[index].metrics.avgtt_kalman_calibration_samples) free(master_ctx->cow_session[index].metrics.avgtt_kalman_calibration_samples);
         master_ctx->cow_c_session[index].cow_index = -1;
         master_ctx->cow_c_session[index].in_use = false;
-        memset(&master_ctx->cow_c_session[index].addr, 0, sizeof(struct sockaddr_in6));
+        memset(&master_ctx->cow_c_session[index].server_addr, 0, sizeof(struct sockaddr_in6));
 		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->cow[index].uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
@@ -350,7 +350,7 @@ void workers_cleanup(master_context *master_ctx) {
         if (master_ctx->sio_session[i].metrics.avgtt_kalman_calibration_samples) free(master_ctx->sio_session[i].metrics.avgtt_kalman_calibration_samples);
         master_ctx->sio_c_session[i].sio_index = -1;
         master_ctx->sio_c_session[i].in_use = false;
-        memset(&master_ctx->sio_c_session[i].addr, 0, sizeof(struct sockaddr_in6));
+        memset(&master_ctx->sio_c_session[i].client_addr, 0, sizeof(struct sockaddr_in6));
 		async_delete_event("[Master]: ", &master_ctx->master_async, &master_ctx->sio[i].uds[0]);
         CLOSE_UDS(&master_ctx->sio[i].uds[0]);
 		CLOSE_UDS(&master_ctx->sio[i].uds[1]);
@@ -369,7 +369,7 @@ void workers_cleanup(master_context *master_ctx) {
         if (master_ctx->cow_session[i].metrics.avgtt_kalman_calibration_samples) free(master_ctx->cow_session[i].metrics.avgtt_kalman_calibration_samples);
         master_ctx->cow_c_session[i].cow_index = -1;
         master_ctx->cow_c_session[i].in_use = false;
-        memset(&master_ctx->cow_c_session[i].addr, 0, sizeof(struct sockaddr_in6));
+        memset(&master_ctx->cow_c_session[i].server_addr, 0, sizeof(struct sockaddr_in6));
 		async_delete_event("[Master]: ", &master_ctx->master_async, &master_ctx->cow[i].uds[0]);
         CLOSE_UDS(&master_ctx->cow[i].uds[0]);
 		CLOSE_UDS(&master_ctx->cow[i].uds[1]);

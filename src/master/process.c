@@ -24,12 +24,12 @@ status_t setup_master(master_context *master_ctx, uint16_t *listen_port) {
     for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
         master_ctx->sio_c_session[i].sio_index = -1;
         master_ctx->sio_c_session[i].in_use = false;
-        memset(&master_ctx->sio_c_session[i].addr, 0, sizeof(struct sockaddr_in6));
+        memset(&master_ctx->sio_c_session[i].client_addr, 0, sizeof(struct sockaddr_in6));
     }
     for (int i = 0; i < MAX_MASTER_COW_SESSIONS; ++i) {
         master_ctx->cow_c_session[i].cow_index = -1;
         master_ctx->cow_c_session[i].in_use = false;
-        memset(&master_ctx->cow_c_session[i].addr, 0, sizeof(struct sockaddr_in6));
+        memset(&master_ctx->cow_c_session[i].server_addr, 0, sizeof(struct sockaddr_in6));
     }
     master_ctx->last_sio_rr_idx = 0;
     master_ctx->last_cow_rr_idx = 0;
@@ -78,7 +78,7 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
             if(!master_ctx->cow_c_session[i].in_use) {
                 master_ctx->cow_c_session[i].cow_index = cow_worker_idx;
                 master_ctx->cow_c_session[i].in_use = true;
-                memcpy(&master_ctx->cow_c_session[i].addr, &bootstrap_nodes->addr[ic], sizeof(bootstrap_nodes->addr[ic]));
+                memcpy(&master_ctx->cow_c_session[i].server_addr, &bootstrap_nodes->addr[ic], sizeof(bootstrap_nodes->addr[ic]));
                 slot_found = i;
                 break;
             }

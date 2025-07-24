@@ -52,7 +52,7 @@ void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 //======================================================================	    
     for (int i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
         sio_c_session[i].in_use = false;
-        memset(&sio_c_session[i].addr, 0, sizeof(struct sockaddr_in6));
+        memset(&sio_c_session[i].client_addr, 0, sizeof(struct sockaddr_in6));
     }    
     while (!sio_shutdown_requested) {
 		int_status_t snfds = async_wait(label, &sio_async);

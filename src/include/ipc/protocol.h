@@ -21,7 +21,7 @@ typedef enum {
 } ipc_protocol_type_t;
 
 typedef struct {  
-    struct sockaddr_in6 addr;
+    struct sockaddr_in6 server_addr;
 } ipc_master_cow_connect_t;
 
 typedef struct {

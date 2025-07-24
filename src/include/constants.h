@@ -41,6 +41,9 @@
 #define KALMAN_ALPHA_EWMA 0.2f
 #define HEALTHY_THRESHOLD 75
 
+#define HASHES_BYTES 32
+#define AESNONCE_BYTES 12
+#define AESTAG_BYTES 16
 //======================================================================
 // OriLink
 //======================================================================
