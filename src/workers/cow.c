@@ -19,7 +19,7 @@
 #include "constants.h"
 #include "sessions/workers_session.h"
 #include "workers/master_ipc_cmds.h"
-#include "workers/master_orilink_cmds.h"
+#include "workers/client_orilink_cmds.h"
 #include "kalman.h"
 #include "pqc.h"
 #include "stdbool.h"
