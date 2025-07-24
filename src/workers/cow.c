@@ -117,9 +117,10 @@ void cleanup_session(const char *label, async_type_t *cow_async, cow_c_session_t
     CLOSE_FD(&session->fin_timer_fd);
 }
 
-bool must_be_disconnected(const char *label, int session_index, async_type_t *cow_async, cow_c_session_t *session) {
+bool must_be_disconnected(const char *label, worker_type_t wot, int worker_idx, int session_index, async_type_t *cow_async, cow_c_session_t *session, int *master_uds_fd) {
     if (session->hello1_sent_try_count > MAX_RETRY) {
         LOG_DEVEL_DEBUG("%s session %d: disconnect => try count %d.", label, session_index, session->hello1_sent_try_count);
+        cow_master_connection(label, wot, worker_idx, &session->old_server_addr, CANNOTCONNECT, master_uds_fd);
         cleanup_session(label, cow_async, session);
         return true;
     }
@@ -248,7 +249,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                     for (int i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
                         if (!cow_c_session[i].in_use) {
                             cow_c_session[i].in_use = true;
-                            memcpy(&cow_c_session[i].server_addr, &cc->server_addr, sizeof(cc->server_addr));
+                            memcpy(&cow_c_session[i].old_server_addr, &cc->server_addr, sizeof(struct sockaddr_in6));
                             slot_found = i;
                             break;
                         }
@@ -271,7 +272,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                     hints.ai_protocol = IPPROTO_UDP;
                     char host_str[NI_MAXHOST];
                     char port_str[NI_MAXSERV];
-                    int getname_res = getnameinfo((struct sockaddr *)&session->server_addr, sizeof(struct sockaddr_in6),
+                    int getname_res = getnameinfo((struct sockaddr *)&session->old_server_addr, sizeof(struct sockaddr_in6),
                                         host_str, NI_MAXHOST,
                                         port_str, NI_MAXSERV,
                                         NI_NUMERICHOST | NI_NUMERICSERV
@@ -375,7 +376,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                         } else if (current_fd == session->hello1_timer_fd) {
                             uint64_t u;
                             read(session->hello1_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                            if (must_be_disconnected(label, i, &cow_async, session)) {
+                            if (must_be_disconnected(label, wot, worker_idx, i, &cow_async, session, &master_uds_fd)) {
                                 event_founded_in_session = true;
                                 break;
                             }

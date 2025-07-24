@@ -72,9 +72,10 @@ status_t new_task_metrics(const char *label, master_context *master_ctx, worker_
     if (!task_count || !metrics) return FAILURE;
     *task_count += 1;
     metrics->last_task_started = rt.r_uint64_t;
-    LOG_DEBUG("%s%s_STATE:\nTask Count: %" PRIu64 "\nLast Ack: %" PRIu64 "\nLast Started: %" PRIu64 "\nLast Finished: %" PRIu64 "\nLongest Task Time: %" PRIu64 "\nAvg Task Time: %Lf",
+    LOG_DEVEL_DEBUG("%s%s[%d]_STATE:\nTask Count: %" PRIu64 "\nLast Ack: %" PRIu64 "\nLast Started: %" PRIu64 "\nLast Finished: %" PRIu64 "\nLongest Task Time: %" PRIu64 "\nAvg Task Time: %Lf",
         label,
         worker_name,
+        index,
         *task_count,
         metrics->last_ack,
         metrics->last_task_started,
@@ -117,7 +118,7 @@ status_t calculate_avg_task_time_metrics(const char *label, master_context *mast
         }
         metrics->longest_task_time = 0;
         metrics->avg_task_time_per_empty_slot = 0.0L;
-        LOG_DEBUG("%s%s Worker %d: First-time setup for Avg Task Time metrics.", label, worker_name, index);
+        LOG_DEVEL_DEBUG("%s%s Worker %d: First-time setup for Avg Task Time metrics.", label, worker_name, index);
     }
     metrics->last_ack = rt.r_uint64_t;
     metrics->last_task_finished = rt.r_uint64_t;
@@ -133,6 +134,11 @@ status_t calculate_avg_task_time_metrics(const char *label, master_context *mast
         metrics->longest_task_time = task_time;
     }
     uint64_t previous_task_count = *task_count;
+    LOG_DEVEL_DEBUG("%s%s[%d]_STATE:\nPrev Task Count: %" PRIu64,
+                    label,
+                    worker_name,
+                    index,
+                    *task_count);
     if (previous_task_count > 0) {
         *task_count -= 1;
     } else {
@@ -140,6 +146,11 @@ status_t calculate_avg_task_time_metrics(const char *label, master_context *mast
                  label, worker_name, index);
         *task_count = 0;
     }
+    LOG_DEVEL_DEBUG("%s%s[%d]_STATE:\nTask Count: %" PRIu64,
+                    label,
+                    worker_name,
+                    index,
+                    *task_count);
     uint64_t current_task_count = *task_count;
     uint64_t previous_slot_kosong = MAX_CONNECTION_PER_SIO_WORKER - previous_task_count;
     uint64_t current_slot_kosong = MAX_CONNECTION_PER_SIO_WORKER - current_task_count;
@@ -179,11 +190,11 @@ status_t calculate_avg_task_time_metrics(const char *label, master_context *mast
                             kalman_q_avg_task, kalman_r_avg_task, kalman_p0_avg_task, avg_value);
                 metrics->avgtt_kalman_filter.is_initialized = true;                                
                 metrics->avg_task_time_per_empty_slot = (long double)metrics->avgtt_kalman_filter.state_estimate;
-                LOG_DEBUG("%s%s Worker %d: Kalman Avg Task Time Filter initialized. Avg: %.2Lf, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
+                LOG_DEVEL_DEBUG("%s%s Worker %d: Kalman Avg Task Time Filter initialized. Avg: %.2Lf, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
                                 label, worker_name, index, (long double)avg_value, var_value, kalman_q_avg_task, kalman_r_avg_task, kalman_p0_avg_task);
             } else {
                 metrics->avg_task_time_per_empty_slot = current_avg_task_time_measurement;
-                LOG_DEBUG("%s%s Worker %d: Calibrating Avg Task Time... (%d/%d) -> Meas: %.2Lf",
+                LOG_DEVEL_DEBUG("%s%s Worker %d: Calibrating Avg Task Time... (%d/%d) -> Meas: %.2Lf",
                                 label, worker_name, index, metrics->avgtt_kalman_initialized_count,
                                 KALMAN_CALIBRATION_SAMPLES, current_avg_task_time_measurement);
             }
@@ -195,12 +206,13 @@ status_t calculate_avg_task_time_metrics(const char *label, master_context *mast
             metrics->avg_task_time_per_empty_slot = 0.0L;
         }
     }
-    LOG_DEBUG("%s%s_STATE:\nTask Count: %" PRIu64 "\nLast Ack: %" PRIu64
+    LOG_DEVEL_DEBUG("%s%s[%d]_STATE:\nTask Count: %" PRIu64 "\nLast Ack: %" PRIu64
                     "\nLast Started: %" PRIu64 "\nLast Finished: %" PRIu64
                     "\nLongest Task Time: %" PRIu64
                     "\nMeas Avg Task Time per Empty Slot: %.2Lf -> Est Avg Task Time per Empty Slot: %.2Lf",
                     label,
                     worker_name,
+                    index,
                     *task_count,
                     metrics->last_ack,
                     metrics->last_task_started,

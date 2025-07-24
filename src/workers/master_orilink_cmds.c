@@ -9,7 +9,7 @@ status_t hello1(const char *label, cow_c_session_t *session) {
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
-    ssize_t_status_t send_result = send_orilink_protocol_packet(label, &session->sock_fd, (const struct sockaddr *)&session->server_addr, cmd_result.r_orilink_protocol_t);
+    ssize_t_status_t send_result = send_orilink_protocol_packet(label, &session->sock_fd, (const struct sockaddr *)&session->old_server_addr, cmd_result.r_orilink_protocol_t);
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent master_hello to Master.", label);
         CLOSE_ORILINK_PROTOCOL(&cmd_result.r_orilink_protocol_t);

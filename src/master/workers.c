@@ -266,6 +266,7 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
 //======================================================================
 // Hitung delay start dan inisialisasi metrics
 //======================================================================
+            master_ctx->cow_session[index].task_count = (uint16_t)0;
             initial_delay_ms = initialize_metrics(label, &master_ctx->cow_session[index].metrics, wot, index);
 //======================================================================
             LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->cow[index].pid);
