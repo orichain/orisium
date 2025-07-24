@@ -40,22 +40,6 @@ typedef enum {
 } worker_type_t;
 
 typedef enum {
-    IP_UNKNOWN = (uint8_t)0x00,
-    IP_V4 = (uint8_t)0x01,
-    IP_V6 = (uint8_t)0x02
-} ip_type_t;
-
-typedef enum {
-    PT_SYN = (uint8_t)0x00,
-    PT_SYN_ACK = (uint8_t)0x02,
-    PT_REUSED_SYN_ACK = (uint8_t)0x03,
-    PT_ACK = (uint8_t)0x04,
-    PT_DATA = (uint8_t)0x05,
-    PT_FIN = (uint8_t)0x06,
-    PT_KEEPALIVE = (uint8_t)0x07
-} udp_packet_type_t;
-
-typedef enum {
 	IMMEDIATELY = (uint8_t)0x00
 } shutdown_type_t;
 
@@ -89,79 +73,5 @@ typedef struct {
 	uint64_t r_uint64_t;
 	status_t status;
 } uint64_t_status_t;
-
-typedef struct {
-    uint32_t connection_id;
-    uint32_t sequence_number;
-    uint8_t packet_type;
-    uint16_t payload_length;
-    uint32_t checksum;
-    uint16_t stream_id;
-    uint32_t stream_sequence_number;
-} udp_packet_header_t;
-
-typedef struct {
-    udp_packet_header_t header;
-    uint8_t payload[];
-} udp_packet_t;
-
-typedef struct {
-    udp_packet_header_t header;
-    uint32_t total_packets;
-} udp_syn_packet_t;
-
-typedef struct {
-    uint32_t start_seq;
-    uint32_t end_seq;
-} udp_sack_block_t;
-
-typedef struct {
-    udp_packet_header_t header;
-    uint32_t last_acked_seq;
-    uint16_t sack_block_count;
-    uint32_t available_receive_window;
-    udp_sack_block_t sack_blocks[];
-} udp_sack_packet_t;
-
-typedef struct {
-    uint32_t global_sequence_number;
-    uint16_t stream_id;
-    uint32_t stream_sequence_number;
-    uint8_t data[ORILINK_MAX_PACKET_SIZE];
-    size_t data_len;
-} udp_received_packet_t;
-
-typedef struct {
-    uint32_t connection_id;
-    struct sockaddr_in6 client_addr;
-    socklen_t client_addr_len;
-    uint32_t next_expected_seq;
-    udp_received_packet_t **recv_buffer;
-    int buffer_count;
-    int max_recv_buffer_size;
-    uint32_t total_packets;
-    uint32_t available_receive_window;
-    uint64_t last_active_time;
-    int is_handshake_complete;
-    int is_fin_received;
-} udp_session_t;
-
-typedef struct {
-    uint32_t global_sequence_number;
-    uint16_t stream_id;
-    uint32_t stream_sequence_number;
-    udp_packet_t *packet;
-    uint64_t last_sent_time;
-    int retransmissions;
-    int is_acked;
-    uint64_t sent_time;
-} udp_sent_packet_t;
-
-typedef struct {
-	int sock_fd;
-    int timer_fd;
-    int retry_count;
-    uint64_t hstime;
-} udp_handshake_t;
 
 #endif
