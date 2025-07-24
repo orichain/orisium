@@ -13,23 +13,23 @@ typedef struct {
     double count_ack;
     uint64_t last_ack;
     uint8_t first_check_healthy;
-    kalman_t health_kalman_filter;
+    kalman_double_t health_kalman_filter;
     int health_kalman_initialized_count;
-    float *health_kalman_calibration_samples; 
-    float health_temp_ewma_value;
+    double *health_kalman_calibration_samples; 
+    double health_temp_ewma_value;
     bool isactive;
     bool ishealthy;
     uint64_t last_checkhealthy;  
-    float healthypct;  
+    double health_value_prediction;  
     uint8_t first_check_avgtt;
-    kalman_t avgtt_kalman_filter;
+    kalman_long_double_t avgtt_kalman_filter;
     int avgtt_kalman_initialized_count;
-    float *avgtt_kalman_calibration_samples;
-    float avgtt_temp_ewma_value;    
+    long double *avgtt_kalman_calibration_samples;
+    long double avgtt_temp_ewma_value;    
     uint64_t last_task_started;
     uint64_t last_task_finished;
     uint64_t longest_task_time;
-    long double avg_task_time_per_empty_slot;
+    long double avgtt_value_prediction;
 } worker_metrics_t;
 
 typedef struct {
@@ -115,10 +115,11 @@ typedef struct {
 // RTT
 //======================================================================    
     uint8_t first_check_rtt;
-    kalman_t rtt_kalman_filter;
+    kalman_double_t rtt_kalman_filter;
     int rtt_kalman_initialized_count;
-    float *rtt_kalman_calibration_samples; 
-    float rtt_temp_ewma_value;
+    double *rtt_kalman_calibration_samples; 
+    double rtt_value_prediction;
+    double rtt_temp_ewma_value;
 //======================================================================
 // RETRY
 //======================================================================    
@@ -126,6 +127,7 @@ typedef struct {
     kalman_t retry_kalman_filter;
     int retry_kalman_initialized_count;
     float *retry_kalman_calibration_samples; 
+    float retry_value_prediction;
     float retry_temp_ewma_value;
 } master_sio_c_session_t;
 

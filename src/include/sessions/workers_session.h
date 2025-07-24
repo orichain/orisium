@@ -63,10 +63,11 @@ typedef struct {
 // RTT
 //======================================================================    
     uint8_t first_check_rtt;
-    kalman_t rtt_kalman_filter;
+    kalman_double_t rtt_kalman_filter;
     int rtt_kalman_initialized_count;
-    float *rtt_kalman_calibration_samples; 
-    float rtt_temp_ewma_value;
+    double *rtt_kalman_calibration_samples; 
+    double rtt_value_prediction;
+    double rtt_temp_ewma_value;
 //======================================================================
 // RETRY
 //======================================================================    
@@ -74,6 +75,7 @@ typedef struct {
     kalman_t retry_kalman_filter;
     int retry_kalman_initialized_count;
     float *retry_kalman_calibration_samples; 
+    float retry_value_prediction;
     float retry_temp_ewma_value;
 } sio_c_session_t; //Server
 
@@ -184,11 +186,11 @@ typedef struct {
 // RTT
 //======================================================================    
     uint8_t first_check_rtt;
-    kalman_t rtt_kalman_filter;
+    kalman_double_t rtt_kalman_filter;
     int rtt_kalman_initialized_count;
-    float *rtt_kalman_calibration_samples; 
-    float rtt_value_prediction;
-    float rtt_temp_ewma_value;
+    double *rtt_kalman_calibration_samples; 
+    double rtt_value_prediction;
+    double rtt_temp_ewma_value;
 //======================================================================
 // RETRY
 //======================================================================    

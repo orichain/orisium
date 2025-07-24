@@ -209,6 +209,24 @@ static inline float calculate_average(const float* data, int num_elements) {
     return sum / (float)num_elements;
 }
 
+static inline double calculate_double_average(const double* data, int num_elements) {
+    if (num_elements == 0) return (double)0;
+    double sum = (double)0;
+    for (int i = 0; i < num_elements; ++i) {
+        sum += data[i];
+    }
+    return sum / (double)num_elements;
+}
+
+static inline long double calculate_long_double_average(const long double* data, int num_elements) {
+    if (num_elements == 0) return (long double)0;
+    long double sum = (long double)0;
+    for (int i = 0; i < num_elements; ++i) {
+        sum += data[i];
+    }
+    return sum / (long double)num_elements;
+}
+
 static inline float calculate_variance(const float* data, int num_elements, float mean) {
     if (num_elements <= 1) return 0.0f;
     float sum_squared_diff = 0.0f;
@@ -217,6 +235,26 @@ static inline float calculate_variance(const float* data, int num_elements, floa
         sum_squared_diff += diff * diff;
     }
     return sum_squared_diff / (float)(num_elements - 1);
+}
+
+static inline double calculate_double_variance(const double* data, int num_elements, double mean) {
+    if (num_elements <= 1) return (double)0;
+    double sum_squared_diff = (double)0;
+    for (int i = 0; i < num_elements; ++i) {
+        double diff = data[i] - mean;
+        sum_squared_diff += diff * diff;
+    }
+    return sum_squared_diff / (double)(num_elements - 1);
+}
+
+static inline long double calculate_long_double_variance(const long double* data, int num_elements, long double mean) {
+    if (num_elements <= 1) return (long double)0;
+    long double sum_squared_diff = (long double)0;
+    for (int i = 0; i < num_elements; ++i) {
+        long double diff = data[i] - mean;
+        sum_squared_diff += diff * diff;
+    }
+    return sum_squared_diff / (long double)(num_elements - 1);
 }
 
 static inline status_t sleep_ns(long nanoseconds) {

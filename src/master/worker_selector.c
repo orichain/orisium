@@ -26,8 +26,8 @@ int select_best_worker(const char *label, master_context *master_ctx, worker_typ
         for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
             if (master_ctx->sio_session[i].task_count < MAX_CONNECTION_PER_SIO_WORKER) {
                 if (master_ctx->sio_session[i].metrics.isactive && master_ctx->sio_session[i].metrics.ishealthy) {
-                    if (master_ctx->sio_session[i].metrics.avg_task_time_per_empty_slot < min_avg_task_time) {
-                        min_avg_task_time = master_ctx->sio_session[i].metrics.avg_task_time_per_empty_slot;
+                    if (master_ctx->sio_session[i].metrics.avgtt_value_prediction < min_avg_task_time) {
+                        min_avg_task_time = master_ctx->sio_session[i].metrics.avgtt_value_prediction;
                         temp_best_idx_t1 = i;
                     }
                 }
@@ -37,8 +37,8 @@ int select_best_worker(const char *label, master_context *master_ctx, worker_typ
         for (int i = 0; i < MAX_COW_WORKERS; ++i) {
             if (master_ctx->cow_session[i].task_count < MAX_CONNECTION_PER_COW_WORKER) {
                 if (master_ctx->cow_session[i].metrics.isactive && master_ctx->cow_session[i].metrics.ishealthy) {
-                    if (master_ctx->cow_session[i].metrics.avg_task_time_per_empty_slot < min_avg_task_time) {
-                        min_avg_task_time = master_ctx->cow_session[i].metrics.avg_task_time_per_empty_slot;
+                    if (master_ctx->cow_session[i].metrics.avgtt_value_prediction < min_avg_task_time) {
+                        min_avg_task_time = master_ctx->cow_session[i].metrics.avgtt_value_prediction;
                         temp_best_idx_t1 = i;
                     }
                 }

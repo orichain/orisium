@@ -393,14 +393,16 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                                 LOG_DEVEL_DEBUG("%s session %d: First-time setup for retry value.", label, i);
                             }
                             float current_retry_measurement = (float)session->hello1_sent_try_count;
-                            if (current_retry_measurement < 0.0f) current_retry_measurement = 0.0f;
-                            if (current_retry_measurement > ((float)MAX_RETRY * 2.0f)) current_retry_measurement = ((float)MAX_RETRY * 2.0f);
+                            if (current_retry_measurement < (float)0) current_retry_measurement = (float)0;
+                            if (current_retry_measurement > ((float)MAX_RETRY * (float)2)) current_retry_measurement = ((float)MAX_RETRY * (float)2);
                             if (!session->retry_kalman_filter.is_initialized) {
                                 if (session->retry_kalman_calibration_samples == NULL) {
                                     session->retry_kalman_calibration_samples = (float *)malloc(KALMAN_CALIBRATION_SAMPLES * sizeof(float));
                                     if (!session->retry_kalman_calibration_samples) {
                                         session->retry_value_prediction = current_retry_measurement;
                                         LOG_ERROR("%s session %d Failed to allocate retry calibration samples. Fallback to raw measurement.", label, i);
+                                        if (session->retry_value_prediction < (float)0) session->retry_value_prediction = (float)0;
+                                        if (session->retry_value_prediction > ((float)MAX_RETRY * (float)2)) session->retry_value_prediction = ((float)MAX_RETRY * (float)2);
                                         session->interval_hello1_timer_fd = pow((double)2, (double)session->retry_value_prediction);
                                         send_hello1(label, session);
                                         event_founded_in_session = true;
@@ -412,17 +414,17 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                                     session->retry_kalman_calibration_samples[session->retry_kalman_initialized_count] = current_retry_measurement;
                                     session->retry_kalman_initialized_count++;
                                     if (session->retry_kalman_initialized_count > 1) {
-                                        session->retry_temp_ewma_value = KALMAN_ALPHA_EWMA * current_retry_measurement + (1.0f - KALMAN_ALPHA_EWMA) * session->retry_temp_ewma_value;
+                                        session->retry_temp_ewma_value = (float)KALMAN_ALPHA_EWMA * current_retry_measurement + ((float)1 - (float)KALMAN_ALPHA_EWMA) * session->retry_temp_ewma_value;
                                     }
                                     if (session->retry_kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
                                         float avg_retry = calculate_average(session->retry_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
                                         float var_retry = calculate_variance(session->retry_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_retry);
                                         free(session->retry_kalman_calibration_samples);
                                         session->retry_kalman_calibration_samples = NULL;
-                                        if (var_retry < 0.1f) var_retry = 0.1f;               
-                                        float kalman_q = 1.0f;
+                                        if (var_retry < (float)0.1) var_retry = (float)0.1;               
+                                        float kalman_q = (float)1;
                                         float kalman_r = var_retry;
-                                        float kalman_p0 = var_retry * 2.0f;
+                                        float kalman_p0 = var_retry * (float)2;
                                         kalman_init(&session->retry_kalman_filter, kalman_q, kalman_r, kalman_p0, avg_retry);
                                         session->retry_kalman_filter.is_initialized = true;
                                         session->retry_value_prediction = session->retry_kalman_filter.state_estimate;
@@ -435,20 +437,22 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                                                         current_retry_measurement, session->retry_temp_ewma_value);
                                     }
                                 }
+                                if (session->retry_value_prediction < (float)0) session->retry_value_prediction = (float)0;
+                                if (session->retry_value_prediction > ((float)MAX_RETRY * (float)2)) session->retry_value_prediction = ((float)MAX_RETRY * (float)2);
                                 session->interval_hello1_timer_fd = pow((double)2, (double)session->retry_value_prediction);
                                 send_hello1(label, session);
                                 event_founded_in_session = true;
                                 break;
                             }
                             session->retry_value_prediction = kalman_filter(&session->retry_kalman_filter, current_retry_measurement);
-                            if (session->retry_value_prediction < 0.0f) session->retry_value_prediction = 0.0f;
-                            if (session->retry_value_prediction > ((float)MAX_RETRY * 2.0f)) session->retry_value_prediction = ((float)MAX_RETRY * 2.0f);
                             LOG_DEVEL_DEBUG(
                                 "%s session %d Meas retry: %.2f%% -> Est retry: %.2f%%",
                                 label, i,
                                 current_retry_measurement,
                                 session->retry_value_prediction
                             );
+                            if (session->retry_value_prediction < (float)0) session->retry_value_prediction = (float)0;
+                            if (session->retry_value_prediction > ((float)MAX_RETRY * (float)2)) session->retry_value_prediction = ((float)MAX_RETRY * (float)2);
                             session->interval_hello1_timer_fd = pow((double)2, (double)session->retry_value_prediction);
                             send_hello1(label, session);
                             event_founded_in_session = true;
