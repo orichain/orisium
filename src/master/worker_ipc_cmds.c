@@ -8,10 +8,10 @@
 
 struct sockaddr_in6;
 
-status_t broadcast_shutdown(master_context *master_ctx) {
+status_t master_workers_shutdown(master_context *master_ctx, shutdown_type_t flag) {
 	const char *label = "[Master]: ";
 	for (int i = 0; i < MAX_SIO_WORKERS; ++i) { 
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_shutdown(label);
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_shutdown(label, flag);
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}
@@ -26,7 +26,7 @@ status_t broadcast_shutdown(master_context *master_ctx) {
 		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t); 
 	}
 	for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_shutdown(label);
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_shutdown(label, flag);
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}	
@@ -41,7 +41,7 @@ status_t broadcast_shutdown(master_context *master_ctx) {
 		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
 	}
 	for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_shutdown(label);
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_shutdown(label, flag);
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}	
@@ -56,7 +56,7 @@ status_t broadcast_shutdown(master_context *master_ctx) {
 		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
 	}
     for (int i = 0; i < MAX_DBR_WORKERS; ++i) { 
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_shutdown(label);
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_shutdown(label, flag);
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}	
@@ -71,7 +71,7 @@ status_t broadcast_shutdown(master_context *master_ctx) {
 		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
 	}
     for (int i = 0; i < MAX_DBW_WORKERS; ++i) { 
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_shutdown(label);
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_shutdown(label, flag);
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}	
@@ -88,7 +88,7 @@ status_t broadcast_shutdown(master_context *master_ctx) {
 	return SUCCESS;
 }
 
-status_t cow_connect(master_context *master_ctx, struct sockaddr_in6 *addr, int index) {
+status_t master_cow_connect(master_context *master_ctx, struct sockaddr_in6 *addr, int index) {
 	const char *label = "[Master]: ";
 	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_cow_connect(label, addr);
     if (cmd_result.status != SUCCESS) {

@@ -3,7 +3,7 @@
 
 #include "master/process.h"
 
-status_t broadcast_shutdown(master_context *master_ctx);
-status_t cow_connect(master_context *master_ctx, struct sockaddr_in6 *addr, int index);
+status_t master_workers_shutdown(master_context *master_ctx, shutdown_type_t flag);
+status_t master_cow_connect(master_context *master_ctx, struct sockaddr_in6 *addr, int index);
 
 #endif

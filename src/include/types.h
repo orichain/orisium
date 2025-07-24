@@ -44,9 +44,15 @@ typedef enum {
 } shutdown_type_t;
 
 typedef enum {
-	MLKEM1024 = 0x01,
-	FALCONPADDED512 = 0x02,
-	MLDSA87 = 0x03,
+	CONNECTED = (uint8_t)0x00,
+    CANNOTCONNECT = (uint8_t)0x01,
+    DISCONNECTED = (uint8_t)0x02
+} connection_type_t;
+
+typedef enum {
+	MLKEM1024 = (uint8_t)0x00,
+	FALCONPADDED512 = (uint8_t)0x01,
+	MLDSA87 = (uint8_t)0x02,
 } pqc_algo_type_t;
 
 typedef struct {

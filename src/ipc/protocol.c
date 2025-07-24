@@ -16,6 +16,7 @@
 #include "ipc/master_worker_shutdown.h"
 #include "ipc/worker_master_heartbeat.h"
 #include "ipc/master_cow_connect.h"
+#include "ipc/cow_master_connection.h"
 #include "constants.h"
 
 static inline size_t_status_t calculate_ipc_payload_size(const char *label, const ipc_protocol_t* p, bool checkfixheader) {
@@ -59,6 +60,18 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
                 }
             }
             payload_fixed_size = SOCKADDR_IN6_SIZE;
+            payload_dynamic_size = 0;
+            break;
+        }
+        case IPC_COW_MASTER_CONNECTION: {
+            if (!checkfixheader) {
+                if (!p->payload.ipc_cow_master_connection) {
+                    LOG_ERROR("%sIPC_COW_MASTER_CONNECTION payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
+            }
+            payload_fixed_size = sizeof(uint8_t) + sizeof(uint8_t) + SOCKADDR_IN6_SIZE + sizeof(uint8_t);
             payload_dynamic_size = 0;
             break;
         }
@@ -133,6 +146,9 @@ ssize_t_status_t ipc_serialize(const char *label, const ipc_protocol_t* p, uint8
             break;
         case IPC_MASTER_COW_CONNECT:
             result_pyld = ipc_serialize_master_cow_connect(label, p->payload.ipc_master_cow_connect, current_buffer, *buffer_size, &offset);
+            break;
+        case IPC_COW_MASTER_CONNECTION:
+            result_pyld = ipc_serialize_cow_master_connection(label, p->payload.ipc_cow_master_connection, current_buffer, *buffer_size, &offset);
             break;
         default:
             LOG_ERROR("%sUnknown protocol type for serialization: 0x%02x", label, p->type);
@@ -230,6 +246,24 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, const uint8_t* buffer
             }
             p->payload.ipc_master_cow_connect = payload;
             result_pyld = ipc_deserialize_master_cow_connect(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case IPC_COW_MASTER_CONNECTION: {
+            if (current_buffer_offset + fixed_header_size > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk IPC_COW_MASTER_CONNECTION fixed header.", label);
+                CLOSE_IPC_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            ipc_cow_master_connection_t *payload = (ipc_cow_master_connection_t*) calloc(1, sizeof(ipc_cow_master_connection_t));
+            if (!payload) {
+                LOG_ERROR("%sFailed to allocate ipc_cow_master_connection_t without FAM. %s", label, strerror(errno));
+                CLOSE_IPC_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.ipc_cow_master_connection = payload;
+            result_pyld = ipc_deserialize_cow_master_connection(label, p, buffer, len, &current_buffer_offset);
             break;
 		}
         default:

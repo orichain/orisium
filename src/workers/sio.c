@@ -14,8 +14,8 @@
 #include "ipc/protocol.h"
 #include "sessions/workers_session.h"
 #include "types.h"
-#include "workers/master_ipc_cmds.h"
 #include "stdbool.h"
+#include "workers/master_ipc_cmds.h"
 
 void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd) {
     volatile sig_atomic_t sio_shutdown_requested = 0;
@@ -88,7 +88,7 @@ void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 					LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
 					continue;
                 }
-                if (master_heartbeat(label, wot, worker_idx, new_heartbeat_interval_double, &master_uds_fd) != SUCCESS) continue;
+                if (worker_master_heartbeat(label, wot, worker_idx, new_heartbeat_interval_double, &master_uds_fd) != SUCCESS) continue;
 //======================================================================
 // 1. Tutup koneksi dr sio_c_session yang tidak ada aktifitas > WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT detik
 //======================================================================

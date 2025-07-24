@@ -79,7 +79,7 @@ void run_logic_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, 
 					LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
 					continue;
                 }
-                if (master_heartbeat(label, wot, worker_idx, new_heartbeat_interval_double, &master_uds_fd) != SUCCESS) continue;
+                if (worker_master_heartbeat(label, wot, worker_idx, new_heartbeat_interval_double, &master_uds_fd) != SUCCESS) continue;
 			} else if (current_fd == master_uds_fd) {
 				ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(label, &master_uds_fd);
 				if (deserialized_result.status != SUCCESS) {

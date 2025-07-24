@@ -16,25 +16,25 @@
 	#define KEM_PRIVATEKEY_BYTES PQCLEAN_MLKEM1024_CLEAN_CRYPTO_SECRETKEYBYTES
 	#define KEM_CIPHERTEXT_BYTES PQCLEAN_MLKEM1024_CLEAN_CRYPTO_CIPHERTEXTBYTES
 	#define KEM_SHAREDSECRET_BYTES PQCLEAN_MLKEM1024_CLEAN_CRYPTO_BYTES
-	#define KEM_GENERATE_KEYPAIR(a, b) PQCLEAN_MLKEM1024_CLEAN_crypto_kem_keypair(a, b)
-	#define KEM_ENCODE_SHAREDSECRET(a, b, c) PQCLEAN_MLKEM1024_CLEAN_crypto_kem_enc(a, b, c)
-	#define KEM_DECODE_SHAREDSECRET(a, b, c) PQCLEAN_MLKEM1024_CLEAN_crypto_kem_dec(a, b, c)
+	#define KEM_GENERATE_KEYPAIR(pk, sk) PQCLEAN_MLKEM1024_CLEAN_crypto_kem_keypair(pk, sk)
+	#define KEM_ENCODE_SHAREDSECRET(ct, ss, pk) PQCLEAN_MLKEM1024_CLEAN_crypto_kem_enc(ct, ss, pk)
+	#define KEM_DECODE_SHAREDSECRET(ss, ct, sk) PQCLEAN_MLKEM1024_CLEAN_crypto_kem_dec(ss, ct, sk)
 #endif
 
 #if defined(SIGN_ALGO) && (SIGN_ALGO == FALCONPADDED512)
 	#define SIGN_PUBLICKEY_BYTES PQCLEAN_FALCONPADDED512_CLEAN_CRYPTO_PUBLICKEYBYTES
 	#define SIGN_PRIVATEKEY_BYTES PQCLEAN_FALCONPADDED512_CLEAN_CRYPTO_SECRETKEYBYTES
 	#define SIGN_GENERATE_SIGNATURE_BBYTES PQCLEAN_FALCONPADDED512_CLEAN_CRYPTO_BYTES
-	#define SIGN_GENERATE_KEYPAIR(a, b) PQCLEAN_FALCONPADDED512_CLEAN_crypto_sign_keypair(a, b)
-	#define SIGN_GENERATE_SIGNATURE(a, b, c, d, e) PQCLEAN_FALCONPADDED512_CLEAN_crypto_sign_signature(a, b, c, d, e)
-	#define SIGN_VERIFY_SIGNATURE(a, b, c, d, e) PQCLEAN_FALCONPADDED512_CLEAN_crypto_sign_verify(a, b, c, d, e)
+	#define SIGN_GENERATE_KEYPAIR(pk, sk) PQCLEAN_FALCONPADDED512_CLEAN_crypto_sign_keypair(pk, sk)
+	#define SIGN_GENERATE_SIGNATURE(sig, siglen, m, mlen, sk) PQCLEAN_FALCONPADDED512_CLEAN_crypto_sign_signature(sig, siglen, m, mlen, sk)
+	#define SIGN_VERIFY_SIGNATURE(sig, siglen, m, mlen, pk) PQCLEAN_FALCONPADDED512_CLEAN_crypto_sign_verify(sig, siglen, m, mlen, pk)
 #elif defined(SIGN_ALGO) && (SIGN_ALGO == MLDSA87)
 	#define SIGN_PUBLICKEY_BYTES PQCLEAN_MLDSA87_CLEAN_CRYPTO_PUBLICKEYBYTES
 	#define SIGN_PRIVATEKEY_BYTES PQCLEAN_MLDSA87_CLEAN_CRYPTO_SECRETKEYBYTES
 	#define SIGN_GENERATE_SIGNATURE_BBYTES PQCLEAN_MLDSA87_CLEAN_CRYPTO_BYTES
-	#define SIGN_GENERATE_KEYPAIR(a, b) PQCLEAN_MLDSA87_CLEAN_crypto_sign_keypair(a, b)
-	#define SIGN_GENERATE_SIGNATURE(a, b, c, d, e) PQCLEAN_MLDSA87_CLEAN_crypto_sign_signature(a, b, c, d, e)
-	#define SIGN_VERIFY_SIGNATURE(a, b, c, d, e) PQCLEAN_MLDSA87_CLEAN_crypto_sign_verify(a, b, c, d, e)
+	#define SIGN_GENERATE_KEYPAIR(pk, sk) PQCLEAN_MLDSA87_CLEAN_crypto_sign_keypair(pk, sk)
+	#define SIGN_GENERATE_SIGNATURE(sig, siglen, m, mlen, sk) PQCLEAN_MLDSA87_CLEAN_crypto_sign_signature(sig, siglen, m, mlen, sk)
+	#define SIGN_VERIFY_SIGNATURE(sig, siglen, m, mlen, pk) PQCLEAN_MLDSA87_CLEAN_crypto_sign_verify(sig, siglen, m, mlen, pk)
 #endif
 
 #endif

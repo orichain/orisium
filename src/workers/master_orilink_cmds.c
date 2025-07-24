@@ -4,7 +4,7 @@
 #include "orilink/hello1.h"
 #include "sessions/workers_session.h"
 
-status_t master_hello1(const char *label, cow_c_session_t *session) {
+status_t hello1(const char *label, cow_c_session_t *session) {
 	orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello1(label, session->client_id, session->kem_publickey, session->hello1_sent_try_count);
     if (cmd_result.status != SUCCESS) {
         return FAILURE;

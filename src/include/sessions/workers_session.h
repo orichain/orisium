@@ -187,6 +187,7 @@ typedef struct {
     kalman_t rtt_kalman_filter;
     int rtt_kalman_initialized_count;
     float *rtt_kalman_calibration_samples; 
+    float rtt_value_prediction;
     float rtt_temp_ewma_value;
 //======================================================================
 // RETRY
@@ -195,6 +196,7 @@ typedef struct {
     kalman_t retry_kalman_filter;
     int retry_kalman_initialized_count;
     float *retry_kalman_calibration_samples; 
+    float retry_value_prediction;
     float retry_temp_ewma_value;
 } cow_c_session_t; //Client
 

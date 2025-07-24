@@ -15,8 +15,8 @@
 #include "master/workers.h"
 #include "master/process.h"
 #include "master/worker_metrics.h"
-#include "master/worker_ipc_cmds.h"
 #include "master/worker_selector.h"
+#include "master/worker_ipc_cmds.h"
 #include "node.h"
 
 status_t setup_master(master_context *master_ctx, uint16_t *listen_port) {
@@ -87,7 +87,11 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
             LOG_ERROR("%sWARNING: No free session slots in master_ctx->cow_c_session.", label);
             goto exit;
         }
-        if (cow_connect(master_ctx, &bootstrap_nodes->addr[ic], cow_worker_idx) != SUCCESS) goto exit;
+        if (new_task_metrics(label, master_ctx, COW, cow_worker_idx) != SUCCESS) {
+            LOG_ERROR("%sFailed to input new task in COW %d metrics.", label, cow_worker_idx);
+            goto exit;
+        }
+        if (master_cow_connect(master_ctx, &bootstrap_nodes->addr[ic], cow_worker_idx) != SUCCESS) goto exit;
     }
     LOG_INFO("%sPID %d UDP Server listening on port %d.", label, master_ctx->master_pid, *listen_port);
     while (!master_shutdown_requested) {
@@ -114,7 +118,7 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
                 {
                     LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
                     master_shutdown_requested = 1;
-                    broadcast_shutdown(master_ctx);
+                    master_workers_shutdown(master_ctx, IMMEDIATELY);
                     continue;
                 }
                 if (check_workers_healthy(master_ctx) != SUCCESS) continue;
@@ -123,7 +127,7 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
 				read(master_ctx->shutdown_event_fd, &u, sizeof(u));
 				LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
 				master_shutdown_requested = 1;
-				broadcast_shutdown(master_ctx);
+				master_workers_shutdown(master_ctx, IMMEDIATELY);
 				continue;
 			} else if (current_fd == master_ctx->listen_sock) {
 				if (async_event_is_EPOLLIN(current_events)) {

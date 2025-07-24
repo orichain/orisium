@@ -43,7 +43,7 @@ status_t ipc_deserialize_master_worker_shutdown(const char *label, ipc_protocol_
     return SUCCESS;
 }
 
-ipc_protocol_t_status_t ipc_prepare_cmd_master_worker_shutdown(const char *label) {
+ipc_protocol_t_status_t ipc_prepare_cmd_master_worker_shutdown(const char *label, shutdown_type_t flag) {
 	ipc_protocol_t_status_t result;
 	result.r_ipc_protocol_t = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
 	result.status = FAILURE;
@@ -61,7 +61,7 @@ ipc_protocol_t_status_t ipc_prepare_cmd_master_worker_shutdown(const char *label
 		CLOSE_IPC_PROTOCOL(&result.r_ipc_protocol_t);
 		return result;
 	}
-	payload->flag = IMMEDIATELY;
+	payload->flag = flag;
 	result.r_ipc_protocol_t->payload.ipc_master_worker_shutdown = payload;
 	result.status = SUCCESS;
 	return result;

@@ -25,6 +25,13 @@ typedef struct {
 } ipc_master_cow_connect_t;
 
 typedef struct {
+    worker_type_t wot;
+    uint8_t index;
+    struct sockaddr_in6 server_addr;
+    connection_type_t flag;
+} ipc_cow_master_connection_t;
+
+typedef struct {
     shutdown_type_t flag;
 } ipc_master_worker_shutdown_t;
 
@@ -41,6 +48,7 @@ typedef struct {
 		ipc_master_worker_shutdown_t *ipc_master_worker_shutdown;
 		ipc_worker_master_heartbeat_t *ipc_worker_master_heartbeat;
         ipc_master_cow_connect_t *ipc_master_cow_connect;
+        ipc_cow_master_connection_t *ipc_cow_master_connection;
 	} payload;
 } ipc_protocol_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan
@@ -60,6 +68,8 @@ static inline void CLOSE_IPC_PROTOCOL(ipc_protocol_t **protocol_ptr) {
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_worker_shutdown);
         } else if (x->type == IPC_MASTER_COW_CONNECT) {
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_cow_connect);
+        } else if (x->type == IPC_COW_MASTER_CONNECTION) {
+            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_cow_master_connection);
         }
         free(x);
         *protocol_ptr = NULL;
