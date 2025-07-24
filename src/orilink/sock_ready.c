@@ -11,6 +11,7 @@
 #include "log.h"
 #include "orilink/sock_ready.h"
 #include "constants.h"
+#include "crypto_kem/ml-kem-1024/clean/api.h"
 
 status_t orilink_serialize_sock_ready(const char *label, const orilink_sock_ready_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
     if (!payload || !current_buffer || !offset) {
@@ -22,9 +23,9 @@ status_t orilink_serialize_sock_ready(const char *label, const orilink_sock_read
     uint64_t client_id_be = htobe64(payload->client_id);
     memcpy(current_buffer + current_offset_local, &client_id_be, sizeof(uint64_t));
     current_offset_local += sizeof(uint64_t);    
-    if (CHECK_BUFFER_BOUNDS(current_offset_local, AESNONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t) + AESTAG_BYTES, buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    memcpy(current_buffer + current_offset_local, payload->server_id_port, AESNONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t) + AESTAG_BYTES);
-    current_offset_local += AESNONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t) + AESTAG_BYTES;
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES, buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(current_buffer + current_offset_local, payload->server_id_port, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
+    current_offset_local += AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES;
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
     memcpy(current_buffer + current_offset_local, (uint8_t *)&payload->trycount, sizeof(uint8_t));
     current_offset_local += sizeof(uint8_t);    
@@ -49,13 +50,13 @@ status_t orilink_deserialize_sock_ready(const char *label, orilink_protocol_t *p
     payload->client_id = be64toh(client_id_be);
     cursor += sizeof(uint64_t);
     current_offset += sizeof(uint64_t);
-    if (current_offset + (AESNONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t) + AESTAG_BYTES) > total_buffer_len) {
+    if (current_offset + (AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading server_id_port.", label);
         return FAILURE_OOBUF;
     }
     memcpy(payload->server_id_port, cursor, PQCLEAN_MLKEM1024_CLEAN_CRYPTO_CIPHERTEXTBYTES / 2);
-    cursor += AESNONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t) + AESTAG_BYTES;
-    current_offset += AESNONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t) + AESTAG_BYTES;
+    cursor += AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES;
+    current_offset += AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES;
     if (current_offset + sizeof(uint8_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading trycount.", label);
         return FAILURE_OOBUF;
@@ -86,7 +87,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_sock_ready(const char *label, ui
 		return result;
 	}
     payload->client_id = client_id;
-    memcpy(payload->server_id_port, server_id_port, AESNONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t) + AESTAG_BYTES);
+    memcpy(payload->server_id_port, server_id_port, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
     payload->trycount = trycount;
 	result.r_orilink_protocol_t->payload.orilink_sock_ready = payload;
 	result.status = SUCCESS;

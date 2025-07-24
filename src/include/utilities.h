@@ -17,8 +17,9 @@
 #include <stdbool.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+/*
 #include <immintrin.h>
-
+*/
 #include "log.h"
 #include "types.h"
 #include "constants.h"
@@ -83,9 +84,11 @@ static inline status_t generate_connection_id(const char* label, uint64_t *out_i
         LOG_ERROR("%sError: out_id cannot be NULL.", label);
         return FAILURE;
     }
+/*
     if (_rdseed64_step((unsigned long long *)out_id)) {
         return SUCCESS;
     }
+*/
     FILE *urandom = fopen("/dev/urandom", "rb");
     if (urandom) {
         size_t bytes_read = fread(out_id, 1, sizeof(uint64_t), urandom);

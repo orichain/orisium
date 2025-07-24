@@ -1,8 +1,8 @@
 #ifndef SESSIONS_WORKERS_SESSION_H
 #define SESSIONS_WORKERS_SESSION_H
 
-#include <crypto_kem/ml-kem-1024/clean/api.h>
 #include "kalman.h"
+#include "pqc.h"
 
 typedef struct {
     uint64_t pid;
@@ -110,10 +110,10 @@ typedef struct {
 // IDENTITY
 //======================================================================    
 	uint64_t client_id;
-    uint8_t kem_privatekey[PQCLEAN_MLKEM1024_CLEAN_CRYPTO_SECRETKEYBYTES];
-    uint8_t kem_publickey[PQCLEAN_MLKEM1024_CLEAN_CRYPTO_SECRETKEYBYTES];
-    uint8_t kem_ciphertext[PQCLEAN_MLKEM1024_CLEAN_CRYPTO_CIPHERTEXTBYTES];
-    uint8_t kem_sharedsecret[32];
+    uint8_t kem_privatekey[KEM_PRIVATEKEY_BYTES];
+    uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
+    uint8_t kem_ciphertext[KEM_CIPHERTEXT_BYTES];
+    uint8_t kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
     uint64_t server_id;
     uint16_t port;
 //======================================================================

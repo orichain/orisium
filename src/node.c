@@ -1,20 +1,17 @@
-#include <errno.h>       // for errno, EAGAIN, EWOULDBLOCK
-#include <netinet/in.h>  // for sockaddr_in, INADDR_ANY, in_addr
-#include <stdio.h>       // for printf, perror, fprintf, NULL, stderr
-#include <string.h>      // for memset, strncpy
+#include <errno.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <string.h>
 #include <json-c/json_object.h>
 #include <json-c/json_tokener.h>
 #include <json-c/json_types.h>
-#include <stdlib.h>
 #include <stdint.h>
-#include <time.h>
 
 #include "log.h"
 #include "constants.h"
 #include "node.h"
 #include "types.h"
 #include "utilities.h"
-#include "pqc.h"
 
 status_t read_listen_port_and_bootstrap_nodes_from_json(const char* label, const char* filename, uint16_t *listen_port, bootstrap_nodes_t* bootstrap_nodes) {
     FILE *fp = NULL;
@@ -105,105 +102,4 @@ status_t read_listen_port_and_bootstrap_nodes_from_json(const char* label, const
 
     json_object_put(parsed_json);
     return SUCCESS;
-}
-
-
-status_t node_identity_init(const char *filepath, node_identity_t *out) {
-    FILE *f = fopen(filepath, "rb");
-    if (f) {
-        // File exists, load
-        char magic[9] = {0};
-        fread(magic, 1, 8, f);
-        if (strcmp(magic, NODE_FILE_MAGIC) != 0) {
-            fclose(f);
-            return FAILURE_NDFLMGC;
-        }
-
-        fread(&out->version, sizeof(uint8_t), 1, f);
-        fread(&out->timestamp, sizeof(uint64_t), 1, f);
-        fread(&out->kem_algo, sizeof(algo_type_t), 1, f);
-        fread(&out->sign_algo, sizeof(algo_type_t), 1, f);
-        fread(&out->vrf_algo, sizeof(algo_type_t), 1, f);
-
-        const pqc_algo_info_t *kem  = get_pqc_info(out->kem_algo);
-        const pqc_algo_info_t *sign = get_pqc_info(out->sign_algo);
-        const pqc_algo_info_t *vrf  = get_pqc_info(out->vrf_algo);
-
-        out->kem_pubkey     = malloc(kem->public_key_len);
-        out->sign_pubkey    = malloc(sign->public_key_len);
-        out->vrf_pubkey     = malloc(vrf->public_key_len);
-        out->signature      = malloc(sign->signature_len);
-
-        fread(out->kem_pubkey, 1, kem->public_key_len, f);
-        fread(out->sign_pubkey, 1, sign->public_key_len, f);
-        fread(out->vrf_pubkey, 1, vrf->public_key_len, f);
-        fread(out->signature, 1, sign->signature_len, f);
-
-        fclose(f);
-        return SUCCESS;
-    }
-
-    // File not found, generate new keys
-    out->version     = NODE_VERSION;
-    out->timestamp   = (uint64_t)time(NULL);
-    out->kem_algo    = KEM_MLKEM1024;
-    out->sign_algo   = SIGN_FALCONPADDED512;
-    out->vrf_algo    = SIGN_FALCONPADDED512;
-
-    const pqc_algo_info_t *kem  = get_pqc_info(out->kem_algo);
-    const pqc_algo_info_t *sign = get_pqc_info(out->sign_algo);
-    const pqc_algo_info_t *vrf  = get_pqc_info(out->vrf_algo);
-
-    // Allocate and generate keys
-    uint8_t kem_sk[kem->private_key_len];
-    uint8_t sign_sk[sign->private_key_len];
-    uint8_t vrf_sk[vrf->private_key_len];
-
-    out->kem_pubkey  = malloc(kem->public_key_len);
-    out->sign_pubkey = malloc(sign->public_key_len);
-    out->vrf_pubkey  = malloc(vrf->public_key_len);
-    out->signature   = malloc(sign->signature_len);
-
-    kem_generate_keypair(out->kem_pubkey, kem_sk, out->kem_algo);
-    sgn_generate_keypair(out->sign_pubkey, sign_sk, out->sign_algo);
-    sgn_generate_keypair(out->vrf_pubkey, vrf_sk, out->vrf_algo);
-
-    // Signature over metadata (version + timestamp + all pubkeys)
-    uint8_t msg[1 + 8 + kem->public_key_len + sign->public_key_len + vrf->public_key_len];
-    size_t offset = 0;
-    msg[offset++] = out->version;
-    memcpy(msg + offset, &out->timestamp, 8); offset += 8;
-    memcpy(msg + offset, out->kem_pubkey, kem->public_key_len); offset += kem->public_key_len;
-    memcpy(msg + offset, out->sign_pubkey, sign->public_key_len); offset += sign->public_key_len;
-    memcpy(msg + offset, out->vrf_pubkey, vrf->public_key_len); offset += vrf->public_key_len;
-
-    size_t siglen = 0;
-    sgn_sign(out->signature, &siglen, msg, offset, sign_sk, out->sign_algo);
-
-    // Save to file
-    f = fopen(filepath, "wb");
-    if (!f) return FAILURE_OPNFL;
-
-    fwrite(NODE_FILE_MAGIC, 1, 8, f);
-    fwrite(&out->version, sizeof(uint8_t), 1, f);
-    fwrite(&out->timestamp, sizeof(uint64_t), 1, f);
-    fwrite(&out->kem_algo, sizeof(algo_type_t), 1, f);
-    fwrite(&out->sign_algo, sizeof(algo_type_t), 1, f);
-    fwrite(&out->vrf_algo, sizeof(algo_type_t), 1, f);
-    fwrite(out->kem_pubkey, 1, kem->public_key_len, f);
-    fwrite(out->sign_pubkey, 1, sign->public_key_len, f);
-    fwrite(out->vrf_pubkey, 1, vrf->public_key_len, f);
-    fwrite(out->signature, 1, sign->signature_len, f);
-    fclose(f);
-
-    return 0;
-}
-
-void node_identity_free(node_identity_t *id) {
-    if (!id) return;
-    free(id->kem_pubkey);
-    free(id->sign_pubkey);
-    free(id->vrf_pubkey);
-    free(id->signature);
-    memset(id, 0, sizeof(*id));
 }

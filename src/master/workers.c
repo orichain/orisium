@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <netinet/in.h>
 
 #include "log.h"
 #include "utilities.h"
@@ -18,6 +19,7 @@
 #include "master/worker_metrics.h"
 #include "async.h"
 #include "master/process.h"
+#include "stdbool.h"
 
 status_t close_worker(const char *label, master_context *master_ctx, worker_type_t wot, int index) {
 	if (wot == SIO) {

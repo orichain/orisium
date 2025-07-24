@@ -1,18 +1,14 @@
-#include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
-#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/epoll.h>
 #include <sys/socket.h>
-#include <sys/timerfd.h>
-#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-#include <inttypes.h>
+#include <bits/types/sig_atomic_t.h>
+#include <netinet/in.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -21,9 +17,9 @@
 #include "types.h"
 #include "constants.h"
 #include "sessions/workers_session.h"
-#include "ipc/worker_master_heartbeat.h"
 #include "workers/master_ipc_cmds.h"
 #include "workers/master_orilink_cmds.h"
+#include "stdbool.h"
 
 void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd) {
     volatile sig_atomic_t cow_shutdown_requested = 0;
@@ -136,11 +132,8 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
-                    //uint64_t id;
-                    //generate_connection_id(label, &id);
                     cow_c_session_t *session;
                     session = &cow_c_session[slot_found];
-                    //session->id = id;
 //======================================================================
 // Init All FD                    
 //======================================================================
@@ -240,13 +233,18 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
+//======================================================================
+                    uint64_t client_id;
+                    generate_connection_id(label, &client_id);
+                    session->client_id = client_id;
+//======================================================================
                     session->syn_sent_try_count = 1;
                     session->syn_sent_time = rt.r_uint64_t;
                     if (master_hello1(label, session) != SUCCESS) {
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
-//======================================================================                    
+//======================================================================    
                     CLOSE_IPC_PROTOCOL(&received_protocol);
 					continue;
 				}

@@ -43,6 +43,12 @@ typedef enum {
 	IMMEDIATELY = (uint8_t)0x00
 } shutdown_type_t;
 
+typedef enum {
+	MLKEM1024 = 0x01,
+	FALCONPADDED512 = 0x02,
+	MLDSA87 = 0x03,
+} pqc_algo_type_t;
+
 typedef struct {
 	int index;
 	worker_type_t r_worker_type_t;

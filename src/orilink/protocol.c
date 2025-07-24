@@ -7,6 +7,7 @@
 #include <endian.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <netinet/in.h>
 
 #include "utilities.h"
 #include "orilink/protocol.h"
@@ -40,6 +41,7 @@
 #include "types.h"
 #include "log.h"
 #include "constants.h"
+#include "pqc.h"
 
 static inline size_t_status_t calculate_orilink_payload_size(const char *label, const orilink_protocol_t* p, bool checkfixheader) {
 	size_t_status_t result;
@@ -57,7 +59,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                     return result;
                 }
             }
-            payload_fixed_size = sizeof(uint64_t) + (PQCLEAN_MLKEM1024_CLEAN_CRYPTO_PUBLICKEYBYTES / 2) + sizeof(uint8_t);
+            payload_fixed_size = sizeof(uint64_t) + (KEM_PUBLICKEY_BYTES / 2) + sizeof(uint8_t);
             payload_dynamic_size = 0;
             break;
         }
@@ -81,7 +83,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                     return result;
                 }
             }
-            payload_fixed_size = sizeof(uint64_t) + (PQCLEAN_MLKEM1024_CLEAN_CRYPTO_PUBLICKEYBYTES / 2) + sizeof(uint8_t);
+            payload_fixed_size = sizeof(uint64_t) + (KEM_PUBLICKEY_BYTES / 2) + sizeof(uint8_t);
             payload_dynamic_size = 0;
             break;
         }
@@ -93,7 +95,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                     return result;
                 }
             }
-            payload_fixed_size = sizeof(uint64_t) + (PQCLEAN_MLKEM1024_CLEAN_CRYPTO_CIPHERTEXTBYTES / 2) + sizeof(uint8_t);
+            payload_fixed_size = sizeof(uint64_t) + (KEM_CIPHERTEXT_BYTES / 2) + sizeof(uint8_t);
             payload_dynamic_size = 0;
             break;
         }
@@ -117,7 +119,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                     return result;
                 }
             }
-            payload_fixed_size = sizeof(uint64_t) + (PQCLEAN_MLKEM1024_CLEAN_CRYPTO_CIPHERTEXTBYTES / 2) + (AESNONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t) + AESTAG_BYTES) + sizeof(uint8_t);
+            payload_fixed_size = sizeof(uint64_t) + (KEM_CIPHERTEXT_BYTES / 2) + (AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES) + sizeof(uint8_t);
             payload_dynamic_size = 0;
             break;
         }
@@ -129,7 +131,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                     return result;
                 }
             }
-            payload_fixed_size = sizeof(uint64_t) + (AESNONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t) + AESTAG_BYTES) + sizeof(uint8_t);
+            payload_fixed_size = sizeof(uint64_t) + (AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES) + sizeof(uint8_t);
             payload_dynamic_size = 0;
             break;
         }
@@ -141,7 +143,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                     return result;
                 }
             }
-            payload_fixed_size = sizeof(uint64_t) + (AESNONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t) + AESTAG_BYTES) + sizeof(uint8_t);
+            payload_fixed_size = sizeof(uint64_t) + (AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES) + sizeof(uint8_t);
             payload_dynamic_size = 0;
             break;
         }

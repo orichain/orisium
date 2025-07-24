@@ -10,6 +10,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <bits/types/sig_atomic_t.h>
 
 #include "log.h"
 #include "node.h"

@@ -3,7 +3,9 @@
 #include <unistd.h>      // for close, fork, getpid
 #include <stdint.h>
 #include <time.h>
-#include <signal.h>
+#include <bits/types/sig_atomic_t.h>
+#include <netinet/in.h>
+#include <string.h>
 
 #include "log.h"
 #include "async.h"
@@ -12,8 +14,8 @@
 #include "ipc/protocol.h"
 #include "sessions/workers_session.h"
 #include "types.h"
-#include "ipc/worker_master_heartbeat.h"
 #include "workers/master_ipc_cmds.h"
+#include "stdbool.h"
 
 void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd) {
     volatile sig_atomic_t sio_shutdown_requested = 0;

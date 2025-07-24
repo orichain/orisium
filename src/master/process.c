@@ -1,9 +1,9 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <stdint.h>
-#include <signal.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <bits/types/sig_atomic_t.h>
 
 #include "log.h"
 #include "constants.h"

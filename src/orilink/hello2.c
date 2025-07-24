@@ -11,6 +11,7 @@
 #include "log.h"
 #include "orilink/hello2.h"
 #include "constants.h"
+#include "pqc.h"
 
 status_t orilink_serialize_hello2(const char *label, const orilink_hello2_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
     if (!payload || !current_buffer || !offset) {
@@ -22,9 +23,9 @@ status_t orilink_serialize_hello2(const char *label, const orilink_hello2_t* pay
     uint64_t client_id_be = htobe64(payload->client_id);
     memcpy(current_buffer + current_offset_local, &client_id_be, sizeof(uint64_t));
     current_offset_local += sizeof(uint64_t);    
-    if (CHECK_BUFFER_BOUNDS(current_offset_local, PQCLEAN_MLKEM1024_CLEAN_CRYPTO_PUBLICKEYBYTES / 2, buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    memcpy(current_buffer + current_offset_local, payload->publickey2, PQCLEAN_MLKEM1024_CLEAN_CRYPTO_PUBLICKEYBYTES / 2);
-    current_offset_local += PQCLEAN_MLKEM1024_CLEAN_CRYPTO_PUBLICKEYBYTES / 2;
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, KEM_PUBLICKEY_BYTES / 2, buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(current_buffer + current_offset_local, payload->publickey2, KEM_PUBLICKEY_BYTES / 2);
+    current_offset_local += KEM_PUBLICKEY_BYTES / 2;
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
     memcpy(current_buffer + current_offset_local, (uint8_t *)&payload->trycount, sizeof(uint8_t));
     current_offset_local += sizeof(uint8_t);    
@@ -49,13 +50,13 @@ status_t orilink_deserialize_hello2(const char *label, orilink_protocol_t *p, co
     payload->client_id = be64toh(client_id_be);
     cursor += sizeof(uint64_t);
     current_offset += sizeof(uint64_t);
-    if (current_offset + (PQCLEAN_MLKEM1024_CLEAN_CRYPTO_PUBLICKEYBYTES / 2) > total_buffer_len) {
+    if (current_offset + (KEM_PUBLICKEY_BYTES / 2) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading publickey2.", label);
         return FAILURE_OOBUF;
     }
-    memcpy(payload->publickey2, cursor, PQCLEAN_MLKEM1024_CLEAN_CRYPTO_PUBLICKEYBYTES / 2);
-    cursor += PQCLEAN_MLKEM1024_CLEAN_CRYPTO_PUBLICKEYBYTES / 2;
-    current_offset += PQCLEAN_MLKEM1024_CLEAN_CRYPTO_PUBLICKEYBYTES / 2;
+    memcpy(payload->publickey2, cursor, KEM_PUBLICKEY_BYTES / 2);
+    cursor += KEM_PUBLICKEY_BYTES / 2;
+    current_offset += KEM_PUBLICKEY_BYTES / 2;
     if (current_offset + sizeof(uint8_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading trycount.", label);
         return FAILURE_OOBUF;
@@ -86,7 +87,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_hello2(const char *label, uint64
 		return result;
 	}
     payload->client_id = client_id;
-    memcpy(payload->publickey2, publickey + (PQCLEAN_MLKEM1024_CLEAN_CRYPTO_PUBLICKEYBYTES / 2), PQCLEAN_MLKEM1024_CLEAN_CRYPTO_PUBLICKEYBYTES / 2);
+    memcpy(payload->publickey2, publickey + (KEM_PUBLICKEY_BYTES / 2), KEM_PUBLICKEY_BYTES / 2);
     payload->trycount = trycount;
 	result.r_orilink_protocol_t->payload.orilink_hello2 = payload;
 	result.status = SUCCESS;

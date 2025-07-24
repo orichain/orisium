@@ -11,6 +11,8 @@
 #include "ipc/master_cow_connect.h"
 #include "constants.h"
 
+struct sockaddr_in6;
+
 status_t ipc_serialize_master_cow_connect(const char *label, const ipc_master_cow_connect_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
     if (!payload || !current_buffer || !offset) {
         LOG_ERROR("%sInvalid input pointers.", label);

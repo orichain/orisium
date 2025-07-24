@@ -8,15 +8,11 @@
 #include <inttypes.h>
 
 #include "log.h"
-#include "constants.h"
 #include "utilities.h"
 #include "orilink/protocol.h"
-#include "sessions/master_session.h"
 #include "types.h"
 #include "master/socket_listenner.h"
-#include "stdbool.h"
 #include "master/process.h"
-#include "master/worker_selector.h"
 
 status_t setup_socket_listenner(const char *label, master_context *master_ctx, uint16_t *listen_port) {
     struct sockaddr_in6 addr;

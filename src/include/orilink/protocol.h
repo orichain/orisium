@@ -4,9 +4,9 @@
 #include <stdlib.h>
 #include <blake3.h>
 #include <string.h>
-#include <crypto_kem/ml-kem-1024/clean/api.h>
 #include "types.h"
 #include "constants.h"
+#include "pqc.h"
 //======================================================================
 // Desain protocol dengan kemampuan mengukur rtt di kedua sisi
 //======================================================================
@@ -51,7 +51,7 @@ typedef enum {
 
 typedef struct {
     uint64_t client_id;
-    uint8_t publickey1[PQCLEAN_MLKEM1024_CLEAN_CRYPTO_PUBLICKEYBYTES / 2];
+    uint8_t publickey1[KEM_PUBLICKEY_BYTES / 2];
     uint8_t trycount;
 } orilink_hello1_t;
 
@@ -62,13 +62,13 @@ typedef struct {
 
 typedef struct {
     uint64_t client_id;
-    uint8_t publickey2[PQCLEAN_MLKEM1024_CLEAN_CRYPTO_PUBLICKEYBYTES / 2];
+    uint8_t publickey2[KEM_PUBLICKEY_BYTES / 2];
     uint8_t trycount;
 } orilink_hello2_t;
 
 typedef struct {
     uint64_t client_id;
-    uint8_t ciphertext1[PQCLEAN_MLKEM1024_CLEAN_CRYPTO_CIPHERTEXTBYTES / 2];
+    uint8_t ciphertext1[KEM_CIPHERTEXT_BYTES / 2];
     uint8_t trycount;
 } orilink_hello2_ack_t;
 
@@ -79,20 +79,23 @@ typedef struct {
 
 typedef struct {
     uint64_t client_id;
-    uint8_t ciphertext2[PQCLEAN_MLKEM1024_CLEAN_CRYPTO_CIPHERTEXTBYTES / 2];
-    uint8_t server_id_port[AESNONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t) + AESTAG_BYTES];
+    uint8_t ciphertext2[KEM_CIPHERTEXT_BYTES / 2];
+//uint64_t server_id; uint16_t port;
+    uint8_t server_id_port[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES];
     uint8_t trycount;
 } orilink_hello3_ack_t;
 
 typedef struct {
     uint64_t client_id;
-    uint8_t server_id_port[AESNONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t) + AESTAG_BYTES];
+//uint64_t server_id; uint16_t port;
+    uint8_t server_id_port[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES];
     uint8_t trycount;
 } orilink_hello_end_t;
 
 typedef struct {
     uint64_t client_id;
-    uint8_t server_id_port[AESNONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t) + AESTAG_BYTES];
+//uint64_t server_id; uint16_t port;
+    uint8_t server_id_port[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES];
     uint8_t trycount;
 } orilink_sock_ready_t;
 

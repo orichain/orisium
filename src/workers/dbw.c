@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <time.h>
-#include <signal.h>
+#include <bits/types/sig_atomic_t.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -11,7 +11,6 @@
 #include "utilities.h"
 #include "types.h"
 #include "constants.h"
-#include "ipc/worker_master_heartbeat.h"
 #include "workers/master_ipc_cmds.h"
 
 void run_dbw_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd) {
