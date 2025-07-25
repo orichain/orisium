@@ -6,7 +6,7 @@
 #include "sessions/workers_session.h"
 
 status_t hello1(const char *label, cow_c_session_t *session) {
-	orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello1(label, session->client_id, session->kem_publickey, session->hello1_sent_try_count);
+	orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello1(label, session->identity.client_id, session->identity.kem_publickey, session->hello1.sent_try_count);
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
@@ -23,7 +23,7 @@ status_t hello1(const char *label, cow_c_session_t *session) {
 }
 
 status_t hello2(const char *label, cow_c_session_t *session) {
-	orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello2(label, session->client_id, session->kem_publickey, session->hello2_sent_try_count);
+	orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello2(label, session->identity.client_id, session->identity.kem_publickey, session->hello1.sent_try_count);
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
