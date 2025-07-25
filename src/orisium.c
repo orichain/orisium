@@ -9,27 +9,12 @@
 #include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
-#include <unistd.h>
-#include <bits/types/sig_atomic_t.h>
 
 #include "log.h"
 #include "node.h"
-#include "sessions/master_session.h"
 #include "master/process.h"
 #include "utilities.h"
 #include "types.h"
-
-volatile sig_atomic_t shutdown_requested = 0;
-int *shutdown_event_fd = NULL;
-
-void sigint_handler(int signum) {
-    shutdown_requested = 1ULL;
-    //LOG_INFO("[Orisium]: SIGINT received. Initiating graceful shutdown...");
-    if (shutdown_event_fd && *shutdown_event_fd != -1) {
-        static const uint64_t u = 1ULL;
-        write(*shutdown_event_fd, &u, sizeof(uint64_t));
-    }
-}
 
 int main() {
 	printf("[Orisium]: ==========================================================\n");
@@ -83,15 +68,11 @@ int main() {
 // Master
 //======================================================================
 	master_context master_ctx;
-    master_ctx.sio_dc_session = NULL;
-    if (setup_master(&master_ctx, &listen_port) != SUCCESS) goto exit;
-    shutdown_event_fd = &master_ctx.shutdown_event_fd;
-	run_master_process(&master_ctx, &listen_port, &bootstrap_nodes);
+    run_master_process(&master_ctx, &listen_port, &bootstrap_nodes);
 //======================================================================
 // Cleanup
 //======================================================================
 exit:
-	free_master_sio_dc_sessions("[Orisium]: ", &master_ctx.sio_dc_session);
     memset(&bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
 #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))    
 	pthread_join(cleaner_thread, NULL);

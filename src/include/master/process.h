@@ -39,7 +39,7 @@ typedef struct {
     master_dbw_session_t dbw_session[MAX_DBW_WORKERS];    
 } master_context;
 
+void sigint_handler(int signum);
 void run_master_process(master_context *master_ctx, uint16_t *listen_port, bootstrap_nodes_t *bootstrap_nodes);
-status_t setup_master(master_context *master_ctx, uint16_t *listen_port);
 
 #endif

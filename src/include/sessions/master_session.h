@@ -111,6 +111,8 @@ typedef struct {
     bool sock_ready_sent;
     int sock_ready_sent_try_count;
     uint64_t sock_ready_sent_time;
+    int sock_ready_timer_fd;
+    double interval_sock_ready_timer_fd;
 //======================================================================
 // RTT
 //======================================================================    
@@ -118,8 +120,8 @@ typedef struct {
     kalman_double_t rtt_kalman_filter;
     int rtt_kalman_initialized_count;
     double *rtt_kalman_calibration_samples; 
-    double rtt_value_prediction;
     double rtt_temp_ewma_value;
+    double rtt_value_prediction;
 //======================================================================
 // RETRY
 //======================================================================    
@@ -127,8 +129,8 @@ typedef struct {
     kalman_t retry_kalman_filter;
     int retry_kalman_initialized_count;
     float *retry_kalman_calibration_samples; 
-    float retry_value_prediction;
     float retry_temp_ewma_value;
+    float retry_value_prediction;
 } master_sio_c_session_t;
 
 typedef struct {

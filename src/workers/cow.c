@@ -24,7 +24,7 @@
 #include "pqc.h"
 #include "stdbool.h"
 
-void setup_session(const char *label, async_type_t *cow_async, cow_c_session_t *session) {
+void setup_session(cow_c_session_t *session) {
     session->in_use = false;
     memset(&session->old_server_addr, 0, sizeof(struct sockaddr_in6));
     memset(&session->server_addr, 0, sizeof(struct sockaddr_in6));
@@ -187,7 +187,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
     for (int i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
         cow_c_session_t *session;
         session = &cow_c_session[i];
-        setup_session(label, &cow_async, session);
+        setup_session(session);
     }    
     while (!cow_shutdown_requested) {
         int_status_t snfds = async_wait(label, &cow_async);
