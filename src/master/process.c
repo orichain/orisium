@@ -99,6 +99,14 @@ void setup_master_sio_session(master_sio_c_session_t *session) {
     session->sock_ready_sent_try_count = 0x00;
     if (session->rtt_kalman_calibration_samples) free(session->rtt_kalman_calibration_samples);
     if (session->retry_kalman_calibration_samples) free(session->retry_kalman_calibration_samples);
+    session->first_check_rtt = (uint8_t)0x01;
+    session->rtt_kalman_calibration_samples = NULL;
+    session->rtt_kalman_initialized_count = 0;
+    session->rtt_temp_ewma_value = (float)0;
+    session->first_check_retry = (uint8_t)0x01;
+    session->retry_kalman_calibration_samples = NULL;
+    session->retry_kalman_initialized_count = 0;
+    session->retry_temp_ewma_value = (float)0;
     CLOSE_FD(&session->sock_fd);
     CLOSE_FD(&session->hello1_ack_timer_fd);
     CLOSE_FD(&session->hello2_ack_timer_fd);
@@ -128,6 +136,14 @@ void cleanup_master_sio_session(const char *label, async_type_t *master_async, m
     session->sock_ready_sent_try_count = 0x00;
     if (session->rtt_kalman_calibration_samples) free(session->rtt_kalman_calibration_samples);
     if (session->retry_kalman_calibration_samples) free(session->retry_kalman_calibration_samples);
+    session->first_check_rtt = (uint8_t)0x01;
+    session->rtt_kalman_calibration_samples = NULL;
+    session->rtt_kalman_initialized_count = 0;
+    session->rtt_temp_ewma_value = (float)0;
+    session->first_check_retry = (uint8_t)0x01;
+    session->retry_kalman_calibration_samples = NULL;
+    session->retry_kalman_initialized_count = 0;
+    session->retry_temp_ewma_value = (float)0;
     async_delete_event(label, master_async, &session->sock_fd);
     async_delete_event(label, master_async, &session->hello1_ack_timer_fd);
     async_delete_event(label, master_async, &session->hello2_ack_timer_fd);
@@ -229,32 +245,79 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
 					CLOSE_FD(&current_fd);
 				}
             } else {
-				if (async_event_is_EPOLLHUP(current_events) ||
-					async_event_is_EPOLLERR(current_events) ||
-					async_event_is_EPOLLRDHUP(current_events))
-				{
-					worker_type_t_status_t worker_closed = handle_ipc_closed_event(label, master_ctx, &current_fd);
-					if (worker_closed.status != SUCCESS) {
-						continue;
-					}
+                bool event_founded_in_uds = false;
+                for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
+                    if (current_fd == master_ctx->sio[i].uds[0]) {
+                        event_founded_in_uds = true;
+                        break;
+                    }
+                }
+                if (!event_founded_in_uds) {
+                    for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) { 
+                        if (current_fd == master_ctx->logic[i].uds[0]) {
+                            event_founded_in_uds = true;
+                            break;
+                        }
+                    }
+                }
+                if (!event_founded_in_uds) {
+                    for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
+                        if (current_fd == master_ctx->cow[i].uds[0]) {
+                            event_founded_in_uds = true;
+                            break;
+                        }
+                    }
+                }
+                if (!event_founded_in_uds) {
+                    for (int i = 0; i < MAX_DBR_WORKERS; ++i) { 
+                        if (current_fd == master_ctx->dbr[i].uds[0]) {
+                            event_founded_in_uds = true;
+                            break;
+                        }
+                    }
+                }                
+                if (!event_founded_in_uds) {
+                    for (int i = 0; i < MAX_DBW_WORKERS; ++i) { 
+                        if (current_fd == master_ctx->dbw[i].uds[0]) {
+                            event_founded_in_uds = true;
+                            break;
+                        }
+                    }
+                }
+                if (event_founded_in_uds) {
+                    if (async_event_is_EPOLLHUP(current_events) ||
+                        async_event_is_EPOLLERR(current_events) ||
+                        async_event_is_EPOLLRDHUP(current_events))
+                    {
+                        worker_type_t_status_t worker_closed = handle_ipc_closed_event(label, master_ctx, &current_fd);
+                        if (worker_closed.status != SUCCESS) {
+                            continue;
+                        }
 //======================================================================
 // Cleanup and recreate worker
 //======================================================================
-					if (close_worker(label, master_ctx, worker_closed.r_worker_type_t, worker_closed.index) != SUCCESS) {
-						continue;
-					}
-					if (create_socket_pair(label, master_ctx, worker_closed.r_worker_type_t, worker_closed.index) != SUCCESS) {
-						continue;
-					}
-					if (setup_fork_worker(label, master_ctx, worker_closed.r_worker_type_t, worker_closed.index) != SUCCESS) {
-						continue;
-					}
+                        if (close_worker(label, master_ctx, worker_closed.r_worker_type_t, worker_closed.index) != SUCCESS) {
+                            continue;
+                        }
+                        if (create_socket_pair(label, master_ctx, worker_closed.r_worker_type_t, worker_closed.index) != SUCCESS) {
+                            continue;
+                        }
+                        if (setup_fork_worker(label, master_ctx, worker_closed.r_worker_type_t, worker_closed.index) != SUCCESS) {
+                            continue;
+                        }
 //======================================================================
-				} else {
-					if (handle_ipc_event(label, master_ctx, &current_fd) != SUCCESS) {
-						continue;
-					}
-				}
+                    } else {
+                        if (handle_ipc_event(label, master_ctx, &current_fd) != SUCCESS) {
+                            continue;
+                        }
+                    }
+                    continue;
+                }
+//======================================================================
+// Event yang belum ditangkap
+//======================================================================                 
+                LOG_ERROR("%sUnknown FD event %d.", label, current_fd);
+//======================================================================
             }
         }
     }

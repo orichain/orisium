@@ -13,6 +13,7 @@
 
 #include "log.h"
 #include "ipc/protocol.h"
+#include "orilink/protocol.h"
 #include "async.h"
 #include "utilities.h"
 #include "types.h"
@@ -55,6 +56,14 @@ void setup_session(cow_c_session_t *session) {
     session->fin_end_sent_try_count = 0x00;
     if (session->rtt_kalman_calibration_samples) free(session->rtt_kalman_calibration_samples);
     if (session->retry_kalman_calibration_samples) free(session->retry_kalman_calibration_samples);
+    session->first_check_rtt = (uint8_t)0x01;
+    session->rtt_kalman_calibration_samples = NULL;
+    session->rtt_kalman_initialized_count = 0;
+    session->rtt_temp_ewma_value = (float)0;
+    session->first_check_retry = (uint8_t)0x01;
+    session->retry_kalman_calibration_samples = NULL;
+    session->retry_kalman_initialized_count = 0;
+    session->retry_temp_ewma_value = (float)0;
     CLOSE_FD(&session->sock_fd);
     CLOSE_FD(&session->hello1_timer_fd);
     CLOSE_FD(&session->hello2_timer_fd);
@@ -97,6 +106,14 @@ void cleanup_session(const char *label, async_type_t *cow_async, cow_c_session_t
     session->fin_end_sent_try_count = 0x00;
     if (session->rtt_kalman_calibration_samples) free(session->rtt_kalman_calibration_samples);
     if (session->retry_kalman_calibration_samples) free(session->retry_kalman_calibration_samples);
+    session->first_check_rtt = (uint8_t)0x01;
+    session->rtt_kalman_calibration_samples = NULL;
+    session->rtt_kalman_initialized_count = 0;
+    session->rtt_temp_ewma_value = (float)0;
+    session->first_check_retry = (uint8_t)0x01;
+    session->retry_kalman_calibration_samples = NULL;
+    session->retry_kalman_initialized_count = 0;
+    session->retry_temp_ewma_value = (float)0;
     async_delete_event(label, cow_async, &session->sock_fd);
     async_delete_event(label, cow_async, &session->hello1_timer_fd);
     async_delete_event(label, cow_async, &session->hello2_timer_fd);
@@ -117,6 +134,13 @@ void cleanup_session(const char *label, async_type_t *cow_async, cow_c_session_t
     CLOSE_FD(&session->fin_timer_fd);
 }
 
+void cleanup_hello1_timer_session(const char *label, async_type_t *cow_async, cow_c_session_t *session) {
+    session->interval_hello1_timer_fd = (double)0;
+    session->hello1_sent_try_count = 0x00;
+    async_delete_event(label, cow_async, &session->hello1_timer_fd);
+    CLOSE_FD(&session->hello1_timer_fd);
+}
+
 bool must_be_disconnected(const char *label, worker_type_t wot, int worker_idx, int session_index, async_type_t *cow_async, cow_c_session_t *session, int *master_uds_fd) {
     if (session->hello1_sent_try_count > MAX_RETRY) {
         LOG_DEVEL_DEBUG("%s session %d: disconnect => try count %d.", label, session_index, session->hello1_sent_try_count);
@@ -132,6 +156,7 @@ status_t send_hello1(const char *label, cow_c_session_t *session) {
     if (rt.status != SUCCESS) {
         return FAILURE;
     }
+    session->hello1_sent = true;
     session->hello1_sent_try_count++;
     session->hello1_sent_time = rt.r_uint64_t;
     if (hello1(label, session) != SUCCESS) {
@@ -147,6 +172,159 @@ status_t send_hello1(const char *label, cow_c_session_t *session) {
         return FAILURE;
     }
     return SUCCESS;
+}
+
+status_t send_hello2(const char *label, cow_c_session_t *session) {
+    uint64_t_status_t rt = get_realtime_time_ns(label);
+    if (rt.status != SUCCESS) {
+        return FAILURE;
+    }
+    session->hello2_sent = true;
+    session->hello2_sent_try_count++;
+    session->hello2_sent_time = rt.r_uint64_t;
+    if (hello2(label, session) != SUCCESS) {
+        printf("Error hello2\n");
+        return FAILURE;
+    }
+    if (async_set_timerfd_time(label, &session->hello2_timer_fd,
+        (time_t)session->interval_hello2_timer_fd,
+        (long)((session->interval_hello2_timer_fd - (time_t)session->interval_hello2_timer_fd) * 1e9),
+        (time_t)session->interval_hello2_timer_fd,
+        (long)((session->interval_hello2_timer_fd - (time_t)session->interval_hello2_timer_fd) * 1e9)) != SUCCESS)
+    {
+        return FAILURE;
+    }
+    return SUCCESS;
+}
+
+void calculate_retry(const char *label, cow_c_session_t *session, int session_index, float try_count) {
+    if (session->first_check_retry == (uint8_t)0x01) {
+        session->first_check_retry = (uint8_t)0x00;
+        session->retry_value_prediction = try_count;
+        session->retry_kalman_filter.is_initialized = false;
+        session->retry_kalman_initialized_count = 0;
+        if (session->retry_kalman_calibration_samples != NULL) {
+            free(session->retry_kalman_calibration_samples);
+            session->retry_kalman_calibration_samples = NULL;
+        }
+        LOG_DEVEL_DEBUG("%s session %d: First-time setup for retry value.", label, session_index);
+    }
+    float current_retry_measurement = try_count;
+    if (current_retry_measurement < (float)0) current_retry_measurement = (float)0;
+    if (current_retry_measurement > ((float)MAX_RETRY * (float)2)) current_retry_measurement = ((float)MAX_RETRY * (float)2);
+    if (!session->retry_kalman_filter.is_initialized) {
+        if (session->retry_kalman_calibration_samples == NULL) {
+            session->retry_kalman_calibration_samples = (float *)malloc(KALMAN_CALIBRATION_SAMPLES * sizeof(float));
+            if (!session->retry_kalman_calibration_samples) {
+                session->retry_value_prediction = current_retry_measurement;
+                LOG_ERROR("%s session %d Failed to allocate retry calibration samples. Fallback to raw measurement.", label, session_index);
+                return;
+            }
+            session->retry_temp_ewma_value = current_retry_measurement;
+        }
+        if (session->retry_kalman_initialized_count < KALMAN_CALIBRATION_SAMPLES) {
+            session->retry_kalman_calibration_samples[session->retry_kalman_initialized_count] = current_retry_measurement;
+            session->retry_kalman_initialized_count++;
+            if (session->retry_kalman_initialized_count > 1) {
+                session->retry_temp_ewma_value = (float)KALMAN_ALPHA_EWMA * current_retry_measurement + ((float)1 - (float)KALMAN_ALPHA_EWMA) * session->retry_temp_ewma_value;
+            }
+            if (session->retry_kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
+                float avg_retry = calculate_average(session->retry_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
+                float var_retry = calculate_variance(session->retry_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_retry);
+                free(session->retry_kalman_calibration_samples);
+                session->retry_kalman_calibration_samples = NULL;
+                if (var_retry < (float)0.1) var_retry = (float)0.1;               
+                float kalman_q = (float)1;
+                float kalman_r = var_retry;
+                float kalman_p0 = var_retry * (float)2;
+                kalman_init(&session->retry_kalman_filter, kalman_q, kalman_r, kalman_p0, avg_retry);
+                session->retry_kalman_filter.is_initialized = true;
+                session->retry_value_prediction = session->retry_kalman_filter.state_estimate;
+                LOG_DEVEL_DEBUG("%s session %d Kalman Retry Filter fully initialized. Avg: %.2f, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
+                                label, session_index, avg_retry, var_retry, kalman_q, kalman_r, kalman_p0);
+            } else {
+                session->retry_value_prediction = session->retry_temp_ewma_value;
+                LOG_DEVEL_DEBUG("Calibrating retry... (%d/%d) -> Meas: %.2f -> EWMA: %.2f",
+                                session->retry_kalman_initialized_count, KALMAN_CALIBRATION_SAMPLES,
+                                current_retry_measurement, session->retry_temp_ewma_value);
+            }
+        }
+        return;
+    }
+    session->retry_value_prediction = kalman_filter(&session->retry_kalman_filter, current_retry_measurement);
+    LOG_DEVEL_DEBUG(
+        "%s session %d Meas retry: %.2f%% -> Est retry: %.2f%%",
+        label, session_index,
+        current_retry_measurement,
+        session->retry_value_prediction
+    );
+    if (session->retry_value_prediction < (float)0) session->retry_value_prediction = (float)0;
+    if (session->retry_value_prediction > ((float)MAX_RETRY * (float)2)) session->retry_value_prediction = ((float)MAX_RETRY * (float)2);
+}
+
+void calculate_rtt(const char *label, cow_c_session_t *session, int session_index, double rtt_value) {
+    if (session->first_check_rtt == (uint8_t)0x01) {
+        session->first_check_rtt = (uint8_t)0x00;
+        session->rtt_value_prediction = rtt_value;
+        session->rtt_kalman_filter.is_initialized = false;
+        session->rtt_kalman_initialized_count = 0;
+        if (session->rtt_kalman_calibration_samples != NULL) {
+            free(session->rtt_kalman_calibration_samples);
+            session->rtt_kalman_calibration_samples = NULL;
+        }
+        LOG_DEVEL_DEBUG("%s session %d: First-time setup for rtt value.", label, session_index);
+    }
+    double current_rtt_measurement = rtt_value;
+    if (current_rtt_measurement < (double)0) current_rtt_measurement = (double)0;
+    if (current_rtt_measurement > ((double)MAX_RTT_SEC * (double)1e9 * (double)2)) current_rtt_measurement = ((double)MAX_RTT_SEC * (double)1e9 * (double)2);
+    if (!session->rtt_kalman_filter.is_initialized) {
+        if (session->rtt_kalman_calibration_samples == NULL) {
+            session->rtt_kalman_calibration_samples = (double *)malloc(KALMAN_CALIBRATION_SAMPLES * sizeof(double));
+            if (!session->rtt_kalman_calibration_samples) {
+                session->rtt_value_prediction = current_rtt_measurement;
+                LOG_ERROR("%s session %d Failed to allocate rtt calibration samples. Fallback to raw measurement.", label, session_index);
+                return;
+            }
+            session->rtt_temp_ewma_value = current_rtt_measurement;
+        }
+        if (session->rtt_kalman_initialized_count < KALMAN_CALIBRATION_SAMPLES) {
+            session->rtt_kalman_calibration_samples[session->rtt_kalman_initialized_count] = current_rtt_measurement;
+            session->rtt_kalman_initialized_count++;
+            if (session->rtt_kalman_initialized_count > 1) {
+                session->rtt_temp_ewma_value = (double)KALMAN_ALPHA_EWMA * current_rtt_measurement + ((double)1 - (double)KALMAN_ALPHA_EWMA) * session->rtt_temp_ewma_value;
+            }
+            if (session->rtt_kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
+                double avg_rtt = calculate_double_average(session->rtt_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
+                double var_rtt = calculate_double_variance(session->rtt_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_rtt);
+                free(session->rtt_kalman_calibration_samples);
+                session->rtt_kalman_calibration_samples = NULL;
+                if (var_rtt < (double)0.1) var_rtt = (double)0.1;               
+                double kalman_q = (double)1;
+                double kalman_r = var_rtt;
+                double kalman_p0 = var_rtt * (double)2;
+                kalman_double_init(&session->rtt_kalman_filter, kalman_q, kalman_r, kalman_p0, avg_rtt);
+                session->rtt_kalman_filter.is_initialized = true;
+                session->rtt_value_prediction = session->rtt_kalman_filter.state_estimate;
+                LOG_DEVEL_DEBUG("%s session %d Kalman Retry Filter fully initialized. Avg: %.2f, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
+                                label, session_index, avg_rtt, var_rtt, kalman_q, kalman_r, kalman_p0);
+            } else {
+                session->rtt_value_prediction = session->rtt_temp_ewma_value;
+                LOG_DEVEL_DEBUG("Calibrating rtt... (%d/%d) -> Meas: %.2f -> EWMA: %.2f",
+                                session->rtt_kalman_initialized_count, KALMAN_CALIBRATION_SAMPLES,
+                                current_rtt_measurement, session->rtt_temp_ewma_value);
+            }
+        }
+        return;
+    }
+    session->rtt_value_prediction = kalman_double_filter(&session->rtt_kalman_filter, current_rtt_measurement);
+    LOG_DEVEL_DEBUG(
+        "%s session %d Meas rtt: %.2f%% -> Est rtt: %.2f%%",
+        label, session_index,
+        current_rtt_measurement,
+        session->rtt_value_prediction
+    );
+    if (session->rtt_value_prediction < (double)0) session->rtt_value_prediction = (double)0;
+    if (session->rtt_value_prediction > ((double)MAX_RTT_SEC * (double)1e9 * (double)2)) session->rtt_value_prediction = ((double)MAX_RTT_SEC * (double)1e9 * (double)2);
 }
 
 void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd) {
@@ -331,18 +509,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
-// + ===================================================================
-// + inisialisasi rtt dan retry
-// + ===================================================================
-                    session->first_check_rtt = (uint8_t)0x01;
-                    session->rtt_kalman_calibration_samples = NULL;
-                    session->rtt_kalman_initialized_count = 0;
-                    session->rtt_temp_ewma_value = (float)0;
-                    session->first_check_retry = (uint8_t)0x01;
-                    session->retry_kalman_calibration_samples = NULL;
-                    session->retry_kalman_initialized_count = 0;
-                    session->retry_temp_ewma_value = (float)0;            
-// + ===================================================================
+//======================================================================                    
                     if (async_create_timerfd(label, &session->hello1_timer_fd) != SUCCESS) {
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
@@ -369,10 +536,81 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                     session = &cow_c_session[i];
                     if (session->in_use) {
                         if (current_fd == session->sock_fd) {
-                            LOG_ERROR("%sock_fd event %d.", label, current_fd);
-
-                            event_founded_in_session = true;
-                            break;
+                            struct sockaddr_in6 server_addr;
+                            char host_str[NI_MAXHOST];
+                            char port_str[NI_MAXSERV];
+                            orilink_protocol_t_status_t rcvd = receive_and_deserialize_orilink_packet(
+                                label,
+                                &session->sock_fd,
+                                (struct sockaddr *)&server_addr
+                            );
+                            if (rcvd.status != SUCCESS) {
+                                event_founded_in_session = true;
+                                break;
+                            }
+                            orilink_protocol_t* received_protocol = rcvd.r_orilink_protocol_t;
+                            int getname_res = getnameinfo((struct sockaddr *)&server_addr, sizeof(struct sockaddr_in6),
+                                                host_str, NI_MAXHOST,
+                                                port_str, NI_MAXSERV,
+                                                NI_NUMERICHOST | NI_NUMERICSERV
+                                              );
+                            if (getname_res != 0) {
+                                LOG_ERROR("%sgetnameinfo failed. %s", label, strerror(errno));
+                                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                event_founded_in_session = true;
+                                break;
+                            }
+                            size_t host_str_len = strlen(host_str);
+                            if (host_str_len >= INET6_ADDRSTRLEN) {
+                                LOG_ERROR("%sKoneksi ditolak dari IP %s. IP terlalu panjang.", label, host_str);
+                                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                event_founded_in_session = true;
+                                break;
+                            }
+                            char *endptr;
+                            long port_num = strtol(port_str, &endptr, 10);
+                            if (*endptr != '\0' || port_num <= 0 || port_num > 65535) {
+                                LOG_ERROR("%sKoneksi ditolak dari IP %s. PORT di luar rentang (1-65535).", label, host_str);
+                                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                event_founded_in_session = true;
+                                break;
+                            }
+                            if (received_protocol->type == ORILINK_HELLO1_ACK) {
+                                orilink_hello1_ack_t *ohello1_ack = received_protocol->payload.orilink_hello1_ack;
+                                if (
+                                        sockaddr_equal((const struct sockaddr *)&session->old_server_addr, (const struct sockaddr *)&server_addr) &&
+                                        (session->client_id == ohello1_ack->client_id) &&
+                                        session->hello1_sent
+                                   )
+                                {
+                                    float try_count = (float)session->hello1_sent_try_count-(float)1;
+                                    calculate_retry(label, session, i, try_count);
+                                    uint64_t_status_t rt = get_realtime_time_ns(label);
+                                    if (rt.status != SUCCESS) {
+                                        LOG_ERROR("%sFailed to get_realtime_time_ns.", label);
+                                        CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                        event_founded_in_session = true;
+                                        break;
+                                    }
+                                    session->hello1_ack_rcvd = true;
+                                    session->hello1_ack_rcvd_time = rt.r_uint64_t;
+                                    uint64_t interval_ull = session->hello1_ack_rcvd_time - session->hello1_sent_time;
+                                    double rtt_value = (double)interval_ull;
+                                    calculate_rtt(label, session, i, rtt_value);
+                                    cleanup_hello1_timer_session(label, &cow_async, session);
+                                    CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                    event_founded_in_session = true;
+                                } else {
+                                    LOG_ERROR("%sKoneksi ditolak Tidak pernah mengirim hello1 ke IP %s.", label, host_str);
+                                    CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                    event_founded_in_session = true;
+                                }
+                                break;
+                            } else {
+                                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                event_founded_in_session = true;
+                                break;
+                            }
                         } else if (current_fd == session->hello1_timer_fd) {
                             uint64_t u;
                             read(session->hello1_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
@@ -380,79 +618,9 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                                 event_founded_in_session = true;
                                 break;
                             }
-                            LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", label, i, session->interval_hello1_timer_fd);
-                            if (session->first_check_retry == (uint8_t)0x01) {
-                                session->first_check_retry = (uint8_t)0x00;
-                                session->retry_value_prediction = (float)session->hello1_sent_try_count;
-                                session->retry_kalman_filter.is_initialized = false;
-                                session->retry_kalman_initialized_count = 0;
-                                if (session->retry_kalman_calibration_samples != NULL) {
-                                    free(session->retry_kalman_calibration_samples);
-                                    session->retry_kalman_calibration_samples = NULL;
-                                }
-                                LOG_DEVEL_DEBUG("%s session %d: First-time setup for retry value.", label, i);
-                            }
-                            float current_retry_measurement = (float)session->hello1_sent_try_count;
-                            if (current_retry_measurement < (float)0) current_retry_measurement = (float)0;
-                            if (current_retry_measurement > ((float)MAX_RETRY * (float)2)) current_retry_measurement = ((float)MAX_RETRY * (float)2);
-                            if (!session->retry_kalman_filter.is_initialized) {
-                                if (session->retry_kalman_calibration_samples == NULL) {
-                                    session->retry_kalman_calibration_samples = (float *)malloc(KALMAN_CALIBRATION_SAMPLES * sizeof(float));
-                                    if (!session->retry_kalman_calibration_samples) {
-                                        session->retry_value_prediction = current_retry_measurement;
-                                        LOG_ERROR("%s session %d Failed to allocate retry calibration samples. Fallback to raw measurement.", label, i);
-                                        if (session->retry_value_prediction < (float)0) session->retry_value_prediction = (float)0;
-                                        if (session->retry_value_prediction > ((float)MAX_RETRY * (float)2)) session->retry_value_prediction = ((float)MAX_RETRY * (float)2);
-                                        session->interval_hello1_timer_fd = pow((double)2, (double)session->retry_value_prediction);
-                                        send_hello1(label, session);
-                                        event_founded_in_session = true;
-                                        break;
-                                    }
-                                    session->retry_temp_ewma_value = current_retry_measurement;
-                                }
-                                if (session->retry_kalman_initialized_count < KALMAN_CALIBRATION_SAMPLES) {
-                                    session->retry_kalman_calibration_samples[session->retry_kalman_initialized_count] = current_retry_measurement;
-                                    session->retry_kalman_initialized_count++;
-                                    if (session->retry_kalman_initialized_count > 1) {
-                                        session->retry_temp_ewma_value = (float)KALMAN_ALPHA_EWMA * current_retry_measurement + ((float)1 - (float)KALMAN_ALPHA_EWMA) * session->retry_temp_ewma_value;
-                                    }
-                                    if (session->retry_kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
-                                        float avg_retry = calculate_average(session->retry_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
-                                        float var_retry = calculate_variance(session->retry_kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_retry);
-                                        free(session->retry_kalman_calibration_samples);
-                                        session->retry_kalman_calibration_samples = NULL;
-                                        if (var_retry < (float)0.1) var_retry = (float)0.1;               
-                                        float kalman_q = (float)1;
-                                        float kalman_r = var_retry;
-                                        float kalman_p0 = var_retry * (float)2;
-                                        kalman_init(&session->retry_kalman_filter, kalman_q, kalman_r, kalman_p0, avg_retry);
-                                        session->retry_kalman_filter.is_initialized = true;
-                                        session->retry_value_prediction = session->retry_kalman_filter.state_estimate;
-                                        LOG_DEVEL_DEBUG("%s session %d Kalman Retry Filter fully initialized. Avg: %.2f, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
-                                                        label, i, avg_retry, var_retry, kalman_q, kalman_r, kalman_p0);
-                                    } else {
-                                        session->retry_value_prediction = session->retry_temp_ewma_value;
-                                        LOG_DEVEL_DEBUG("Calibrating retry... (%d/%d) -> Meas: %.2f -> EWMA: %.2f",
-                                                        session->retry_kalman_initialized_count, KALMAN_CALIBRATION_SAMPLES,
-                                                        current_retry_measurement, session->retry_temp_ewma_value);
-                                    }
-                                }
-                                if (session->retry_value_prediction < (float)0) session->retry_value_prediction = (float)0;
-                                if (session->retry_value_prediction > ((float)MAX_RETRY * (float)2)) session->retry_value_prediction = ((float)MAX_RETRY * (float)2);
-                                session->interval_hello1_timer_fd = pow((double)2, (double)session->retry_value_prediction);
-                                send_hello1(label, session);
-                                event_founded_in_session = true;
-                                break;
-                            }
-                            session->retry_value_prediction = kalman_filter(&session->retry_kalman_filter, current_retry_measurement);
-                            LOG_DEVEL_DEBUG(
-                                "%s session %d Meas retry: %.2f%% -> Est retry: %.2f%%",
-                                label, i,
-                                current_retry_measurement,
-                                session->retry_value_prediction
-                            );
-                            if (session->retry_value_prediction < (float)0) session->retry_value_prediction = (float)0;
-                            if (session->retry_value_prediction > ((float)MAX_RETRY * (float)2)) session->retry_value_prediction = ((float)MAX_RETRY * (float)2);
+                            LOG_DEBUG("%s session %d: interval = %lf.", label, i, session->interval_hello1_timer_fd);
+                            float try_count = (float)session->hello1_sent_try_count;
+                            calculate_retry(label, session, i, try_count);
                             session->interval_hello1_timer_fd = pow((double)2, (double)session->retry_value_prediction);
                             send_hello1(label, session);
                             event_founded_in_session = true;

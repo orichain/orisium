@@ -45,7 +45,8 @@
 #define AES_NONCE_BYTES 12
 #define AES_TAG_BYTES 16
 
-#define MAX_RETRY 7
+#define MAX_RETRY 5
+#define MAX_RTT_SEC 1
 //======================================================================
 // OriLink
 //======================================================================

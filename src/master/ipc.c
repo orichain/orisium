@@ -91,38 +91,39 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
 	switch (received_protocol->type) {
 		case IPC_WORKER_MASTER_HEARTBEAT: {
             ipc_worker_master_heartbeat_t *hbt = received_protocol->payload.ipc_worker_master_heartbeat;
-            uint64_t_status_t rt = get_realtime_time_ns("[Master]: ");
+            uint64_t_status_t rt = get_realtime_time_ns(label);
             if (hbt->wot == SIO) {
-                LOG_DEBUG("[Master]: SIO %d set last_ack to %llu.", hbt->index, rt.r_uint64_t);
+                LOG_DEBUG("%sSIO %d set last_ack to %llu.", label, hbt->index, rt.r_uint64_t);
                 master_ctx->sio_session[hbt->index].metrics.last_ack = rt.r_uint64_t;
                 master_ctx->sio_session[hbt->index].metrics.count_ack += (long)1;
                 master_ctx->sio_session[hbt->index].metrics.sum_hbtime += hbt->hbtime;
                 master_ctx->sio_session[hbt->index].metrics.hbtime = hbt->hbtime;
             } else if (hbt->wot == LOGIC) {
-                LOG_DEBUG("[Master]: Logic %d set last_ack to %llu.", hbt->index, rt.r_uint64_t);
+                LOG_DEBUG("%sLogic %d set last_ack to %llu.", label, hbt->index, rt.r_uint64_t);
                 master_ctx->logic_session[hbt->index].metrics.last_ack = rt.r_uint64_t;
                 master_ctx->logic_session[hbt->index].metrics.count_ack += (long)1;
                 master_ctx->logic_session[hbt->index].metrics.sum_hbtime += hbt->hbtime;
                 master_ctx->logic_session[hbt->index].metrics.hbtime = hbt->hbtime;
             } else if (hbt->wot == COW) {
-                LOG_DEBUG("[Master]: COW %d set last_ack to %llu.", hbt->index, rt.r_uint64_t);
+                LOG_DEBUG("%sCOW %d set last_ack to %llu.", label, hbt->index, rt.r_uint64_t);
                 master_ctx->cow_session[hbt->index].metrics.last_ack = rt.r_uint64_t;
                 master_ctx->cow_session[hbt->index].metrics.count_ack += (long)1;
                 master_ctx->cow_session[hbt->index].metrics.sum_hbtime += hbt->hbtime;
                 master_ctx->cow_session[hbt->index].metrics.hbtime = hbt->hbtime;
             } else if (hbt->wot == DBR) {
-                LOG_DEBUG("[Master]: DBR %d set last_ack to %llu.", hbt->index, rt.r_uint64_t);
+                LOG_DEBUG("%sDBR %d set last_ack to %llu.", label, hbt->index, rt.r_uint64_t);
                 master_ctx->dbr_session[hbt->index].metrics.last_ack = rt.r_uint64_t;
                 master_ctx->dbr_session[hbt->index].metrics.count_ack += (long)1;
                 master_ctx->dbr_session[hbt->index].metrics.sum_hbtime += hbt->hbtime;
                 master_ctx->dbr_session[hbt->index].metrics.hbtime = hbt->hbtime;
             } else if (hbt->wot == DBW) {
-                LOG_DEBUG("[Master]: DBW %d set last_ack to %llu.", hbt->index, rt.r_uint64_t);
+                LOG_DEBUG("%sDBW %d set last_ack to %llu.", label, hbt->index, rt.r_uint64_t);
                 master_ctx->dbw_session[hbt->index].metrics.last_ack = rt.r_uint64_t;
                 master_ctx->dbw_session[hbt->index].metrics.count_ack += (long)1;
                 master_ctx->dbw_session[hbt->index].metrics.sum_hbtime += hbt->hbtime;
                 master_ctx->dbw_session[hbt->index].metrics.hbtime = hbt->hbtime;
             }
+            CLOSE_IPC_PROTOCOL(&received_protocol);
 			break;
 		}
         case IPC_COW_MASTER_CONNECTION: {
@@ -140,12 +141,12 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
                     break;
                 }
             }
+            CLOSE_IPC_PROTOCOL(&received_protocol);
             break;
         }
 		default:
 			LOG_ERROR("[Master]: Unknown protocol type %d from UDS FD %d. Ignoring.", received_protocol->type, *current_fd);
-			break;
+			CLOSE_IPC_PROTOCOL(&received_protocol);
 	}
-	CLOSE_IPC_PROTOCOL(&received_protocol);
 	return SUCCESS;
 }

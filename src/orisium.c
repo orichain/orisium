@@ -78,7 +78,6 @@ exit:
 	pthread_join(cleaner_thread, NULL);
     log_close();
 #endif
-	
 	printf("[Orisium]: ==========================================================\n");
     printf("[Orisium]: Orisium selesai dijalankan.\n");
     printf("[Orisium]: ==========================================================\n");
