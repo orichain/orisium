@@ -143,7 +143,7 @@ void cleanup_hello1_timer_session(const char *label, async_type_t *cow_async, co
 
 bool must_be_disconnected(const char *label, worker_type_t wot, int worker_idx, int session_index, async_type_t *cow_async, cow_c_session_t *session, int *master_uds_fd) {
     if (session->hello1_sent_try_count > MAX_RETRY) {
-        LOG_DEVEL_DEBUG("%s session %d: disconnect => try count %d.", label, session_index, session->hello1_sent_try_count);
+        LOG_DEBUG("%s session %d: disconnect => try count %d.", label, session_index, session->hello1_sent_try_count);
         cow_master_connection(label, wot, worker_idx, &session->old_server_addr, CANNOTCONNECT, master_uds_fd);
         cleanup_session(label, cow_async, session);
         return true;
@@ -207,7 +207,7 @@ void calculate_retry(const char *label, cow_c_session_t *session, int session_in
             free(session->retry_kalman_calibration_samples);
             session->retry_kalman_calibration_samples = NULL;
         }
-        LOG_DEVEL_DEBUG("%s session %d: First-time setup for retry value.", label, session_index);
+        LOG_DEBUG("%s session %d: First-time setup for retry value.", label, session_index);
     }
     float current_retry_measurement = try_count;
     if (current_retry_measurement < (float)0) current_retry_measurement = (float)0;
@@ -240,11 +240,11 @@ void calculate_retry(const char *label, cow_c_session_t *session, int session_in
                 kalman_init(&session->retry_kalman_filter, kalman_q, kalman_r, kalman_p0, avg_retry);
                 session->retry_kalman_filter.is_initialized = true;
                 session->retry_value_prediction = session->retry_kalman_filter.state_estimate;
-                LOG_DEVEL_DEBUG("%s session %d Kalman Retry Filter fully initialized. Avg: %.2f, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
+                LOG_DEBUG("%s session %d Kalman Retry Filter fully initialized. Avg: %.2f, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
                                 label, session_index, avg_retry, var_retry, kalman_q, kalman_r, kalman_p0);
             } else {
                 session->retry_value_prediction = session->retry_temp_ewma_value;
-                LOG_DEVEL_DEBUG("Calibrating retry... (%d/%d) -> Meas: %.2f -> EWMA: %.2f",
+                LOG_DEBUG("Calibrating retry... (%d/%d) -> Meas: %.2f -> EWMA: %.2f",
                                 session->retry_kalman_initialized_count, KALMAN_CALIBRATION_SAMPLES,
                                 current_retry_measurement, session->retry_temp_ewma_value);
             }
@@ -252,7 +252,7 @@ void calculate_retry(const char *label, cow_c_session_t *session, int session_in
         return;
     }
     session->retry_value_prediction = kalman_filter(&session->retry_kalman_filter, current_retry_measurement);
-    LOG_DEVEL_DEBUG(
+    LOG_DEBUG(
         "%s session %d Meas retry: %.2f%% -> Est retry: %.2f%%",
         label, session_index,
         current_retry_measurement,
@@ -272,7 +272,7 @@ void calculate_rtt(const char *label, cow_c_session_t *session, int session_inde
             free(session->rtt_kalman_calibration_samples);
             session->rtt_kalman_calibration_samples = NULL;
         }
-        LOG_DEVEL_DEBUG("%s session %d: First-time setup for rtt value.", label, session_index);
+        LOG_DEBUG("%s session %d: First-time setup for rtt value.", label, session_index);
     }
     double current_rtt_measurement = rtt_value;
     if (current_rtt_measurement < (double)0) current_rtt_measurement = (double)0;
@@ -305,11 +305,11 @@ void calculate_rtt(const char *label, cow_c_session_t *session, int session_inde
                 kalman_double_init(&session->rtt_kalman_filter, kalman_q, kalman_r, kalman_p0, avg_rtt);
                 session->rtt_kalman_filter.is_initialized = true;
                 session->rtt_value_prediction = session->rtt_kalman_filter.state_estimate;
-                LOG_DEVEL_DEBUG("%s session %d Kalman Retry Filter fully initialized. Avg: %.2f, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
+                LOG_DEBUG("%s session %d Kalman Retry Filter fully initialized. Avg: %.2f, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
                                 label, session_index, avg_rtt, var_rtt, kalman_q, kalman_r, kalman_p0);
             } else {
                 session->rtt_value_prediction = session->rtt_temp_ewma_value;
-                LOG_DEVEL_DEBUG("Calibrating rtt... (%d/%d) -> Meas: %.2f -> EWMA: %.2f",
+                LOG_DEBUG("Calibrating rtt... (%d/%d) -> Meas: %.2f -> EWMA: %.2f",
                                 session->rtt_kalman_initialized_count, KALMAN_CALIBRATION_SAMPLES,
                                 current_rtt_measurement, session->rtt_temp_ewma_value);
             }
@@ -317,7 +317,7 @@ void calculate_rtt(const char *label, cow_c_session_t *session, int session_inde
         return;
     }
     session->rtt_value_prediction = kalman_double_filter(&session->rtt_kalman_filter, current_rtt_measurement);
-    LOG_DEVEL_DEBUG(
+    LOG_DEBUG(
         "%s session %d Meas rtt: %.2f%% -> Est rtt: %.2f%%",
         label, session_index,
         current_rtt_measurement,

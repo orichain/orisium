@@ -12,24 +12,10 @@ typedef struct {
     double sum_hbtime;
     double count_ack;
     uint64_t last_ack;
-    uint8_t first_check_healthy;
-    kalman_double_t health_kalman_filter;
-    int health_kalman_initialized_count;
-    double *health_kalman_calibration_samples; 
-    double health_temp_ewma_value;
-    bool isactive;
-    bool ishealthy;
-    uint64_t last_checkhealthy;  
-    double health_value_prediction;  
-    uint8_t first_check_avgtt;
-    kalman_long_double_t avgtt_kalman_filter;
-    int avgtt_kalman_initialized_count;
-    long double *avgtt_kalman_calibration_samples;
-    long double avgtt_temp_ewma_value;    
+    uint64_t last_checkhealthy;
     uint64_t last_task_started;
     uint64_t last_task_finished;
     uint64_t longest_task_time;
-    long double avgtt_value_prediction;
 } worker_metrics_t;
 
 typedef int uds_pair[2];
@@ -40,21 +26,33 @@ typedef struct {
 } uds_pair_pid_t;
 
 typedef struct {
+    bool isactive;
+    bool ishealthy;
     uint16_t task_count;
     uds_pair_pid_t upp;
 	worker_metrics_t metrics;
+    oricle_double_t healthy;
+    oricle_long_double_t avgtt;
 } master_sio_session_t;
 
 typedef struct {
+    bool isactive;
+    bool ishealthy;
     uint16_t task_count;
     uds_pair_pid_t upp;
 	worker_metrics_t metrics;
+    oricle_double_t healthy;
+    oricle_long_double_t avgtt;
 } master_logic_session_t;
 
 typedef struct {
+    bool isactive;
+    bool ishealthy;
     uint16_t task_count;
     uds_pair_pid_t upp;
 	worker_metrics_t metrics;
+    oricle_double_t healthy;
+    oricle_long_double_t avgtt;
 } master_dbr_session_t;
 //======================================================================
 // hanya ada 1 writer
@@ -65,14 +63,22 @@ typedef struct {
 //======================================================================
 typedef struct {
 	bool in_use;
+    bool isactive;
+    bool ishealthy;
     uds_pair_pid_t upp;
 	worker_metrics_t metrics;
+    oricle_double_t healthy;
+    oricle_long_double_t avgtt;
 } master_dbw_session_t;
 
 typedef struct {
+    bool isactive;
+    bool ishealthy;
     uint16_t task_count;
     uds_pair_pid_t upp;
     worker_metrics_t metrics;
+    oricle_double_t healthy;
+    oricle_long_double_t avgtt;
 } master_cow_session_t;
 
 typedef struct {

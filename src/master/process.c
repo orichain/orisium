@@ -162,6 +162,21 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
     if (setup_master(label, master_ctx, listen_port) != SUCCESS) goto exit;
     shutdown_event_fd = &master_ctx->shutdown_event_fd;
     if (setup_workers(master_ctx) != SUCCESS) goto exit;
+    
+    
+	if (async_create_timerfd(label, &master_ctx->master_timer_fd) != SUCCESS) {
+		goto exit;
+	}
+	if (async_set_timerfd_time(label, &master_ctx->master_timer_fd,
+		WORKER_HEARTBEATSEC_TIMEOUT, 0,
+        WORKER_HEARTBEATSEC_TIMEOUT, 0) != SUCCESS)
+    {
+		goto exit;
+	}
+    if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->master_timer_fd) != SUCCESS) {
+		goto exit;
+	}
+
     if (sleep_s(1) != SUCCESS) goto exit;   
     for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
         master_sio_c_session_t *session;

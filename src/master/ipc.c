@@ -10,7 +10,7 @@
 #include "utilities.h"
 #include "master/ipc.h"
 #include "master/process.h"
-#include "master/worker_metrics.h"
+#include "master/workers.h"
 
 worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context *master_ctx, int *current_fd) {
 	worker_type_t_status_t result;
@@ -134,7 +134,7 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
                     sockaddr_equal((const struct sockaddr *)&master_ctx->cow_c_session[i].server_addr, (const struct sockaddr *)&cmc->server_addr)
                    )
                 {
-                    calculate_avg_task_time_metrics(label, master_ctx, cmc->wot, cmc->index);
+                    calculate_avgtt(label, master_ctx, cmc->wot, cmc->index);
                     master_ctx->cow_c_session[i].cow_index = -1;
                     master_ctx->cow_c_session[i].in_use = false;
                     memset(&master_ctx->cow_c_session[i].server_addr, 0, sizeof(struct sockaddr_in6));

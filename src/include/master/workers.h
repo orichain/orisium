@@ -8,5 +8,7 @@ status_t create_socket_pair(const char *label, master_context *master_ctx, worke
 status_t setup_fork_worker(const char* label, master_context *master_ctx, worker_type_t wot, int index);
 status_t setup_workers(master_context *master_ctx);
 void workers_cleanup(master_context *master_ctx);
+status_t calculate_avgtt(const char *label, master_context *master_ctx, worker_type_t wot, int index);
+status_t check_workers_healthy(master_context *master_ctx);
 
 #endif

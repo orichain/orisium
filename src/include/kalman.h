@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <stddef.h>
 
 typedef struct {
     float process_noise;
@@ -27,6 +29,36 @@ typedef struct {
     long double state_estimate;
     bool is_initialized;
 } kalman_long_double_t;
+
+typedef struct {
+    bool first_check;
+    kalman_t kalman_filter;
+    int kalman_initialized_count;
+    float *kalman_calibration_samples; 
+    float initial_value;
+    float temp_ewma_value;
+    float value_prediction;
+} oricle_t;
+
+typedef struct {
+    bool first_check;
+    kalman_double_t kalman_filter;
+    int kalman_initialized_count;
+    double *kalman_calibration_samples; 
+    double initial_value;
+    double temp_ewma_value;
+    double value_prediction;
+} oricle_double_t;
+
+typedef struct {
+    bool first_check;
+    kalman_long_double_t kalman_filter;
+    int kalman_initialized_count;
+    long double *kalman_calibration_samples; 
+    long double initial_value;
+    long double temp_ewma_value;
+    long double value_prediction;
+} oricle_long_double_t;
 
 static inline void kalman_init(
     kalman_t *filter,
@@ -105,5 +137,12 @@ static inline long double kalman_long_double_filter(kalman_long_double_t *filter
     filter->estimated_error *= ((long double)1 - kalman_gain);
     return filter->state_estimate;
 }
+
+void setup_oricle_long_double(oricle_long_double_t *o, long double initial_value);
+void setup_oricle_double(oricle_double_t *o, double initial_value);
+void cleanup_oricle_long_double(oricle_long_double_t *o);
+void cleanup_oricle_double(oricle_double_t *o);
+void calculate_oricle_long_double(const char *label, const char *desc, oricle_long_double_t *o, long double value, long double max_value);
+void calculate_oricle_double(const char *label, const char *desc, oricle_double_t *o, double value, double max_value);
 
 #endif
