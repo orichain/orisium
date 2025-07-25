@@ -17,6 +17,10 @@
 #include <stdbool.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <netdb.h>
+#include <stdlib.h>
+#include <arpa/inet.h>
+#include <inttypes.h>
 /*
 #include <immintrin.h>
 */
@@ -166,6 +170,28 @@ static inline status_t convert_str_to_sockaddr_in6(const char *ip_str, uint16_t 
         memcpy(&(addr->sin6_addr), out_ipv6, IPV6_ADDRESS_LEN);
         return SUCCESS;
     }
+    struct addrinfo hints, *res, *p;
+    int status_gai;
+    char port_str[6];
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET6;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_flags = AI_V4MAPPED | AI_ADDRCONFIG;
+    snprintf(port_str, sizeof(port_str), "%u", port);
+    status_gai = getaddrinfo(ip_str, port_str, &hints, &res);
+    if (status_gai != 0) {
+        LOG_ERROR("getaddrinfo for '%s': %s", ip_str, gai_strerror(status_gai));
+        return FAILURE;
+    }
+    for (p = res; p != NULL; p = p->ai_next) {
+        if (p->ai_family == AF_INET6) {
+            memcpy(addr, p->ai_addr, p->ai_addrlen);
+            freeaddrinfo(res);
+            return SUCCESS;
+        }
+    }
+    LOG_ERROR("getaddrinfo untuk '%s' tidak menemukan alamat IPv6 atau IPv4-mapped yang sesuai.", ip_str);
+    freeaddrinfo(res);
     return FAILURE;
 }
 
