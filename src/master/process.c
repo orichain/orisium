@@ -173,7 +173,6 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
         session = &master_ctx->cow_c_session[i];
         setup_master_cow_session(session);
     }
-    master_ctx->sio_dc_session = NULL;
     for (int ic = 0; ic < bootstrap_nodes->len; ic++) {
         int cow_worker_idx = select_best_worker(label, master_ctx, COW);
         if (cow_worker_idx == -1) {
@@ -327,7 +326,6 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
 // async_create_eventfd_nonblock_close_after_exec <= close after exec/read
 //======================================================================
 exit:
-    free_master_sio_dc_sessions(label, &master_ctx->sio_dc_session);
     for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
         master_sio_c_session_t *session;
         session = &master_ctx->sio_c_session[i];
