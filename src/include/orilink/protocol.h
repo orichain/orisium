@@ -51,6 +51,16 @@ typedef enum {
 
 typedef struct {
     uint64_t client_id;
+    uint8_t kem_privatekey[KEM_PRIVATEKEY_BYTES];
+    uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
+    uint8_t kem_ciphertext[KEM_CIPHERTEXT_BYTES];
+    uint8_t kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
+    uint64_t server_id;
+    uint16_t port;
+} orilink_identity_t;
+
+typedef struct {
+    uint64_t client_id;
     uint8_t publickey1[KEM_PUBLICKEY_BYTES / 2];
     uint8_t trycount;
 } orilink_hello1_t;

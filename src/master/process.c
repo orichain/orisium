@@ -20,6 +20,7 @@
 #include "master/worker_ipc_cmds.h"
 #include "node.h"
 #include "pqc.h"
+#include "kalman.h"
 #include "sessions/master_session.h"
 
 volatile sig_atomic_t shutdown_requested = 0;
@@ -82,36 +83,20 @@ void setup_master_sio_session(master_sio_c_session_t *session) {
     session->in_use = false;    
     memset(&session->old_client_addr, 0, sizeof(struct sockaddr_in6));
     memset(&session->client_addr, 0, sizeof(struct sockaddr_in6));
-    memset(&session->kem_privatekey, 0, KEM_PRIVATEKEY_BYTES);
-    memset(&session->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
-    memset(&session->kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
-    memset(&session->kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
-    session->client_id = 0ULL;
-    session->server_id = 0ULL;
-    session->port = 0x0000;
-    session->interval_hello1_ack_timer_fd = (double)1;
-    session->interval_hello2_ack_timer_fd = (double)1;
-    session->interval_hello3_ack_timer_fd = (double)1;
-    session->interval_sock_ready_timer_fd = (double)1;
-    session->hello1_ack_sent_try_count = 0x00;
-    session->hello2_ack_sent_try_count = 0x00;
-    session->hello3_ack_sent_try_count = 0x00;
-    session->sock_ready_sent_try_count = 0x00;
-    if (session->rtt_kalman_calibration_samples) free(session->rtt_kalman_calibration_samples);
-    if (session->retry_kalman_calibration_samples) free(session->retry_kalman_calibration_samples);
-    session->first_check_rtt = (uint8_t)0x01;
-    session->rtt_kalman_calibration_samples = NULL;
-    session->rtt_kalman_initialized_count = 0;
-    session->rtt_temp_ewma_value = (float)0;
-    session->first_check_retry = (uint8_t)0x01;
-    session->retry_kalman_calibration_samples = NULL;
-    session->retry_kalman_initialized_count = 0;
-    session->retry_temp_ewma_value = (float)0;
+    memset(session->identity.kem_privatekey, 0, KEM_PRIVATEKEY_BYTES);
+    memset(session->identity.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+    memset(session->identity.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+    memset(session->identity.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+    session->identity.client_id = 0ULL;
+    session->identity.server_id = 0ULL;
+    session->identity.port = 0x0000;
+    setup_oricle_double(&session->rtt, (double)0);
+    setup_oricle_double(&session->retry, (double)0);
     CLOSE_FD(&session->sock_fd);
-    CLOSE_FD(&session->hello1_ack_timer_fd);
-    CLOSE_FD(&session->hello2_ack_timer_fd);
-    CLOSE_FD(&session->hello3_ack_timer_fd);
-    CLOSE_FD(&session->sock_ready_timer_fd);
+    setup_hello_ack(&session->hello1_ack);
+    setup_hello_ack(&session->hello2_ack);
+    setup_hello_ack(&session->hello3_ack);
+    setup_hello_ack(&session->sock_ready);
 }
 
 void cleanup_master_sio_session(const char *label, async_type_t *master_async, master_sio_c_session_t *session) {
@@ -119,41 +104,21 @@ void cleanup_master_sio_session(const char *label, async_type_t *master_async, m
     session->in_use = false;    
     memset(&session->old_client_addr, 0, sizeof(struct sockaddr_in6));
     memset(&session->client_addr, 0, sizeof(struct sockaddr_in6));
-    memset(&session->kem_privatekey, 0, KEM_PRIVATEKEY_BYTES);
-    memset(&session->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
-    memset(&session->kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
-    memset(&session->kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
-    session->client_id = 0ULL;
-    session->server_id = 0ULL;
-    session->port = 0x0000;
-    session->interval_hello1_ack_timer_fd = (double)1;
-    session->interval_hello2_ack_timer_fd = (double)1;
-    session->interval_hello3_ack_timer_fd = (double)1;
-    session->interval_sock_ready_timer_fd = (double)1;
-    session->hello1_ack_sent_try_count = 0x00;
-    session->hello2_ack_sent_try_count = 0x00;
-    session->hello3_ack_sent_try_count = 0x00;
-    session->sock_ready_sent_try_count = 0x00;
-    if (session->rtt_kalman_calibration_samples) free(session->rtt_kalman_calibration_samples);
-    if (session->retry_kalman_calibration_samples) free(session->retry_kalman_calibration_samples);
-    session->first_check_rtt = (uint8_t)0x01;
-    session->rtt_kalman_calibration_samples = NULL;
-    session->rtt_kalman_initialized_count = 0;
-    session->rtt_temp_ewma_value = (float)0;
-    session->first_check_retry = (uint8_t)0x01;
-    session->retry_kalman_calibration_samples = NULL;
-    session->retry_kalman_initialized_count = 0;
-    session->retry_temp_ewma_value = (float)0;
+    memset(session->identity.kem_privatekey, 0, KEM_PRIVATEKEY_BYTES);
+    memset(session->identity.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+    memset(session->identity.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+    memset(session->identity.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+    session->identity.client_id = 0ULL;
+    session->identity.server_id = 0ULL;
+    session->identity.port = 0x0000;
+    cleanup_oricle_double(&session->rtt);
+    cleanup_oricle_double(&session->retry);
     async_delete_event(label, master_async, &session->sock_fd);
-    async_delete_event(label, master_async, &session->hello1_ack_timer_fd);
-    async_delete_event(label, master_async, &session->hello2_ack_timer_fd);
-    async_delete_event(label, master_async, &session->hello3_ack_timer_fd);
-    async_delete_event(label, master_async, &session->sock_ready_timer_fd);    
     CLOSE_FD(&session->sock_fd);
-    CLOSE_FD(&session->hello1_ack_timer_fd);
-    CLOSE_FD(&session->hello2_ack_timer_fd);
-    CLOSE_FD(&session->hello3_ack_timer_fd);
-    CLOSE_FD(&session->sock_ready_timer_fd);
+    cleanup_hello_ack(label, master_async, &session->hello1_ack);
+    cleanup_hello_ack(label, master_async, &session->hello2_ack);
+    cleanup_hello_ack(label, master_async, &session->hello3_ack);
+    cleanup_hello_ack(label, master_async, &session->sock_ready);
 }
 
 void run_master_process(master_context *master_ctx, uint16_t *listen_port, bootstrap_nodes_t *bootstrap_nodes) {

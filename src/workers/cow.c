@@ -143,7 +143,7 @@ void cleanup_hello1_timer_session(const char *label, async_type_t *cow_async, co
 
 bool must_be_disconnected(const char *label, worker_type_t wot, int worker_idx, int session_index, async_type_t *cow_async, cow_c_session_t *session, int *master_uds_fd) {
     if (session->hello1_sent_try_count > MAX_RETRY) {
-        LOG_DEBUG("%s session %d: disconnect => try count %d.", label, session_index, session->hello1_sent_try_count);
+        LOG_DEVEL_DEBUG("%s session %d: disconnect => try count %d.", label, session_index, session->hello1_sent_try_count);
         cow_master_connection(label, wot, worker_idx, &session->old_server_addr, CANNOTCONNECT, master_uds_fd);
         cleanup_session(label, cow_async, session);
         return true;
@@ -207,7 +207,7 @@ void calculate_retry(const char *label, cow_c_session_t *session, int session_in
             free(session->retry_kalman_calibration_samples);
             session->retry_kalman_calibration_samples = NULL;
         }
-        LOG_DEBUG("%s session %d: First-time setup for retry value.", label, session_index);
+        LOG_DEVEL_DEBUG("%s session %d: First-time setup for retry value.", label, session_index);
     }
     float current_retry_measurement = try_count;
     if (current_retry_measurement < (float)0) current_retry_measurement = (float)0;
@@ -240,11 +240,11 @@ void calculate_retry(const char *label, cow_c_session_t *session, int session_in
                 kalman_init(&session->retry_kalman_filter, kalman_q, kalman_r, kalman_p0, avg_retry);
                 session->retry_kalman_filter.is_initialized = true;
                 session->retry_value_prediction = session->retry_kalman_filter.state_estimate;
-                LOG_DEBUG("%s session %d Kalman Retry Filter fully initialized. Avg: %.2f, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
+                LOG_DEVEL_DEBUG("%s session %d Kalman Retry Filter fully initialized. Avg: %.2f, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
                                 label, session_index, avg_retry, var_retry, kalman_q, kalman_r, kalman_p0);
             } else {
                 session->retry_value_prediction = session->retry_temp_ewma_value;
-                LOG_DEBUG("Calibrating retry... (%d/%d) -> Meas: %.2f -> EWMA: %.2f",
+                LOG_DEVEL_DEBUG("Calibrating retry... (%d/%d) -> Meas: %.2f -> EWMA: %.2f",
                                 session->retry_kalman_initialized_count, KALMAN_CALIBRATION_SAMPLES,
                                 current_retry_measurement, session->retry_temp_ewma_value);
             }
@@ -252,7 +252,7 @@ void calculate_retry(const char *label, cow_c_session_t *session, int session_in
         return;
     }
     session->retry_value_prediction = kalman_filter(&session->retry_kalman_filter, current_retry_measurement);
-    LOG_DEBUG(
+    LOG_DEVEL_DEBUG(
         "%s session %d Meas retry: %.2f%% -> Est retry: %.2f%%",
         label, session_index,
         current_retry_measurement,
@@ -272,7 +272,7 @@ void calculate_rtt(const char *label, cow_c_session_t *session, int session_inde
             free(session->rtt_kalman_calibration_samples);
             session->rtt_kalman_calibration_samples = NULL;
         }
-        LOG_DEBUG("%s session %d: First-time setup for rtt value.", label, session_index);
+        LOG_DEVEL_DEBUG("%s session %d: First-time setup for rtt value.", label, session_index);
     }
     double current_rtt_measurement = rtt_value;
     if (current_rtt_measurement < (double)0) current_rtt_measurement = (double)0;
@@ -305,11 +305,11 @@ void calculate_rtt(const char *label, cow_c_session_t *session, int session_inde
                 kalman_double_init(&session->rtt_kalman_filter, kalman_q, kalman_r, kalman_p0, avg_rtt);
                 session->rtt_kalman_filter.is_initialized = true;
                 session->rtt_value_prediction = session->rtt_kalman_filter.state_estimate;
-                LOG_DEBUG("%s session %d Kalman Retry Filter fully initialized. Avg: %.2f, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
+                LOG_DEVEL_DEBUG("%s session %d Kalman Retry Filter fully initialized. Avg: %.2f, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
                                 label, session_index, avg_rtt, var_rtt, kalman_q, kalman_r, kalman_p0);
             } else {
                 session->rtt_value_prediction = session->rtt_temp_ewma_value;
-                LOG_DEBUG("Calibrating rtt... (%d/%d) -> Meas: %.2f -> EWMA: %.2f",
+                LOG_DEVEL_DEBUG("Calibrating rtt... (%d/%d) -> Meas: %.2f -> EWMA: %.2f",
                                 session->rtt_kalman_initialized_count, KALMAN_CALIBRATION_SAMPLES,
                                 current_rtt_measurement, session->rtt_temp_ewma_value);
             }
@@ -317,7 +317,7 @@ void calculate_rtt(const char *label, cow_c_session_t *session, int session_inde
         return;
     }
     session->rtt_value_prediction = kalman_double_filter(&session->rtt_kalman_filter, current_rtt_measurement);
-    LOG_DEBUG(
+    LOG_DEVEL_DEBUG(
         "%s session %d Meas rtt: %.2f%% -> Est rtt: %.2f%%",
         label, session_index,
         current_rtt_measurement,
@@ -347,7 +347,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 	if (async_create_incoming_event_with_disconnect(label, &cow_async, &master_uds_fd) != SUCCESS) goto exit;
 //======================================================================
 	if (initial_delay_ms > 0) {
-        LOG_DEBUG("%sApplying initial delay of %ld ms...", label, initial_delay_ms);
+        LOG_DEVEL_DEBUG("%sApplying initial delay of %ld ms...", label, initial_delay_ms);
         sleep_ms(initial_delay_ms);
     }
 //======================================================================
@@ -415,7 +415,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 					continue;
 				}
 				ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;
-				LOG_DEBUG("%sReceived message type: 0x%02x", label, received_protocol->type);		
+				LOG_DEVEL_DEBUG("%sReceived message type: 0x%02x", label, received_protocol->type);		
                 if (received_protocol->type == IPC_MASTER_WORKER_SHUTDOWN) {
 					LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
 					cow_shutdown_requested = 1;
@@ -472,13 +472,13 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                             LOG_ERROR("%sUDP Socket creation failed: %s", label, strerror(errno));
                             continue;
                         }
-                        LOG_DEBUG("%sUDP Socket FD %d created.", label, session->sock_fd);
+                        LOG_DEVEL_DEBUG("%sUDP Socket FD %d created.", label, session->sock_fd);
                         status_t r_snbkg = set_nonblocking(label, session->sock_fd);
                         if (r_snbkg != SUCCESS) {
                             LOG_ERROR("%sset_nonblocking failed.", label);
                             continue;
                         }
-                        LOG_DEBUG("%sUDP Socket FD %d set to non-blocking.", label, session->sock_fd);
+                        LOG_DEVEL_DEBUG("%sUDP Socket FD %d set to non-blocking.", label, session->sock_fd);
                         int conn_res = connect(session->sock_fd, rp->ai_addr, rp->ai_addrlen);
                         if (conn_res == 0) {
                             LOG_INFO("%sUDP socket 'connected' to %s:%s (FD %d).", label, host_str, port_str, session->sock_fd);
@@ -618,7 +618,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                                 event_founded_in_session = true;
                                 break;
                             }
-                            LOG_DEBUG("%s session %d: interval = %lf.", label, i, session->interval_hello1_timer_fd);
+                            LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", label, i, session->interval_hello1_timer_fd);
                             float try_count = (float)session->hello1_sent_try_count;
                             calculate_retry(label, session, i, try_count);
                             session->interval_hello1_timer_fd = pow((double)2, (double)session->retry_value_prediction);

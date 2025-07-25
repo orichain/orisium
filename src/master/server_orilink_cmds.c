@@ -11,7 +11,7 @@
 #include "stdbool.h"
 
 status_t hello1_ack(const char *label, int *listen_sock, master_sio_c_session_t *session) {
-	orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello1_ack(label, session->client_id, session->hello1_ack_sent_try_count);
+	orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello1_ack(label, session->identity.client_id, session->hello1_ack.ack_sent_try_count);
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
@@ -32,18 +32,18 @@ status_t send_hello1_ack(const char *label, int *listen_sock, master_sio_c_sessi
     if (rt.status != SUCCESS) {
         return FAILURE;
     }
-    session->hello1_ack_sent = true;
-    session->hello1_ack_sent_try_count++;
-    session->hello1_ack_sent_time = rt.r_uint64_t;
+    session->hello1_ack.ack_sent = true;
+    session->hello1_ack.ack_sent_try_count++;
+    session->hello1_ack.ack_sent_time = rt.r_uint64_t;
     if (hello1_ack(label, listen_sock, session) != SUCCESS) {
         printf("Error hello1_ack\n");
         return FAILURE;
     }
-    if (async_set_timerfd_time(label, &session->hello1_ack_timer_fd,
-        (time_t)session->interval_hello1_ack_timer_fd,
-        (long)((session->interval_hello1_ack_timer_fd - (time_t)session->interval_hello1_ack_timer_fd) * 1e9),
-        (time_t)session->interval_hello1_ack_timer_fd,
-        (long)((session->interval_hello1_ack_timer_fd - (time_t)session->interval_hello1_ack_timer_fd) * 1e9)) != SUCCESS)
+    if (async_set_timerfd_time(label, &session->hello1_ack.ack_timer_fd,
+        (time_t)session->hello1_ack.interval_ack_timer_fd,
+        (long)((session->hello1_ack.interval_ack_timer_fd - (time_t)session->hello1_ack.interval_ack_timer_fd) * 1e9),
+        (time_t)session->hello1_ack.interval_ack_timer_fd,
+        (long)((session->hello1_ack.interval_ack_timer_fd - (time_t)session->hello1_ack.interval_ack_timer_fd) * 1e9)) != SUCCESS)
     {
         return FAILURE;
     }

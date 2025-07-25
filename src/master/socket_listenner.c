@@ -104,7 +104,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx)
 //======================================================================
 // (master_ctx->sio_c_session[i].client_id == ohello1->client_id) &&
 //======================================================================
-                        master_ctx->sio_c_session[i].hello1_rcvd
+                        master_ctx->sio_c_session[i].hello1_ack.rcvd
                    )
                 {
                     ip_already_connected = true;
@@ -150,12 +150,12 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx)
             }
             LOG_DEVEL_DEBUG("%sNew client connected from IP %s.", label, host_str);
             master_sio_c_session_t *session = &master_ctx->sio_c_session[slot_found];
-            session->hello1_rcvd = true;
-            session->hello1_rcvd_time = rt.r_uint64_t;
-            session->client_id = ohello1->client_id;
-            memcpy(session->kem_publickey, ohello1->publickey1, KEM_PUBLICKEY_BYTES / 2);
+            session->hello1_ack.rcvd = true;
+            session->hello1_ack.rcvd_time = rt.r_uint64_t;
+            session->identity.client_id = ohello1->client_id;
+            memcpy(session->identity.kem_publickey, ohello1->publickey1, KEM_PUBLICKEY_BYTES / 2);
 //======================================================================                    
-            if (async_create_timerfd(label, &session->hello1_ack_timer_fd) != SUCCESS) {
+            if (async_create_timerfd(label, &session->hello1_ack.ack_timer_fd) != SUCCESS) {
                 LOG_ERROR("%sFailed to async_create_timerfd.", label);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
@@ -167,7 +167,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx)
                 return FAILURE;
             }
 //======================================================================
-            if (async_create_incoming_event(label, &master_ctx->master_async, &session->hello1_ack_timer_fd) != SUCCESS) {
+            if (async_create_incoming_event(label, &master_ctx->master_async, &session->hello1_ack.ack_timer_fd) != SUCCESS) {
                 LOG_ERROR("%sFailed to async_create_incoming_event.", label);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;

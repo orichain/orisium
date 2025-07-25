@@ -2,10 +2,16 @@
 #define SESSIONS_MASTER_SESSION_H
 
 #include <stdbool.h>
+#include <netinet/in.h>
+#include <stdint.h>
+#include <sys/types.h>
+
 #include "types.h"
 #include "constants.h"
 #include "kalman.h"
 #include "pqc.h"
+#include "orilink/protocol.h"
+#include "async.h"
 
 typedef struct {
     double hbtime;
@@ -82,6 +88,16 @@ typedef struct {
 } master_cow_session_t;
 
 typedef struct {
+    bool rcvd;
+    uint64_t rcvd_time;
+    bool ack_sent;
+    int ack_sent_try_count;
+    uint64_t ack_sent_time;
+    int ack_timer_fd;
+    double interval_ack_timer_fd;
+} hello_ack_t;
+
+typedef struct {
 	int sio_index;
     bool in_use;
     struct sockaddr_in6 old_client_addr;
@@ -90,65 +106,19 @@ typedef struct {
 //======================================================================
 // IDENTITY
 //======================================================================    
-	uint64_t client_id;
-    uint8_t kem_privatekey[KEM_PRIVATEKEY_BYTES];
-    uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
-    uint8_t kem_ciphertext[KEM_CIPHERTEXT_BYTES];
-    uint8_t kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
-    uint64_t server_id;
-    uint16_t port;    
+	orilink_identity_t identity;
 //======================================================================
 // HELLO SOCK
 //======================================================================
-    bool hello1_rcvd;
-    uint64_t hello1_rcvd_time;
-    bool hello1_ack_sent;
-    int hello1_ack_sent_try_count;
-    uint64_t hello1_ack_sent_time;
-    int hello1_ack_timer_fd;
-    double interval_hello1_ack_timer_fd;
-//======================================================================    
-    bool hello2_rcvd;
-    uint64_t hello2_rcvd_time;    
-    bool hello2_ack_sent;
-    int hello2_ack_sent_try_count;
-    uint64_t hello2_ack_sent_time;
-    int hello2_ack_timer_fd;
-    double interval_hello2_ack_timer_fd;
-//======================================================================    
-    bool hello3_ack_rcvd;
-    uint64_t hello3_ack_rcvd_time;
-    bool hello3_ack_sent;
-    int hello3_ack_sent_try_count;
-    uint64_t hello3_ack_sent_time;
-    int hello3_ack_timer_fd;
-    double interval_hello3_ack_timer_fd;
-//======================================================================    
-    bool hello_end_rcvd;
-    uint64_t hello_end_rcvd_time;
-    bool sock_ready_sent;
-    int sock_ready_sent_try_count;
-    uint64_t sock_ready_sent_time;
-    int sock_ready_timer_fd;
-    double interval_sock_ready_timer_fd;
+    hello_ack_t hello1_ack;
+    hello_ack_t hello2_ack;
+    hello_ack_t hello3_ack;
+    hello_ack_t sock_ready;
 //======================================================================
-// RTT
+// ORICLE
 //======================================================================    
-    uint8_t first_check_rtt;
-    kalman_double_t rtt_kalman_filter;
-    int rtt_kalman_initialized_count;
-    double *rtt_kalman_calibration_samples; 
-    double rtt_temp_ewma_value;
-    double rtt_value_prediction;
-//======================================================================
-// RETRY
-//======================================================================    
-    uint8_t first_check_retry;
-    kalman_t retry_kalman_filter;
-    int retry_kalman_initialized_count;
-    float *retry_kalman_calibration_samples; 
-    float retry_temp_ewma_value;
-    float retry_value_prediction;
+    oricle_double_t rtt;
+    oricle_double_t retry;
 } master_sio_c_session_t;
 
 typedef struct {
@@ -156,5 +126,8 @@ typedef struct {
     bool in_use;
     struct sockaddr_in6 server_addr;
 } master_cow_c_session_t;
+
+void cleanup_hello_ack(const char *label, async_type_t *async, hello_ack_t *h);
+void setup_hello_ack(hello_ack_t *h);
 
 #endif
