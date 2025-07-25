@@ -247,14 +247,14 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
             } else {
                 bool event_founded_in_uds = false;
                 for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-                    if (current_fd == master_ctx->sio[i].uds[0]) {
+                    if (current_fd == master_ctx->sio_session[i].upp.uds[0]) {
                         event_founded_in_uds = true;
                         break;
                     }
                 }
                 if (!event_founded_in_uds) {
                     for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) { 
-                        if (current_fd == master_ctx->logic[i].uds[0]) {
+                        if (current_fd == master_ctx->logic_session[i].upp.uds[0]) {
                             event_founded_in_uds = true;
                             break;
                         }
@@ -262,7 +262,7 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
                 }
                 if (!event_founded_in_uds) {
                     for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
-                        if (current_fd == master_ctx->cow[i].uds[0]) {
+                        if (current_fd == master_ctx->cow_session[i].upp.uds[0]) {
                             event_founded_in_uds = true;
                             break;
                         }
@@ -270,7 +270,7 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
                 }
                 if (!event_founded_in_uds) {
                     for (int i = 0; i < MAX_DBR_WORKERS; ++i) { 
-                        if (current_fd == master_ctx->dbr[i].uds[0]) {
+                        if (current_fd == master_ctx->dbr_session[i].upp.uds[0]) {
                             event_founded_in_uds = true;
                             break;
                         }
@@ -278,7 +278,7 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
                 }                
                 if (!event_founded_in_uds) {
                     for (int i = 0; i < MAX_DBW_WORKERS; ++i) { 
-                        if (current_fd == master_ctx->dbw[i].uds[0]) {
+                        if (current_fd == master_ctx->dbw_session[i].upp.uds[0]) {
                             event_founded_in_uds = true;
                             break;
                         }

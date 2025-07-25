@@ -32,18 +32,28 @@ typedef struct {
     long double avgtt_value_prediction;
 } worker_metrics_t;
 
+typedef int uds_pair[2];
+
+typedef struct {
+	uds_pair uds;
+	pid_t pid;
+} uds_pair_pid_t;
+
 typedef struct {
     uint16_t task_count;
+    uds_pair_pid_t upp;
 	worker_metrics_t metrics;
 } master_sio_session_t;
 
 typedef struct {
     uint16_t task_count;
+    uds_pair_pid_t upp;
 	worker_metrics_t metrics;
 } master_logic_session_t;
 
 typedef struct {
     uint16_t task_count;
+    uds_pair_pid_t upp;
 	worker_metrics_t metrics;
 } master_dbr_session_t;
 //======================================================================
@@ -55,11 +65,13 @@ typedef struct {
 //======================================================================
 typedef struct {
 	bool in_use;
+    uds_pair_pid_t upp;
 	worker_metrics_t metrics;
 } master_dbw_session_t;
 
 typedef struct {
     uint16_t task_count;
+    uds_pair_pid_t upp;
     worker_metrics_t metrics;
 } master_cow_session_t;
 

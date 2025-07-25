@@ -15,7 +15,7 @@ status_t master_workers_shutdown(master_context *master_ctx, shutdown_type_t fla
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}
-		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->sio[i].uds[0], cmd_result.r_ipc_protocol_t);
+		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->sio_session[i].upp.uds[0], cmd_result.r_ipc_protocol_t);
 		if (send_result.status != SUCCESS) {
 			LOG_ERROR("%sFailed to sent master_worker_shutdown to SIO %ld.", label, i);
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
@@ -30,7 +30,7 @@ status_t master_workers_shutdown(master_context *master_ctx, shutdown_type_t fla
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}	
-		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->logic[i].uds[0], cmd_result.r_ipc_protocol_t);
+		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->logic_session[i].upp.uds[0], cmd_result.r_ipc_protocol_t);
 		if (send_result.status != SUCCESS) {
 			LOG_ERROR("%sFailed to sent master_worker_shutdown to Logic %ld.", label, i);
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
@@ -45,7 +45,7 @@ status_t master_workers_shutdown(master_context *master_ctx, shutdown_type_t fla
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}	
-		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->cow[i].uds[0], cmd_result.r_ipc_protocol_t);
+		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->cow_session[i].upp.uds[0], cmd_result.r_ipc_protocol_t);
 		if (send_result.status != SUCCESS) {
 			LOG_ERROR("%sFailed to sent master_worker_shutdown to COW %ld.", label, i);
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
@@ -60,7 +60,7 @@ status_t master_workers_shutdown(master_context *master_ctx, shutdown_type_t fla
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}	
-		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->dbr[i].uds[0], cmd_result.r_ipc_protocol_t);
+		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->dbr_session[i].upp.uds[0], cmd_result.r_ipc_protocol_t);
 		if (send_result.status != SUCCESS) {
 			LOG_ERROR("%sFailed to sent master_worker_shutdown to DBR %ld.", label, i);
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
@@ -75,7 +75,7 @@ status_t master_workers_shutdown(master_context *master_ctx, shutdown_type_t fla
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}	
-		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->dbw[i].uds[0], cmd_result.r_ipc_protocol_t);
+		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->dbw_session[i].upp.uds[0], cmd_result.r_ipc_protocol_t);
 		if (send_result.status != SUCCESS) {
 			LOG_ERROR("%sFailed to sent master_worker_shutdown to DBW %ld.", label, i);
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
@@ -94,7 +94,7 @@ status_t master_cow_connect(master_context *master_ctx, struct sockaddr_in6 *add
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
-    ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->cow[index].uds[0], cmd_result.r_ipc_protocol_t);
+    ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->cow_session[index].upp.uds[0], cmd_result.r_ipc_protocol_t);
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent master_cow_connect to COW %ld.", label, index);
         CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);

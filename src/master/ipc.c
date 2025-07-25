@@ -21,7 +21,7 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
     bool is_worker_uds = false;
 
     for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-        if (*current_fd == master_ctx->sio[i].uds[0]) {
+        if (*current_fd == master_ctx->sio_session[i].upp.uds[0]) {
             is_worker_uds = true;
             result.r_worker_type_t = SIO;
             worker_name = "SIO";
@@ -31,7 +31,7 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
     }
     if (!is_worker_uds) {
         for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-            if (*current_fd == master_ctx->logic[i].uds[0]) {
+            if (*current_fd == master_ctx->logic_session[i].upp.uds[0]) {
                 is_worker_uds = true;
                 result.r_worker_type_t = LOGIC;
                 worker_name = "Logic";
@@ -42,7 +42,7 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
     }
     if (!is_worker_uds) {
         for (int i = 0; i < MAX_COW_WORKERS; ++i) {
-            if (*current_fd == master_ctx->cow[i].uds[0]) {
+            if (*current_fd == master_ctx->cow_session[i].upp.uds[0]) {
                 is_worker_uds = true;
                 result.r_worker_type_t = COW;
                 worker_name = "COW";
@@ -53,7 +53,7 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
     }
     if (!is_worker_uds) {
         for (int i = 0; i < MAX_DBR_WORKERS; ++i) {
-            if (*current_fd == master_ctx->dbr[i].uds[0]) {
+            if (*current_fd == master_ctx->dbr_session[i].upp.uds[0]) {
                 is_worker_uds = true;
                 result.r_worker_type_t = DBR;
                 worker_name = "DBR";
@@ -64,7 +64,7 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
     }
     if (!is_worker_uds) {
         for (int i = 0; i < MAX_DBW_WORKERS; ++i) {
-            if (*current_fd == master_ctx->dbw[i].uds[0]) {
+            if (*current_fd == master_ctx->dbw_session[i].upp.uds[0]) {
                 is_worker_uds = true;
                 result.r_worker_type_t = DBW;
                 worker_name = "DBW";
