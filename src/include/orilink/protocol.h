@@ -2,7 +2,6 @@
 #define ORILINK_PROTOCOL_H
 
 #include <stdlib.h>
-#include <blake3.h>
 #include <string.h>
 #include <stdbool.h>
 #include "types.h"

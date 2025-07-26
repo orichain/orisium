@@ -1,4 +1,8 @@
 #include <common/aes.h>
+#include <endian.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "log.h"
 #include "types.h"
 #include "orilink/protocol.h"
@@ -8,6 +12,8 @@
 #include "sessions/master_session.h"
 #include "poly1305-donna.h"
 #include "utilities.h"
+#include "constants.h"
+#include "pqc.h"
 
 status_t hello1_ack(const char *label, int *listen_sock, master_sio_c_session_t *session) {
 	orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello1_ack(label, session->identity.client_id, session->hello1_ack.ack_sent_try_count);
