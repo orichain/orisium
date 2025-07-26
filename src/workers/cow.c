@@ -66,9 +66,9 @@ void cleanup_session(const char *label, async_type_t *cow_async, cow_c_session_t
     cleanup_hello(label, cow_async, &session->hello_end);
 }
 
-bool must_be_disconnected(const char *label, worker_type_t wot, int worker_idx, int session_index, async_type_t *cow_async, cow_c_session_t *session, int *master_uds_fd) {
-    if (session->hello1.sent_try_count > MAX_RETRY) {
-        LOG_DEVEL_DEBUG("%s session %d: disconnect => try count %d.", label, session_index, session->hello1.sent_try_count);
+bool server_disconnected(const char *label, worker_type_t wot, int worker_idx, int session_index, async_type_t *cow_async, cow_c_session_t *session, uint8_t try_count, int *master_uds_fd) {
+    if (try_count > (uint8_t)MAX_RETRY) {
+        LOG_DEVEL_DEBUG("%s session %d: disconnect => try count %d.", label, session_index, try_count);
         cow_master_connection(label, wot, worker_idx, &session->old_server_addr, CANNOTCONNECT, master_uds_fd);
         cleanup_session(label, cow_async, session);
         return true;
@@ -122,7 +122,7 @@ status_t send_hello2(const char *label, cow_c_session_t *session) {
     return SUCCESS;
 }
 
-void calculate_retry(const char *label, cow_c_session_t *session, int session_index, double try_count) {
+void cow_calculate_retry(const char *label, cow_c_session_t *session, int session_index, double try_count) {
     char *desc;
 	int needed = snprintf(NULL, 0, "ORICLE => RETRY %d", session_index);
 	desc = malloc(needed + 1);
@@ -131,7 +131,7 @@ void calculate_retry(const char *label, cow_c_session_t *session, int session_in
     free(desc);
 }
 
-void calculate_rtt(const char *label, cow_c_session_t *session, int session_index, double rtt_value) {
+void cow_calculate_rtt(const char *label, cow_c_session_t *session, int session_index, double rtt_value) {
     char *desc;
 	int needed = snprintf(NULL, 0, "ORICLE => RTT %d", session_index);
 	desc = malloc(needed + 1);
@@ -313,7 +313,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                         continue;
                     }
 //======================================================================
-// Send HELLO                    
+// Generate Identity                    
 //======================================================================
                     uint64_t client_id;
                     generate_connection_id(label, &client_id);
@@ -322,17 +322,19 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
-//======================================================================                    
+//======================================================================
+// Send HELLO1                    
+//======================================================================           
                     if (async_create_timerfd(label, &session->hello1.timer_fd) != SUCCESS) {
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
-//======================================================================
+//----------------------------------------------------------------------
                     if (send_hello1(label, session) != SUCCESS) {
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
-//======================================================================
+//----------------------------------------------------------------------
                     if (async_create_incoming_event(label, &cow_async, &session->hello1.timer_fd) != SUCCESS) {
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
@@ -397,7 +399,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                                    )
                                 {
                                     double try_count = (double)session->hello1.sent_try_count-(double)1;
-                                    calculate_retry(label, session, i, try_count);
+                                    cow_calculate_retry(label, session, i, try_count);
                                     uint64_t_status_t rt = get_realtime_time_ns(label);
                                     if (rt.status != SUCCESS) {
                                         LOG_ERROR("%sFailed to get_realtime_time_ns.", label);
@@ -409,8 +411,32 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                                     session->hello1.ack_rcvd_time = rt.r_uint64_t;
                                     uint64_t interval_ull = session->hello1.ack_rcvd_time - session->hello1.sent_time;
                                     double rtt_value = (double)interval_ull;
-                                    calculate_rtt(label, session, i, rtt_value);
+                                    cow_calculate_rtt(label, session, i, rtt_value);
                                     cleanup_hello(label, &cow_async, &session->hello1);
+//======================================================================
+// Send HELLO2                   
+//======================================================================           
+                                    if (async_create_timerfd(label, &session->hello2.timer_fd) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to async_create_timerfd.", label);
+                                        CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                        event_founded_in_session = true;
+                                        break;
+                                    }
+//----------------------------------------------------------------------
+                                    if (send_hello2(label, session) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to send_hello2.", label);
+                                        CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                        event_founded_in_session = true;
+                                        break;
+                                    }
+//----------------------------------------------------------------------
+                                    if (async_create_incoming_event(label, &cow_async, &session->hello2.timer_fd) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to async_create_incoming_event.", label);
+                                        CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                        event_founded_in_session = true;
+                                        break;
+                                    }        
+//======================================================================  
                                     CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                     event_founded_in_session = true;
                                 } else {
@@ -427,15 +453,29 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                         } else if (current_fd == session->hello1.timer_fd) {
                             uint64_t u;
                             read(session->hello1.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                            if (must_be_disconnected(label, wot, worker_idx, i, &cow_async, session, &master_uds_fd)) {
+                            if (server_disconnected(label, wot, worker_idx, i, &cow_async, session, session->hello1.sent_try_count, &master_uds_fd)) {
                                 event_founded_in_session = true;
                                 break;
                             }
                             LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", label, i, session->hello1.interval_timer_fd);
                             double try_count = (double)session->hello1.sent_try_count;
-                            calculate_retry(label, session, i, try_count);
+                            cow_calculate_retry(label, session, i, try_count);
                             session->hello1.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
                             send_hello1(label, session);
+                            event_founded_in_session = true;
+                            break;
+                        } else if (current_fd == session->hello2.timer_fd) {
+                            uint64_t u;
+                            read(session->hello2.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                            if (server_disconnected(label, wot, worker_idx, i, &cow_async, session, session->hello2.sent_try_count, &master_uds_fd)) {
+                                event_founded_in_session = true;
+                                break;
+                            }
+                            LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", label, i, session->hello2.interval_timer_fd);
+                            double try_count = (double)session->hello2.sent_try_count;
+                            cow_calculate_retry(label, session, i, try_count);
+                            session->hello2.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                            send_hello2(label, session);
                             event_founded_in_session = true;
                             break;
                         }

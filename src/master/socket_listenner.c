@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <inttypes.h>
+#include <stdbool.h>
 
 #include "log.h"
 #include "utilities.h"
@@ -15,12 +16,11 @@
 #include "master/process.h"
 #include "master/worker_metrics.h"
 #include "master/worker_selector.h"
-#include "master/server_orilink_cmds.h"
 #include "async.h"
 #include "constants.h"
 #include "pqc.h"
 #include "sessions/master_session.h"
-#include "stdbool.h"
+#include "master/server_orilink.h"
 
 status_t setup_socket_listenner(const char *label, master_context *master_ctx, uint16_t *listen_port) {
     struct sockaddr_in6 addr;
@@ -160,19 +160,60 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx)
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
-//======================================================================
+//----------------------------------------------------------------------
             if (send_hello1_ack(label, &master_ctx->listen_sock, session) != SUCCESS) {
                 LOG_ERROR("%sFailed to send_hello1_ack.", label);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
-//======================================================================
+//----------------------------------------------------------------------
             if (async_create_incoming_event(label, &master_ctx->master_async, &session->hello1_ack.ack_timer_fd) != SUCCESS) {
                 LOG_ERROR("%sFailed to async_create_incoming_event.", label);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }        
 //======================================================================
+            CLOSE_ORILINK_PROTOCOL(&received_protocol);
+            break;
+        }
+        case ORILINK_HELLO2: {
+            orilink_hello2_t *ohello2 = received_protocol->payload.orilink_hello2;
+            int session_index = -1;
+            for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
+                if (
+                        master_ctx->sio_c_session[i].in_use &&
+                        sockaddr_equal((const struct sockaddr *)&master_ctx->sio_c_session[i].old_client_addr, (const struct sockaddr *)&client_addr) &&
+                        (master_ctx->sio_c_session[i].identity.client_id == ohello2->client_id) &&
+                        master_ctx->sio_c_session[i].hello1_ack.ack_sent &&
+                        (!master_ctx->sio_c_session[i].hello2_ack.rcvd)
+                   )
+                {
+                    session_index = i;
+                    break;
+                }
+            }
+            if (session_index == -1) {
+                LOG_WARN("%sHELLO2 ditolak dari IP %s. Tidak pernah mengirim HELLO1_ACK ke IP ini atau HELLO2 dari IP ini sudah ditangani.", label, host_str);
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE_IVLDHDLD;
+            }
+            master_sio_c_session_t *session = &master_ctx->sio_c_session[session_index];
+            double try_count = (double)session->hello1_ack.ack_sent_try_count-(double)1;
+            sio_c_calculate_retry(label, session, session_index, try_count);
+            uint64_t_status_t rt = get_realtime_time_ns(label);
+            if (rt.status != SUCCESS) {
+                LOG_ERROR("%sFailed to get_realtime_time_ns.", label);
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            session->hello2_ack.rcvd = true;
+            session->hello2_ack.rcvd_time = rt.r_uint64_t;
+            memcpy(session->identity.kem_publickey + (KEM_PUBLICKEY_BYTES / 2), ohello2->publickey2, KEM_PUBLICKEY_BYTES / 2);
+            uint64_t interval_ull = session->hello2_ack.rcvd_time - session->hello1_ack.ack_sent_time;
+            double rtt_value = (double)interval_ull;
+            sio_c_calculate_rtt(label, session, session_index, rtt_value);
+            cleanup_hello_ack(label, &master_ctx->master_async, &session->hello1_ack);
+            LOG_DEVEL_DEBUG("===========================HELLO2 YA?==========================");
             CLOSE_ORILINK_PROTOCOL(&received_protocol);
             break;
         }

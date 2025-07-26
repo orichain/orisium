@@ -4,7 +4,8 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <bits/types/sig_atomic_t.h>
-#include <stdlib.h>
+#include <math.h>
+#include <stdio.h>
 
 #include "log.h"
 #include "constants.h"
@@ -18,6 +19,7 @@
 #include "master/worker_metrics.h"
 #include "master/worker_selector.h"
 #include "master/worker_ipc_cmds.h"
+#include "master/server_orilink.h"
 #include "node.h"
 #include "pqc.h"
 #include "kalman.h"
@@ -119,6 +121,15 @@ void cleanup_master_sio_session(const char *label, async_type_t *master_async, m
     cleanup_hello_ack(label, master_async, &session->hello2_ack);
     cleanup_hello_ack(label, master_async, &session->hello3_ack);
     cleanup_hello_ack(label, master_async, &session->sock_ready);
+}
+
+bool client_disconnected(const char *label, int session_index, async_type_t *master_async, master_sio_c_session_t *session, uint8_t try_count) {
+    if (try_count > (uint8_t)MAX_RETRY) {
+        LOG_DEVEL_DEBUG("%s session %d: disconnect => try count %d.", label, session_index, try_count);
+        cleanup_master_sio_session(label, master_async, session);
+        return true;
+    }
+    return false;
 }
 
 void run_master_process(master_context *master_ctx, uint16_t *listen_port, bootstrap_nodes_t *bootstrap_nodes) {
@@ -292,6 +303,29 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
                     }
                     continue;
                 }
+                bool event_founded_in_sio_c_session = false;
+                for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
+                    master_sio_c_session_t *session;
+                    session = &master_ctx->sio_c_session[i];
+                    if (session->in_use) {
+                        if (current_fd == session->hello1_ack.ack_timer_fd) {
+                            uint64_t u;
+                            read(session->hello1_ack.ack_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                            if (client_disconnected(label, i, &master_ctx->master_async, session, session->hello1_ack.ack_sent_try_count)) {
+                                event_founded_in_sio_c_session = true;
+                                break;
+                            }
+                            LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", label, i, session->hello1_ack.interval_ack_timer_fd);
+                            double try_count = (double)session->hello1_ack.ack_sent_try_count;
+                            sio_c_calculate_retry(label, session, i, try_count);
+                            session->hello1_ack.interval_ack_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                            send_hello1_ack(label, &master_ctx->listen_sock, session);
+                            event_founded_in_sio_c_session = true;
+                            break;
+                        }
+                    }
+                }
+                if (event_founded_in_sio_c_session) continue;
 //======================================================================
 // Event yang belum ditangkap
 //======================================================================                 
