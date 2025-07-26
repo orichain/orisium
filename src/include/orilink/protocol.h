@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <blake3.h>
 #include <string.h>
+#include <poly1305-donna.h>
+#include <common/fips202.h>
+#include <stdbool.h>
 #include "types.h"
 #include "constants.h"
 #include "pqc.h"
@@ -261,7 +264,7 @@ typedef struct {
 typedef struct {
 	uint8_t version[ORILINK_VERSION_BYTES];
 	orilink_protocol_type_t type;
-    uint32_t chksum;
+    uint8_t mac[ORILINK_MAC];
 	union {
 //======================================================================
 // Untuk pembentukan sock_fd baru
@@ -371,17 +374,20 @@ static inline void CLOSE_ORILINK_PROTOCOL(orilink_protocol_t **protocol_ptr) {
     }
 }
 
-static inline uint32_t orilink_hash32(const void* data, size_t len) {
-    uint8_t out[32]; // full BLAKE3 hash
-    blake3_hasher hasher;
-    blake3_hasher_init(&hasher);
-    blake3_hasher_update(&hasher, data, len);
-    blake3_hasher_finalize(&hasher, out, 32);
-
-    // Ambil 4 byte pertama, perlakukan sebagai big-endian, dan konversi ke host byte order
-    uint32_t hash_val_be;
-    memcpy(&hash_val_be, out, sizeof(uint32_t)); // Salin 4 byte pertama dari output hash BLAKE3
-    return be32toh(hash_val_be);                 // Konversi dari big-endian (network byte order) ke host byte order
+static inline uint8_t *orilink_mac(uint8_t *key, const uint8_t *data, size_t len) {
+    bool nokey = false;
+    if (!key) {
+        nokey = true;
+        key = (uint8_t *)calloc(1, HASHES_BYTES);
+        shake256(key, HASHES_BYTES, data, len);
+    }
+    poly1305_context ctx;
+	poly1305_init(&ctx, key);
+	poly1305_update(&ctx, data, len);
+    uint8_t *mac = (uint8_t *)calloc(1, ORILINK_MAC);
+	poly1305_finish(&ctx, mac);
+    if (nokey) free(key);
+    return mac;
 }
 
 typedef struct {

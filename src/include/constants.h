@@ -42,6 +42,8 @@
 #define HEALTHY_THRESHOLD 75
 
 #define HASHES_BYTES 32
+#define HAS_GCC_4_4_64BIT
+#define ORILINK_MAC 16
 #define AES_NONCE_BYTES 12
 #define AES_TAG_BYTES 16
 

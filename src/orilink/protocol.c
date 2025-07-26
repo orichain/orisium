@@ -42,6 +42,7 @@
 #include "log.h"
 #include "constants.h"
 #include "pqc.h"
+#include "poly1305-donna.h"
 
 static inline size_t_status_t calculate_orilink_payload_size(const char *label, const orilink_protocol_t* p, bool checkfixheader) {
 	size_t_status_t result;
@@ -383,7 +384,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
     if (checkfixheader) {
         result.r_size_t = payload_fixed_size;
     } else {
-        result.r_size_t = ORILINK_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint32_t) + payload_fixed_size + payload_dynamic_size;
+        result.r_size_t = ORILINK_VERSION_BYTES + sizeof(uint8_t) + ORILINK_MAC + payload_fixed_size + payload_dynamic_size;
     }
     result.status = SUCCESS;
     return result;
@@ -443,13 +444,13 @@ ssize_t_status_t orilink_serialize(const char *label, const orilink_protocol_t* 
     }
     memcpy(current_buffer + offset, (uint8_t *)&p->type, sizeof(uint8_t));
     offset += sizeof(uint8_t);
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint32_t), *buffer_size) != SUCCESS) {
+    if (CHECK_BUFFER_BOUNDS(offset, ORILINK_MAC, *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
     }
     offset_chksum = offset;
-    memset(current_buffer + offset, 0, sizeof(uint32_t));
-    offset += sizeof(uint32_t);
+    memset(current_buffer + offset, 0, ORILINK_MAC);
+    offset += ORILINK_MAC;
     offset_payload = offset;
     status_t result_pyld = FAILURE;
     switch (p->type) {
@@ -544,8 +545,9 @@ ssize_t_status_t orilink_serialize(const char *label, const orilink_protocol_t* 
         result.status = FAILURE_OPYLD;
         return result;
     }
-    uint32_t chksum_be = htobe32(orilink_hash32(current_buffer + offset_payload, offset - offset_payload));
-    memcpy(current_buffer + offset_chksum, &chksum_be, sizeof(uint32_t));
+    uint8_t *key = NULL;
+    uint8_t *mac = orilink_mac(key, current_buffer + offset_payload, offset - offset_payload);
+    memcpy(current_buffer + offset_chksum, mac, ORILINK_MAC);
     result.r_ssize_t = (ssize_t)offset;
     result.status = SUCCESS;
     return result;
@@ -556,8 +558,8 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, const uint8_t
     result.r_orilink_protocol_t = NULL;
     result.status = FAILURE;
 
-    if (!buffer || len < (ORILINK_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint32_t))) {
-        LOG_ERROR("%sBuffer terlalu kecil untuk Version, Type dan Chksum. Len: %zu", label, len);
+    if (!buffer || len < (ORILINK_VERSION_BYTES + sizeof(uint8_t) + ORILINK_MAC)) {
+        LOG_ERROR("%sBuffer terlalu kecil untuk Version, Type dan Mac. Len: %zu", label, len);
         result.status = FAILURE_OOBUF;
         return result;
     }
@@ -574,12 +576,11 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, const uint8_t
     }
     LOG_DEBUG("%sAllocating orilink_protocol_t struct: %zu bytes.", label, sizeof(orilink_protocol_t));
     memcpy(p->version, buffer, ORILINK_VERSION_BYTES);
-    memcpy((uint8_t *)&p->type, buffer + ORILINK_VERSION_BYTES, sizeof(uint8_t));
-    size_t current_buffer_offset = ORILINK_VERSION_BYTES + sizeof(uint8_t);
-    uint32_t chksum_be;
-    memcpy(&chksum_be, buffer + current_buffer_offset, sizeof(uint32_t));
-    p->chksum = be32toh(chksum_be);
-    current_buffer_offset += sizeof(uint32_t);
+    size_t current_buffer_offset = ORILINK_VERSION_BYTES;
+    memcpy((uint8_t *)&p->type, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+    memcpy(p->mac, buffer + current_buffer_offset, ORILINK_MAC);
+    current_buffer_offset += ORILINK_MAC;
     size_t offset_payload = current_buffer_offset;
     size_t_status_t psize = calculate_orilink_payload_size(label, p, true);
     if (psize.status != SUCCESS) {
@@ -1092,14 +1093,17 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, const uint8_t
         result.status = FAILURE_OPYLD;
         return result;
     }
-    uint32_t calculated_chksum = orilink_hash32(buffer + offset_payload, current_buffer_offset - offset_payload);
-    if (calculated_chksum != p->chksum) {
-        LOG_ERROR("%sChecksum mismatch! Received: 0x%08x, Calculated: 0x%08x", label, p->chksum, calculated_chksum);
+    uint8_t *key = NULL;
+    uint8_t *mac = orilink_mac(key, buffer + offset_payload, current_buffer_offset - offset_payload);
+    if (poly1305_verify(mac, p->mac)) {
+        LOG_DEBUG("%sChecksum cocok: 0x%08x", label, mac);
+        free(mac);
+    } else {
+        LOG_ERROR("%sChecksum mismatch! Received: 0x%08x, Calculated: 0x%08x", label, p->mac, mac);
         CLOSE_ORILINK_PROTOCOL(&p);
         result.status = FAILURE_CHKSUM;
+        free(mac);
         return result;
-    } else {
-        LOG_DEBUG("%sChecksum cocok: 0x%08x", label, p->chksum);
     }
     result.r_orilink_protocol_t = p;
     result.status = SUCCESS;

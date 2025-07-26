@@ -6,6 +6,8 @@
 #include <crypto_sign/ml-dsa-87/clean/api.h>
 #include <crypto_kem/ml-kem-1024/clean/api.h>
 #include <common/fips202.h>
+#include <common/randombytes.h>
+#include <common/aes.h>
 #include "types.h"
 
 #define KEM_ALGO MLKEM1024

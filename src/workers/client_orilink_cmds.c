@@ -3,6 +3,7 @@
 #include "orilink/protocol.h"
 #include "orilink/hello1.h"
 #include "orilink/hello2.h"
+#include "orilink/hello3.h"
 #include "sessions/workers_session.h"
 
 status_t hello1(const char *label, cow_c_session_t *session) {
@@ -34,6 +35,23 @@ status_t hello2(const char *label, cow_c_session_t *session) {
         return send_result.status;
     } else {
         LOG_DEBUG("%sSent hello2 to Server.", label);
+    }
+    CLOSE_ORILINK_PROTOCOL(&cmd_result.r_orilink_protocol_t);
+    return SUCCESS;
+}
+
+status_t hello3(const char *label, cow_c_session_t *session) {
+	orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello3(label, session->identity.client_id, session->hello1.sent_try_count);
+    if (cmd_result.status != SUCCESS) {
+        return FAILURE;
+    }
+    ssize_t_status_t send_result = send_orilink_protocol_packet(label, &session->sock_fd, (const struct sockaddr *)&session->old_server_addr, cmd_result.r_orilink_protocol_t);
+    if (send_result.status != SUCCESS) {
+        LOG_ERROR("%sFailed to sent hello3 to Server.", label);
+        CLOSE_ORILINK_PROTOCOL(&cmd_result.r_orilink_protocol_t);
+        return send_result.status;
+    } else {
+        LOG_DEBUG("%sSent hello3 to Server.", label);
     }
     CLOSE_ORILINK_PROTOCOL(&cmd_result.r_orilink_protocol_t);
     return SUCCESS;

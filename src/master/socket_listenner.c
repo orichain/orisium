@@ -153,8 +153,10 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx)
             session->hello1_ack.rcvd = true;
             session->hello1_ack.rcvd_time = rt.r_uint64_t;
             session->identity.client_id = ohello1->client_id;
-            memcpy(session->identity.kem_publickey, ohello1->publickey1, KEM_PUBLICKEY_BYTES / 2);
-//======================================================================                    
+            memcpy(session->client_kem_publickey, ohello1->publickey1, KEM_PUBLICKEY_BYTES / 2);
+//====================================================================== 
+// SEND HELLO1_ACK                   
+//====================================================================== 
             if (async_create_timerfd(label, &session->hello1_ack.ack_timer_fd) != SUCCESS) {
                 LOG_ERROR("%sFailed to async_create_timerfd.", label);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
@@ -208,12 +210,121 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx)
             }
             session->hello2_ack.rcvd = true;
             session->hello2_ack.rcvd_time = rt.r_uint64_t;
-            memcpy(session->identity.kem_publickey + (KEM_PUBLICKEY_BYTES / 2), ohello2->publickey2, KEM_PUBLICKEY_BYTES / 2);
+            memcpy(session->client_kem_publickey + (KEM_PUBLICKEY_BYTES / 2), ohello2->publickey2, KEM_PUBLICKEY_BYTES / 2);
             uint64_t interval_ull = session->hello2_ack.rcvd_time - session->hello1_ack.ack_sent_time;
             double rtt_value = (double)interval_ull;
             sio_c_calculate_rtt(label, session, session_index, rtt_value);
-            cleanup_hello_ack(label, &master_ctx->master_async, &session->hello1_ack);
-            LOG_DEVEL_DEBUG("===========================HELLO2 YA?==========================");
+            cleanup_hello_ack(label, &master_ctx->master_async, &session->hello1_ack);            
+//======================================================================
+// Generate Identity                    
+//======================================================================
+            if (KEM_GENERATE_KEYPAIR(session->identity.kem_publickey, session->identity.kem_privatekey) != 0) {
+                LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", label);
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            if (KEM_ENCODE_SHAREDSECRET(session->identity.kem_ciphertext, session->identity.kem_sharedsecret, session->client_kem_publickey) != 0) {
+                LOG_ERROR("%sFailed to KEM_ENCODE_SHAREDSECRET.", label);
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+//====================================================================== 
+// SEND HELLO2_ACK                   
+//====================================================================== 
+            if (async_create_timerfd(label, &session->hello2_ack.ack_timer_fd) != SUCCESS) {
+                LOG_ERROR("%sFailed to async_create_timerfd.", label);
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+//----------------------------------------------------------------------
+            if (send_hello2_ack(label, &master_ctx->listen_sock, session) != SUCCESS) {
+                LOG_ERROR("%sFailed to send_hello2_ack.", label);
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+//----------------------------------------------------------------------
+            if (async_create_incoming_event(label, &master_ctx->master_async, &session->hello2_ack.ack_timer_fd) != SUCCESS) {
+                LOG_ERROR("%sFailed to async_create_incoming_event.", label);
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }        
+//======================================================================                       
+            print_hex(label, session->identity.kem_ciphertext, KEM_CIPHERTEXT_BYTES, 1);
+            CLOSE_ORILINK_PROTOCOL(&received_protocol);
+            break;
+        }
+        case ORILINK_HELLO3: {
+            orilink_hello3_t *ohello3 = received_protocol->payload.orilink_hello3;
+            int session_index = -1;
+            for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
+                if (
+                        master_ctx->sio_c_session[i].in_use &&
+                        sockaddr_equal((const struct sockaddr *)&master_ctx->sio_c_session[i].old_client_addr, (const struct sockaddr *)&client_addr) &&
+                        (master_ctx->sio_c_session[i].identity.client_id == ohello3->client_id) &&
+                        master_ctx->sio_c_session[i].hello1_ack.ack_sent &&
+                        master_ctx->sio_c_session[i].hello2_ack.ack_sent &&
+                        (!master_ctx->sio_c_session[i].hello3_ack.rcvd)
+                   )
+                {
+                    session_index = i;
+                    break;
+                }
+            }
+            if (session_index == -1) {
+                LOG_WARN("%sHELLO3 ditolak dari IP %s. Tidak pernah mengirim HELLO1_ACK dan atau HELLO2_ACK ke IP ini atau HELLO3 dari IP ini sudah ditangani.", label, host_str);
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE_IVLDHDLD;
+            }
+            master_sio_c_session_t *session = &master_ctx->sio_c_session[session_index];
+            double try_count = (double)session->hello2_ack.ack_sent_try_count-(double)1;
+            sio_c_calculate_retry(label, session, session_index, try_count);
+            uint64_t_status_t rt = get_realtime_time_ns(label);
+            if (rt.status != SUCCESS) {
+                LOG_ERROR("%sFailed to get_realtime_time_ns.", label);
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            session->hello3_ack.rcvd = true;
+            session->hello3_ack.rcvd_time = rt.r_uint64_t;
+            uint64_t interval_ull = session->hello3_ack.rcvd_time - session->hello2_ack.ack_sent_time;
+            double rtt_value = (double)interval_ull;
+            sio_c_calculate_rtt(label, session, session_index, rtt_value);
+            cleanup_hello_ack(label, &master_ctx->master_async, &session->hello2_ack);            
+//======================================================================
+// Generate Identity                    
+//======================================================================
+            if (KEM_GENERATE_KEYPAIR(session->identity.kem_publickey, session->identity.kem_privatekey) != 0) {
+                LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", label);
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            if (KEM_ENCODE_SHAREDSECRET(session->identity.kem_ciphertext, session->identity.kem_sharedsecret, session->client_kem_publickey) != 0) {
+                LOG_ERROR("%sFailed to KEM_ENCODE_SHAREDSECRET.", label);
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+//====================================================================== 
+// SEND HELLO3_ACK                   
+//====================================================================== 
+            if (async_create_timerfd(label, &session->hello3_ack.ack_timer_fd) != SUCCESS) {
+                LOG_ERROR("%sFailed to async_create_timerfd.", label);
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+//----------------------------------------------------------------------
+            if (send_hello3_ack(label, &master_ctx->listen_sock, session) != SUCCESS) {
+                LOG_ERROR("%sFailed to send_hello3_ack.", label);
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+//----------------------------------------------------------------------
+            if (async_create_incoming_event(label, &master_ctx->master_async, &session->hello3_ack.ack_timer_fd) != SUCCESS) {
+                LOG_ERROR("%sFailed to async_create_incoming_event.", label);
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }        
+//======================================================================                       
+            print_hex(label, session->identity.kem_ciphertext, KEM_CIPHERTEXT_BYTES, 1);
             CLOSE_ORILINK_PROTOCOL(&received_protocol);
             break;
         }
@@ -221,44 +332,5 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx)
             CLOSE_ORILINK_PROTOCOL(&received_protocol);
             return FAILURE;
     }
-    /*
-	master_sio_dc_session_t_status_t ccid_result = find_first_ratelimited_master_sio_dc_session("[Master]: ", master_ctx->sio_dc_session, &client_addr);
-	if (ccid_result.status == SUCCESS) {
-		status_t ccid_del_result = delete_master_sio_dc_session("[Master]: ", &master_ctx->sio_dc_session, &client_addr);
-		if (ccid_del_result != SUCCESS) return FAILURE;
-	} else {
-		if (ccid_result.status == FAILURE_RATELIMIT) {
-			LOG_WARN("%sKoneksi ditolak dari IP %s. ratelimit mungkin ddoser.", label, host_str);
-            CLOSE_ORILINK_PROTOCOL(&received_protocol);
-			return FAILURE_ALRDYCONTD;
-		} else {
-            CLOSE_ORILINK_PROTOCOL(&received_protocol);
-			return FAILURE;
-		}
-	}
-    */
-    
-	/*
-	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_client_request_task(label, &client_sock, host_ip_bin, (uint16_t)0, NULL);
-	if (cmd_result.status != SUCCESS) {
-		return cmd_result.status;
-	}	
-	ssize_t_status_t send_result = send_ipc_protocol_message(label, &sio_worker_uds_fd, cmd_result.r_ipc_protocol_t, &client_sock);
-	if (send_result.status != SUCCESS) {
-		LOG_ERROR("%sFailed to forward client FD %d to Server IO Worker %d.",
-				  label, client_sock, sio_worker_idx);
-	} else {
-        if (new_task_metrics(label, master_ctx, SIO, sio_worker_idx) != SUCCESS) {
-            LOG_ERROR("%sFailed to input new task in SIO %d metrics.",
-                    label, sio_worker_idx);
-        } else {
-            LOG_DEBUG("%sForwarding client FD %d from IP %s to Server IO Worker %d (UDS FD %d). Bytes sent: %zd.",
-                    label, client_sock, host_str, sio_worker_idx, sio_worker_uds_fd, send_result.r_ssize_t);
-        }
-	}
-	CLOSE_FD(&client_sock); // Menghindari kebocoran FD jika send_ipc gagal => biarkan client reconnect
-	CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
-    */
-    //CLOSE_ORILINK_PROTOCOL(&received_protocol);
 	return SUCCESS;
 }

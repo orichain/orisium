@@ -10,6 +10,7 @@
 #include <bits/types/sig_atomic_t.h>
 #include <math.h>
 #include <netinet/in.h>
+#include <stdbool.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -23,7 +24,6 @@
 #include "workers/client_orilink_cmds.h"
 #include "kalman.h"
 #include "pqc.h"
-#include "stdbool.h"
 
 void setup_session(cow_c_session_t *session) {
     session->in_use = false;
@@ -116,6 +116,29 @@ status_t send_hello2(const char *label, cow_c_session_t *session) {
         (long)((session->hello2.interval_timer_fd - (time_t)session->hello2.interval_timer_fd) * 1e9),
         (time_t)session->hello2.interval_timer_fd,
         (long)((session->hello2.interval_timer_fd - (time_t)session->hello2.interval_timer_fd) * 1e9)) != SUCCESS)
+    {
+        return FAILURE;
+    }
+    return SUCCESS;
+}
+
+status_t send_hello3(const char *label, cow_c_session_t *session) {
+    uint64_t_status_t rt = get_realtime_time_ns(label);
+    if (rt.status != SUCCESS) {
+        return FAILURE;
+    }
+    session->hello3.sent = true;
+    session->hello3.sent_try_count++;
+    session->hello3.sent_time = rt.r_uint64_t;
+    if (hello3(label, session) != SUCCESS) {
+        printf("Error hello3\n");
+        return FAILURE;
+    }
+    if (async_set_timerfd_time(label, &session->hello3.timer_fd,
+        (time_t)session->hello3.interval_timer_fd,
+        (long)((session->hello3.interval_timer_fd - (time_t)session->hello3.interval_timer_fd) * 1e9),
+        (time_t)session->hello3.interval_timer_fd,
+        (long)((session->hello3.interval_timer_fd - (time_t)session->hello3.interval_timer_fd) * 1e9)) != SUCCESS)
     {
         return FAILURE;
     }
@@ -315,8 +338,11 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 //======================================================================
 // Generate Identity                    
 //======================================================================
-                    uint64_t client_id;
-                    generate_connection_id(label, &client_id);
+                    uint64_t client_id = 0ULL;
+                    if (generate_connection_id(label, &client_id) != SUCCESS) {
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        continue;
+                    }
                     session->identity.client_id = client_id;
                     if (KEM_GENERATE_KEYPAIR(session->identity.kem_publickey, session->identity.kem_privatekey) != 0) {
                         CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -416,6 +442,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 //======================================================================
 // Send HELLO2                   
 //======================================================================           
+                                    print_hex(label, session->identity.kem_publickey, KEM_PUBLICKEY_BYTES, 1);
                                     if (async_create_timerfd(label, &session->hello2.timer_fd) != SUCCESS) {
                                         LOG_ERROR("%sFailed to async_create_timerfd.", label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
@@ -439,12 +466,71 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 //======================================================================  
                                     CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                     event_founded_in_session = true;
+                                    break;
                                 } else {
                                     LOG_ERROR("%sKoneksi ditolak Tidak pernah mengirim hello1 ke IP %s.", label, host_str);
                                     CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                     event_founded_in_session = true;
+                                    break;
                                 }
-                                break;
+                            } else if (received_protocol->type == ORILINK_HELLO2_ACK) {
+                                orilink_hello2_ack_t *ohello2_ack = received_protocol->payload.orilink_hello2_ack;
+                                if (
+                                        sockaddr_equal((const struct sockaddr *)&session->old_server_addr, (const struct sockaddr *)&server_addr) &&
+                                        (session->identity.client_id == ohello2_ack->client_id) &&
+                                        session->hello1.sent &&
+                                        session->hello2.sent
+                                   )
+                                {
+                                    double try_count = (double)session->hello2.sent_try_count-(double)1;
+                                    cow_calculate_retry(label, session, i, try_count);
+                                    uint64_t_status_t rt = get_realtime_time_ns(label);
+                                    if (rt.status != SUCCESS) {
+                                        LOG_ERROR("%sFailed to get_realtime_time_ns.", label);
+                                        CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                        event_founded_in_session = true;
+                                        break;
+                                    }
+                                    session->hello2.ack_rcvd = true;
+                                    session->hello2.ack_rcvd_time = rt.r_uint64_t;
+                                    memcpy(session->identity.kem_ciphertext, ohello2_ack->ciphertext1, KEM_CIPHERTEXT_BYTES / 2);
+                                    uint64_t interval_ull = session->hello2.ack_rcvd_time - session->hello2.sent_time;
+                                    double rtt_value = (double)interval_ull;
+                                    cow_calculate_rtt(label, session, i, rtt_value);
+                                    cleanup_hello(label, &cow_async, &session->hello2);
+//======================================================================
+// Send HELLO3
+//======================================================================           
+                                    if (async_create_timerfd(label, &session->hello3.timer_fd) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to async_create_timerfd.", label);
+                                        CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                        event_founded_in_session = true;
+                                        break;
+                                    }
+//----------------------------------------------------------------------
+                                    if (send_hello3(label, session) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to send_hello3.", label);
+                                        CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                        event_founded_in_session = true;
+                                        break;
+                                    }
+//----------------------------------------------------------------------
+                                    if (async_create_incoming_event(label, &cow_async, &session->hello3.timer_fd) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to async_create_incoming_event.", label);
+                                        CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                        event_founded_in_session = true;
+                                        break;
+                                    }        
+//======================================================================  
+                                    CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                    event_founded_in_session = true;
+                                    break;
+                                } else {
+                                    LOG_ERROR("%sKoneksi ditolak Tidak pernah mengirim HELLO1 dan atau HELLO2 ke IP %s.", label, host_str);
+                                    CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                    event_founded_in_session = true;
+                                    break;
+                                }
                             } else {
                                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                 event_founded_in_session = true;
@@ -476,6 +562,20 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                             cow_calculate_retry(label, session, i, try_count);
                             session->hello2.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
                             send_hello2(label, session);
+                            event_founded_in_session = true;
+                            break;
+                        } else if (current_fd == session->hello3.timer_fd) {
+                            uint64_t u;
+                            read(session->hello3.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                            if (server_disconnected(label, wot, worker_idx, i, &cow_async, session, session->hello3.sent_try_count, &master_uds_fd)) {
+                                event_founded_in_session = true;
+                                break;
+                            }
+                            LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", label, i, session->hello3.interval_timer_fd);
+                            double try_count = (double)session->hello3.sent_try_count;
+                            cow_calculate_retry(label, session, i, try_count);
+                            session->hello3.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                            send_hello3(label, session);
                             event_founded_in_session = true;
                             break;
                         }
