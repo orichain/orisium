@@ -113,6 +113,7 @@ typedef struct {
     uint8_t remote_nonce[AES_NONCE_BYTES];
     uint32_t remote_ctr;
     uint8_t encrypted_server_id_port[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES];
+    uint8_t temp_kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
 //======================================================================
 // HELLO SOCK
 //======================================================================

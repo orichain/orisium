@@ -56,7 +56,7 @@ status_t setup_socket_listenner(const char *label, master_context *master_ctx, u
     return SUCCESS;
 }
 
-status_t handle_listen_sock_event(const char *label, master_context *master_ctx) {
+status_t handle_listen_sock_event(const char *label, master_context *master_ctx, uint16_t *listen_port) {
     struct sockaddr_in6 client_addr;
 	char host_str[NI_MAXHOST];
     char port_str[NI_MAXSERV];
@@ -236,7 +236,11 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx)
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
-            if (KEM_ENCODE_SHAREDSECRET(session->identity.kem_ciphertext, session->identity.kem_sharedsecret, session->client_kem_publickey) != 0) {
+//----------------------------------------------------------------------
+// disimpan di temp_kem_sharedsecret terlebih dahulu karena clienr
+// belum siap
+//----------------------------------------------------------------------
+            if (KEM_ENCODE_SHAREDSECRET(session->identity.kem_ciphertext, session->temp_kem_sharedsecret, session->client_kem_publickey) != 0) {
                 LOG_ERROR("%sFailed to KEM_ENCODE_SHAREDSECRET.", label);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
@@ -318,18 +322,19 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx)
             sio_c_calculate_rtt(label, session, session_index, rtt_value);
             cleanup_hello_ack(label, &master_ctx->master_async, &session->hello2_ack);            
 //======================================================================
-// Generate Identity                    
+// Generate Nonce, Server ID, Port
 //======================================================================
-            if (KEM_GENERATE_KEYPAIR(session->identity.kem_publickey, session->identity.kem_privatekey) != 0) {
-                LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", label);
+            if (generate_nonce(label, session->local_nonce) != SUCCESS) {
+                LOG_ERROR("%sFailed to generate_nonce.", label);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
-            if (KEM_ENCODE_SHAREDSECRET(session->identity.kem_ciphertext, session->identity.kem_sharedsecret, session->client_kem_publickey) != 0) {
-                LOG_ERROR("%sFailed to KEM_ENCODE_SHAREDSECRET.", label);
+            if (generate_connection_id(label, &session->identity.server_id) != SUCCESS) {
+                LOG_ERROR("%sFailed to generate_connection_id.", label);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
+            session->identity.port = *listen_port + session_index;
 //====================================================================== 
 // SEND HELLO3_ACK                   
 //====================================================================== 
@@ -351,7 +356,6 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx)
                 return FAILURE;
             }        
 //======================================================================                       
-            print_hex(label, session->identity.kem_ciphertext, KEM_CIPHERTEXT_BYTES, 1);
             CLOSE_ORILINK_PROTOCOL(&received_protocol);
             break;
         }

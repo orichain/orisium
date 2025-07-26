@@ -8,7 +8,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <netinet/in.h>
-#include <common/fips202.h>
 
 #include "utilities.h"
 #include "orilink/protocol.h"
@@ -547,8 +546,11 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key, uint8_t* non
         return result;
     }
     uint8_t mac[AES_TAG_BYTES];
-    shake256(key, HASHES_BYTES, current_buffer + offset_payload, offset - offset_payload);
-    orilink_mac(key, mac, current_buffer + offset_payload, offset - offset_payload);
+    //shake256(key, HASHES_BYTES, current_buffer + offset_payload, offset - offset_payload);
+    poly1305_context ctx;
+	poly1305_init(&ctx, key);
+	poly1305_update(&ctx, current_buffer + offset_payload, offset - offset_payload);
+	poly1305_finish(&ctx, mac);
     memcpy(current_buffer + offset_chksum, mac, AES_TAG_BYTES);
     result.r_ssize_t = (ssize_t)offset;
     result.status = SUCCESS;
@@ -1096,8 +1098,11 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key,
         return result;
     }
     uint8_t mac[AES_TAG_BYTES];
-    shake256(key, HASHES_BYTES, buffer + offset_payload, current_buffer_offset - offset_payload);
-    orilink_mac(key, mac, buffer + offset_payload, current_buffer_offset - offset_payload);
+    //shake256(key, HASHES_BYTES, buffer + offset_payload, current_buffer_offset - offset_payload);
+    poly1305_context ctx;
+	poly1305_init(&ctx, key);
+	poly1305_update(&ctx, buffer + offset_payload, current_buffer_offset - offset_payload);
+	poly1305_finish(&ctx, mac);
     if (poly1305_verify(mac, p->mac)) {
         LOG_DEBUG("%sChecksum cocok: 0x%08x", label, mac);
     } else {
@@ -1169,7 +1174,6 @@ status_t receive_orilink_raw_protocol_packet(const char *label, orilink_raw_prot
     uint16_t rn = (uint16_t)n;
     memcpy(&raw->n, &rn, sizeof(uint16_t));
     memcpy(raw->recv_buffer, recv_buffer, ORILINK_MAX_PACKET_SIZE);
-    print_hex("========", raw->recv_buffer, raw->n, 1);
     memcpy(raw->version, recv_buffer, ORILINK_VERSION_BYTES);
     size_t current_buffer_offset = ORILINK_VERSION_BYTES;
     memcpy((uint8_t *)&raw->type, recv_buffer + current_buffer_offset, sizeof(uint8_t));

@@ -98,6 +98,7 @@ void setup_master_sio_session(master_sio_c_session_t *session) {
     memset(session->remote_nonce, 0, AES_NONCE_BYTES);
     session->remote_ctr = (uint32_t)0;
     memset(session->encrypted_server_id_port, 0, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
+    memset(session->temp_kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
     setup_oricle_double(&session->rtt, (double)0);
     setup_oricle_double(&session->retry, (double)0);
     CLOSE_FD(&session->sock_fd);
@@ -125,6 +126,7 @@ void cleanup_master_sio_session(const char *label, async_type_t *master_async, m
     memset(session->remote_nonce, 0, AES_NONCE_BYTES);
     session->remote_ctr = (uint32_t)0;
     memset(session->encrypted_server_id_port, 0, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
+    memset(session->temp_kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
     cleanup_oricle_double(&session->rtt);
     cleanup_oricle_double(&session->retry);
     async_delete_event(label, master_async, &session->sock_fd);
@@ -240,7 +242,7 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
 				continue;
 			} else if (current_fd == master_ctx->listen_sock) {
 				if (async_event_is_EPOLLIN(current_events)) {
-					if (handle_listen_sock_event(label, master_ctx) != SUCCESS) {
+					if (handle_listen_sock_event(label, master_ctx, listen_port) != SUCCESS) {
 						continue;
 					}
 				} else {

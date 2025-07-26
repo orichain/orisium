@@ -348,12 +348,10 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 //======================================================================
 // Generate Identity                    
 //======================================================================
-                    uint64_t client_id = 0ULL;
-                    if (generate_connection_id(label, &client_id) != SUCCESS) {
+                    if (generate_connection_id(label, &session->identity.client_id) != SUCCESS) {
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
-                    session->identity.client_id = client_id;
                     if (KEM_GENERATE_KEYPAIR(session->identity.kem_publickey, session->identity.kem_privatekey) != 0) {
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;

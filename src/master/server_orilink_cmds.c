@@ -1,9 +1,13 @@
+#include <common/aes.h>
 #include "log.h"
 #include "types.h"
 #include "orilink/protocol.h"
 #include "orilink/hello1_ack.h"
 #include "orilink/hello2_ack.h"
+#include "orilink/hello3_ack.h"
 #include "sessions/master_session.h"
+#include "poly1305-donna.h"
+#include "utilities.h"
 
 status_t hello1_ack(const char *label, int *listen_sock, master_sio_c_session_t *session) {
 	orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello1_ack(label, session->identity.client_id, session->hello1_ack.ack_sent_try_count);
@@ -46,8 +50,49 @@ status_t hello2_ack(const char *label, int *listen_sock, master_sio_c_session_t 
 }
 
 status_t hello3_ack(const char *label, int *listen_sock, master_sio_c_session_t *session) {
-    /*
-	orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello3_ack(label, session->identity.client_id, session->identity.kem_ciphertext, session->raw_server_id_port, session->hello3_ack.ack_sent_try_count);
+    uint8_t server_id_port[sizeof(uint64_t) + sizeof(uint16_t)];
+    uint8_t encrypted_server_id_port1[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t)];
+    uint8_t encrypted_server_id_port2[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES];
+    memcpy(encrypted_server_id_port1, session->local_nonce, AES_NONCE_BYTES);
+    uint64_t server_id_be = htobe64(session->identity.server_id);
+    memcpy(server_id_port, &server_id_be, sizeof(uint64_t));
+    uint16_t port_be = htobe16(session->identity.port);
+    memcpy(server_id_port + sizeof(uint64_t), &port_be, sizeof(uint16_t));
+    
+    print_hex("===========KEY ", session->temp_kem_sharedsecret, KEM_SHAREDSECRET_BYTES, 1);
+    print_hex("===========NONCE ", session->local_nonce, AES_NONCE_BYTES, 1);
+    print_hex("===========SEBELUM ", server_id_port, sizeof(uint64_t) + sizeof(uint16_t), 1);
+    
+    aes256ctx ctx;
+    aes256_ctr_keyexp(&ctx, session->temp_kem_sharedsecret);
+    uint8_t iv[AES_IV_BYTES];
+    memcpy(iv, session->local_nonce, AES_NONCE_BYTES);
+    
+    uint32_t local_ctr_be = htobe32(session->local_ctr);
+    memcpy(iv + AES_NONCE_BYTES, &local_ctr_be, sizeof(uint32_t));
+    aes256_ctr(server_id_port, sizeof(uint64_t) + sizeof(uint16_t), iv, &ctx);
+    aes256_ctx_release(&ctx);
+    session->local_ctr++;
+    
+    print_hex("===========IV ", iv, AES_IV_BYTES, 1);
+    print_hex("===========SESUDAH ", server_id_port, sizeof(uint64_t) + sizeof(uint16_t), 1);
+    
+    memcpy(encrypted_server_id_port1 + AES_NONCE_BYTES, server_id_port, sizeof(uint64_t) + sizeof(uint16_t));
+    uint8_t mac[AES_TAG_BYTES];
+    poly1305_context ctxx;
+	poly1305_init(&ctxx, session->temp_kem_sharedsecret);
+	poly1305_update(&ctxx, encrypted_server_id_port1, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t));
+	poly1305_finish(&ctxx, mac);
+    
+    print_hex("===========NONCE+DATA ", encrypted_server_id_port1, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t), 1);
+    print_hex("===========MAC ", mac, AES_TAG_BYTES, 1);
+    
+    memcpy(encrypted_server_id_port2, encrypted_server_id_port1, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t));
+    memcpy(encrypted_server_id_port2 + AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t), mac, AES_TAG_BYTES);
+    
+    print_hex("===========ALL DATA ", encrypted_server_id_port2, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES, 1);
+    
+    orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello3_ack(label, session->identity.client_id, session->identity.kem_ciphertext, encrypted_server_id_port2, session->hello3_ack.ack_sent_try_count);
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
@@ -63,6 +108,5 @@ status_t hello3_ack(const char *label, int *listen_sock, master_sio_c_session_t 
         LOG_DEBUG("%sSent hello3_ack to Client.", label);
     }
     CLOSE_ORILINK_PROTOCOL(&cmd_result.r_orilink_protocol_t);
-    */
     return SUCCESS;
 }

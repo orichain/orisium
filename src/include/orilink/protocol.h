@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <blake3.h>
 #include <string.h>
-#include <poly1305-donna.h>
 #include <stdbool.h>
 #include "types.h"
 #include "constants.h"
@@ -373,13 +372,6 @@ static inline void CLOSE_ORILINK_PROTOCOL(orilink_protocol_t **protocol_ptr) {
     }
 }
 
-static inline void orilink_mac(uint8_t *key, uint8_t *mac, const uint8_t *data, size_t len) {
-    poly1305_context ctx;
-	poly1305_init(&ctx, key);
-	poly1305_update(&ctx, data, len);
-	poly1305_finish(&ctx, mac);
-}
-
 typedef struct {
 	orilink_protocol_t *r_orilink_protocol_t;
     status_t status;
@@ -391,6 +383,11 @@ typedef struct {
     uint8_t version[ORILINK_VERSION_BYTES];
 	orilink_protocol_type_t type;
 } orilink_raw_protocol_t;
+
+typedef struct {
+	orilink_raw_protocol_t *r_orilink_raw_protocol_t;
+    status_t status;
+} orilink_raw_protocol_t_status_t;
 
 ssize_t_status_t send_orilink_protocol_packet(const char *label, uint8_t* key, uint8_t* nonce, uint32_t ctr, int *sock_fd, const struct sockaddr *dest_addr, const orilink_protocol_t* p);
 status_t receive_orilink_raw_protocol_packet(const char *label, orilink_raw_protocol_t *raw, int *sock_fd, struct sockaddr *source_addr);
