@@ -11,7 +11,6 @@
 #include "log.h"
 #include "orilink/sock_ready.h"
 #include "constants.h"
-#include "crypto_kem/ml-kem-1024/clean/api.h"
 
 status_t orilink_serialize_sock_ready(const char *label, const orilink_sock_ready_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
     if (!payload || !current_buffer || !offset) {
@@ -22,10 +21,15 @@ status_t orilink_serialize_sock_ready(const char *label, const orilink_sock_read
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint64_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
     uint64_t client_id_be = htobe64(payload->client_id);
     memcpy(current_buffer + current_offset_local, &client_id_be, sizeof(uint64_t));
-    current_offset_local += sizeof(uint64_t);    
-    if (CHECK_BUFFER_BOUNDS(current_offset_local, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES, buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    memcpy(current_buffer + current_offset_local, payload->server_id_port, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
-    current_offset_local += AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES;
+    current_offset_local += sizeof(uint64_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint64_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    uint64_t server_id_be = htobe64(payload->server_id);
+    memcpy(current_buffer + current_offset_local, &server_id_be, sizeof(uint64_t));
+    current_offset_local += sizeof(uint64_t); 
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint16_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    uint16_t port_be = htobe16(payload->port);
+    memcpy(current_buffer + current_offset_local, &port_be, sizeof(uint16_t));
+    current_offset_local += sizeof(uint16_t); 
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
     memcpy(current_buffer + current_offset_local, (uint8_t *)&payload->trycount, sizeof(uint8_t));
     current_offset_local += sizeof(uint8_t);    
@@ -50,13 +54,24 @@ status_t orilink_deserialize_sock_ready(const char *label, orilink_protocol_t *p
     payload->client_id = be64toh(client_id_be);
     cursor += sizeof(uint64_t);
     current_offset += sizeof(uint64_t);
-    if (current_offset + (AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading server_id_port.", label);
+    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading server_id.", label);
         return FAILURE_OOBUF;
     }
-    memcpy(payload->server_id_port, cursor, PQCLEAN_MLKEM1024_CLEAN_CRYPTO_CIPHERTEXTBYTES / 2);
-    cursor += AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES;
-    current_offset += AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES;
+    uint64_t server_id_be;
+    memcpy(&server_id_be, cursor, sizeof(uint64_t));
+    payload->server_id = be64toh(server_id_be);
+    cursor += sizeof(uint64_t);
+    current_offset += sizeof(uint64_t);
+    if (current_offset + sizeof(uint16_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading port.", label);
+        return FAILURE_OOBUF;
+    }
+    uint16_t port_be;
+    memcpy(&port_be, cursor, sizeof(uint16_t));
+    payload->port = be16toh(port_be);
+    cursor += sizeof(uint16_t);
+    current_offset += sizeof(uint16_t);
     if (current_offset + sizeof(uint8_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading trycount.", label);
         return FAILURE_OOBUF;
@@ -68,7 +83,7 @@ status_t orilink_deserialize_sock_ready(const char *label, orilink_protocol_t *p
     return SUCCESS;
 }
 
-orilink_protocol_t_status_t orilink_prepare_cmd_sock_ready(const char *label, uint64_t client_id, uint8_t *server_id_port, uint8_t trycount) {
+orilink_protocol_t_status_t orilink_prepare_cmd_sock_ready(const char *label, uint64_t client_id, uint64_t server_id, uint16_t port, uint8_t trycount) {
 	orilink_protocol_t_status_t result;
 	result.r_orilink_protocol_t = (orilink_protocol_t *)malloc(sizeof(orilink_protocol_t));
 	result.status = FAILURE;
@@ -87,7 +102,8 @@ orilink_protocol_t_status_t orilink_prepare_cmd_sock_ready(const char *label, ui
 		return result;
 	}
     payload->client_id = client_id;
-    memcpy(payload->server_id_port, server_id_port, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
+    payload->server_id = server_id;
+    payload->port = port;
     payload->trycount = trycount;
 	result.r_orilink_protocol_t->payload.orilink_sock_ready = payload;
 	result.status = SUCCESS;

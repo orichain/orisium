@@ -108,9 +108,11 @@ typedef struct {
 //======================================================================    
 	orilink_identity_t identity;
     uint8_t client_kem_publickey[KEM_PUBLICKEY_BYTES];
-    uint32_t local_iv_counter;
-    uint32_t remote_iv_counter;
-    uint8_t raw_server_id_port[sizeof(uint64_t) + sizeof(uint16_t)];
+    uint8_t local_nonce[AES_NONCE_BYTES];
+    uint32_t local_ctr;
+    uint8_t remote_nonce[AES_NONCE_BYTES];
+    uint32_t remote_ctr;
+    uint8_t encrypted_server_id_port[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES];
 //======================================================================
 // HELLO SOCK
 //======================================================================

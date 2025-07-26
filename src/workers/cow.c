@@ -36,6 +36,11 @@ void setup_session(cow_c_session_t *session) {
     session->identity.client_id = 0ULL;
     session->identity.server_id = 0ULL;
     session->identity.port = 0x0000;
+    memset(session->local_nonce, 0, AES_NONCE_BYTES);
+    session->local_ctr = (uint32_t)0;
+    memset(session->remote_nonce, 0, AES_NONCE_BYTES);
+    session->remote_ctr = (uint32_t)0;
+    memset(session->encrypted_server_id_port, 0, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
     setup_oricle_double(&session->rtt, (double)0);
     setup_oricle_double(&session->retry, (double)0);
     CLOSE_FD(&session->sock_fd);
@@ -56,6 +61,11 @@ void cleanup_session(const char *label, async_type_t *cow_async, cow_c_session_t
     session->identity.client_id = 0ULL;
     session->identity.server_id = 0ULL;
     session->identity.port = 0x0000;
+    memset(session->local_nonce, 0, AES_NONCE_BYTES);
+    session->local_ctr = (uint32_t)0;
+    memset(session->remote_nonce, 0, AES_NONCE_BYTES);
+    session->remote_ctr = (uint32_t)0;
+    memset(session->encrypted_server_id_port, 0, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
     cleanup_oricle_double(&session->rtt);
     cleanup_oricle_double(&session->retry);
     async_delete_event(label, cow_async, &session->sock_fd);
@@ -380,16 +390,17 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                             struct sockaddr_in6 server_addr;
                             char host_str[NI_MAXHOST];
                             char port_str[NI_MAXSERV];
-                            orilink_protocol_t_status_t rcvd = receive_and_deserialize_orilink_packet(
+                            orilink_raw_protocol_t rcvd;
+                            status_t rcvd_status = receive_orilink_raw_protocol_packet(
                                 label,
+                                &rcvd,
                                 &session->sock_fd,
                                 (struct sockaddr *)&server_addr
                             );
-                            if (rcvd.status != SUCCESS) {
+                            if (rcvd_status != SUCCESS) {
                                 event_founded_in_session = true;
                                 break;
                             }
-                            orilink_protocol_t* received_protocol = rcvd.r_orilink_protocol_t;
                             int getname_res = getnameinfo((struct sockaddr *)&server_addr, sizeof(struct sockaddr_in6),
                                                 host_str, NI_MAXHOST,
                                                 port_str, NI_MAXSERV,
@@ -397,14 +408,12 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                                               );
                             if (getname_res != 0) {
                                 LOG_ERROR("%sgetnameinfo failed. %s", label, strerror(errno));
-                                CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                 event_founded_in_session = true;
                                 break;
                             }
                             size_t host_str_len = strlen(host_str);
                             if (host_str_len >= INET6_ADDRSTRLEN) {
                                 LOG_ERROR("%sKoneksi ditolak dari IP %s. IP terlalu panjang.", label, host_str);
-                                CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                 event_founded_in_session = true;
                                 break;
                             }
@@ -412,18 +421,34 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                             long port_num = strtol(port_str, &endptr, 10);
                             if (*endptr != '\0' || port_num <= 0 || port_num > 65535) {
                                 LOG_ERROR("%sKoneksi ditolak dari IP %s. PORT di luar rentang (1-65535).", label, host_str);
-                                CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                 event_founded_in_session = true;
                                 break;
                             }
-                            if (received_protocol->type == ORILINK_HELLO1_ACK) {
-                                orilink_hello1_ack_t *ohello1_ack = received_protocol->payload.orilink_hello1_ack;
+                            if (rcvd.type == ORILINK_HELLO1_ACK) {
                                 if (
                                         sockaddr_equal((const struct sockaddr *)&session->old_server_addr, (const struct sockaddr *)&server_addr) &&
-                                        (session->identity.client_id == ohello1_ack->client_id) &&
                                         session->hello1.sent
                                    )
                                 {
+                                    orilink_protocol_t_status_t deserialized_rcvd = orilink_deserialize(label,
+                                        session->identity.kem_sharedsecret, session->remote_nonce, session->remote_ctr,
+                                        (const uint8_t*)rcvd.recv_buffer, rcvd.n
+                                    );
+                                    if (deserialized_rcvd.status != SUCCESS) {
+                                        LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", label, deserialized_rcvd.status);
+                                        event_founded_in_session = true;
+                                        break;
+                                    } else {
+                                        LOG_DEBUG("%sorilink_deserialize BERHASIL.", label);
+                                    }  
+                                    orilink_protocol_t* received_protocol = deserialized_rcvd.r_orilink_protocol_t;
+                                    orilink_hello1_ack_t *ohello1_ack = received_protocol->payload.orilink_hello1_ack;
+                                    if (session->identity.client_id != ohello1_ack->client_id) {
+                                        LOG_WARN("%HELLO1_ACK ditolak dari IP %s. client_id berbeda.", label, host_str);
+                                        CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                        event_founded_in_session = true;
+                                        break;
+                                    }
                                     double try_count = (double)session->hello1.sent_try_count-(double)1;
                                     cow_calculate_retry(label, session, i, try_count);
                                     uint64_t_status_t rt = get_realtime_time_ns(label);
@@ -468,20 +493,36 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                                     event_founded_in_session = true;
                                     break;
                                 } else {
-                                    LOG_ERROR("%sKoneksi ditolak Tidak pernah mengirim hello1 ke IP %s.", label, host_str);
-                                    CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                    LOG_ERROR("%sKoneksi ditolak Tidak pernah mengirim HELLO1 ke IP %s.", label, host_str);
                                     event_founded_in_session = true;
                                     break;
                                 }
-                            } else if (received_protocol->type == ORILINK_HELLO2_ACK) {
-                                orilink_hello2_ack_t *ohello2_ack = received_protocol->payload.orilink_hello2_ack;
+                            } else if (rcvd.type == ORILINK_HELLO2_ACK) {
                                 if (
                                         sockaddr_equal((const struct sockaddr *)&session->old_server_addr, (const struct sockaddr *)&server_addr) &&
-                                        (session->identity.client_id == ohello2_ack->client_id) &&
                                         session->hello1.sent &&
                                         session->hello2.sent
                                    )
                                 {
+                                    orilink_protocol_t_status_t deserialized_rcvd = orilink_deserialize(label,
+                                        session->identity.kem_sharedsecret, session->remote_nonce, session->remote_ctr,
+                                        (const uint8_t*)rcvd.recv_buffer, rcvd.n
+                                    );
+                                    if (deserialized_rcvd.status != SUCCESS) {
+                                        LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", label, deserialized_rcvd.status);
+                                        event_founded_in_session = true;
+                                        break;
+                                    } else {
+                                        LOG_DEBUG("%sorilink_deserialize BERHASIL.", label);
+                                    }  
+                                    orilink_protocol_t* received_protocol = deserialized_rcvd.r_orilink_protocol_t;
+                                    orilink_hello2_ack_t *ohello2_ack = received_protocol->payload.orilink_hello2_ack;
+                                    if (session->identity.client_id != ohello2_ack->client_id) {
+                                        LOG_WARN("%HELLO2_ACK ditolak dari IP %s. client_id berbeda.", label, host_str);
+                                        CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                        event_founded_in_session = true;
+                                        break;
+                                    }
                                     double try_count = (double)session->hello2.sent_try_count-(double)1;
                                     cow_calculate_retry(label, session, i, try_count);
                                     uint64_t_status_t rt = get_realtime_time_ns(label);
@@ -527,12 +568,10 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                                     break;
                                 } else {
                                     LOG_ERROR("%sKoneksi ditolak Tidak pernah mengirim HELLO1 dan atau HELLO2 ke IP %s.", label, host_str);
-                                    CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                     event_founded_in_session = true;
                                     break;
                                 }
                             } else {
-                                CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                 event_founded_in_session = true;
                                 break;
                             }

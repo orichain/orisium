@@ -93,6 +93,11 @@ void setup_master_sio_session(master_sio_c_session_t *session) {
     session->identity.client_id = 0ULL;
     session->identity.server_id = 0ULL;
     session->identity.port = 0x0000;
+    memset(session->local_nonce, 0, AES_NONCE_BYTES);
+    session->local_ctr = (uint32_t)0;
+    memset(session->remote_nonce, 0, AES_NONCE_BYTES);
+    session->remote_ctr = (uint32_t)0;
+    memset(session->encrypted_server_id_port, 0, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
     setup_oricle_double(&session->rtt, (double)0);
     setup_oricle_double(&session->retry, (double)0);
     CLOSE_FD(&session->sock_fd);
@@ -115,6 +120,11 @@ void cleanup_master_sio_session(const char *label, async_type_t *master_async, m
     session->identity.client_id = 0ULL;
     session->identity.server_id = 0ULL;
     session->identity.port = 0x0000;
+    memset(session->local_nonce, 0, AES_NONCE_BYTES);
+    session->local_ctr = (uint32_t)0;
+    memset(session->remote_nonce, 0, AES_NONCE_BYTES);
+    session->remote_ctr = (uint32_t)0;
+    memset(session->encrypted_server_id_port, 0, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
     cleanup_oricle_double(&session->rtt);
     cleanup_oricle_double(&session->retry);
     async_delete_event(label, master_async, &session->sock_fd);

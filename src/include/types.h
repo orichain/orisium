@@ -8,6 +8,7 @@
 
 typedef enum {
     SUCCESS = (uint8_t)0x00,
+    FAILURE_DIFCLID = (uint8_t)0xeb,
     FAILURE_IVLDHDLD = (uint8_t)0xec,
     FAILURE_CHKSUM = (uint8_t)0xed,
     FAILURE_OPYLD = (uint8_t)0xee,

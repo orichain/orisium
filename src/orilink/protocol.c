@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <netinet/in.h>
+#include <common/fips202.h>
 
 #include "utilities.h"
 #include "orilink/protocol.h"
@@ -132,7 +133,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                     return result;
                 }
             }
-            payload_fixed_size = sizeof(uint64_t) + (AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES) + sizeof(uint8_t);
+            payload_fixed_size = sizeof(uint64_t) + AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + sizeof(uint8_t);
             payload_dynamic_size = 0;
             break;
         }
@@ -144,7 +145,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                     return result;
                 }
             }
-            payload_fixed_size = sizeof(uint64_t) + (AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES) + sizeof(uint8_t);
+            payload_fixed_size = sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint16_t) + sizeof(uint8_t);
             payload_dynamic_size = 0;
             break;
         }
@@ -384,13 +385,13 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
     if (checkfixheader) {
         result.r_size_t = payload_fixed_size;
     } else {
-        result.r_size_t = ORILINK_VERSION_BYTES + sizeof(uint8_t) + ORILINK_MAC + payload_fixed_size + payload_dynamic_size;
+        result.r_size_t = ORILINK_VERSION_BYTES + sizeof(uint8_t) + AES_TAG_BYTES + payload_fixed_size + payload_dynamic_size;
     }
     result.status = SUCCESS;
     return result;
 }
 
-ssize_t_status_t orilink_serialize(const char *label, const orilink_protocol_t* p, uint8_t** ptr_buffer, size_t* buffer_size) {
+ssize_t_status_t orilink_serialize(const char *label, uint8_t* key, uint8_t* nonce, uint32_t ctr, const orilink_protocol_t* p, uint8_t** ptr_buffer, size_t* buffer_size) {
     ssize_t_status_t result;
     result.r_ssize_t = 0;
     result.status = FAILURE;
@@ -444,13 +445,13 @@ ssize_t_status_t orilink_serialize(const char *label, const orilink_protocol_t* 
     }
     memcpy(current_buffer + offset, (uint8_t *)&p->type, sizeof(uint8_t));
     offset += sizeof(uint8_t);
-    if (CHECK_BUFFER_BOUNDS(offset, ORILINK_MAC, *buffer_size) != SUCCESS) {
+    if (CHECK_BUFFER_BOUNDS(offset, AES_TAG_BYTES, *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
     }
     offset_chksum = offset;
-    memset(current_buffer + offset, 0, ORILINK_MAC);
-    offset += ORILINK_MAC;
+    memset(current_buffer + offset, 0, AES_TAG_BYTES);
+    offset += AES_TAG_BYTES;
     offset_payload = offset;
     status_t result_pyld = FAILURE;
     switch (p->type) {
@@ -545,20 +546,21 @@ ssize_t_status_t orilink_serialize(const char *label, const orilink_protocol_t* 
         result.status = FAILURE_OPYLD;
         return result;
     }
-    uint8_t *key = NULL;
-    uint8_t *mac = orilink_mac(key, current_buffer + offset_payload, offset - offset_payload);
-    memcpy(current_buffer + offset_chksum, mac, ORILINK_MAC);
+    uint8_t mac[AES_TAG_BYTES];
+    shake256(key, HASHES_BYTES, current_buffer + offset_payload, offset - offset_payload);
+    orilink_mac(key, mac, current_buffer + offset_payload, offset - offset_payload);
+    memcpy(current_buffer + offset_chksum, mac, AES_TAG_BYTES);
     result.r_ssize_t = (ssize_t)offset;
     result.status = SUCCESS;
     return result;
 }
 
-orilink_protocol_t_status_t orilink_deserialize(const char *label, const uint8_t* buffer, size_t len) {
+orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key, uint8_t* nonce, uint32_t ctr, const uint8_t* buffer, size_t len) {
     orilink_protocol_t_status_t result;
     result.r_orilink_protocol_t = NULL;
     result.status = FAILURE;
 
-    if (!buffer || len < (ORILINK_VERSION_BYTES + sizeof(uint8_t) + ORILINK_MAC)) {
+    if (!buffer || len < (ORILINK_VERSION_BYTES + sizeof(uint8_t) + AES_TAG_BYTES)) {
         LOG_ERROR("%sBuffer terlalu kecil untuk Version, Type dan Mac. Len: %zu", label, len);
         result.status = FAILURE_OOBUF;
         return result;
@@ -579,8 +581,8 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, const uint8_t
     size_t current_buffer_offset = ORILINK_VERSION_BYTES;
     memcpy((uint8_t *)&p->type, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
-    memcpy(p->mac, buffer + current_buffer_offset, ORILINK_MAC);
-    current_buffer_offset += ORILINK_MAC;
+    memcpy(p->mac, buffer + current_buffer_offset, AES_TAG_BYTES);
+    current_buffer_offset += AES_TAG_BYTES;
     size_t offset_payload = current_buffer_offset;
     size_t_status_t psize = calculate_orilink_payload_size(label, p, true);
     if (psize.status != SUCCESS) {
@@ -1093,16 +1095,15 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, const uint8_t
         result.status = FAILURE_OPYLD;
         return result;
     }
-    uint8_t *key = NULL;
-    uint8_t *mac = orilink_mac(key, buffer + offset_payload, current_buffer_offset - offset_payload);
+    uint8_t mac[AES_TAG_BYTES];
+    shake256(key, HASHES_BYTES, buffer + offset_payload, current_buffer_offset - offset_payload);
+    orilink_mac(key, mac, buffer + offset_payload, current_buffer_offset - offset_payload);
     if (poly1305_verify(mac, p->mac)) {
         LOG_DEBUG("%sChecksum cocok: 0x%08x", label, mac);
-        free(mac);
     } else {
         LOG_ERROR("%sChecksum mismatch! Received: 0x%08x, Calculated: 0x%08x", label, p->mac, mac);
         CLOSE_ORILINK_PROTOCOL(&p);
         result.status = FAILURE_CHKSUM;
-        free(mac);
         return result;
     }
     result.r_orilink_protocol_t = p;
@@ -1111,13 +1112,13 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, const uint8_t
     return result;
 }
 
-ssize_t_status_t send_orilink_protocol_packet(const char *label, int *sock_fd, const struct sockaddr *dest_addr, const orilink_protocol_t* p) {
+ssize_t_status_t send_orilink_protocol_packet(const char *label, uint8_t* key, uint8_t* nonce, uint32_t ctr, int *sock_fd, const struct sockaddr *dest_addr, const orilink_protocol_t* p) {
 	ssize_t_status_t result;
     result.r_ssize_t = 0;
     result.status = FAILURE;
     uint8_t* serialized_orilink_data_buffer = NULL;
     size_t serialized_orilink_data_len = 0;
-    ssize_t_status_t serialize_result = orilink_serialize(label, p, &serialized_orilink_data_buffer, &serialized_orilink_data_len);
+    ssize_t_status_t serialize_result = orilink_serialize(label, key, nonce, ctr, p, &serialized_orilink_data_buffer, &serialized_orilink_data_len);
     if (serialize_result.status != SUCCESS) {
         LOG_ERROR("%sError serializing ORILINK protocol: %d", label, serialize_result.status);
         if (serialized_orilink_data_buffer) {
@@ -1150,35 +1151,28 @@ ssize_t_status_t send_orilink_protocol_packet(const char *label, int *sock_fd, c
     return result;
 }
 
-orilink_protocol_t_status_t receive_and_deserialize_orilink_packet(const char *label, int *sock_fd, struct sockaddr *source_addr) {
-    orilink_protocol_t_status_t deserialized_result;
-    deserialized_result.r_orilink_protocol_t = NULL;
-    deserialized_result.status = FAILURE;
+status_t receive_orilink_raw_protocol_packet(const char *label, orilink_raw_protocol_t *raw, int *sock_fd, struct sockaddr *source_addr) {
     uint8_t recv_buffer[ORILINK_MAX_PACKET_SIZE];
     socklen_t source_addr_len = sizeof(struct sockaddr_in6);
     ssize_t n = recvfrom(*sock_fd, recv_buffer, ORILINK_MAX_PACKET_SIZE, 0, source_addr, &source_addr_len);
     if (n < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            deserialized_result.status = FAILURE_EAGNEWBLK;
-            return deserialized_result;
+            return FAILURE_EAGNEWBLK;
         } else {
-            LOG_ERROR("%sreceive_and_deserialize_orilink_packet failed: %s", label, strerror(errno));
-            deserialized_result.status = FAILURE;
-            return deserialized_result;
+            LOG_ERROR("%receive_orilink_raw_protocol_packet failed: %s", label, strerror(errno));
+            return FAILURE;
         }
-    } else if (n == 0) {
-        LOG_ERROR("%sreceive_and_deserialize_orilink_packet received 0 bytes (unexpected for UDP).", label);
-        deserialized_result.status = FAILURE;
-        return deserialized_result;
+    } else if (n < (ssize_t)(ORILINK_VERSION_BYTES + sizeof(uint8_t) + AES_TAG_BYTES)) {
+        LOG_ERROR("%receive_orilink_raw_protocol_packet received 0 bytes (unexpected for UDP).", label);
+        return FAILURE;
     }
-    deserialized_result = orilink_deserialize(label, (const uint8_t*)recv_buffer, n);
-    if (deserialized_result.status != SUCCESS) {
-        LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", label, deserialized_result.status);
-        deserialized_result.status = FAILURE;
-        return deserialized_result;
-    } else {
-        LOG_DEBUG("%sorilink_deserialize BERHASIL.", label);
-    }
-    deserialized_result.status = SUCCESS;
-    return deserialized_result;
+    uint16_t rn = (uint16_t)n;
+    memcpy(&raw->n, &rn, sizeof(uint16_t));
+    memcpy(raw->recv_buffer, recv_buffer, ORILINK_MAX_PACKET_SIZE);
+    print_hex("========", raw->recv_buffer, raw->n, 1);
+    memcpy(raw->version, recv_buffer, ORILINK_VERSION_BYTES);
+    size_t current_buffer_offset = ORILINK_VERSION_BYTES;
+    memcpy((uint8_t *)&raw->type, recv_buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+    return SUCCESS;
 }

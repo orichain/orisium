@@ -10,7 +10,10 @@ status_t hello1_ack(const char *label, int *listen_sock, master_sio_c_session_t 
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
-    ssize_t_status_t send_result = send_orilink_protocol_packet(label, listen_sock, (const struct sockaddr *)&session->old_client_addr, cmd_result.r_orilink_protocol_t);
+    ssize_t_status_t send_result = send_orilink_protocol_packet(label, 
+        session->identity.kem_sharedsecret, session->local_nonce, session->local_ctr,
+        listen_sock, (const struct sockaddr *)&session->old_client_addr, cmd_result.r_orilink_protocol_t
+    );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent hello1_ack to Client.", label);
         CLOSE_ORILINK_PROTOCOL(&cmd_result.r_orilink_protocol_t);
@@ -27,7 +30,10 @@ status_t hello2_ack(const char *label, int *listen_sock, master_sio_c_session_t 
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
-    ssize_t_status_t send_result = send_orilink_protocol_packet(label, listen_sock, (const struct sockaddr *)&session->old_client_addr, cmd_result.r_orilink_protocol_t);
+    ssize_t_status_t send_result = send_orilink_protocol_packet(label, 
+        session->identity.kem_sharedsecret, session->local_nonce, session->local_ctr,
+        listen_sock, (const struct sockaddr *)&session->old_client_addr, cmd_result.r_orilink_protocol_t
+    );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent hello2_ack to Client.", label);
         CLOSE_ORILINK_PROTOCOL(&cmd_result.r_orilink_protocol_t);
@@ -45,7 +51,10 @@ status_t hello3_ack(const char *label, int *listen_sock, master_sio_c_session_t 
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
-    ssize_t_status_t send_result = send_orilink_protocol_packet(label, listen_sock, (const struct sockaddr *)&session->old_client_addr, cmd_result.r_orilink_protocol_t);
+    ssize_t_status_t send_result = send_orilink_protocol_packet(label, 
+        session->identity.kem_sharedsecret, session->local_nonce, session->local_ctr,
+        listen_sock, (const struct sockaddr *)&session->old_client_addr, cmd_result.r_orilink_protocol_t
+    );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent hello3_ack to Client.", label);
         CLOSE_ORILINK_PROTOCOL(&cmd_result.r_orilink_protocol_t);

@@ -5,7 +5,6 @@
 #include <blake3.h>
 #include <string.h>
 #include <poly1305-donna.h>
-#include <common/fips202.h>
 #include <stdbool.h>
 #include "types.h"
 #include "constants.h"
@@ -93,22 +92,22 @@ typedef struct {
 typedef struct {
     uint64_t client_id;
     uint8_t ciphertext2[KEM_CIPHERTEXT_BYTES / 2];
-//uint64_t server_id; uint16_t port;
-    uint8_t server_id_port[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES];
+    uint8_t encrypted_server_id_port[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES];
     uint8_t trycount;
 } orilink_hello3_ack_t;
 
 typedef struct {
     uint64_t client_id;
-//uint64_t server_id; uint16_t port;
-    uint8_t server_id_port[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES];
+    uint8_t nonce[AES_NONCE_BYTES];
+    uint64_t server_id;
+    uint16_t port;
     uint8_t trycount;
 } orilink_hello_end_t;
 
 typedef struct {
     uint64_t client_id;
-//uint64_t server_id; uint16_t port;
-    uint8_t server_id_port[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES];
+    uint64_t server_id;
+    uint16_t port;
     uint8_t trycount;
 } orilink_sock_ready_t;
 
@@ -264,7 +263,7 @@ typedef struct {
 typedef struct {
 	uint8_t version[ORILINK_VERSION_BYTES];
 	orilink_protocol_type_t type;
-    uint8_t mac[ORILINK_MAC];
+    uint8_t mac[AES_TAG_BYTES];
 	union {
 //======================================================================
 // Untuk pembentukan sock_fd baru
@@ -374,20 +373,11 @@ static inline void CLOSE_ORILINK_PROTOCOL(orilink_protocol_t **protocol_ptr) {
     }
 }
 
-static inline uint8_t *orilink_mac(uint8_t *key, const uint8_t *data, size_t len) {
-    bool nokey = false;
-    if (!key) {
-        nokey = true;
-        key = (uint8_t *)calloc(1, HASHES_BYTES);
-        shake256(key, HASHES_BYTES, data, len);
-    }
+static inline void orilink_mac(uint8_t *key, uint8_t *mac, const uint8_t *data, size_t len) {
     poly1305_context ctx;
 	poly1305_init(&ctx, key);
 	poly1305_update(&ctx, data, len);
-    uint8_t *mac = (uint8_t *)calloc(1, ORILINK_MAC);
 	poly1305_finish(&ctx, mac);
-    if (nokey) free(key);
-    return mac;
 }
 
 typedef struct {
@@ -395,7 +385,15 @@ typedef struct {
     status_t status;
 } orilink_protocol_t_status_t;
 
-ssize_t_status_t send_orilink_protocol_packet(const char *label, int *sock_fd, const struct sockaddr *dest_addr, const orilink_protocol_t* p);
-orilink_protocol_t_status_t receive_and_deserialize_orilink_packet(const char *label, int *sock_fd, struct sockaddr *source_addr);
+typedef struct {
+    uint8_t recv_buffer[ORILINK_MAX_PACKET_SIZE];
+    uint16_t n;
+    uint8_t version[ORILINK_VERSION_BYTES];
+	orilink_protocol_type_t type;
+} orilink_raw_protocol_t;
+
+ssize_t_status_t send_orilink_protocol_packet(const char *label, uint8_t* key, uint8_t* nonce, uint32_t ctr, int *sock_fd, const struct sockaddr *dest_addr, const orilink_protocol_t* p);
+status_t receive_orilink_raw_protocol_packet(const char *label, orilink_raw_protocol_t *raw, int *sock_fd, struct sockaddr *source_addr);
+orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key, uint8_t* nonce, uint32_t ctr, const uint8_t* buffer, size_t len);
 
 #endif

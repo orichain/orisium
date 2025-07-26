@@ -11,7 +11,7 @@ OBJ_DIR = obj
 
 CC = gcc
 GCC_INCLUDE_DIRS := $(shell echo '' | gcc -E -x c - -v 2>&1 | awk '/^ \/.*\/include/ { print "-I" $$1 }')
-INCLUDE_DIR = $(GCC_INCLUDE_DIRS) -I./$(SRC_DIR)/include -I./blake3/c -I./PQClean -I./PQClean/common -I./lmdb/libraries/liblmdb -I./poly1305
+INCLUDE_DIR = $(GCC_INCLUDE_DIRS) -I./$(SRC_DIR)/include -I./blake3/c -I./PQClean -I./PQClean/common -I./lmdb/libraries/liblmdb
 COMMON_CFLAGS = -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration -pthread -ljson-c -lm $(INCLUDE_DIR)
 BUILD_MODE ?= DEVELOPMENT
 DEBUG_MODE ?= DEVELOPMENT
@@ -59,14 +59,6 @@ BLAKE3_C_DIR = c
 BLAKE3_BUILD_DIR = build
 BLAKE3_LIB_NAME = libblake3.a
 BLAKE3_LIB_PATH = $(BLAKE3_DIR)/$(BLAKE3_C_DIR)/$(BLAKE3_BUILD_DIR)/$(BLAKE3_LIB_NAME)
-
-
-# =============================
-# PQClean Libraries
-# =============================
-POLY1305_DIR = poly1305
-POLY1305_SRCS = $(wildcard $(POLY1305_DIR)/*.c)
-POLY1305_OBJS = $(addprefix $(OBJ_DIR)/, $(notdir $(POLY1305_SRCS:.c=.o)))
 
 # =============================
 # PQClean Libraries
@@ -160,7 +152,6 @@ prod:
 	
 $(TARGET): $(OBJS) $(BLAKE3_LIB_PATH) \
 		$(PQCLEAN_COMMON_OBJS) \
-		$(POLY1305_OBJS) \
 		$(PQCLEAN_SIGN_MLDSA87_LIB_PATH) \
 		$(PQCLEAN_SIGN_FALCONPADDED512_LIB_PATH) \
 		$(PQCLEAN_KEM_LIB_PATH) \
@@ -177,11 +168,6 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 
 # Rule untuk file .c dari PQClean/common
 $(OBJ_DIR)/%.o: $(PQCLEAN_COMMON_DIR)/%.c
-	@mkdir -p $(OBJ_DIR)
-	$(CC) $(FINAL_CFLAGS) -c $< -o $@
-	
-# Rule untuk file .c dari poly1305
-$(OBJ_DIR)/%.o: $(POLY1305_DIR)/%.c
 	@mkdir -p $(OBJ_DIR)
 	$(CC) $(FINAL_CFLAGS) -c $< -o $@	
 	
