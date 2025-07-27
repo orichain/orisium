@@ -259,9 +259,9 @@ typedef struct {
 } orilink_fin_end_t;
 
 typedef struct {
+    uint8_t mac[AES_TAG_BYTES];
 	uint8_t version[ORILINK_VERSION_BYTES];
 	orilink_protocol_type_t type;
-    uint8_t mac[AES_TAG_BYTES];
 	union {
 //======================================================================
 // Untuk pembentukan sock_fd baru

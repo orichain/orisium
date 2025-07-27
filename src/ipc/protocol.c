@@ -522,6 +522,7 @@ ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message_wfdrcvd(const char 
     if (!b) {
         LOG_ERROR("%sFailed to allocate ipc_raw_protocol_t buffer. %s", label, strerror(errno));
         free(full_ipc_payload_buffer);
+        CLOSE_IPC_RAW_PROTOCOL(&r);
         result.status = FAILURE_NOMEM;
         return result;
     }
@@ -618,6 +619,7 @@ ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, 
     if (!b) {
         LOG_ERROR("%sFailed to allocate ipc_raw_protocol_t buffer. %s", label, strerror(errno));
         free(full_ipc_payload_buffer);
+        CLOSE_IPC_RAW_PROTOCOL(&r);
         result.status = FAILURE_NOMEM;
         return result;
     }

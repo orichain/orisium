@@ -430,8 +430,19 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key, uint8_t* non
         LOG_DEBUG("%sBuffer size %zu is sufficient for %zu bytes. No reallocation needed.", label, *buffer_size, total_required_size);
     }
     size_t offset = 0;
-    size_t offset_chksum = 0;
-    size_t offset_payload = 0;
+    size_t offset_mac = 0;
+    size_t offset_mac_payload = 0;
+    
+    if (CHECK_BUFFER_BOUNDS(offset, AES_TAG_BYTES, *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    offset_mac = offset;
+    memset(current_buffer + offset, 0, AES_TAG_BYTES);
+    offset += AES_TAG_BYTES;
+    offset_mac_payload = offset;
+    
+    
     if (CHECK_BUFFER_BOUNDS(offset, ORILINK_VERSION_BYTES, *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
@@ -444,14 +455,7 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key, uint8_t* non
     }
     memcpy(current_buffer + offset, (uint8_t *)&p->type, sizeof(uint8_t));
     offset += sizeof(uint8_t);
-    if (CHECK_BUFFER_BOUNDS(offset, AES_TAG_BYTES, *buffer_size) != SUCCESS) {
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-    offset_chksum = offset;
-    memset(current_buffer + offset, 0, AES_TAG_BYTES);
-    offset += AES_TAG_BYTES;
-    offset_payload = offset;
+    
     status_t result_pyld = FAILURE;
     switch (p->type) {
         case ORILINK_HELLO1:
@@ -546,12 +550,12 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key, uint8_t* non
         return result;
     }
     uint8_t mac[AES_TAG_BYTES];
-    //shake256(key, HASHES_BYTES, current_buffer + offset_payload, offset - offset_payload);
+    //shake256(key, HASHES_BYTES, current_buffer + offset_mac_payload, offset - offset_mac_payload);
     poly1305_context ctx;
 	poly1305_init(&ctx, key);
-	poly1305_update(&ctx, current_buffer + offset_payload, offset - offset_payload);
+	poly1305_update(&ctx, current_buffer + offset_mac_payload, offset - offset_mac_payload);
 	poly1305_finish(&ctx, mac);
-    memcpy(current_buffer + offset_chksum, mac, AES_TAG_BYTES);
+    memcpy(current_buffer + offset_mac, mac, AES_TAG_BYTES);
     result.r_ssize_t = (ssize_t)offset;
     result.status = SUCCESS;
     return result;
@@ -579,13 +583,16 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key,
         return result;
     }
     LOG_DEBUG("%sAllocating orilink_protocol_t struct: %zu bytes.", label, sizeof(orilink_protocol_t));
-    memcpy(p->version, buffer, ORILINK_VERSION_BYTES);
-    size_t current_buffer_offset = ORILINK_VERSION_BYTES;
-    memcpy((uint8_t *)&p->type, buffer + current_buffer_offset, sizeof(uint8_t));
-    current_buffer_offset += sizeof(uint8_t);
+    size_t current_buffer_offset = 0;
+    
     memcpy(p->mac, buffer + current_buffer_offset, AES_TAG_BYTES);
     current_buffer_offset += AES_TAG_BYTES;
-    size_t offset_payload = current_buffer_offset;
+    size_t offset_mac_payload = current_buffer_offset;
+    
+    memcpy(p->version, buffer, ORILINK_VERSION_BYTES);
+    current_buffer_offset += ORILINK_VERSION_BYTES;
+    memcpy((uint8_t *)&p->type, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
     size_t_status_t psize = calculate_orilink_payload_size(label, p, true);
     if (psize.status != SUCCESS) {
 		result.status = psize.status;
@@ -1098,15 +1105,15 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key,
         return result;
     }
     uint8_t mac[AES_TAG_BYTES];
-    //shake256(key, HASHES_BYTES, buffer + offset_payload, current_buffer_offset - offset_payload);
+    //shake256(key, HASHES_BYTES, buffer + offset_mac_payload, current_buffer_offset - offset_mac_payload);
     poly1305_context ctx;
 	poly1305_init(&ctx, key);
-	poly1305_update(&ctx, buffer + offset_payload, current_buffer_offset - offset_payload);
+	poly1305_update(&ctx, buffer + offset_mac_payload, current_buffer_offset - offset_mac_payload);
 	poly1305_finish(&ctx, mac);
     if (poly1305_verify(mac, p->mac)) {
-        LOG_DEBUG("%sChecksum cocok: 0x%08x", label, mac);
+        LOG_DEBUG("%sMac cocok: 0x%08x", label, mac);
     } else {
-        LOG_ERROR("%sChecksum mismatch! Received: 0x%08x, Calculated: 0x%08x", label, p->mac, mac);
+        LOG_ERROR("%sMac mismatch! Received: 0x%08x, Calculated: 0x%08x", label, p->mac, mac);
         CLOSE_ORILINK_PROTOCOL(&p);
         result.status = FAILURE_CHKSUM;
         return result;
@@ -1184,14 +1191,15 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
     uint8_t *b = (uint8_t*) calloc(1, n);
     if (!b) {
         LOG_ERROR("%sFailed to allocate orilink_raw_protocol_t buffer. %s", label, strerror(errno));
+        CLOSE_ORILINK_RAW_PROTOCOL(&r);
         result.status = FAILURE_NOMEM;
         return result;
     }
     memcpy(b, recv_buffer, n);
     r->recv_buffer = b;
     r->n = (uint16_t)n;
-    memcpy(r->version, b, ORILINK_VERSION_BYTES);
-    memcpy((uint8_t *)&r->type, b + ORILINK_VERSION_BYTES, sizeof(uint8_t));
+    memcpy(r->version, b + AES_TAG_BYTES, ORILINK_VERSION_BYTES);
+    memcpy((uint8_t *)&r->type, b + AES_TAG_BYTES + ORILINK_VERSION_BYTES, sizeof(uint8_t));
     result.r_orilink_raw_protocol_t = r;
     result.status = SUCCESS;
     return result;
