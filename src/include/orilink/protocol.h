@@ -372,16 +372,32 @@ static inline void CLOSE_ORILINK_PROTOCOL(orilink_protocol_t **protocol_ptr) {
 }
 
 typedef struct {
-	orilink_protocol_t *r_orilink_protocol_t;
-    status_t status;
-} orilink_protocol_t_status_t;
-
-typedef struct {
-    uint8_t recv_buffer[ORILINK_MAX_PACKET_SIZE];
+    uint8_t *recv_buffer;
     uint16_t n;
     uint8_t version[ORILINK_VERSION_BYTES];
 	orilink_protocol_type_t type;
 } orilink_raw_protocol_t;
+//Huruf_besar biar selalu ingat karena akan sering digunakan
+static inline void CLOSE_ORILINK_RAW_PAYLOAD(void **ptr) {
+    if (ptr != NULL && *ptr != NULL) {
+        free(*ptr);
+        *ptr = NULL;
+    }
+}
+//Huruf_besar biar selalu ingat karena akan sering digunakan
+static inline void CLOSE_ORILINK_RAW_PROTOCOL(orilink_raw_protocol_t **protocol_ptr) {
+    if (protocol_ptr != NULL && *protocol_ptr != NULL) {
+        orilink_raw_protocol_t *x = *protocol_ptr;
+        CLOSE_ORILINK_RAW_PAYLOAD((void **)&x->recv_buffer);
+        free(x);
+        *protocol_ptr = NULL;
+    }
+}
+
+typedef struct {
+	orilink_protocol_t *r_orilink_protocol_t;
+    status_t status;
+} orilink_protocol_t_status_t;
 
 typedef struct {
 	orilink_raw_protocol_t *r_orilink_raw_protocol_t;
@@ -389,7 +405,7 @@ typedef struct {
 } orilink_raw_protocol_t_status_t;
 
 ssize_t_status_t send_orilink_protocol_packet(const char *label, uint8_t* key, uint8_t* nonce, uint32_t ctr, int *sock_fd, const struct sockaddr *dest_addr, const orilink_protocol_t* p);
-status_t receive_orilink_raw_protocol_packet(const char *label, orilink_raw_protocol_t *raw, int *sock_fd, struct sockaddr *source_addr);
+orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *label, int *sock_fd, struct sockaddr *source_addr);
 orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key, uint8_t* nonce, uint32_t ctr, const uint8_t* buffer, size_t len);
 
 #endif

@@ -1156,27 +1156,43 @@ ssize_t_status_t send_orilink_protocol_packet(const char *label, uint8_t* key, u
     return result;
 }
 
-status_t receive_orilink_raw_protocol_packet(const char *label, orilink_raw_protocol_t *raw, int *sock_fd, struct sockaddr *source_addr) {
+orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *label, int *sock_fd, struct sockaddr *source_addr) {
+    orilink_raw_protocol_t_status_t result;
+    result.status = FAILURE;
+    result.r_orilink_raw_protocol_t = NULL;
     uint8_t recv_buffer[ORILINK_MAX_PACKET_SIZE];
     socklen_t source_addr_len = sizeof(struct sockaddr_in6);
     ssize_t n = recvfrom(*sock_fd, recv_buffer, ORILINK_MAX_PACKET_SIZE, 0, source_addr, &source_addr_len);
     if (n < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            return FAILURE_EAGNEWBLK;
+            result.status = FAILURE_EAGNEWBLK;
+            return result;
         } else {
             LOG_ERROR("%receive_orilink_raw_protocol_packet failed: %s", label, strerror(errno));
-            return FAILURE;
+            return result;
         }
     } else if (n < (ssize_t)(ORILINK_VERSION_BYTES + sizeof(uint8_t) + AES_TAG_BYTES)) {
         LOG_ERROR("%receive_orilink_raw_protocol_packet received 0 bytes (unexpected for UDP).", label);
-        return FAILURE;
+        return result;
     }
-    uint16_t rn = (uint16_t)n;
-    memcpy(&raw->n, &rn, sizeof(uint16_t));
-    memcpy(raw->recv_buffer, recv_buffer, ORILINK_MAX_PACKET_SIZE);
-    memcpy(raw->version, recv_buffer, ORILINK_VERSION_BYTES);
-    size_t current_buffer_offset = ORILINK_VERSION_BYTES;
-    memcpy((uint8_t *)&raw->type, recv_buffer + current_buffer_offset, sizeof(uint8_t));
-    current_buffer_offset += sizeof(uint8_t);
-    return SUCCESS;
+    orilink_raw_protocol_t* r = (orilink_raw_protocol_t*)calloc(1, sizeof(orilink_raw_protocol_t));
+    if (!r) {
+        LOG_ERROR("%sFailed to allocate orilink_raw_protocol_t. %s", label, strerror(errno));
+        result.status = FAILURE_NOMEM;
+        return result;
+    }
+    uint8_t *b = (uint8_t*) calloc(1, n);
+    if (!b) {
+        LOG_ERROR("%sFailed to allocate orilink_raw_protocol_t buffer. %s", label, strerror(errno));
+        result.status = FAILURE_NOMEM;
+        return result;
+    }
+    memcpy(b, recv_buffer, n);
+    r->recv_buffer = b;
+    r->n = (uint16_t)n;
+    memcpy(r->version, b, ORILINK_VERSION_BYTES);
+    memcpy((uint8_t *)&r->type, b + ORILINK_VERSION_BYTES, sizeof(uint8_t));
+    result.r_orilink_raw_protocol_t = r;
+    result.status = SUCCESS;
+    return result;
 }

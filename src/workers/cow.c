@@ -388,14 +388,13 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                             struct sockaddr_in6 server_addr;
                             char host_str[NI_MAXHOST];
                             char port_str[NI_MAXSERV];
-                            orilink_raw_protocol_t rcvd;
-                            status_t rcvd_status = receive_orilink_raw_protocol_packet(
+                            
+                            orilink_raw_protocol_t_status_t orcvdo = receive_orilink_raw_protocol_packet(
                                 label,
-                                &rcvd,
                                 &session->sock_fd,
                                 (struct sockaddr *)&server_addr
                             );
-                            if (rcvd_status != SUCCESS) {
+                            if (orcvdo.status != SUCCESS) {
                                 event_founded_in_session = true;
                                 break;
                             }
@@ -406,12 +405,14 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                                               );
                             if (getname_res != 0) {
                                 LOG_ERROR("%sgetnameinfo failed. %s", label, strerror(errno));
+                                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                 event_founded_in_session = true;
                                 break;
                             }
                             size_t host_str_len = strlen(host_str);
                             if (host_str_len >= INET6_ADDRSTRLEN) {
                                 LOG_ERROR("%sKoneksi ditolak dari IP %s. IP terlalu panjang.", label, host_str);
+                                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                 event_founded_in_session = true;
                                 break;
                             }
@@ -419,30 +420,33 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                             long port_num = strtol(port_str, &endptr, 10);
                             if (*endptr != '\0' || port_num <= 0 || port_num > 65535) {
                                 LOG_ERROR("%sKoneksi ditolak dari IP %s. PORT di luar rentang (1-65535).", label, host_str);
+                                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                 event_founded_in_session = true;
                                 break;
                             }
-                            if (rcvd.type == ORILINK_HELLO1_ACK) {
+                            if (orcvdo.r_orilink_raw_protocol_t->type == ORILINK_HELLO1_ACK) {
                                 if (
                                         sockaddr_equal((const struct sockaddr *)&session->old_server_addr, (const struct sockaddr *)&server_addr) &&
                                         session->hello1.sent
                                    )
                                 {
-                                    orilink_protocol_t_status_t deserialized_rcvd = orilink_deserialize(label,
+                                    orilink_protocol_t_status_t deserialized_orcvdo = orilink_deserialize(label,
                                         session->identity.kem_sharedsecret, session->remote_nonce, session->remote_ctr,
-                                        (const uint8_t*)rcvd.recv_buffer, rcvd.n
+                                        (const uint8_t*)orcvdo.r_orilink_raw_protocol_t->recv_buffer, orcvdo.r_orilink_raw_protocol_t->n
                                     );
-                                    if (deserialized_rcvd.status != SUCCESS) {
-                                        LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", label, deserialized_rcvd.status);
+                                    if (deserialized_orcvdo.status != SUCCESS) {
+                                        LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", label, deserialized_orcvdo.status);
+                                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                         event_founded_in_session = true;
                                         break;
                                     } else {
                                         LOG_DEBUG("%sorilink_deserialize BERHASIL.", label);
                                     }  
-                                    orilink_protocol_t* received_protocol = deserialized_rcvd.r_orilink_protocol_t;
+                                    orilink_protocol_t* received_protocol = deserialized_orcvdo.r_orilink_protocol_t;
                                     orilink_hello1_ack_t *ohello1_ack = received_protocol->payload.orilink_hello1_ack;
                                     if (session->identity.client_id != ohello1_ack->client_id) {
                                         LOG_WARN("%HELLO1_ACK ditolak dari IP %s. client_id berbeda.", label, host_str);
+                                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -452,6 +456,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                                     uint64_t_status_t rt = get_realtime_time_ns(label);
                                     if (rt.status != SUCCESS) {
                                         LOG_ERROR("%sFailed to get_realtime_time_ns.", label);
+                                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -468,6 +473,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                                     print_hex(label, session->identity.kem_publickey, KEM_PUBLICKEY_BYTES, 1);
                                     if (async_create_timerfd(label, &session->hello2.timer_fd) != SUCCESS) {
                                         LOG_ERROR("%sFailed to async_create_timerfd.", label);
+                                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -475,6 +481,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 //----------------------------------------------------------------------
                                     if (send_hello2(label, session) != SUCCESS) {
                                         LOG_ERROR("%sFailed to send_hello2.", label);
+                                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -482,41 +489,46 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 //----------------------------------------------------------------------
                                     if (async_create_incoming_event(label, &cow_async, &session->hello2.timer_fd) != SUCCESS) {
                                         LOG_ERROR("%sFailed to async_create_incoming_event.", label);
+                                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
                                     }        
 //======================================================================  
+                                    CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                     CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                     event_founded_in_session = true;
                                     break;
                                 } else {
                                     LOG_ERROR("%sKoneksi ditolak Tidak pernah mengirim HELLO1 ke IP %s.", label, host_str);
+                                    CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                     event_founded_in_session = true;
                                     break;
                                 }
-                            } else if (rcvd.type == ORILINK_HELLO2_ACK) {
+                            } else if (orcvdo.r_orilink_raw_protocol_t->type == ORILINK_HELLO2_ACK) {
                                 if (
                                         sockaddr_equal((const struct sockaddr *)&session->old_server_addr, (const struct sockaddr *)&server_addr) &&
                                         session->hello1.sent &&
                                         session->hello2.sent
                                    )
                                 {
-                                    orilink_protocol_t_status_t deserialized_rcvd = orilink_deserialize(label,
+                                    orilink_protocol_t_status_t deserialized_orcvdo = orilink_deserialize(label,
                                         session->identity.kem_sharedsecret, session->remote_nonce, session->remote_ctr,
-                                        (const uint8_t*)rcvd.recv_buffer, rcvd.n
+                                        (const uint8_t*)orcvdo.r_orilink_raw_protocol_t->recv_buffer, orcvdo.r_orilink_raw_protocol_t->n
                                     );
-                                    if (deserialized_rcvd.status != SUCCESS) {
-                                        LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", label, deserialized_rcvd.status);
+                                    if (deserialized_orcvdo.status != SUCCESS) {
+                                        LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", label, deserialized_orcvdo.status);
+                                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                         event_founded_in_session = true;
                                         break;
                                     } else {
                                         LOG_DEBUG("%sorilink_deserialize BERHASIL.", label);
                                     }  
-                                    orilink_protocol_t* received_protocol = deserialized_rcvd.r_orilink_protocol_t;
+                                    orilink_protocol_t* received_protocol = deserialized_orcvdo.r_orilink_protocol_t;
                                     orilink_hello2_ack_t *ohello2_ack = received_protocol->payload.orilink_hello2_ack;
                                     if (session->identity.client_id != ohello2_ack->client_id) {
                                         LOG_WARN("%HELLO2_ACK ditolak dari IP %s. client_id berbeda.", label, host_str);
+                                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -526,6 +538,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                                     uint64_t_status_t rt = get_realtime_time_ns(label);
                                     if (rt.status != SUCCESS) {
                                         LOG_ERROR("%sFailed to get_realtime_time_ns.", label);
+                                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -542,6 +555,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 //======================================================================           
                                     if (async_create_timerfd(label, &session->hello3.timer_fd) != SUCCESS) {
                                         LOG_ERROR("%sFailed to async_create_timerfd.", label);
+                                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -549,6 +563,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 //----------------------------------------------------------------------
                                     if (send_hello3(label, session) != SUCCESS) {
                                         LOG_ERROR("%sFailed to send_hello3.", label);
+                                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -556,20 +571,24 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 //----------------------------------------------------------------------
                                     if (async_create_incoming_event(label, &cow_async, &session->hello3.timer_fd) != SUCCESS) {
                                         LOG_ERROR("%sFailed to async_create_incoming_event.", label);
+                                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
                                     }        
 //======================================================================  
+                                    CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                     CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                     event_founded_in_session = true;
                                     break;
                                 } else {
                                     LOG_ERROR("%sKoneksi ditolak Tidak pernah mengirim HELLO1 dan atau HELLO2 ke IP %s.", label, host_str);
+                                    CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                     event_founded_in_session = true;
                                     break;
                                 }
                             } else {
+                                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                 event_founded_in_session = true;
                                 break;
                             }
