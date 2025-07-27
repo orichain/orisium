@@ -153,6 +153,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
                 return deserialized_orcvdo.status;
             } else {
                 LOG_DEBUG("%sorilink_deserialize BERHASIL.", label);
+                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
             }  
             orilink_protocol_t* received_protocol = deserialized_orcvdo.r_orilink_protocol_t;
             orilink_hello1_t *ohello1 = received_protocol->payload.orilink_hello1;
@@ -165,26 +166,22 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 //====================================================================== 
             if (async_create_timerfd(label, &session->hello1_ack.ack_timer_fd) != SUCCESS) {
                 LOG_ERROR("%sFailed to async_create_timerfd.", label);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
 //----------------------------------------------------------------------
             if (send_hello1_ack(label, &master_ctx->listen_sock, session) != SUCCESS) {
                 LOG_ERROR("%sFailed to send_hello1_ack.", label);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
 //----------------------------------------------------------------------
             if (async_create_incoming_event(label, &master_ctx->master_async, &session->hello1_ack.ack_timer_fd) != SUCCESS) {
                 LOG_ERROR("%sFailed to async_create_incoming_event.", label);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }        
 //======================================================================
-            CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
             CLOSE_ORILINK_PROTOCOL(&received_protocol);
             break;
         }
@@ -218,12 +215,12 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
                 return deserialized_orcvdo.status;
             } else {
                 LOG_DEBUG("%sorilink_deserialize BERHASIL.", label);
+                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
             }  
             orilink_protocol_t* received_protocol = deserialized_orcvdo.r_orilink_protocol_t;
             orilink_hello2_t *ohello2 = received_protocol->payload.orilink_hello2;
             if (master_ctx->sio_c_session[session_index].identity.client_id != ohello2->client_id) {
                 LOG_WARN("%sHELLO2 ditolak dari IP %s. client_id berbeda.", label, host_str);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE_DIFCLID;
             }
@@ -232,7 +229,6 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
             uint64_t_status_t rt = get_realtime_time_ns(label);
             if (rt.status != SUCCESS) {
                 LOG_ERROR("%sFailed to get_realtime_time_ns.", label);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
@@ -248,7 +244,6 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 //======================================================================
             if (KEM_GENERATE_KEYPAIR(session->identity.kem_publickey, session->identity.kem_privatekey) != 0) {
                 LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", label);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
@@ -258,7 +253,6 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 //----------------------------------------------------------------------
             if (KEM_ENCODE_SHAREDSECRET(session->identity.kem_ciphertext, session->temp_kem_sharedsecret, session->client_kem_publickey) != 0) {
                 LOG_ERROR("%sFailed to KEM_ENCODE_SHAREDSECRET.", label);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
@@ -267,27 +261,23 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 //====================================================================== 
             if (async_create_timerfd(label, &session->hello2_ack.ack_timer_fd) != SUCCESS) {
                 LOG_ERROR("%sFailed to async_create_timerfd.", label);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
 //----------------------------------------------------------------------
             if (send_hello2_ack(label, &master_ctx->listen_sock, session) != SUCCESS) {
                 LOG_ERROR("%sFailed to send_hello2_ack.", label);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
 //----------------------------------------------------------------------
             if (async_create_incoming_event(label, &master_ctx->master_async, &session->hello2_ack.ack_timer_fd) != SUCCESS) {
                 LOG_ERROR("%sFailed to async_create_incoming_event.", label);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }        
 //======================================================================                       
             print_hex(label, session->identity.kem_ciphertext, KEM_CIPHERTEXT_BYTES, 1);
-            CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
             CLOSE_ORILINK_PROTOCOL(&received_protocol);
             break;
         }
@@ -322,12 +312,12 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
                 return deserialized_orcvdo.status;
             } else {
                 LOG_DEBUG("%sorilink_deserialize BERHASIL.", label);
+                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
             }  
             orilink_protocol_t* received_protocol = deserialized_orcvdo.r_orilink_protocol_t;
             orilink_hello3_t *ohello3 = received_protocol->payload.orilink_hello3;
             if (master_ctx->sio_c_session[session_index].identity.client_id != ohello3->client_id) {
                 LOG_WARN("%sHELLO3 ditolak dari IP %s. client_id berbeda.", label, host_str);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE_DIFCLID;
             }
@@ -336,7 +326,6 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
             uint64_t_status_t rt = get_realtime_time_ns(label);
             if (rt.status != SUCCESS) {
                 LOG_ERROR("%sFailed to get_realtime_time_ns.", label);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
@@ -351,13 +340,11 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 //======================================================================
             if (generate_nonce(label, session->local_nonce) != SUCCESS) {
                 LOG_ERROR("%sFailed to generate_nonce.", label);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
             if (generate_connection_id(label, &session->identity.server_id) != SUCCESS) {
                 LOG_ERROR("%sFailed to generate_connection_id.", label);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
@@ -367,26 +354,22 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 //====================================================================== 
             if (async_create_timerfd(label, &session->hello3_ack.ack_timer_fd) != SUCCESS) {
                 LOG_ERROR("%sFailed to async_create_timerfd.", label);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
 //----------------------------------------------------------------------
             if (send_hello3_ack(label, &master_ctx->listen_sock, session) != SUCCESS) {
                 LOG_ERROR("%sFailed to send_hello3_ack.", label);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
 //----------------------------------------------------------------------
             if (async_create_incoming_event(label, &master_ctx->master_async, &session->hello3_ack.ack_timer_fd) != SUCCESS) {
                 LOG_ERROR("%sFailed to async_create_incoming_event.", label);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }        
 //======================================================================   
-            CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
             CLOSE_ORILINK_PROTOCOL(&received_protocol);
             break;
         }
