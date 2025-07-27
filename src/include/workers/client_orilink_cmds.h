@@ -4,5 +4,6 @@
 status_t hello1(const char *label, cow_c_session_t *session);
 status_t hello2(const char *label, cow_c_session_t *session);
 status_t hello3(const char *label, cow_c_session_t *session);
+status_t hello_end(const char *label, cow_c_session_t *session);
 
 #endif

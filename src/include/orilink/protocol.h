@@ -96,9 +96,7 @@ typedef struct {
 
 typedef struct {
     uint64_t client_id;
-    uint8_t nonce[AES_NONCE_BYTES];
-    uint64_t server_id;
-    uint16_t port;
+    uint8_t encrypted_server_id_new_client_id[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t) + AES_TAG_BYTES];
     uint8_t trycount;
 } orilink_hello_end_t;
 

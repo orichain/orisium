@@ -7,6 +7,8 @@
 #include <arpa/inet.h>
 #include <inttypes.h>
 #include <stdbool.h>
+#include <endian.h>
+#include <stdio.h>
 
 #include "log.h"
 #include "utilities.h"
@@ -21,6 +23,8 @@
 #include "pqc.h"
 #include "sessions/master_session.h"
 #include "master/server_orilink.h"
+#include "poly1305-donna.h"
+#include "aes.h"
 
 status_t setup_socket_listenner(const char *label, master_context *master_ctx, uint16_t *listen_port) {
     struct sockaddr_in6 addr;
@@ -250,6 +254,11 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 //----------------------------------------------------------------------
 // disimpan di temp_kem_sharedsecret terlebih dahulu karena clienr
 // belum siap
+// saat terima hello_end dari client segera pindah
+// session->temp_kem_sharedsecret ke session->identity.kem_sharedsecret
+// untuk membaca helo_end dari client
+// data heloo_end belum terenkripsi karena berisi nonce
+// namun sudah ada pengecekan mac menggunakan sharedsecret
 //----------------------------------------------------------------------
             if (KEM_ENCODE_SHAREDSECRET(session->identity.kem_ciphertext, session->temp_kem_sharedsecret, session->client_kem_publickey) != 0) {
                 LOG_ERROR("%sFailed to KEM_ENCODE_SHAREDSECRET.", label);
@@ -277,7 +286,6 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
                 return FAILURE;
             }        
 //======================================================================                       
-            print_hex(label, session->identity.kem_ciphertext, KEM_CIPHERTEXT_BYTES, 1);
             CLOSE_ORILINK_PROTOCOL(&received_protocol);
             break;
         }
@@ -369,6 +377,178 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }        
+//======================================================================   
+            CLOSE_ORILINK_PROTOCOL(&received_protocol);
+            break;
+        }
+        case ORILINK_HELLO_END: {
+            int session_index = -1;
+            for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
+                if (
+                        master_ctx->sio_c_session[i].in_use &&
+                        sockaddr_equal((const struct sockaddr *)&master_ctx->sio_c_session[i].old_client_addr, (const struct sockaddr *)&client_addr) &&
+                        master_ctx->sio_c_session[i].hello1_ack.ack_sent &&
+                        master_ctx->sio_c_session[i].hello2_ack.ack_sent &&
+                        master_ctx->sio_c_session[i].hello3_ack.ack_sent &&
+                        (!master_ctx->sio_c_session[i].sock_ready.rcvd)
+                   )
+                {
+                    session_index = i;
+                    break;
+                }
+            }
+            if (session_index == -1) {
+                LOG_WARN("%sHELLO_END ditolak dari IP %s. Tidak pernah mengirim HELLO1_ACK dan atau HELLO2_ACK dan atau HELLO3_ACK ke IP ini atau HELLO_END dari IP ini sudah ditangani.", label, host_str);
+                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                return FAILURE_IVLDHDLD;
+            }
+            master_sio_c_session_t *session = &master_ctx->sio_c_session[session_index];
+//----------------------------------------------------------------------
+// Pindahkan temp_kem_sharedsecret ke identity
+// Di duga client sudah mengirim hello end
+// Jika decrypt gagal berarti Mac tidak cocok
+// Jika mac tidak cocok kembalikan lagi
+// kosongkan kembali session->identity.kem_sharedsecret
+// Artinya mungkin bukan client sebenarnya yang mengirim hello_end
+// Tujuan pengosongan barangkali client sebenarnya masih retry hello3
+//---------------------------------------------------------------------- 
+            memcpy(session->identity.kem_sharedsecret, session->temp_kem_sharedsecret, KEM_SHAREDSECRET_BYTES);
+//----------------------------------------------------------------------
+            orilink_protocol_t_status_t deserialized_orcvdo = orilink_deserialize(label,
+                session->identity.kem_sharedsecret, session->remote_nonce, session->remote_ctr,
+                (const uint8_t*)orcvdo.r_orilink_raw_protocol_t->recv_buffer, orcvdo.r_orilink_raw_protocol_t->n
+            );
+            if (deserialized_orcvdo.status != SUCCESS) {
+                LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", label, deserialized_orcvdo.status);
+//----------------------------------------------------------------------
+// Diduga Mac tidak cocok atau data tidak valid
+// Diduga bukan client sebenarnya
+// Artinya mungkin bukan client sebenarnya yang mengirim hello_end
+// Tujuan pengosongan barangkali client sebenarnya masih retry hello3
+//---------------------------------------------------------------------- 
+                memset(session->identity.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+//----------------------------------------------------------------------
+                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                return deserialized_orcvdo.status;
+            } else {
+                LOG_DEBUG("%sorilink_deserialize BERHASIL.", label);
+                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+            }            
+            orilink_protocol_t* received_protocol = deserialized_orcvdo.r_orilink_protocol_t;
+            orilink_hello_end_t *ohello_end = received_protocol->payload.orilink_hello_end;
+            if (master_ctx->sio_c_session[session_index].identity.client_id != ohello_end->client_id) {
+                LOG_WARN("%sHELLO_END ditolak dari IP %s. client_id berbeda.", label, host_str);
+//----------------------------------------------------------------------
+// Diduga bukan client sebenarnya
+// Artinya mungkin bukan client sebenarnya yang mengirim hello_end
+// Tujuan pengosongan barangkali client sebenarnya masih retry hello3
+//---------------------------------------------------------------------- 
+                memset(session->identity.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+//----------------------------------------------------------------------
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE_DIFCLID;
+            }
+            double try_count = (double)session->hello3_ack.ack_sent_try_count-(double)1;
+            sio_c_calculate_retry(label, session, session_index, try_count);
+            uint64_t_status_t rt = get_realtime_time_ns(label);
+            if (rt.status != SUCCESS) {
+                LOG_ERROR("%sFailed to get_realtime_time_ns.", label);
+//----------------------------------------------------------------------
+// Tujuan pengosongan memulai awal karna kegagalan server
+// Harusnya tidak pernah terjadi server gagal mengambil real time clock
+//---------------------------------------------------------------------- 
+                memset(session->identity.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+//----------------------------------------------------------------------
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            session->sock_ready.rcvd = true;
+            session->sock_ready.rcvd_time = rt.r_uint64_t;
+            uint64_t interval_ull = session->sock_ready.rcvd_time - session->hello3_ack.ack_sent_time;
+            double rtt_value = (double)interval_ull;
+            sio_c_calculate_rtt(label, session, session_index, rtt_value);
+            cleanup_hello_ack(label, &master_ctx->master_async, &session->hello3_ack);            
+//======================================================================
+// Ambil remote_nonce
+// Set remote_ctr = 0
+// Ambil encrypter server_id+new_client_id
+// Ambil Mac
+// Cocokkan MAc
+// Decrypt server_id dan new_client_id
+//======================================================================
+            memcpy(session->remote_nonce, ohello_end->encrypted_server_id_new_client_id, AES_NONCE_BYTES);
+            uint8_t encrypted_server_id_new_client_id[sizeof(uint64_t) + sizeof(uint64_t)];   
+            memcpy(encrypted_server_id_new_client_id, ohello_end->encrypted_server_id_new_client_id + AES_NONCE_BYTES, sizeof(uint64_t) + sizeof(uint64_t));
+            uint8_t data_mac[AES_TAG_BYTES];
+            memcpy(data_mac, ohello_end->encrypted_server_id_new_client_id + AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t), AES_TAG_BYTES);
+//----------------------------------------------------------------------
+// cek Mac
+//----------------------------------------------------------------------  
+            uint8_t encrypted_server_id_new_client_id1[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t)];
+            memcpy(encrypted_server_id_new_client_id1, ohello_end->encrypted_server_id_new_client_id, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t));
+            uint8_t mac[AES_TAG_BYTES];
+            poly1305_context mac_ctx;
+            poly1305_init(&mac_ctx, session->identity.kem_sharedsecret);
+            poly1305_update(&mac_ctx, encrypted_server_id_new_client_id1, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t));
+            poly1305_finish(&mac_ctx, mac);
+            if (!poly1305_verify(mac, data_mac)) {
+                LOG_ERROR("%sFailed to Mac Tidak Sesuai.", label);
+//----------------------------------------------------------------------
+// Tujuan pengosongan memulai awal karna Mac nonce, server_id dan new_client_id mismatch
+//---------------------------------------------------------------------- 
+                memset(session->identity.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+//----------------------------------------------------------------------
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            uint32_t temp_remote_ctr = (uint32_t)0;
+//----------------------------------------------------------------------
+// Decrypt
+//---------------------------------------------------------------------- 
+            uint8_t decrypted_server_id_new_client_id[sizeof(uint64_t) + sizeof(uint64_t)];
+            aes256ctx aes_ctx;
+            aes256_ctr_keyexp(&aes_ctx, session->identity.kem_sharedsecret);
+//=========================================IV===========================    
+            uint8_t keystream_buffer[sizeof(uint64_t) + sizeof(uint64_t)];
+            uint8_t iv[AES_IV_BYTES];
+            memcpy(iv, session->remote_nonce, AES_NONCE_BYTES);
+            uint32_t remote_ctr_be = htobe32(temp_remote_ctr);
+            memcpy(iv + AES_NONCE_BYTES, &remote_ctr_be, sizeof(uint32_t));
+//=========================================IV===========================    
+            aes256_ctr(keystream_buffer, sizeof(uint64_t) + sizeof(uint16_t), iv, &aes_ctx);
+            for (size_t i = 0; i < sizeof(uint64_t) + sizeof(uint16_t); i++) {
+                decrypted_server_id_new_client_id[i] = encrypted_server_id_new_client_id[i] ^ keystream_buffer[i];
+            }
+            aes256_ctx_release(&aes_ctx);
+//---------------------------------------------------------------------- 
+// Mengecek dan Mengisi identity
+//---------------------------------------------------------------------- 
+            uint64_t server_id_be;
+            memcpy(&server_id_be, decrypted_server_id_new_client_id, sizeof(uint64_t));
+            if (session->identity.server_id != be64toh(server_id_be)) {
+                LOG_WARN("%sHELLO_END ditolak dari IP %s. server_id berbeda.", label, host_str);
+//----------------------------------------------------------------------
+// Tujuan pengosongan memulai awal karna server_id berbeda
+//---------------------------------------------------------------------- 
+                memset(session->identity.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+//----------------------------------------------------------------------
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+//----------------------------------------------------------------------
+// Kosongkan temp_kem_sharedsecret
+// Menganggap data valid dengan integritas
+//---------------------------------------------------------------------- 
+            session->remote_ctr = (uint32_t)1;//sudah melakukan dekripsi data valid 1 kali
+            memset(session->temp_kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+//---------------------------------------------------------------------- 
+            uint64_t new_client_id_be;
+            memcpy(&new_client_id_be, decrypted_server_id_new_client_id + sizeof(uint64_t), sizeof(uint64_t));
+            session->identity.client_id = be64toh(new_client_id_be);    
+//====================================================================== 
+// SEND SOCK_READY                  
+//====================================================================== 
+            printf("===========================SUDAH SOCK READY YA?=================\n");
 //======================================================================   
             CLOSE_ORILINK_PROTOCOL(&received_protocol);
             break;

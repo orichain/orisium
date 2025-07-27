@@ -11,6 +11,7 @@
 #include <math.h>
 #include <netinet/in.h>
 #include <stdbool.h>
+#include <endian.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -24,6 +25,8 @@
 #include "workers/client_orilink_cmds.h"
 #include "kalman.h"
 #include "pqc.h"
+#include "poly1305-donna.h"
+#include "aes.h"
 
 void setup_session(cow_c_session_t *session) {
     session->in_use = false;
@@ -41,6 +44,8 @@ void setup_session(cow_c_session_t *session) {
     memset(session->remote_nonce, 0, AES_NONCE_BYTES);
     session->remote_ctr = (uint32_t)0;
     memset(session->encrypted_server_id_port, 0, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
+    memset(session->temp_kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+    session->new_client_id = 0ULL;
     setup_oricle_double(&session->rtt, (double)0);
     setup_oricle_double(&session->retry, (double)0);
     CLOSE_FD(&session->sock_fd);
@@ -66,6 +71,8 @@ void cleanup_session(const char *label, async_type_t *cow_async, cow_c_session_t
     memset(session->remote_nonce, 0, AES_NONCE_BYTES);
     session->remote_ctr = (uint32_t)0;
     memset(session->encrypted_server_id_port, 0, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
+    memset(session->temp_kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+    session->new_client_id = 0ULL;
     cleanup_oricle_double(&session->rtt);
     cleanup_oricle_double(&session->retry);
     async_delete_event(label, cow_async, &session->sock_fd);
@@ -149,6 +156,29 @@ status_t send_hello3(const char *label, cow_c_session_t *session) {
         (long)((session->hello3.interval_timer_fd - (time_t)session->hello3.interval_timer_fd) * 1e9),
         (time_t)session->hello3.interval_timer_fd,
         (long)((session->hello3.interval_timer_fd - (time_t)session->hello3.interval_timer_fd) * 1e9)) != SUCCESS)
+    {
+        return FAILURE;
+    }
+    return SUCCESS;
+}
+
+status_t send_hello_end(const char *label, cow_c_session_t *session) {
+    uint64_t_status_t rt = get_realtime_time_ns(label);
+    if (rt.status != SUCCESS) {
+        return FAILURE;
+    }
+    session->hello_end.sent = true;
+    session->hello_end.sent_try_count++;
+    session->hello_end.sent_time = rt.r_uint64_t;
+    if (hello_end(label, session) != SUCCESS) {
+        printf("Error hello_end\n");
+        return FAILURE;
+    }
+    if (async_set_timerfd_time(label, &session->hello_end.timer_fd,
+        (time_t)session->hello_end.interval_timer_fd,
+        (long)((session->hello_end.interval_timer_fd - (time_t)session->hello_end.interval_timer_fd) * 1e9),
+        (time_t)session->hello_end.interval_timer_fd,
+        (long)((session->hello_end.interval_timer_fd - (time_t)session->hello_end.interval_timer_fd) * 1e9)) != SUCCESS)
     {
         return FAILURE;
     }
@@ -496,7 +526,6 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 //======================================================================
 // Send HELLO2                   
 //======================================================================           
-                                    print_hex(label, session->identity.kem_publickey, KEM_PUBLICKEY_BYTES, 1);
                                     if (async_create_timerfd(label, &session->hello2.timer_fd) != SUCCESS) {
                                         LOG_ERROR("%sFailed to async_create_timerfd.", label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
@@ -604,6 +633,154 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                                     event_founded_in_session = true;
                                     break;
                                 }
+                            } else if (orcvdo.r_orilink_raw_protocol_t->type == ORILINK_HELLO3_ACK) {
+                                if (
+                                        sockaddr_equal((const struct sockaddr *)&session->old_server_addr, (const struct sockaddr *)&server_addr) &&
+                                        session->hello1.sent &&
+                                        session->hello2.sent &&
+                                        session->hello3.sent
+                                   )
+                                {
+                                    orilink_protocol_t_status_t deserialized_orcvdo = orilink_deserialize(label,
+                                        session->identity.kem_sharedsecret, session->remote_nonce, session->remote_ctr,
+                                        (const uint8_t*)orcvdo.r_orilink_raw_protocol_t->recv_buffer, orcvdo.r_orilink_raw_protocol_t->n
+                                    );
+                                    if (deserialized_orcvdo.status != SUCCESS) {
+                                        LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", label, deserialized_orcvdo.status);
+                                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                                        event_founded_in_session = true;
+                                        break;
+                                    } else {
+                                        LOG_DEBUG("%sorilink_deserialize BERHASIL.", label);
+                                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                                    }  
+                                    orilink_protocol_t* received_protocol = deserialized_orcvdo.r_orilink_protocol_t;
+                                    orilink_hello3_ack_t *ohello3_ack = received_protocol->payload.orilink_hello3_ack;
+                                    if (session->identity.client_id != ohello3_ack->client_id) {
+                                        LOG_WARN("%HELLO3_ACK ditolak dari IP %s. client_id berbeda.", label, host_str);
+                                        CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                        event_founded_in_session = true;
+                                        break;
+                                    }
+                                    double try_count = (double)session->hello3.sent_try_count-(double)1;
+                                    cow_calculate_retry(label, session, i, try_count);
+                                    uint64_t_status_t rt = get_realtime_time_ns(label);
+                                    if (rt.status != SUCCESS) {
+                                        LOG_ERROR("%sFailed to get_realtime_time_ns.", label);
+                                        CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                        event_founded_in_session = true;
+                                        break;
+                                    }
+                                    session->hello3.ack_rcvd = true;
+                                    session->hello3.ack_rcvd_time = rt.r_uint64_t;
+                                    memcpy(session->identity.kem_ciphertext + (KEM_CIPHERTEXT_BYTES / 2), ohello3_ack->ciphertext2, KEM_CIPHERTEXT_BYTES / 2);
+//----------------------------------------------------------------------
+// data heloo_end belum terenkripsi karena berisi nonce
+// namun sudah ada pengecekan mac menggunakan sharedsecret
+// simpan shared_secret di temporary
+// jika mac sesuai segera pindah
+// temp_kem_sharedsecret ke identity
+//----------------------------------------------------------------------
+                                    if (KEM_DECODE_SHAREDSECRET(session->temp_kem_sharedsecret, session->identity.kem_ciphertext, session->identity.kem_privatekey) != 0) {
+                                        LOG_ERROR("%sFailed to KEM_DECODE_SHAREDSECRET.", label);
+                                        CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                        event_founded_in_session = true;
+                                        break;
+                                    }                                    
+                                    memcpy(session->remote_nonce, ohello3_ack->encrypted_server_id_port, AES_NONCE_BYTES);
+                                    uint8_t encrypted_server_id_port[sizeof(uint64_t) + sizeof(uint16_t)];
+                                    memcpy(encrypted_server_id_port, ohello3_ack->encrypted_server_id_port + AES_NONCE_BYTES, sizeof(uint64_t) + sizeof(uint16_t));
+                                    uint8_t data_mac[AES_TAG_BYTES];
+                                    memcpy(data_mac, ohello3_ack->encrypted_server_id_port + AES_NONCE_BYTES + (sizeof(uint64_t) + sizeof(uint16_t)), AES_TAG_BYTES);
+//----------------------------------------------------------------------
+// cek Mac
+//----------------------------------------------------------------------  
+                                    uint8_t encrypted_server_id_port1[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t)];
+                                    memcpy(encrypted_server_id_port1, ohello3_ack->encrypted_server_id_port, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t));
+                                    uint8_t mac[AES_TAG_BYTES];
+                                    poly1305_context mac_ctx;
+                                    poly1305_init(&mac_ctx, session->temp_kem_sharedsecret);
+                                    poly1305_update(&mac_ctx, encrypted_server_id_port1, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t));
+                                    poly1305_finish(&mac_ctx, mac);
+                                    if (!poly1305_verify(mac, data_mac)) {
+                                        LOG_ERROR("%sFailed to Mac Tidak Sesuai.", label);
+                                        CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                        event_founded_in_session = true;
+                                        break;
+                                    }
+//----------------------------------------------------------------------
+// Pindahkan temp_kem_sharedsecret ke identity
+// Menganggap data valid dengan integritas
+//---------------------------------------------------------------------- 
+                                    session->remote_ctr = (uint32_t)0;
+                                    memcpy(session->identity.kem_sharedsecret, session->temp_kem_sharedsecret, KEM_SHAREDSECRET_BYTES);
+                                    memset(session->temp_kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+//----------------------------------------------------------------------
+// Decrypt
+//---------------------------------------------------------------------- 
+                                    uint8_t decrypted_server_id_port[sizeof(uint64_t) + sizeof(uint16_t)];
+                                    aes256ctx aes_ctx;
+                                    aes256_ctr_keyexp(&aes_ctx, session->identity.kem_sharedsecret);
+//=========================================IV===========================    
+                                    uint8_t keystream_buffer[sizeof(uint64_t) + sizeof(uint16_t)];
+                                    uint8_t iv[AES_IV_BYTES];
+                                    memcpy(iv, session->remote_nonce, AES_NONCE_BYTES);
+                                    uint32_t remote_ctr_be = htobe32(session->remote_ctr);
+                                    memcpy(iv + AES_NONCE_BYTES, &remote_ctr_be, sizeof(uint32_t));
+//=========================================IV===========================    
+                                    aes256_ctr(keystream_buffer, sizeof(uint64_t) + sizeof(uint16_t), iv, &aes_ctx);
+                                    for (size_t i = 0; i < sizeof(uint64_t) + sizeof(uint16_t); i++) {
+                                        decrypted_server_id_port[i] = encrypted_server_id_port[i] ^ keystream_buffer[i];
+                                    }
+                                    aes256_ctx_release(&aes_ctx);
+                                    session->remote_ctr++;
+//---------------------------------------------------------------------- 
+// Mengisi identity
+//---------------------------------------------------------------------- 
+                                    uint64_t server_id_be;
+                                    memcpy(&server_id_be, decrypted_server_id_port, sizeof(uint64_t));
+                                    session->identity.server_id = be64toh(server_id_be);
+                                    uint16_t port_be;
+                                    memcpy(&port_be, decrypted_server_id_port + sizeof(uint64_t), sizeof(uint16_t));
+                                    session->identity.port = be16toh(port_be);
+//---------------------------------------------------------------------- 
+                                    uint64_t interval_ull = session->hello3.ack_rcvd_time - session->hello3.sent_time;
+                                    double rtt_value = (double)interval_ull;
+                                    cow_calculate_rtt(label, session, i, rtt_value);
+                                    cleanup_hello(label, &cow_async, &session->hello3);
+//======================================================================
+// Send HELLO_END
+//======================================================================   
+                                    if (async_create_timerfd(label, &session->hello_end.timer_fd) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to async_create_timerfd.", label);
+                                        CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                        event_founded_in_session = true;
+                                        break;
+                                    }
+//----------------------------------------------------------------------
+                                    if (send_hello_end(label, session) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to send_hello_end.", label);
+                                        CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                        event_founded_in_session = true;
+                                        break;
+                                    }
+//----------------------------------------------------------------------
+                                    if (async_create_incoming_event(label, &cow_async, &session->hello_end.timer_fd) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to async_create_incoming_event.", label);
+                                        CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                        event_founded_in_session = true;
+                                        break;
+                                    }             
+//======================================================================  
+                                    CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                                    event_founded_in_session = true;
+                                    break;
+                                } else {
+                                    LOG_ERROR("%sKoneksi ditolak Tidak pernah mengirim HELLO1 dan atau HELLO2 dan atau HELLO3 ke IP %s.", label, host_str);
+                                    CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                                    event_founded_in_session = true;
+                                    break;
+                                }
                             } else {
                                 CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                 event_founded_in_session = true;
@@ -649,6 +826,20 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                             cow_calculate_retry(label, session, i, try_count);
                             session->hello3.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
                             send_hello3(label, session);
+                            event_founded_in_session = true;
+                            break;
+                        } else if (current_fd == session->hello_end.timer_fd) {
+                            uint64_t u;
+                            read(session->hello_end.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                            if (server_disconnected(label, wot, worker_idx, i, &cow_async, session, session->hello_end.sent_try_count, &master_uds_fd)) {
+                                event_founded_in_session = true;
+                                break;
+                            }
+                            LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", label, i, session->hello_end.interval_timer_fd);
+                            double try_count = (double)session->hello_end.sent_try_count;
+                            cow_calculate_retry(label, session, i, try_count);
+                            session->hello_end.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                            send_hello_end(label, session);
                             event_founded_in_session = true;
                             break;
                         }

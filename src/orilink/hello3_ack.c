@@ -64,7 +64,7 @@ status_t orilink_deserialize_hello3_ack(const char *label, orilink_protocol_t *p
         LOG_ERROR("%sOut of bounds reading encrypted_server_id_port.", label);
         return FAILURE_OOBUF;
     }
-    memcpy(payload->encrypted_server_id_port, cursor, KEM_CIPHERTEXT_BYTES / 2);
+    memcpy(payload->encrypted_server_id_port, cursor, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
     cursor += AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES;
     current_offset += AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES;
     if (current_offset + sizeof(uint8_t) > total_buffer_len) {

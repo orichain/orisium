@@ -350,6 +350,20 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
                             send_hello2_ack(label, &master_ctx->listen_sock, session);
                             event_founded_in_sio_c_session = true;
                             break;
+                        } else if (current_fd == session->hello3_ack.ack_timer_fd) {
+                            uint64_t u;
+                            read(session->hello3_ack.ack_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                            if (client_disconnected(label, i, &master_ctx->master_async, session, session->hello3_ack.ack_sent_try_count)) {
+                                event_founded_in_sio_c_session = true;
+                                break;
+                            }
+                            LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", label, i, session->hello3_ack.interval_ack_timer_fd);
+                            double try_count = (double)session->hello3_ack.ack_sent_try_count;
+                            sio_c_calculate_retry(label, session, i, try_count);
+                            session->hello3_ack.interval_ack_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                            send_hello3_ack(label, &master_ctx->listen_sock, session);
+                            event_founded_in_sio_c_session = true;
+                            break;
                         }
                     }
                 }
