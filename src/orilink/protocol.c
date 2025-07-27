@@ -1172,7 +1172,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
             return result;
         }
     } else if (n < (ssize_t)(ORILINK_VERSION_BYTES + sizeof(uint8_t) + AES_TAG_BYTES)) {
-        LOG_ERROR("%receive_orilink_raw_protocol_packet received 0 bytes (unexpected for UDP).", label);
+        LOG_ERROR("%sreceive_orilink_raw_protocol_packet received 0 bytes (unexpected for UDP).", label);
         return result;
     }
     orilink_raw_protocol_t* r = (orilink_raw_protocol_t*)calloc(1, sizeof(orilink_raw_protocol_t));

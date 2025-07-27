@@ -77,11 +77,42 @@ static inline void CLOSE_IPC_PROTOCOL(ipc_protocol_t **protocol_ptr) {
 }
 
 typedef struct {
+    uint8_t *recv_buffer;
+    uint32_t n;
+    uint8_t version[IPC_VERSION_BYTES];
+	ipc_protocol_type_t type;
+} ipc_raw_protocol_t;
+//Huruf_besar biar selalu ingat karena akan sering digunakan
+static inline void CLOSE_IPC_RAW_PAYLOAD(void **ptr) {
+    if (ptr != NULL && *ptr != NULL) {
+        free(*ptr);
+        *ptr = NULL;
+    }
+}
+//Huruf_besar biar selalu ingat karena akan sering digunakan
+static inline void CLOSE_IPC_RAW_PROTOCOL(ipc_raw_protocol_t **protocol_ptr) {
+    if (protocol_ptr != NULL && *protocol_ptr != NULL) {
+        ipc_raw_protocol_t *x = *protocol_ptr;
+        CLOSE_IPC_RAW_PAYLOAD((void **)&x->recv_buffer);
+        free(x);
+        *protocol_ptr = NULL;
+    }
+}
+
+typedef struct {
 	ipc_protocol_t *r_ipc_protocol_t;
     status_t status;
 } ipc_protocol_t_status_t;
 
+typedef struct {
+	ipc_raw_protocol_t *r_ipc_raw_protocol_t;
+    status_t status;
+} ipc_raw_protocol_t_status_t;
+
 ssize_t_status_t send_ipc_protocol_message(const char *label, int *uds_fd, const ipc_protocol_t* p);
-ipc_protocol_t_status_t receive_and_deserialize_ipc_message(const char *label, int *uds_fd);
+ssize_t_status_t send_ipc_protocol_message_wfdtopass(const char *label, int *uds_fd, const ipc_protocol_t* p, int *fd_to_pass);
+ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, int *uds_fd);
+ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message_wfdrcvd(const char *label, int *uds_fd, int *fd_received);
+ipc_protocol_t_status_t ipc_deserialize(const char *label, const uint8_t* buffer, size_t len);
 
 #endif

@@ -245,29 +245,43 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 					LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
 					continue;
                 }
-                if (worker_master_heartbeat(label, wot, worker_idx, new_heartbeat_interval_double, &master_uds_fd) != SUCCESS) continue;
+                if (worker_master_heartbeat(label, wot, worker_idx, new_heartbeat_interval_double, &master_uds_fd) != SUCCESS) {
+                    continue;
+                } else {
+                    continue;
+                }
 			} else if (current_fd == master_uds_fd) {
-				ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(label, &master_uds_fd);
-				if (deserialized_result.status != SUCCESS) {
-					if (async_event_is_EPOLLHUP(current_events) ||
-						async_event_is_EPOLLERR(current_events) ||
-						async_event_is_EPOLLRDHUP(current_events))
-					{
-						cow_shutdown_requested = 1;
-						LOG_INFO("%sMaster disconnected. Initiating graceful shutdown...", label);
-						continue;
-					}
-					LOG_ERROR("%sError receiving or deserializing IPC message from Master: %d", label, deserialized_result.status);
+                if (async_event_is_EPOLLHUP(current_events) ||
+                    async_event_is_EPOLLERR(current_events) ||
+                    async_event_is_EPOLLRDHUP(current_events))
+                {
+                    cow_shutdown_requested = 1;
+                    LOG_INFO("%sMaster disconnected. Initiating graceful shutdown...", label);
+                    continue;
+                }
+                ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(label, &master_uds_fd);
+				if (ircvdi.status != SUCCESS) {
+					LOG_ERROR("%sError receiving or deserializing IPC message from Master: %d", label, ircvdi.status);
 					continue;
 				}
-				ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;
-				LOG_DEVEL_DEBUG("%sReceived message type: 0x%02x", label, received_protocol->type);		
-                if (received_protocol->type == IPC_MASTER_WORKER_SHUTDOWN) {
+				if (ircvdi.r_ipc_raw_protocol_t->type == IPC_MASTER_WORKER_SHUTDOWN) {
 					LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
+                    CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
 					cow_shutdown_requested = 1;
-					CLOSE_IPC_PROTOCOL(&received_protocol);
 					continue;
-				} else if (received_protocol->type == IPC_MASTER_COW_CONNECT) {
+				} else if (ircvdi.r_ipc_raw_protocol_t->type == IPC_MASTER_COW_CONNECT) {                    
+                    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
+                        (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+                    );
+                    if (deserialized_ircvdi.status != SUCCESS) {
+                        LOG_ERROR("%sipc_deserialize gagal dengan status %d.", label, deserialized_ircvdi.status);
+                        CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                        continue;
+                    } else {
+                        LOG_DEBUG("%sipc_deserialize BERHASIL.", label);
+                        CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                    }           
+                    ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
 					ipc_master_cow_connect_t *cc = received_protocol->payload.ipc_master_cow_connect;
                     int slot_found = -1;
                     for (int i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
@@ -316,21 +330,25 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                         session->sock_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
                         if (session->sock_fd == -1) {
                             LOG_ERROR("%sUDP Socket creation failed: %s", label, strerror(errno));
+                            CLOSE_IPC_PROTOCOL(&received_protocol);
                             continue;
                         }
                         LOG_DEVEL_DEBUG("%sUDP Socket FD %d created.", label, session->sock_fd);
                         status_t r_snbkg = set_nonblocking(label, session->sock_fd);
                         if (r_snbkg != SUCCESS) {
                             LOG_ERROR("%sset_nonblocking failed.", label);
+                            CLOSE_IPC_PROTOCOL(&received_protocol);
                             continue;
                         }
                         LOG_DEVEL_DEBUG("%sUDP Socket FD %d set to non-blocking.", label, session->sock_fd);
                         int conn_res = connect(session->sock_fd, rp->ai_addr, rp->ai_addrlen);
                         if (conn_res == 0) {
                             LOG_INFO("%sUDP socket 'connected' to %s:%s (FD %d).", label, host_str, port_str, session->sock_fd);
+                            CLOSE_IPC_PROTOCOL(&received_protocol);
                             break;
                         } else {
                             LOG_ERROR("%sUDP 'connect' failed for %s:%s (FD %d): %s", label, host_str, port_str, session->sock_fd, strerror(errno));
+                            CLOSE_IPC_PROTOCOL(&received_protocol);
                             CLOSE_FD(&session->sock_fd);
                             continue;
                         }
@@ -342,6 +360,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                         continue;
                     }
                     if (async_create_incoming_event(label, &cow_async, &session->sock_fd) != SUCCESS) {
+                        LOG_ERROR("%sFailed to async_create_incoming_event for %s:%s.", label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
@@ -349,10 +368,12 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 // Generate Identity                    
 //======================================================================
                     if (generate_connection_id(label, &session->identity.client_id) != SUCCESS) {
+                        LOG_ERROR("%sFailed to generate_connection_id for %s:%s.", label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
                     if (KEM_GENERATE_KEYPAIR(session->identity.kem_publickey, session->identity.kem_privatekey) != 0) {
+                        LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR for %s:%s.", label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
@@ -360,24 +381,30 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 // Send HELLO1                    
 //======================================================================           
                     if (async_create_timerfd(label, &session->hello1.timer_fd) != SUCCESS) {
+                        LOG_ERROR("%sFailed to async_create_timerfd for %s:%s.", label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
 //----------------------------------------------------------------------
                     if (send_hello1(label, session) != SUCCESS) {
+                        LOG_ERROR("%sFailed to send_hello1 for %s:%s.", label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
 //----------------------------------------------------------------------
                     if (async_create_incoming_event(label, &cow_async, &session->hello1.timer_fd) != SUCCESS) {
+                        LOG_ERROR("%sFailed to async_create_incoming_event for %s:%s.", label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }        
 //======================================================================    
                     CLOSE_IPC_PROTOCOL(&received_protocol);
 					continue;
-				}
-				CLOSE_IPC_PROTOCOL(&received_protocol);
+				} else {
+                    LOG_ERROR("%sUnknown protocol type %d from Master. Ignoring.", label, ircvdi.r_ipc_raw_protocol_t->type);
+                    CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                    continue;
+                }
             } else {
                 bool event_founded_in_session = false;
                 for (int i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {

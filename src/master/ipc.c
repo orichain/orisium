@@ -2,6 +2,7 @@
 #include <string.h>
 #include <errno.h>
 #include <netinet/in.h>
+#include <stdint.h>
 
 #include "log.h"
 #include "constants.h"
@@ -82,14 +83,25 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
 }
 
 status_t handle_ipc_event(const char *label, master_context *master_ctx, int *current_fd) {
-	ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(label, current_fd);
-	if (deserialized_result.status != SUCCESS) {
+    ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(label, current_fd);
+	if (ircvdi.status != SUCCESS) {
 		LOG_ERROR("%srecv_ipc_message from worker. %s", label, strerror(errno));
-		return deserialized_result.status;
+		return ircvdi.status;
 	}
-	ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;                
-	switch (received_protocol->type) {
+	switch (ircvdi.r_ipc_raw_protocol_t->type) {
 		case IPC_WORKER_MASTER_HEARTBEAT: {
+            ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
+                (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+            );
+            if (deserialized_ircvdi.status != SUCCESS) {
+                LOG_ERROR("%sipc_deserialize gagal dengan status %d.", label, deserialized_ircvdi.status);
+                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                return deserialized_ircvdi.status;
+            } else {
+                LOG_DEBUG("%sipc_deserialize BERHASIL.", label);
+                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+            }           
+            ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
             ipc_worker_master_heartbeat_t *hbt = received_protocol->payload.ipc_worker_master_heartbeat;
             uint64_t_status_t rt = get_realtime_time_ns(label);
             if (hbt->wot == SIO) {
@@ -127,6 +139,18 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
 			break;
 		}
         case IPC_COW_MASTER_CONNECTION: {
+            ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
+                (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+            );
+            if (deserialized_ircvdi.status != SUCCESS) {
+                LOG_ERROR("%sipc_deserialize gagal dengan status %d.", label, deserialized_ircvdi.status);
+                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                return deserialized_ircvdi.status;
+            } else {
+                LOG_DEBUG("%sipc_deserialize BERHASIL.", label);
+                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+            }           
+            ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
             ipc_cow_master_connection_t *cmc = received_protocol->payload.ipc_cow_master_connection;
             for (int i = 0; i < MAX_MASTER_COW_SESSIONS; ++i) {
                 if (
@@ -145,8 +169,8 @@ status_t handle_ipc_event(const char *label, master_context *master_ctx, int *cu
             break;
         }
 		default:
-			LOG_ERROR("[Master]: Unknown protocol type %d from UDS FD %d. Ignoring.", received_protocol->type, *current_fd);
-			CLOSE_IPC_PROTOCOL(&received_protocol);
+			LOG_ERROR("%sUnknown protocol type %d from UDS FD %d. Ignoring.", label, ircvdi.r_ipc_raw_protocol_t->type, *current_fd);
+			CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
 	}
 	return SUCCESS;
 }

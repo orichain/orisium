@@ -79,32 +79,37 @@ void run_logic_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, 
 					LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
 					continue;
                 }
-                if (worker_master_heartbeat(label, wot, worker_idx, new_heartbeat_interval_double, &master_uds_fd) != SUCCESS) continue;
+                if (worker_master_heartbeat(label, wot, worker_idx, new_heartbeat_interval_double, &master_uds_fd) != SUCCESS) {
+                    continue;
+                } else {
+                    continue;
+                }
 			} else if (current_fd == master_uds_fd) {
-				ipc_protocol_t_status_t deserialized_result = receive_and_deserialize_ipc_message(label, &master_uds_fd);
-				if (deserialized_result.status != SUCCESS) {
-					if (async_event_is_EPOLLHUP(current_events) ||
-						async_event_is_EPOLLERR(current_events) ||
-						async_event_is_EPOLLRDHUP(current_events))
-					{
-						logic_shutdown_requested = 1;
-						LOG_INFO("%sMaster disconnected. Initiating graceful shutdown...", label);
-						continue;
-					}
-					LOG_ERROR("%sError receiving or deserializing IPC message from Master: %d", label, deserialized_result.status);
+                if (async_event_is_EPOLLHUP(current_events) ||
+                    async_event_is_EPOLLERR(current_events) ||
+                    async_event_is_EPOLLRDHUP(current_events))
+                {
+                    logic_shutdown_requested = 1;
+                    LOG_INFO("%sMaster disconnected. Initiating graceful shutdown...", label);
+                    continue;
+                }
+				ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(label, &master_uds_fd);
+				if (ircvdi.status != SUCCESS) {
+					LOG_ERROR("%sError receiving or deserializing IPC message from Master: %d", label, ircvdi.status);
 					continue;
 				}
-				ipc_protocol_t* received_protocol = deserialized_result.r_ipc_protocol_t;
-				LOG_DEBUG("%sReceived message type: 0x%02x", label, received_protocol->type);
-                if (received_protocol->type == IPC_MASTER_WORKER_SHUTDOWN) {
+                if (ircvdi.r_ipc_raw_protocol_t->type == IPC_MASTER_WORKER_SHUTDOWN) {
 					LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
+                    CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
 					logic_shutdown_requested = 1;
-					CLOSE_IPC_PROTOCOL(&received_protocol);
 					continue;
 				} else {
-                    LOG_ERROR("%sUnknown message type %d from Master.", label, received_protocol->type);
+                    LOG_ERROR("%sUnknown protocol type %d from Master. Ignoring.", label, ircvdi.r_ipc_raw_protocol_t->type);
+                    CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                    continue;
                 }
-                CLOSE_IPC_PROTOCOL(&received_protocol);
+            } else {
+                LOG_ERROR("%sUnknown FD event %d.", label, current_fd);
             }
         }
     }
