@@ -1170,7 +1170,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
             result.status = FAILURE_EAGNEWBLK;
             return result;
         } else {
-            LOG_ERROR("%receive_orilink_raw_protocol_packet failed: %s", label, strerror(errno));
+            LOG_ERROR("%sreceive_orilink_raw_protocol_packet failed: %s", label, strerror(errno));
             return result;
         }
     } else if (n < (ssize_t)(AES_TAG_BYTES + ORILINK_VERSION_BYTES + sizeof(uint8_t))) {
