@@ -8,7 +8,6 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <endian.h>
-#include <stdio.h>
 
 #include "log.h"
 #include "utilities.h"
@@ -100,7 +99,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
             for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
                 if (
                         master_ctx->sio_c_session[i].in_use &&
-                        sockaddr_equal((const struct sockaddr *)&master_ctx->sio_c_session[i].old_client_addr, (const struct sockaddr *)&client_addr) &&
+                        sockaddr_equal((const struct sockaddr *)&master_ctx->sio_c_session[i].identity.remote_addr, (const struct sockaddr *)&client_addr) &&
                         master_ctx->sio_c_session[i].hello1_ack.rcvd
                    )
                 {
@@ -124,7 +123,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
                 if(!master_ctx->sio_c_session[i].in_use) {
                     master_ctx->sio_c_session[i].sio_index = sio_worker_idx;
                     master_ctx->sio_c_session[i].in_use = true;
-                    memcpy(&master_ctx->sio_c_session[i].old_client_addr, &client_addr, sizeof(struct sockaddr_in6));
+                    memcpy(&master_ctx->sio_c_session[i].identity.remote_addr, &client_addr, sizeof(struct sockaddr_in6));
                     slot_found = i;
                     break;
                 }
@@ -148,7 +147,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
             LOG_DEVEL_DEBUG("%sNew client connected from IP %s.", label, host_str);
             master_sio_c_session_t *session = &master_ctx->sio_c_session[slot_found];
             orilink_protocol_t_status_t deserialized_orcvdo = orilink_deserialize(label,
-                session->identity.kem_sharedsecret, session->remote_nonce, session->remote_ctr,
+                session->identity.kem_sharedsecret, session->identity.remote_nonce, session->identity.remote_ctr,
                 (const uint8_t*)orcvdo.r_orilink_raw_protocol_t->recv_buffer, orcvdo.r_orilink_raw_protocol_t->n
             );
             if (deserialized_orcvdo.status != SUCCESS) {
@@ -160,9 +159,19 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
                 CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
             }  
             orilink_protocol_t* received_protocol = deserialized_orcvdo.r_orilink_protocol_t;
-            orilink_hello1_t *ohello1 = received_protocol->payload.orilink_hello1;
-            session->hello1_ack.rcvd = true;
-            session->hello1_ack.rcvd_time = rt.r_uint64_t;
+            orilink_hello1_t *ohello1 = received_protocol->payload.orilink_hello1;            
+            bool client_id_found = false;
+            for(int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
+                if(master_ctx->sio_c_session[i].in_use && (ohello1->client_id == master_ctx->sio_c_session[i].identity.client_id)) {
+                    client_id_found = true;
+                    break;
+                }
+            }
+            if (client_id_found) {
+                LOG_WARN("%sHELLO1 ditolak dari IP %s. Sudah ada client_id yang sama.", label, host_str);
+                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                return FAILURE;
+            }
             session->identity.client_id = ohello1->client_id;
             memcpy(session->client_kem_publickey, ohello1->publickey1, KEM_PUBLICKEY_BYTES / 2);
 //====================================================================== 
@@ -185,6 +194,11 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }        
+//----------------------------------------------------------------------
+// Semua sudah bersih
+//----------------------------------------------------------------------
+            session->hello1_ack.rcvd = true;
+            session->hello1_ack.rcvd_time = rt.r_uint64_t;
 //======================================================================
             CLOSE_ORILINK_PROTOCOL(&received_protocol);
             break;
@@ -194,7 +208,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
             for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
                 if (
                         master_ctx->sio_c_session[i].in_use &&
-                        sockaddr_equal((const struct sockaddr *)&master_ctx->sio_c_session[i].old_client_addr, (const struct sockaddr *)&client_addr) &&
+                        sockaddr_equal((const struct sockaddr *)&master_ctx->sio_c_session[i].identity.remote_addr, (const struct sockaddr *)&client_addr) &&
                         master_ctx->sio_c_session[i].hello1_ack.ack_sent &&
                         (!master_ctx->sio_c_session[i].hello2_ack.rcvd)
                    )
@@ -210,7 +224,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
             }
             master_sio_c_session_t *session = &master_ctx->sio_c_session[session_index];
             orilink_protocol_t_status_t deserialized_orcvdo = orilink_deserialize(label,
-                session->identity.kem_sharedsecret, session->remote_nonce, session->remote_ctr,
+                session->identity.kem_sharedsecret, session->identity.remote_nonce, session->identity.remote_ctr,
                 (const uint8_t*)orcvdo.r_orilink_raw_protocol_t->recv_buffer, orcvdo.r_orilink_raw_protocol_t->n
             );
             if (deserialized_orcvdo.status != SUCCESS) {
@@ -228,21 +242,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE_DIFCLID;
             }
-            double try_count = (double)session->hello1_ack.ack_sent_try_count-(double)1;
-            sio_c_calculate_retry(label, session, session_index, try_count);
-            uint64_t_status_t rt = get_realtime_time_ns(label);
-            if (rt.status != SUCCESS) {
-                LOG_ERROR("%sFailed to get_realtime_time_ns.", label);
-                CLOSE_ORILINK_PROTOCOL(&received_protocol);
-                return FAILURE;
-            }
-            session->hello2_ack.rcvd = true;
-            session->hello2_ack.rcvd_time = rt.r_uint64_t;
             memcpy(session->client_kem_publickey + (KEM_PUBLICKEY_BYTES / 2), ohello2->publickey2, KEM_PUBLICKEY_BYTES / 2);
-            uint64_t interval_ull = session->hello2_ack.rcvd_time - session->hello1_ack.ack_sent_time;
-            double rtt_value = (double)interval_ull;
-            sio_c_calculate_rtt(label, session, session_index, rtt_value);
-            cleanup_hello_ack(label, &master_ctx->master_async, &session->hello1_ack);            
 //======================================================================
 // Generate Identity                    
 //======================================================================
@@ -274,6 +274,22 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
                 return FAILURE;
             }
 //----------------------------------------------------------------------
+// Hitung rtt retry sebelum kirim data
+//----------------------------------------------------------------------
+            double try_count = (double)session->hello1_ack.ack_sent_try_count-(double)1;
+            sio_c_calculate_retry(label, session, session_index, try_count);
+            uint64_t_status_t rt = get_realtime_time_ns(label);
+            if (rt.status != SUCCESS) {
+                LOG_ERROR("%sFailed to get_realtime_time_ns.", label);
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            session->hello2_ack.rcvd = true;
+            session->hello2_ack.rcvd_time = rt.r_uint64_t;
+            uint64_t interval_ull = session->hello2_ack.rcvd_time - session->hello1_ack.ack_sent_time;
+            double rtt_value = (double)interval_ull;
+            sio_c_calculate_rtt(label, session, session_index, rtt_value);
+//----------------------------------------------------------------------
             if (send_hello2_ack(label, &master_ctx->listen_sock, session) != SUCCESS) {
                 LOG_ERROR("%sFailed to send_hello2_ack.", label);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
@@ -284,7 +300,11 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
                 LOG_ERROR("%sFailed to async_create_incoming_event.", label);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
-            }        
+            }   
+//----------------------------------------------------------------------
+// Semua sudah bersih
+//----------------------------------------------------------------------
+            cleanup_hello_ack(label, &master_ctx->master_async, &session->hello1_ack);  
 //======================================================================                       
             CLOSE_ORILINK_PROTOCOL(&received_protocol);
             break;
@@ -294,7 +314,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
             for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
                 if (
                         master_ctx->sio_c_session[i].in_use &&
-                        sockaddr_equal((const struct sockaddr *)&master_ctx->sio_c_session[i].old_client_addr, (const struct sockaddr *)&client_addr) &&
+                        sockaddr_equal((const struct sockaddr *)&master_ctx->sio_c_session[i].identity.remote_addr, (const struct sockaddr *)&client_addr) &&
                         master_ctx->sio_c_session[i].hello1_ack.ack_sent &&
                         master_ctx->sio_c_session[i].hello2_ack.ack_sent &&
                         (!master_ctx->sio_c_session[i].hello3_ack.rcvd)
@@ -311,7 +331,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
             }
             master_sio_c_session_t *session = &master_ctx->sio_c_session[session_index];
             orilink_protocol_t_status_t deserialized_orcvdo = orilink_deserialize(label,
-                session->identity.kem_sharedsecret, session->remote_nonce, session->remote_ctr,
+                session->identity.kem_sharedsecret, session->identity.remote_nonce, session->identity.remote_ctr,
                 (const uint8_t*)orcvdo.r_orilink_raw_protocol_t->recv_buffer, orcvdo.r_orilink_raw_protocol_t->n
             );
             if (deserialized_orcvdo.status != SUCCESS) {
@@ -329,6 +349,31 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE_DIFCLID;
             }
+//======================================================================
+// Generate Nonce, Server ID, Port
+//======================================================================
+            if (generate_nonce(label, session->identity.local_nonce) != SUCCESS) {
+                LOG_ERROR("%sFailed to generate_nonce.", label);
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            if (generate_connection_id(label, &session->identity.server_id) != SUCCESS) {
+                LOG_ERROR("%sFailed to generate_connection_id.", label);
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            session->identity.port = *listen_port + session_index + 1;
+//====================================================================== 
+// SEND HELLO3_ACK                   
+//====================================================================== 
+            if (async_create_timerfd(label, &session->hello3_ack.ack_timer_fd) != SUCCESS) {
+                LOG_ERROR("%sFailed to async_create_timerfd.", label);
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+//----------------------------------------------------------------------
+// Hitung rtt retry sebelum kirim data
+//----------------------------------------------------------------------
             double try_count = (double)session->hello2_ack.ack_sent_try_count-(double)1;
             sio_c_calculate_retry(label, session, session_index, try_count);
             uint64_t_status_t rt = get_realtime_time_ns(label);
@@ -342,29 +387,6 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
             uint64_t interval_ull = session->hello3_ack.rcvd_time - session->hello2_ack.ack_sent_time;
             double rtt_value = (double)interval_ull;
             sio_c_calculate_rtt(label, session, session_index, rtt_value);
-            cleanup_hello_ack(label, &master_ctx->master_async, &session->hello2_ack);            
-//======================================================================
-// Generate Nonce, Server ID, Port
-//======================================================================
-            if (generate_nonce(label, session->local_nonce) != SUCCESS) {
-                LOG_ERROR("%sFailed to generate_nonce.", label);
-                CLOSE_ORILINK_PROTOCOL(&received_protocol);
-                return FAILURE;
-            }
-            if (generate_connection_id(label, &session->identity.server_id) != SUCCESS) {
-                LOG_ERROR("%sFailed to generate_connection_id.", label);
-                CLOSE_ORILINK_PROTOCOL(&received_protocol);
-                return FAILURE;
-            }
-            session->identity.port = *listen_port + session_index;
-//====================================================================== 
-// SEND HELLO3_ACK                   
-//====================================================================== 
-            if (async_create_timerfd(label, &session->hello3_ack.ack_timer_fd) != SUCCESS) {
-                LOG_ERROR("%sFailed to async_create_timerfd.", label);
-                CLOSE_ORILINK_PROTOCOL(&received_protocol);
-                return FAILURE;
-            }
 //----------------------------------------------------------------------
             if (send_hello3_ack(label, &master_ctx->listen_sock, session) != SUCCESS) {
                 LOG_ERROR("%sFailed to send_hello3_ack.", label);
@@ -376,7 +398,11 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
                 LOG_ERROR("%sFailed to async_create_incoming_event.", label);
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
-            }        
+            }
+//----------------------------------------------------------------------
+// Semua sudah bersih
+//----------------------------------------------------------------------
+            cleanup_hello_ack(label, &master_ctx->master_async, &session->hello2_ack);
 //======================================================================   
             CLOSE_ORILINK_PROTOCOL(&received_protocol);
             break;
@@ -386,7 +412,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
             for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
                 if (
                         master_ctx->sio_c_session[i].in_use &&
-                        sockaddr_equal((const struct sockaddr *)&master_ctx->sio_c_session[i].old_client_addr, (const struct sockaddr *)&client_addr) &&
+                        sockaddr_equal((const struct sockaddr *)&master_ctx->sio_c_session[i].identity.remote_addr, (const struct sockaddr *)&client_addr) &&
                         master_ctx->sio_c_session[i].hello1_ack.ack_sent &&
                         master_ctx->sio_c_session[i].hello2_ack.ack_sent &&
                         master_ctx->sio_c_session[i].hello3_ack.ack_sent &&
@@ -415,7 +441,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
             memcpy(session->identity.kem_sharedsecret, session->temp_kem_sharedsecret, KEM_SHAREDSECRET_BYTES);
 //----------------------------------------------------------------------
             orilink_protocol_t_status_t deserialized_orcvdo = orilink_deserialize(label,
-                session->identity.kem_sharedsecret, session->remote_nonce, session->remote_ctr,
+                session->identity.kem_sharedsecret, session->identity.remote_nonce, session->identity.remote_ctr,
                 (const uint8_t*)orcvdo.r_orilink_raw_protocol_t->recv_buffer, orcvdo.r_orilink_raw_protocol_t->n
             );
             if (deserialized_orcvdo.status != SUCCESS) {
@@ -448,26 +474,6 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE_DIFCLID;
             }
-            double try_count = (double)session->hello3_ack.ack_sent_try_count-(double)1;
-            sio_c_calculate_retry(label, session, session_index, try_count);
-            uint64_t_status_t rt = get_realtime_time_ns(label);
-            if (rt.status != SUCCESS) {
-                LOG_ERROR("%sFailed to get_realtime_time_ns.", label);
-//----------------------------------------------------------------------
-// Tujuan pengosongan memulai awal karna kegagalan server
-// Harusnya tidak pernah terjadi server gagal mengambil real time clock
-//---------------------------------------------------------------------- 
-                memset(session->identity.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
-//----------------------------------------------------------------------
-                CLOSE_ORILINK_PROTOCOL(&received_protocol);
-                return FAILURE;
-            }
-            session->sock_ready.rcvd = true;
-            session->sock_ready.rcvd_time = rt.r_uint64_t;
-            uint64_t interval_ull = session->sock_ready.rcvd_time - session->hello3_ack.ack_sent_time;
-            double rtt_value = (double)interval_ull;
-            sio_c_calculate_rtt(label, session, session_index, rtt_value);
-            cleanup_hello_ack(label, &master_ctx->master_async, &session->hello3_ack);            
 //======================================================================
 // Ambil remote_nonce
 // Set remote_ctr = 0
@@ -476,7 +482,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 // Cocokkan MAc
 // Decrypt server_id dan new_client_id
 //======================================================================
-            memcpy(session->remote_nonce, ohello_end->encrypted_server_id_new_client_id, AES_NONCE_BYTES);
+            memcpy(session->identity.remote_nonce, ohello_end->encrypted_server_id_new_client_id, AES_NONCE_BYTES);
             uint8_t encrypted_server_id_new_client_id[sizeof(uint64_t) + sizeof(uint64_t)];   
             memcpy(encrypted_server_id_new_client_id, ohello_end->encrypted_server_id_new_client_id + AES_NONCE_BYTES, sizeof(uint64_t) + sizeof(uint64_t));
             uint8_t data_mac[AES_TAG_BYTES];
@@ -511,7 +517,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 //=========================================IV===========================    
             uint8_t keystream_buffer[sizeof(uint64_t) + sizeof(uint64_t)];
             uint8_t iv[AES_IV_BYTES];
-            memcpy(iv, session->remote_nonce, AES_NONCE_BYTES);
+            memcpy(iv, session->identity.remote_nonce, AES_NONCE_BYTES);
             uint32_t remote_ctr_be = htobe32(temp_remote_ctr);
             memcpy(iv + AES_NONCE_BYTES, &remote_ctr_be, sizeof(uint32_t));
 //=========================================IV===========================    
@@ -539,17 +545,43 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
 // Kosongkan temp_kem_sharedsecret
 // Menganggap data valid dengan integritas
 //---------------------------------------------------------------------- 
-            session->remote_ctr = (uint32_t)1;//sudah melakukan dekripsi data valid 1 kali
+            session->identity.remote_ctr = (uint32_t)1;//sudah melakukan dekripsi data valid 1 kali
             memset(session->temp_kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
 //---------------------------------------------------------------------- 
             uint64_t new_client_id_be;
             memcpy(&new_client_id_be, decrypted_server_id_new_client_id + sizeof(uint64_t), sizeof(uint64_t));
-            session->identity.client_id = be64toh(new_client_id_be);    
+            session->identity.client_id = be64toh(new_client_id_be);
 //====================================================================== 
-// SEND SOCK_READY                  
-//====================================================================== 
-            printf("===========================SUDAH SOCK READY YA?=================\n");
-//======================================================================   
+// Mengirim session ke SIO worker
+//======================================================================
+//----------------------------------------------------------------------
+// Hitung rtt retry sebelum kirim data
+//----------------------------------------------------------------------
+            double try_count = (double)session->hello3_ack.ack_sent_try_count-(double)1;
+            sio_c_calculate_retry(label, session, session_index, try_count);
+            uint64_t_status_t rt = get_realtime_time_ns(label);
+            if (rt.status != SUCCESS) {
+                LOG_ERROR("%sFailed to get_realtime_time_ns.", label);
+//----------------------------------------------------------------------
+// Tujuan pengosongan memulai awal karna kegagalan server
+// Harusnya tidak pernah terjadi server gagal mengambil real time clock
+//---------------------------------------------------------------------- 
+                memset(session->identity.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+//----------------------------------------------------------------------
+                CLOSE_ORILINK_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            session->sock_ready.rcvd = true;
+            session->sock_ready.rcvd_time = rt.r_uint64_t;
+            uint64_t interval_ull = session->sock_ready.rcvd_time - session->hello3_ack.ack_sent_time;
+            double rtt_value = (double)interval_ull;
+            sio_c_calculate_rtt(label, session, session_index, rtt_value);
+//----------------------------------------------------------------------
+//----------------------------------------------------------------------
+// Semua sudah bersih
+//----------------------------------------------------------------------
+            cleanup_hello_ack(label, &master_ctx->master_async, &session->hello3_ack);
+//======================================================================  
             CLOSE_ORILINK_PROTOCOL(&received_protocol);
             break;
         }

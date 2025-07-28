@@ -21,8 +21,8 @@ status_t hello1(const char *label, cow_c_session_t *session) {
         return FAILURE;
     }
     ssize_t_status_t send_result = send_orilink_protocol_packet(label, 
-        session->identity.kem_sharedsecret, session->local_nonce, session->local_ctr,
-        &session->sock_fd, (const struct sockaddr *)&session->old_server_addr, cmd_result.r_orilink_protocol_t
+        session->identity.kem_sharedsecret, session->identity.local_nonce, session->identity.local_ctr,
+        &session->sock_fd, (const struct sockaddr *)&session->identity.remote_addr, cmd_result.r_orilink_protocol_t
     );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent hello1 to Server.", label);
@@ -41,8 +41,8 @@ status_t hello2(const char *label, cow_c_session_t *session) {
         return FAILURE;
     }
     ssize_t_status_t send_result = send_orilink_protocol_packet(label, 
-        session->identity.kem_sharedsecret, session->local_nonce, session->local_ctr,
-        &session->sock_fd, (const struct sockaddr *)&session->old_server_addr, cmd_result.r_orilink_protocol_t
+        session->identity.kem_sharedsecret, session->identity.local_nonce, session->identity.local_ctr,
+        &session->sock_fd, (const struct sockaddr *)&session->identity.remote_addr, cmd_result.r_orilink_protocol_t
     );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent hello2 to Server.", label);
@@ -61,8 +61,8 @@ status_t hello3(const char *label, cow_c_session_t *session) {
         return FAILURE;
     }
     ssize_t_status_t send_result = send_orilink_protocol_packet(label, 
-        session->identity.kem_sharedsecret, session->local_nonce, session->local_ctr,
-        &session->sock_fd, (const struct sockaddr *)&session->old_server_addr, cmd_result.r_orilink_protocol_t
+        session->identity.kem_sharedsecret, session->identity.local_nonce, session->identity.local_ctr,
+        &session->sock_fd, (const struct sockaddr *)&session->identity.remote_addr, cmd_result.r_orilink_protocol_t
     );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent hello3 to Server.", label);
@@ -86,7 +86,7 @@ status_t hello_end(const char *label, cow_c_session_t *session) {
     uint8_t encrypted_server_id_new_client_id[sizeof(uint64_t) + sizeof(uint64_t)];   
     uint8_t encrypted_server_id_new_client_id1[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t)];
     uint8_t encrypted_server_id_new_client_id2[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t) + AES_TAG_BYTES];
-    memcpy(encrypted_server_id_new_client_id1, session->local_nonce, AES_NONCE_BYTES);
+    memcpy(encrypted_server_id_new_client_id1, session->identity.local_nonce, AES_NONCE_BYTES);
     uint64_t server_id_be = htobe64(session->identity.server_id);
     memcpy(server_id_new_client_id, &server_id_be, sizeof(uint64_t));
     uint64_t new_client_id_be = htobe64(session->new_client_id);
@@ -97,8 +97,8 @@ status_t hello_end(const char *label, cow_c_session_t *session) {
 //=========================================IV===========================    
     uint8_t keystream_buffer[sizeof(uint64_t) + sizeof(uint64_t)];
     uint8_t iv[AES_IV_BYTES];
-    memcpy(iv, session->local_nonce, AES_NONCE_BYTES);
-    uint32_t local_ctr_be = htobe32(session->local_ctr);
+    memcpy(iv, session->identity.local_nonce, AES_NONCE_BYTES);
+    uint32_t local_ctr_be = htobe32(session->identity.local_ctr);
     memcpy(iv + AES_NONCE_BYTES, &local_ctr_be, sizeof(uint32_t));
 //=========================================IV===========================    
     aes256_ctr(keystream_buffer, sizeof(uint64_t) + sizeof(uint64_t), iv, &ctx);
@@ -122,15 +122,15 @@ status_t hello_end(const char *label, cow_c_session_t *session) {
 // Tambah Local Counter Jika Berhasil Encrypt    
 // Tambah Remote Counter Jika Mac Cocok dan Berhasil Decrypt
 //======================================================================
-    session->local_ctr++;
+    session->identity.local_ctr++;
 //======================================================================
 	orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello_end(label, session->identity.client_id, encrypted_server_id_new_client_id2, session->hello_end.sent_try_count);
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
     ssize_t_status_t send_result = send_orilink_protocol_packet(label, 
-        session->identity.kem_sharedsecret, session->local_nonce, session->local_ctr,
-        &session->sock_fd, (const struct sockaddr *)&session->old_server_addr, cmd_result.r_orilink_protocol_t
+        session->identity.kem_sharedsecret, session->identity.local_nonce, session->identity.local_ctr,
+        &session->sock_fd, (const struct sockaddr *)&session->identity.remote_addr, cmd_result.r_orilink_protocol_t
     );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent hello_end to Server.", label);

@@ -4,12 +4,10 @@
 #include <stdlib.h>
 #include "types.h"
 #include "constants.h"
+#include "pqc.h"
 
 typedef enum {
-    IPC_MASTER_SIO_CONNECT = (uint8_t)0x00,
-    IPC_MASTER_SIO_DATA = (uint8_t)0x01,
-    IPC_SIO_MASTER_DATA = (uint8_t)0x02,
-    IPC_SIO_MASTER_CONNECTION = (uint8_t)0x03,
+    IPC_MASTER_SIO_ORILINK_IDENTITY = (uint8_t)0x00,
     
     IPC_MASTER_COW_CONNECT = (uint8_t)0x10,
     IPC_MASTER_COW_DATA = (uint8_t)0x11,
@@ -23,6 +21,21 @@ typedef enum {
 typedef struct {  
     struct sockaddr_in6 server_addr;
 } ipc_master_cow_connect_t;
+
+typedef struct {
+    struct sockaddr_in6 remote_addr;
+    uint64_t server_id;
+    uint64_t client_id;
+    uint16_t port;
+    uint8_t kem_privatekey[KEM_PRIVATEKEY_BYTES];
+    uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
+    uint8_t kem_ciphertext[KEM_CIPHERTEXT_BYTES];
+    uint8_t kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
+    uint8_t local_nonce[AES_NONCE_BYTES];
+    uint32_t local_ctr;
+    uint8_t remote_nonce[AES_NONCE_BYTES];
+    uint32_t remote_ctr;
+} ipc_master_sio_orilink_identity_t;
 
 typedef struct {
     worker_type_t wot;
@@ -49,6 +62,7 @@ typedef struct {
 		ipc_worker_master_heartbeat_t *ipc_worker_master_heartbeat;
         ipc_master_cow_connect_t *ipc_master_cow_connect;
         ipc_cow_master_connection_t *ipc_cow_master_connection;
+        ipc_master_sio_orilink_identity_t *ipc_master_sio_orilink_identity;
 	} payload;
 } ipc_protocol_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan
@@ -70,6 +84,8 @@ static inline void CLOSE_IPC_PROTOCOL(ipc_protocol_t **protocol_ptr) {
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_cow_connect);
         } else if (x->type == IPC_COW_MASTER_CONNECTION) {
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_cow_master_connection);
+        } else if (x->type == IPC_MASTER_SIO_ORILINK_IDENTITY) {
+            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_sio_orilink_identity);
         }
         free(x);
         *protocol_ptr = NULL;

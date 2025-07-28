@@ -50,13 +50,18 @@ typedef enum {
 } orilink_mode_t;
 
 typedef struct {
+    struct sockaddr_in6 remote_addr;
+    uint64_t server_id;
     uint64_t client_id;
+    uint16_t port;
     uint8_t kem_privatekey[KEM_PRIVATEKEY_BYTES];
     uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
     uint8_t kem_ciphertext[KEM_CIPHERTEXT_BYTES];
     uint8_t kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
-    uint64_t server_id;
-    uint16_t port;
+    uint8_t local_nonce[AES_NONCE_BYTES];
+    uint32_t local_ctr;
+    uint8_t remote_nonce[AES_NONCE_BYTES];
+    uint32_t remote_ctr;
 } orilink_identity_t;
 
 typedef struct {

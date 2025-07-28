@@ -83,8 +83,7 @@ void cleanup_master_cow_session(master_cow_c_session_t *session) {
 void setup_master_sio_session(master_sio_c_session_t *session) {
     session->sio_index = -1;
     session->in_use = false;    
-    memset(&session->old_client_addr, 0, sizeof(struct sockaddr_in6));
-    memset(&session->client_addr, 0, sizeof(struct sockaddr_in6));
+    memset(&session->identity.remote_addr, 0, sizeof(struct sockaddr_in6));
     memset(session->client_kem_publickey, 0, KEM_PUBLICKEY_BYTES);
     memset(session->identity.kem_privatekey, 0, KEM_PRIVATEKEY_BYTES);
     memset(session->identity.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
@@ -93,10 +92,10 @@ void setup_master_sio_session(master_sio_c_session_t *session) {
     session->identity.client_id = 0ULL;
     session->identity.server_id = 0ULL;
     session->identity.port = 0x0000;
-    memset(session->local_nonce, 0, AES_NONCE_BYTES);
-    session->local_ctr = (uint32_t)0;
-    memset(session->remote_nonce, 0, AES_NONCE_BYTES);
-    session->remote_ctr = (uint32_t)0;
+    memset(session->identity.local_nonce, 0, AES_NONCE_BYTES);
+    session->identity.local_ctr = (uint32_t)0;
+    memset(session->identity.remote_nonce, 0, AES_NONCE_BYTES);
+    session->identity.remote_ctr = (uint32_t)0;
     memset(session->encrypted_server_id_port, 0, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
     memset(session->temp_kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
     setup_oricle_double(&session->rtt, (double)0);
@@ -111,8 +110,7 @@ void setup_master_sio_session(master_sio_c_session_t *session) {
 void cleanup_master_sio_session(const char *label, async_type_t *master_async, master_sio_c_session_t *session) {
     session->sio_index = -1;
     session->in_use = false;    
-    memset(&session->old_client_addr, 0, sizeof(struct sockaddr_in6));
-    memset(&session->client_addr, 0, sizeof(struct sockaddr_in6));
+    memset(&session->identity.remote_addr, 0, sizeof(struct sockaddr_in6));
     memset(session->client_kem_publickey, 0, KEM_PUBLICKEY_BYTES);
     memset(session->identity.kem_privatekey, 0, KEM_PRIVATEKEY_BYTES);
     memset(session->identity.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
@@ -121,10 +119,10 @@ void cleanup_master_sio_session(const char *label, async_type_t *master_async, m
     session->identity.client_id = 0ULL;
     session->identity.server_id = 0ULL;
     session->identity.port = 0x0000;
-    memset(session->local_nonce, 0, AES_NONCE_BYTES);
-    session->local_ctr = (uint32_t)0;
-    memset(session->remote_nonce, 0, AES_NONCE_BYTES);
-    session->remote_ctr = (uint32_t)0;
+    memset(session->identity.local_nonce, 0, AES_NONCE_BYTES);
+    session->identity.local_ctr = (uint32_t)0;
+    memset(session->identity.remote_nonce, 0, AES_NONCE_BYTES);
+    session->identity.remote_ctr = (uint32_t)0;
     memset(session->encrypted_server_id_port, 0, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
     memset(session->temp_kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
     cleanup_oricle_double(&session->rtt);

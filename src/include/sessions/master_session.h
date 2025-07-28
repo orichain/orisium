@@ -100,18 +100,12 @@ typedef struct {
 typedef struct {
 	int sio_index;
     bool in_use;
-    struct sockaddr_in6 old_client_addr;
-    struct sockaddr_in6 client_addr;
     int sock_fd;
 //======================================================================
 // IDENTITY
 //======================================================================    
 	orilink_identity_t identity;
     uint8_t client_kem_publickey[KEM_PUBLICKEY_BYTES];
-    uint8_t local_nonce[AES_NONCE_BYTES];
-    uint32_t local_ctr;
-    uint8_t remote_nonce[AES_NONCE_BYTES];
-    uint32_t remote_ctr;
     uint8_t encrypted_server_id_port[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES];
     uint8_t temp_kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
 //======================================================================

@@ -4,22 +4,17 @@
 #include <stdint.h>
 #include <time.h>
 #include <bits/types/sig_atomic_t.h>
-#include <netinet/in.h>
-#include <string.h>
 
 #include "log.h"
 #include "async.h"
 #include "constants.h"
 #include "utilities.h"
 #include "ipc/protocol.h"
-#include "sessions/workers_session.h"
 #include "types.h"
-#include "stdbool.h"
 #include "workers/master_ipc_cmds.h"
 
 void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd) {
     volatile sig_atomic_t sio_shutdown_requested = 0;
-    sio_c_session_t sio_c_session[MAX_CONNECTION_PER_SIO_WORKER];
     async_type_t sio_async;
     sio_async.async_fd = -1;
     int sio_timer_fd = -1;
@@ -52,10 +47,6 @@ void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 	}
 	if (async_create_incoming_event(label, &sio_async, &sio_timer_fd) != SUCCESS) goto exit;
 //======================================================================	    
-    for (int i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
-        sio_c_session[i].in_use = false;
-        memset(&sio_c_session[i].client_addr, 0, sizeof(struct sockaddr_in6));
-    }    
     while (!sio_shutdown_requested) {
 		int_status_t snfds = async_wait(label, &sio_async);
 		if (snfds.status != SUCCESS) continue;

@@ -19,8 +19,8 @@ status_t hello1_ack(const char *label, int *listen_sock, master_sio_c_session_t 
         return FAILURE;
     }
     ssize_t_status_t send_result = send_orilink_protocol_packet(label, 
-        session->identity.kem_sharedsecret, session->local_nonce, session->local_ctr,
-        listen_sock, (const struct sockaddr *)&session->old_client_addr, cmd_result.r_orilink_protocol_t
+        session->identity.kem_sharedsecret, session->identity.local_nonce, session->identity.local_ctr,
+        listen_sock, (const struct sockaddr *)&session->identity.remote_addr, cmd_result.r_orilink_protocol_t
     );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent hello1_ack to Client.", label);
@@ -39,8 +39,8 @@ status_t hello2_ack(const char *label, int *listen_sock, master_sio_c_session_t 
         return FAILURE;
     }
     ssize_t_status_t send_result = send_orilink_protocol_packet(label, 
-        session->identity.kem_sharedsecret, session->local_nonce, session->local_ctr,
-        listen_sock, (const struct sockaddr *)&session->old_client_addr, cmd_result.r_orilink_protocol_t
+        session->identity.kem_sharedsecret, session->identity.local_nonce, session->identity.local_ctr,
+        listen_sock, (const struct sockaddr *)&session->identity.remote_addr, cmd_result.r_orilink_protocol_t
     );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent hello2_ack to Client.", label);
@@ -59,7 +59,7 @@ status_t hello3_ack(const char *label, int *listen_sock, master_sio_c_session_t 
     uint8_t encrypted_server_id_port[sizeof(uint64_t) + sizeof(uint16_t)];   
     uint8_t encrypted_server_id_port1[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t)];
     uint8_t encrypted_server_id_port2[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES];
-    memcpy(encrypted_server_id_port1, session->local_nonce, AES_NONCE_BYTES);
+    memcpy(encrypted_server_id_port1, session->identity.local_nonce, AES_NONCE_BYTES);
     uint64_t server_id_be = htobe64(session->identity.server_id);
     memcpy(server_id_port, &server_id_be, sizeof(uint64_t));
     uint16_t port_be = htobe16(session->identity.port);
@@ -70,8 +70,8 @@ status_t hello3_ack(const char *label, int *listen_sock, master_sio_c_session_t 
 //=========================================IV===========================    
     uint8_t keystream_buffer[sizeof(uint64_t) + sizeof(uint16_t)];
     uint8_t iv[AES_IV_BYTES];
-    memcpy(iv, session->local_nonce, AES_NONCE_BYTES);
-    uint32_t local_ctr_be = htobe32(session->local_ctr);
+    memcpy(iv, session->identity.local_nonce, AES_NONCE_BYTES);
+    uint32_t local_ctr_be = htobe32(session->identity.local_ctr);
     memcpy(iv + AES_NONCE_BYTES, &local_ctr_be, sizeof(uint32_t));
 //=========================================IV===========================    
     aes256_ctr(keystream_buffer, sizeof(uint64_t) + sizeof(uint16_t), iv, &ctx);
@@ -95,15 +95,15 @@ status_t hello3_ack(const char *label, int *listen_sock, master_sio_c_session_t 
 // Tambah Local Counter Jika Berhasil Encrypt    
 // Tambah Remote Counter Jika Mac Cocok dan Berhasil Decrypt
 //======================================================================
-    session->local_ctr++;
+    session->identity.local_ctr++;
 //======================================================================    
     orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello3_ack(label, session->identity.client_id, session->identity.kem_ciphertext, encrypted_server_id_port2, session->hello3_ack.ack_sent_try_count);
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
     ssize_t_status_t send_result = send_orilink_protocol_packet(label, 
-        session->identity.kem_sharedsecret, session->local_nonce, session->local_ctr,
-        listen_sock, (const struct sockaddr *)&session->old_client_addr, cmd_result.r_orilink_protocol_t
+        session->identity.kem_sharedsecret, session->identity.local_nonce, session->identity.local_ctr,
+        listen_sock, (const struct sockaddr *)&session->identity.remote_addr, cmd_result.r_orilink_protocol_t
     );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent hello3_ack to Client.", label);

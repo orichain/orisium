@@ -30,5 +30,7 @@ typedef struct {
 
 void sigint_handler(int signum);
 void run_master_process(master_context *master_ctx, uint16_t *listen_port, bootstrap_nodes_t *bootstrap_nodes);
+void cleanup_master_sio_session(const char *label, async_type_t *master_async, master_sio_c_session_t *session);
+void cleanup_master_cow_session(master_cow_c_session_t *session);
 
 #endif

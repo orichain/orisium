@@ -4,7 +4,6 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <stdint.h>
-#include <netinet/in.h>
 #include <stdio.h>
 
 #include "log.h"
@@ -26,13 +25,17 @@
 
 status_t close_worker(const char *label, master_context *master_ctx, worker_type_t wot, int index) {
 	if (wot == SIO) {
+        for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
+            master_sio_c_session_t *session;
+            session = &master_ctx->sio_c_session[i];
+            if (session->in_use && (session->sio_index == index)) {
+                cleanup_master_sio_session(label, &master_ctx->master_async, session);
+            }
+        }
         cleanup_oricle_long_double(&master_ctx->sio_session[index].avgtt);
         cleanup_oricle_double(&master_ctx->sio_session[index].healthy);
         master_ctx->sio_session[index].isactive = false;
         master_ctx->sio_session[index].ishealthy = false;
-        master_ctx->sio_c_session[index].sio_index = -1;
-        master_ctx->sio_c_session[index].in_use = false;
-        memset(&master_ctx->sio_c_session[index].client_addr, 0, sizeof(struct sockaddr_in6));
 		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->sio_session[index].upp.uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
@@ -51,13 +54,17 @@ status_t close_worker(const char *label, master_context *master_ctx, worker_type
 		CLOSE_UDS(&master_ctx->logic_session[index].upp.uds[1]);
 		CLOSE_PID(&master_ctx->logic_session[index].upp.pid);
 	} else if (wot == COW) {
+        for (int i = 0; i < MAX_MASTER_COW_SESSIONS; ++i) {
+            master_cow_c_session_t *session;
+            session = &master_ctx->cow_c_session[i];
+            if (session->in_use && (session->cow_index == index)) {
+                cleanup_master_cow_session(session);
+            }
+        }
         cleanup_oricle_long_double(&master_ctx->cow_session[index].avgtt);
         cleanup_oricle_double(&master_ctx->cow_session[index].healthy);
         master_ctx->cow_session[index].isactive = false;
         master_ctx->cow_session[index].ishealthy = false;
-        master_ctx->cow_c_session[index].cow_index = -1;
-        master_ctx->cow_c_session[index].in_use = false;
-        memset(&master_ctx->cow_c_session[index].server_addr, 0, sizeof(struct sockaddr_in6));
 		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->cow_session[index].upp.uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
