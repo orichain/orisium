@@ -18,11 +18,6 @@ typedef struct {
 // IDENTITY
 //======================================================================    
 	orilink_identity_t identity;
-//======================================================================
-// ORICLE
-//======================================================================    
-    oricle_double_t rtt;
-    oricle_double_t retry;
 } sio_c_session_t; //Server
 
 typedef struct {
@@ -52,11 +47,6 @@ typedef struct {
     hello_t hello2;
     hello_t hello3;
     hello_t hello_end;
-//======================================================================
-// ORICLE
-//======================================================================    
-    oricle_double_t rtt;
-    oricle_double_t retry;
 } cow_c_session_t; //Client
 
 void cleanup_hello(const char *label, async_type_t *async, hello_t *h);

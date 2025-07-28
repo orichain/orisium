@@ -45,8 +45,8 @@ void setup_session(cow_c_session_t *session) {
     memset(session->encrypted_server_id_port, 0, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
     memset(session->temp_kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
     session->new_client_id = 0ULL;
-    setup_oricle_double(&session->rtt, (double)0);
-    setup_oricle_double(&session->retry, (double)0);
+    setup_oricle_double(&session->identity.rtt, (double)0);
+    setup_oricle_double(&session->identity.retry, (double)0);
     CLOSE_FD(&session->sock_fd);
     setup_hello(&session->hello1);
     setup_hello(&session->hello2);
@@ -71,8 +71,8 @@ void cleanup_session(const char *label, async_type_t *cow_async, cow_c_session_t
     memset(session->encrypted_server_id_port, 0, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
     memset(session->temp_kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
     session->new_client_id = 0ULL;
-    cleanup_oricle_double(&session->rtt);
-    cleanup_oricle_double(&session->retry);
+    cleanup_oricle_double(&session->identity.rtt);
+    cleanup_oricle_double(&session->identity.retry);
     async_delete_event(label, cow_async, &session->sock_fd);
     CLOSE_FD(&session->sock_fd);
     cleanup_hello(label, cow_async, &session->hello1);
@@ -188,7 +188,7 @@ void cow_calculate_retry(const char *label, cow_c_session_t *session, int sessio
 	int needed = snprintf(NULL, 0, "ORICLE => RETRY %d", session_index);
 	desc = malloc(needed + 1);
 	snprintf(desc, needed + 1, "ORICLE => RETRY %d", session_index);
-    calculate_oricle_double(label, desc, &session->retry, try_count, ((double)MAX_RETRY * (double)2));
+    calculate_oricle_double(label, desc, &session->identity.retry, try_count, ((double)MAX_RETRY * (double)2));
     free(desc);
 }
 
@@ -197,7 +197,7 @@ void cow_calculate_rtt(const char *label, cow_c_session_t *session, int session_
 	int needed = snprintf(NULL, 0, "ORICLE => RTT %d", session_index);
 	desc = malloc(needed + 1);
 	snprintf(desc, needed + 1, "ORICLE => RTT %d", session_index);
-    calculate_oricle_double(label, desc, &session->rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
+    calculate_oricle_double(label, desc, &session->identity.rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
     free(desc);
 }
 
@@ -811,7 +811,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                             LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", label, i, session->hello1.interval_timer_fd);
                             double try_count = (double)session->hello1.sent_try_count;
                             cow_calculate_retry(label, session, i, try_count);
-                            session->hello1.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                            session->hello1.interval_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);
                             send_hello1(label, session);
                             event_founded_in_session = true;
                             break;
@@ -825,7 +825,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                             LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", label, i, session->hello2.interval_timer_fd);
                             double try_count = (double)session->hello2.sent_try_count;
                             cow_calculate_retry(label, session, i, try_count);
-                            session->hello2.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                            session->hello2.interval_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);
                             send_hello2(label, session);
                             event_founded_in_session = true;
                             break;
@@ -839,7 +839,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                             LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", label, i, session->hello3.interval_timer_fd);
                             double try_count = (double)session->hello3.sent_try_count;
                             cow_calculate_retry(label, session, i, try_count);
-                            session->hello3.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                            session->hello3.interval_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);
                             send_hello3(label, session);
                             event_founded_in_session = true;
                             break;
@@ -853,7 +853,7 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
                             LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", label, i, session->hello_end.interval_timer_fd);
                             double try_count = (double)session->hello_end.sent_try_count;
                             cow_calculate_retry(label, session, i, try_count);
-                            session->hello_end.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                            session->hello_end.interval_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);
                             send_hello_end(label, session);
                             event_founded_in_session = true;
                             break;

@@ -33,7 +33,7 @@ typedef struct {
 typedef struct {
     bool first_check;
     kalman_t kalman_filter;
-    int kalman_initialized_count;
+    uint8_t kalman_initialized_count;
     float *kalman_calibration_samples; 
     float initial_value;
     float temp_ewma_value;
@@ -43,7 +43,7 @@ typedef struct {
 typedef struct {
     bool first_check;
     kalman_double_t kalman_filter;
-    int kalman_initialized_count;
+    uint8_t kalman_initialized_count;
     double *kalman_calibration_samples; 
     double initial_value;
     double temp_ewma_value;
@@ -53,7 +53,7 @@ typedef struct {
 typedef struct {
     bool first_check;
     kalman_long_double_t kalman_filter;
-    int kalman_initialized_count;
+    uint8_t kalman_initialized_count;
     long double *kalman_calibration_samples; 
     long double initial_value;
     long double temp_ewma_value;

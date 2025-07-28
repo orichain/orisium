@@ -7,6 +7,7 @@
 #include "types.h"
 #include "constants.h"
 #include "pqc.h"
+#include "kalman.h"
 //======================================================================
 // Desain protocol dengan kemampuan mengukur rtt di kedua sisi
 //======================================================================
@@ -62,6 +63,11 @@ typedef struct {
     uint32_t local_ctr;
     uint8_t remote_nonce[AES_NONCE_BYTES];
     uint32_t remote_ctr;
+//======================================================================
+// ORICLE
+//======================================================================    
+    oricle_double_t rtt;
+    oricle_double_t retry;
 } orilink_identity_t;
 
 typedef struct {

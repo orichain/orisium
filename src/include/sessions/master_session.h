@@ -115,11 +115,6 @@ typedef struct {
     hello_ack_t hello2_ack;
     hello_ack_t hello3_ack;
     hello_ack_t sock_ready;
-//======================================================================
-// ORICLE
-//======================================================================    
-    oricle_double_t rtt;
-    oricle_double_t retry;
 } master_sio_c_session_t;
 
 typedef struct {
