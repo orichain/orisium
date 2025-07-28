@@ -96,8 +96,30 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
                                  AES_NONCE_BYTES +
                                  sizeof(uint32_t) +
                                  AES_NONCE_BYTES +
-                                 sizeof(uint32_t);
-            payload_dynamic_size = 0;
+                                 sizeof(uint32_t) +
+                                 DOUBLE_ARRAY_SIZE +
+                                 DOUBLE_ARRAY_SIZE +
+                                 DOUBLE_ARRAY_SIZE +
+                                 DOUBLE_ARRAY_SIZE +
+                                 sizeof(uint8_t) +
+                                 sizeof(uint8_t) +
+                                 sizeof(uint8_t) +
+                                 DOUBLE_ARRAY_SIZE +
+                                 DOUBLE_ARRAY_SIZE +
+                                 DOUBLE_ARRAY_SIZE +
+                                 DOUBLE_ARRAY_SIZE +
+                                 DOUBLE_ARRAY_SIZE +
+                                 DOUBLE_ARRAY_SIZE +
+                                 DOUBLE_ARRAY_SIZE +
+                                 sizeof(uint8_t) +
+                                 sizeof(uint8_t) +
+                                 sizeof(uint8_t) +
+                                 DOUBLE_ARRAY_SIZE +
+                                 DOUBLE_ARRAY_SIZE +
+                                 DOUBLE_ARRAY_SIZE +
+                                 sizeof(uint8_t) +
+                                 sizeof(uint8_t);
+            payload_dynamic_size = (p->payload.ipc_master_sio_orilink_identity->rtt_kcs_len * DOUBLE_ARRAY_SIZE) + (p->payload.ipc_master_sio_orilink_identity->retry_kcs_len * DOUBLE_ARRAY_SIZE);
             break;
         }
         default:

@@ -35,6 +35,29 @@ typedef struct {
     uint32_t local_ctr;
     uint8_t remote_nonce[AES_NONCE_BYTES];
     uint32_t remote_ctr;
+    double rtt_pn;
+    double rtt_mn;
+    double rtt_ee;
+    double rtt_se;
+    uint8_t rtt_ii;    
+    uint8_t rtt_fc;
+    uint8_t rtt_kic;
+    double rtt_iv;
+    double rtt_tev;
+    double rtt_vp;
+    double retry_pn;
+    double retry_mn;
+    double retry_ee;
+    double retry_se;
+    uint8_t retry_ii;    
+    uint8_t retry_fc;
+    uint8_t retry_kic;
+    double retry_iv;
+    double retry_tev;
+    double retry_vp;
+    uint8_t rtt_kcs_len;
+    uint8_t retry_kcs_len;
+    double rtt_retry_kcs[];
 } ipc_master_sio_orilink_identity_t;
 
 typedef struct {

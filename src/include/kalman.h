@@ -11,7 +11,7 @@ typedef struct {
     float measurement_noise;
     float estimated_error;
     float state_estimate;
-    bool is_initialized;
+    uint8_t is_initialized;
 } kalman_t;
 
 typedef struct {
@@ -19,7 +19,7 @@ typedef struct {
     double measurement_noise;
     double estimated_error;
     double state_estimate;
-    bool is_initialized;
+    uint8_t is_initialized;
 } kalman_double_t;
 
 typedef struct {
@@ -27,11 +27,11 @@ typedef struct {
     long double measurement_noise;
     long double estimated_error;
     long double state_estimate;
-    bool is_initialized;
+    uint8_t is_initialized;
 } kalman_long_double_t;
 
 typedef struct {
-    bool first_check;
+    uint8_t first_check;
     kalman_t kalman_filter;
     uint8_t kalman_initialized_count;
     float *kalman_calibration_samples; 
@@ -41,7 +41,7 @@ typedef struct {
 } oricle_t;
 
 typedef struct {
-    bool first_check;
+    uint8_t first_check;
     kalman_double_t kalman_filter;
     uint8_t kalman_initialized_count;
     double *kalman_calibration_samples; 
@@ -51,7 +51,7 @@ typedef struct {
 } oricle_double_t;
 
 typedef struct {
-    bool first_check;
+    uint8_t first_check;
     kalman_long_double_t kalman_filter;
     uint8_t kalman_initialized_count;
     long double *kalman_calibration_samples; 
