@@ -38,6 +38,14 @@ void sigint_handler(int signum) {
 }
 
 status_t setup_master(const char *label, master_context *master_ctx, uint16_t *listen_port) {
+//----------------------------------------------------------------------
+// Setup IPC security
+//----------------------------------------------------------------------
+    if (KEM_GENERATE_KEYPAIR(master_ctx->kem_publickey, master_ctx->kem_privatekey) != 0) {
+        LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", label);
+        return FAILURE;
+    }
+//----------------------------------------------------------------------
     master_ctx->last_sio_rr_idx = 0;
     master_ctx->last_cow_rr_idx = 0;
 	master_ctx->master_pid = -1;
@@ -399,4 +407,6 @@ exit:
     async_delete_event(label, &master_ctx->master_async, &master_ctx->master_timer_fd);
     CLOSE_FD(&master_ctx->master_timer_fd);
     CLOSE_FD(&master_ctx->master_async.async_fd);
+    memset(master_ctx->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+    memset(master_ctx->kem_publickey, 0, KEM_PRIVATEKEY_BYTES);
 }

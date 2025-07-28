@@ -213,15 +213,32 @@ void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
 //----------------------------------------------------------------------
     srandom(time(NULL) ^ getpid());
 //----------------------------------------------------------------------
-    
-//======================================================================
-// Setup Logic
-//======================================================================
+// Setup label
+//----------------------------------------------------------------------
 	char *label;
 	int needed = snprintf(NULL, 0, "[COW %d]: ", worker_idx);
 	label = malloc(needed + 1);
 	snprintf(label, needed + 1, "[COW %d]: ", worker_idx);  
-//======================================================================	
+//----------------------------------------------------------------------
+// Setup IPC security
+//----------------------------------------------------------------------
+    uint8_t kem_privatekey[KEM_PRIVATEKEY_BYTES];
+    uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
+    uint8_t kem_ciphertext[KEM_CIPHERTEXT_BYTES];
+    uint8_t kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
+    uint8_t local_nonce[AES_NONCE_BYTES];
+    //uint32_t local_ctr = (uint32_t)0;
+    uint8_t remote_nonce[AES_NONCE_BYTES];
+    //uint32_t remote_ctr = (uint32_t)0;
+    if (KEM_GENERATE_KEYPAIR(kem_publickey, kem_privatekey) != 0) {
+        LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", label);
+        goto exit;
+    }
+    if (generate_nonce(label, local_nonce) != SUCCESS) {
+        LOG_ERROR("%sFailed to generate_nonce.", label);
+        goto exit;
+    }
+//----------------------------------------------------------------------	
 	if (async_create(label, &cow_async) != SUCCESS) goto exit;
 	if (async_create_incoming_event_with_disconnect(label, &cow_async, &master_uds_fd) != SUCCESS) goto exit;
 //======================================================================
@@ -891,5 +908,13 @@ exit:
 	async_delete_event(label, &cow_async, &cow_timer_fd);
     CLOSE_FD(&cow_timer_fd);
     CLOSE_FD(&cow_async.async_fd);
+    memset(kem_privatekey, 0, KEM_PRIVATEKEY_BYTES);
+    memset(kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+    memset(kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+    memset(kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+    memset(local_nonce, 0, AES_NONCE_BYTES);
+    //local_ctr = (uint32_t)0;
+    memset(remote_nonce, 0, AES_NONCE_BYTES);
+    //remote_ctr = (uint32_t)0;
     free(label);
 }

@@ -32,6 +32,16 @@ typedef struct {
 } uds_pair_pid_t;
 
 typedef struct {
+    uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
+    uint8_t kem_ciphertext[KEM_CIPHERTEXT_BYTES];
+    uint8_t kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
+    uint8_t local_nonce[AES_NONCE_BYTES];
+    uint32_t local_ctr;
+    uint8_t remote_nonce[AES_NONCE_BYTES];
+    uint32_t remote_ctr;
+} worker_security_t;
+
+typedef struct {
     bool isactive;
     bool ishealthy;
     uint16_t task_count;
@@ -39,6 +49,7 @@ typedef struct {
 	worker_metrics_t metrics;
     oricle_double_t healthy;
     oricle_long_double_t avgtt;
+    worker_security_t security;
 } master_sio_session_t;
 
 typedef struct {
@@ -49,6 +60,7 @@ typedef struct {
 	worker_metrics_t metrics;
     oricle_double_t healthy;
     oricle_long_double_t avgtt;
+    worker_security_t security;
 } master_logic_session_t;
 
 typedef struct {
@@ -59,6 +71,7 @@ typedef struct {
 	worker_metrics_t metrics;
     oricle_double_t healthy;
     oricle_long_double_t avgtt;
+    worker_security_t security;
 } master_dbr_session_t;
 //======================================================================
 // hanya ada 1 writer
@@ -75,6 +88,7 @@ typedef struct {
 	worker_metrics_t metrics;
     oricle_double_t healthy;
     oricle_long_double_t avgtt;
+    worker_security_t security;
 } master_dbw_session_t;
 
 typedef struct {
@@ -85,6 +99,7 @@ typedef struct {
     worker_metrics_t metrics;
     oricle_double_t healthy;
     oricle_long_double_t avgtt;
+    worker_security_t security;
 } master_cow_session_t;
 
 typedef struct {

@@ -17,6 +17,8 @@ typedef struct {
     async_type_t master_async;
     int last_sio_rr_idx;
     int last_cow_rr_idx;
+    uint8_t kem_privatekey[KEM_PRIVATEKEY_BYTES];
+    uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
     master_sio_session_t sio_session[MAX_SIO_WORKERS];
     master_logic_session_t logic_session[MAX_LOGIC_WORKERS];
     master_cow_session_t cow_session[MAX_COW_WORKERS];

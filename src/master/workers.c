@@ -22,6 +22,7 @@
 #include "stdbool.h"
 #include "kalman.h"
 #include "sessions/master_session.h"
+#include "pqc.h"
 
 status_t close_worker(const char *label, master_context *master_ctx, worker_type_t wot, int index) {
 	if (wot == SIO) {
@@ -36,6 +37,13 @@ status_t close_worker(const char *label, master_context *master_ctx, worker_type
         cleanup_oricle_double(&master_ctx->sio_session[index].healthy);
         master_ctx->sio_session[index].isactive = false;
         master_ctx->sio_session[index].ishealthy = false;
+        memset(master_ctx->sio_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+        memset(master_ctx->sio_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+        memset(master_ctx->sio_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        memset(master_ctx->sio_session[index].security.local_nonce, 0, AES_NONCE_BYTES);
+        master_ctx->sio_session[index].security.local_ctr = (uint32_t)0;
+        memset(master_ctx->sio_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
+        master_ctx->sio_session[index].security.remote_ctr = (uint32_t)0;
 		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->sio_session[index].upp.uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
@@ -47,6 +55,13 @@ status_t close_worker(const char *label, master_context *master_ctx, worker_type
         cleanup_oricle_double(&master_ctx->logic_session[index].healthy);
         master_ctx->logic_session[index].isactive = false;
         master_ctx->logic_session[index].ishealthy = false;
+        memset(master_ctx->logic_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+        memset(master_ctx->logic_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+        memset(master_ctx->logic_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        memset(master_ctx->logic_session[index].security.local_nonce, 0, AES_NONCE_BYTES);
+        master_ctx->logic_session[index].security.local_ctr = (uint32_t)0;
+        memset(master_ctx->logic_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
+        master_ctx->logic_session[index].security.remote_ctr = (uint32_t)0;
 		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->logic_session[index].upp.uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
@@ -65,6 +80,13 @@ status_t close_worker(const char *label, master_context *master_ctx, worker_type
         cleanup_oricle_double(&master_ctx->cow_session[index].healthy);
         master_ctx->cow_session[index].isactive = false;
         master_ctx->cow_session[index].ishealthy = false;
+        memset(master_ctx->cow_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+        memset(master_ctx->cow_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+        memset(master_ctx->cow_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        memset(master_ctx->cow_session[index].security.local_nonce, 0, AES_NONCE_BYTES);
+        master_ctx->cow_session[index].security.local_ctr = (uint32_t)0;
+        memset(master_ctx->cow_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
+        master_ctx->cow_session[index].security.remote_ctr = (uint32_t)0;
 		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->cow_session[index].upp.uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
@@ -76,6 +98,13 @@ status_t close_worker(const char *label, master_context *master_ctx, worker_type
         cleanup_oricle_double(&master_ctx->dbr_session[index].healthy);
         master_ctx->dbr_session[index].isactive = false;
         master_ctx->dbr_session[index].ishealthy = false;
+        memset(master_ctx->dbr_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+        memset(master_ctx->dbr_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+        memset(master_ctx->dbr_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        memset(master_ctx->dbr_session[index].security.local_nonce, 0, AES_NONCE_BYTES);
+        master_ctx->dbr_session[index].security.local_ctr = (uint32_t)0;
+        memset(master_ctx->dbr_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
+        master_ctx->dbr_session[index].security.remote_ctr = (uint32_t)0;
 		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->dbr_session[index].upp.uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
@@ -87,6 +116,13 @@ status_t close_worker(const char *label, master_context *master_ctx, worker_type
         cleanup_oricle_double(&master_ctx->dbw_session[index].healthy);
         master_ctx->dbw_session[index].isactive = false;
         master_ctx->dbw_session[index].ishealthy = false;
+        memset(master_ctx->dbw_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+        memset(master_ctx->dbw_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+        memset(master_ctx->dbw_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        memset(master_ctx->dbw_session[index].security.local_nonce, 0, AES_NONCE_BYTES);
+        master_ctx->dbw_session[index].security.local_ctr = (uint32_t)0;
+        memset(master_ctx->dbw_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
+        master_ctx->dbw_session[index].security.remote_ctr = (uint32_t)0;
 		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->dbw_session[index].upp.uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
@@ -389,13 +425,23 @@ void workers_cleanup(master_context *master_ctx) {
 
 status_t setup_workers(master_context *master_ctx) {
 	const char *label = "[Master]: ";
-    for (int index = 0; index < MAX_SIO_WORKERS; ++index) { 
+    for (int index = 0; index < MAX_SIO_WORKERS; ++index) {
 		master_ctx->sio_session[index].upp.uds[0] = 0; 
 		master_ctx->sio_session[index].upp.uds[1] = 0; 
         setup_oricle_long_double(&master_ctx->sio_session[index].avgtt, (long double)0);
         setup_oricle_double(&master_ctx->sio_session[index].healthy, (double)100);
         master_ctx->sio_session[index].isactive = true;
-        master_ctx->sio_session[index].ishealthy = true;
+        master_ctx->sio_session[index].ishealthy = true;        
+        memset(master_ctx->sio_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+        memset(master_ctx->sio_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+        memset(master_ctx->sio_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        if (generate_nonce(label, master_ctx->sio_session[index].security.local_nonce) != SUCCESS) {
+            LOG_ERROR("%sFailed to generate_nonce.", label);
+            return FAILURE;
+        }
+        master_ctx->sio_session[index].security.local_ctr = (uint32_t)0;
+        memset(master_ctx->sio_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
+        master_ctx->sio_session[index].security.remote_ctr = (uint32_t)0;
 	}
     for (int index = 0; index < MAX_LOGIC_WORKERS; ++index) { 
 		master_ctx->logic_session[index].upp.uds[0] = 0; 
@@ -404,6 +450,16 @@ status_t setup_workers(master_context *master_ctx) {
         setup_oricle_double(&master_ctx->logic_session[index].healthy, (double)100);
         master_ctx->logic_session[index].isactive = true;
         master_ctx->logic_session[index].ishealthy = true;
+        memset(master_ctx->logic_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+        memset(master_ctx->logic_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+        memset(master_ctx->logic_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        if (generate_nonce(label, master_ctx->logic_session[index].security.local_nonce) != SUCCESS) {
+            LOG_ERROR("%sFailed to generate_nonce.", label);
+            return FAILURE;
+        }
+        master_ctx->logic_session[index].security.local_ctr = (uint32_t)0;
+        memset(master_ctx->logic_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
+        master_ctx->logic_session[index].security.remote_ctr = (uint32_t)0;
 	}
     for (int index = 0; index < MAX_COW_WORKERS; ++index) { 
 		master_ctx->cow_session[index].upp.uds[0] = 0; 
@@ -412,6 +468,16 @@ status_t setup_workers(master_context *master_ctx) {
         setup_oricle_double(&master_ctx->cow_session[index].healthy, (double)100);
         master_ctx->cow_session[index].isactive = true;
         master_ctx->cow_session[index].ishealthy = true;
+        memset(master_ctx->cow_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+        memset(master_ctx->cow_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+        memset(master_ctx->cow_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        if (generate_nonce(label, master_ctx->cow_session[index].security.local_nonce) != SUCCESS) {
+            LOG_ERROR("%sFailed to generate_nonce.", label);
+            return FAILURE;
+        }
+        master_ctx->cow_session[index].security.local_ctr = (uint32_t)0;
+        memset(master_ctx->cow_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
+        master_ctx->cow_session[index].security.remote_ctr = (uint32_t)0;
 	}
     for (int index = 0; index < MAX_DBR_WORKERS; ++index) { 
 		master_ctx->dbr_session[index].upp.uds[0] = 0; 
@@ -420,6 +486,16 @@ status_t setup_workers(master_context *master_ctx) {
         setup_oricle_double(&master_ctx->dbr_session[index].healthy, (double)100);
         master_ctx->dbr_session[index].isactive = true;
         master_ctx->dbr_session[index].ishealthy = true;
+        memset(master_ctx->dbr_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+        memset(master_ctx->dbr_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+        memset(master_ctx->dbr_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        if (generate_nonce(label, master_ctx->dbr_session[index].security.local_nonce) != SUCCESS) {
+            LOG_ERROR("%sFailed to generate_nonce.", label);
+            return FAILURE;
+        }
+        master_ctx->dbr_session[index].security.local_ctr = (uint32_t)0;
+        memset(master_ctx->dbr_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
+        master_ctx->dbr_session[index].security.remote_ctr = (uint32_t)0;
 	}
     for (int index = 0; index < MAX_DBW_WORKERS; ++index) { 
 		master_ctx->dbw_session[index].upp.uds[0] = 0; 
@@ -428,6 +504,16 @@ status_t setup_workers(master_context *master_ctx) {
         setup_oricle_double(&master_ctx->dbw_session[index].healthy, (double)100);
         master_ctx->dbw_session[index].isactive = true;
         master_ctx->dbw_session[index].ishealthy = true;
+        memset(master_ctx->dbw_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+        memset(master_ctx->dbw_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+        memset(master_ctx->dbw_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        if (generate_nonce(label, master_ctx->dbw_session[index].security.local_nonce) != SUCCESS) {
+            LOG_ERROR("%sFailed to generate_nonce.", label);
+            return FAILURE;
+        }
+        master_ctx->dbw_session[index].security.local_ctr = (uint32_t)0;
+        memset(master_ctx->dbw_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
+        master_ctx->dbw_session[index].security.remote_ctr = (uint32_t)0;
 	}
     for (int index = 0; index < MAX_SIO_WORKERS; ++index) {
 		if (create_socket_pair(label, master_ctx, SIO, index) != SUCCESS) return FAILURE;

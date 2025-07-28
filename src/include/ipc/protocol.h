@@ -7,12 +7,17 @@
 #include "pqc.h"
 
 typedef enum {
-    IPC_MASTER_SIO_ORILINK_IDENTITY = (uint8_t)0x00,
+    IPC_WORKER_MASTER_HELLO1 = (uint8_t)0x00,
+    IPC_MASTER_WORKER_HELLO1_ACK = (uint8_t)0x01,
+    IPC_WORKER_MASTER_HELLO2 = (uint8_t)0x02,
+    IPC_MASTER_WORKER_HELLO2_ACK = (uint8_t)0x03,
     
-    IPC_MASTER_COW_CONNECT = (uint8_t)0x10,
-    IPC_MASTER_COW_DATA = (uint8_t)0x11,
-    IPC_COW_MASTER_DATA = (uint8_t)0x12,
-    IPC_COW_MASTER_CONNECTION = (uint8_t)0x13,
+    IPC_MASTER_SIO_ORILINK_IDENTITY = (uint8_t)0x12,
+    
+    IPC_MASTER_COW_CONNECT = (uint8_t)0x20,
+    IPC_MASTER_COW_DATA = (uint8_t)0x21,
+    IPC_COW_MASTER_DATA = (uint8_t)0x22,
+    IPC_COW_MASTER_CONNECTION = (uint8_t)0x23,
     
     IPC_WORKER_MASTER_HEARTBEAT = (uint8_t)0xfe,
     IPC_MASTER_WORKER_SHUTDOWN = (uint8_t)0xff
@@ -78,6 +83,26 @@ typedef struct {
 } ipc_worker_master_heartbeat_t;
 
 typedef struct {
+    worker_type_t wot;
+    uint8_t index;
+    uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
+} ipc_worker_master_hello1_t;
+
+typedef struct {
+    uint8_t encrypted_wot_index[AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES];
+} ipc_worker_master_hello2_t;
+
+typedef struct {
+    worker_type_t wot;
+    uint8_t index;
+    uint8_t kem_ciphertext[KEM_CIPHERTEXT_BYTES];
+} ipc_master_worker_hello1_ack_t;
+
+typedef struct {
+    uint8_t encrypted_wot_index[AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES];
+} ipc_master_worker_hello2_ack_t;
+
+typedef struct {
 	uint8_t version[IPC_VERSION_BYTES];
 	ipc_protocol_type_t type;
 	union {
@@ -86,6 +111,10 @@ typedef struct {
         ipc_master_cow_connect_t *ipc_master_cow_connect;
         ipc_cow_master_connection_t *ipc_cow_master_connection;
         ipc_master_sio_orilink_identity_t *ipc_master_sio_orilink_identity;
+        ipc_worker_master_hello1_t *ipc_worker_master_hello1;
+        ipc_master_worker_hello1_ack_t *ipc_master_worker_hello1_ack;
+        ipc_worker_master_hello2_t *ipc_worker_master_hello2;
+        ipc_master_worker_hello2_ack_t *ipc_master_worker_hello2_ack;
 	} payload;
 } ipc_protocol_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan
@@ -109,6 +138,14 @@ static inline void CLOSE_IPC_PROTOCOL(ipc_protocol_t **protocol_ptr) {
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_cow_master_connection);
         } else if (x->type == IPC_MASTER_SIO_ORILINK_IDENTITY) {
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_sio_orilink_identity);
+        } else if (x->type == IPC_WORKER_MASTER_HELLO1) {
+            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_worker_master_hello1);
+        } else if (x->type == IPC_MASTER_WORKER_HELLO1_ACK) {
+            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_worker_hello1_ack);
+        } else if (x->type == IPC_WORKER_MASTER_HELLO2) {
+            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_worker_master_hello2);
+        } else if (x->type == IPC_MASTER_WORKER_HELLO2_ACK) {
+            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_worker_hello2_ack);
         }
         free(x);
         *protocol_ptr = NULL;

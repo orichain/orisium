@@ -18,6 +18,10 @@
 #include "ipc/master_cow_connect.h"
 #include "ipc/master_sio_orilink_identity.h"
 #include "ipc/cow_master_connection.h"
+#include "ipc/worker_master_hello1.h"
+#include "ipc/worker_master_hello2.h"
+#include "ipc/master_worker_hello1_ack.h"
+#include "ipc/master_worker_hello2_ack.h"
 #include "constants.h"
 #include "pqc.h"
 
@@ -122,6 +126,54 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
             payload_dynamic_size = (p->payload.ipc_master_sio_orilink_identity->rtt_kcs_len * DOUBLE_ARRAY_SIZE) + (p->payload.ipc_master_sio_orilink_identity->retry_kcs_len * DOUBLE_ARRAY_SIZE);
             break;
         }
+        case IPC_WORKER_MASTER_HELLO1: {
+            if (!checkfixheader) {
+                if (!p->payload.ipc_worker_master_hello1) {
+                    LOG_ERROR("%sIPC_WORKER_MASTER_HELLO1 payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
+            }
+            payload_fixed_size = sizeof(uint8_t) + sizeof(uint8_t) + KEM_PUBLICKEY_BYTES;
+            payload_dynamic_size = 0;
+            break;
+        }
+        case IPC_WORKER_MASTER_HELLO2: {
+            if (!checkfixheader) {
+                if (!p->payload.ipc_worker_master_hello2) {
+                    LOG_ERROR("%sIPC_WORKER_MASTER_HELLO2 payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
+            }
+            payload_fixed_size = AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES;
+            payload_dynamic_size = 0;
+            break;
+        }
+        case IPC_MASTER_WORKER_HELLO1_ACK: {
+            if (!checkfixheader) {
+                if (!p->payload.ipc_master_worker_hello1_ack) {
+                    LOG_ERROR("%sIPC_MASTER_WORKER_HELLO1_ACK payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
+            }
+            payload_fixed_size = sizeof(uint8_t) + sizeof(uint8_t) + KEM_CIPHERTEXT_BYTES;
+            payload_dynamic_size = 0;
+            break;
+        }
+        case IPC_MASTER_WORKER_HELLO2_ACK: {
+            if (!checkfixheader) {
+                if (!p->payload.ipc_master_worker_hello2_ack) {
+                    LOG_ERROR("%sIPC_MASTER_WORKER_HELLO2_ACK payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
+            }
+            payload_fixed_size = AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES;
+            payload_dynamic_size = 0;
+            break;
+        }
         default:
             LOG_ERROR("%sUnknown protocol type for serialization: 0x%02x", label, p->type);
             result.status = FAILURE_IPYLD;
@@ -200,6 +252,19 @@ ssize_t_status_t ipc_serialize(const char *label, const ipc_protocol_t* p, uint8
         case IPC_MASTER_SIO_ORILINK_IDENTITY:
             result_pyld = ipc_serialize_master_sio_orilink_identity(label, p->payload.ipc_master_sio_orilink_identity, current_buffer, *buffer_size, &offset);
             break;
+        case IPC_WORKER_MASTER_HELLO1:
+            result_pyld = ipc_serialize_worker_master_hello1(label, p->payload.ipc_worker_master_hello1, current_buffer, *buffer_size, &offset);
+            break;
+        case IPC_WORKER_MASTER_HELLO2:
+            result_pyld = ipc_serialize_worker_master_hello2(label, p->payload.ipc_worker_master_hello2, current_buffer, *buffer_size, &offset);
+            break;
+        case IPC_MASTER_WORKER_HELLO1_ACK:
+            result_pyld = ipc_serialize_master_worker_hello1_ack(label, p->payload.ipc_master_worker_hello1_ack, current_buffer, *buffer_size, &offset);
+            break;
+        case IPC_MASTER_WORKER_HELLO2_ACK:
+            result_pyld = ipc_serialize_master_worker_hello2_ack(label, p->payload.ipc_master_worker_hello2_ack, current_buffer, *buffer_size, &offset);
+            break;
+            
         default:
             LOG_ERROR("%sUnknown protocol type for serialization: 0x%02x", label, p->type);
             result.status = FAILURE_IPYLD;
@@ -322,16 +387,94 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, const uint8_t* buffer
                 CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_OOBUF;
                 return result;
-            }
-            ipc_master_sio_orilink_identity_t *payload = (ipc_master_sio_orilink_identity_t*) calloc(1, sizeof(ipc_master_sio_orilink_identity_t));
+            }            
+            size_t fixed_header_blen1_size = fixed_header_size - sizeof(uint8_t) - sizeof(uint8_t);
+            uint8_t actual_data_len1;
+            memcpy(&actual_data_len1, buffer + current_buffer_offset + fixed_header_blen1_size, sizeof(uint8_t));
+            size_t fixed_header_blen2_size = fixed_header_size - sizeof(uint8_t);
+            uint8_t actual_data_len2;
+            memcpy(&actual_data_len2, buffer + current_buffer_offset + fixed_header_blen2_size, sizeof(uint8_t));
+            ipc_master_sio_orilink_identity_t *payload = (ipc_master_sio_orilink_identity_t*) calloc(1, sizeof(ipc_master_sio_orilink_identity_t) + actual_data_len1 + actual_data_len2);
             if (!payload) {
-                LOG_ERROR("%sFailed to allocate ipc_master_sio_orilink_identity_t without FAM. %s", label, strerror(errno));
+                LOG_ERROR("%sFailed to allocate ipc_master_sio_orilink_identity_t with FAM. %s", label, strerror(errno));
                 CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
             p->payload.ipc_master_sio_orilink_identity = payload;
             result_pyld = ipc_deserialize_master_sio_orilink_identity(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case IPC_WORKER_MASTER_HELLO1: {
+            if (current_buffer_offset + fixed_header_size > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk IPC_WORKER_MASTER_HELLO1 fixed header.", label);
+                CLOSE_IPC_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            ipc_worker_master_hello1_t *payload = (ipc_worker_master_hello1_t*) calloc(1, sizeof(ipc_worker_master_hello1_t));
+            if (!payload) {
+                LOG_ERROR("%sFailed to allocate ipc_worker_master_hello1_t without FAM. %s", label, strerror(errno));
+                CLOSE_IPC_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.ipc_worker_master_hello1 = payload;
+            result_pyld = ipc_deserialize_worker_master_hello1(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case IPC_WORKER_MASTER_HELLO2: {
+            if (current_buffer_offset + fixed_header_size > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk IPC_WORKER_MASTER_HELLO1 fixed header.", label);
+                CLOSE_IPC_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            ipc_worker_master_hello2_t *payload = (ipc_worker_master_hello2_t*) calloc(1, sizeof(ipc_worker_master_hello2_t));
+            if (!payload) {
+                LOG_ERROR("%sFailed to allocate ipc_worker_master_hello2_t without FAM. %s", label, strerror(errno));
+                CLOSE_IPC_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.ipc_worker_master_hello2 = payload;
+            result_pyld = ipc_deserialize_worker_master_hello2(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case IPC_MASTER_WORKER_HELLO1_ACK: {
+            if (current_buffer_offset + fixed_header_size > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk IPC_MASTER_WORKER_HELLO1_ACK fixed header.", label);
+                CLOSE_IPC_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            ipc_master_worker_hello1_ack_t *payload = (ipc_master_worker_hello1_ack_t*) calloc(1, sizeof(ipc_master_worker_hello1_ack_t));
+            if (!payload) {
+                LOG_ERROR("%sFailed to allocate ipc_master_worker_hello1_ack_t without FAM. %s", label, strerror(errno));
+                CLOSE_IPC_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.ipc_master_worker_hello1_ack = payload;
+            result_pyld = ipc_deserialize_master_worker_hello1_ack(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case IPC_MASTER_WORKER_HELLO2_ACK: {
+            if (current_buffer_offset + fixed_header_size > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk IPC_MASTER_WORKER_HELLO2_ACK fixed header.", label);
+                CLOSE_IPC_PROTOCOL(&p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            ipc_master_worker_hello2_ack_t *payload = (ipc_master_worker_hello2_ack_t*) calloc(1, sizeof(ipc_master_worker_hello2_ack_t));
+            if (!payload) {
+                LOG_ERROR("%sFailed to allocate ipc_master_worker_hello2_ack_t without FAM. %s", label, strerror(errno));
+                CLOSE_IPC_PROTOCOL(&p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.ipc_master_worker_hello2_ack = payload;
+            result_pyld = ipc_deserialize_master_worker_hello2_ack(label, p, buffer, len, &current_buffer_offset);
             break;
 		}
         default:
