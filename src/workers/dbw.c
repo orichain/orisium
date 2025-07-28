@@ -18,7 +18,12 @@ void run_dbw_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
     async_type_t dbw_async;
     dbw_async.async_fd = -1;
     int dbw_timer_fd = -1;
+//----------------------------------------------------------------------
+// Inisialisasi seed dengan waktu saat ini untuk hasil yang berbeda setiap kali
+// Seed untuk random() jitter
+//----------------------------------------------------------------------
     srandom(time(NULL) ^ getpid());
+//----------------------------------------------------------------------
     
 //======================================================================
 // Setup Logic

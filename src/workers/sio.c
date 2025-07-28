@@ -18,7 +18,12 @@ void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, in
     async_type_t sio_async;
     sio_async.async_fd = -1;
     int sio_timer_fd = -1;
+//----------------------------------------------------------------------
+// Inisialisasi seed dengan waktu saat ini untuk hasil yang berbeda setiap kali
+// Seed untuk random() jitter
+//----------------------------------------------------------------------
     srandom(time(NULL) ^ getpid());
+//----------------------------------------------------------------------
     
 //======================================================================
 // SIO Setup

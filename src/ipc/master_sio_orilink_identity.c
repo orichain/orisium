@@ -536,6 +536,10 @@ ipc_protocol_t_status_t ipc_prepare_cmd_master_sio_orilink_identity(
     double *rtt_retry_kcs
 )
 {
+//----------------------------------------------------------------------
+// karena masih data asli host
+// gunakan sizeof(double) bukan DOUBLE_ARRAY_SIZE
+//----------------------------------------------------------------------
 	ipc_protocol_t_status_t result;
 	result.r_ipc_protocol_t = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
 	result.status = FAILURE;

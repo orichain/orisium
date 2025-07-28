@@ -18,7 +18,12 @@ void run_logic_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, 
     async_type_t logic_async;
     logic_async.async_fd = -1;
     int logic_timer_fd = -1;
+//----------------------------------------------------------------------
+// Inisialisasi seed dengan waktu saat ini untuk hasil yang berbeda setiap kali
+// Seed untuk random() jitter
+//----------------------------------------------------------------------
     srandom(time(NULL) ^ getpid());
+//----------------------------------------------------------------------
     
 //======================================================================
 // Setup Logic
