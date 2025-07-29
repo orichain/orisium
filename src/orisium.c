@@ -30,32 +30,6 @@ int main() {
 // Configuring node and bootstrap
 //======================================================================
 	if (ensure_directory_exists("[Orisium]: ", "./database") != SUCCESS) goto exit;
-//====================================================================== 
-    uint16_t listen_port = 0;
-    bootstrap_nodes_t bootstrap_nodes;
-    memset(&bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
-    if (read_listen_port_and_bootstrap_nodes_from_json("[Orisium]: ", "config.json", &listen_port, &bootstrap_nodes) != SUCCESS) {
-        LOG_ERROR("[Orisium]: Gagal membaca konfigurasi dari %s.", "config.json");
-        goto exit;
-    }    
-    LOG_INFO("[Orisium]: --- Node Configuration ---");
-    LOG_INFO("[Orisium]: Listen Port: %d", listen_port);
-    LOG_INFO("[Orisium]: Bootstrap Nodes (%d):", bootstrap_nodes.len);
-    for (int i = 0; i < bootstrap_nodes.len; i++) {
-        char host_str[NI_MAXHOST];
-        char port_str[NI_MAXSERV];
-        int getname_res = getnameinfo((struct sockaddr *)&bootstrap_nodes.addr[i], sizeof(bootstrap_nodes.addr[i]),
-                            host_str, NI_MAXHOST,
-                            port_str, NI_MAXSERV,
-                            NI_NUMERICHOST | NI_NUMERICSERV
-                          );
-        if (getname_res != 0) {
-            LOG_ERROR("[Orisium]: getnameinfo failed. %s", strerror(errno));
-            goto exit;
-        }
-        LOG_INFO("[Orisium]:   - Node %d: IP %s, Port %s", i + 1, host_str, port_str);
-    }
-    LOG_INFO("[Orisium]: -------------------------");
 //======================================================================
 // Install sigint handler
 //======================================================================    
@@ -68,12 +42,37 @@ int main() {
 // Master
 //======================================================================
 	master_context master_ctx;
-    run_master_process(&master_ctx, &listen_port, &bootstrap_nodes);
+    master_ctx.listen_port = (uint16_t)0;
+    memset(&master_ctx.bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
+    if (read_listen_port_and_bootstrap_nodes_from_json("[Orisium]: ", "config.json", &master_ctx.listen_port, &master_ctx.bootstrap_nodes) != SUCCESS) {
+        LOG_ERROR("[Master]: Gagal membaca konfigurasi dari %s.", "config.json");
+        goto exit;
+    }
+    printf("[Master]: --- Node Configuration ---\n");
+    printf("[Master]: Listen Port: %d\n", master_ctx.listen_port);
+    printf("[Master]: Bootstrap Nodes (%d):\n", master_ctx.bootstrap_nodes.len);
+    for (int i = 0; i < master_ctx.bootstrap_nodes.len; i++) {
+        char host_str[NI_MAXHOST];
+        char port_str[NI_MAXSERV];
+        int getname_res = getnameinfo((struct sockaddr *)&master_ctx.bootstrap_nodes.addr[i], sizeof(struct sockaddr_in6),
+                            host_str, NI_MAXHOST,
+                            port_str, NI_MAXSERV,
+                            NI_NUMERICHOST | NI_NUMERICSERV
+                          );
+        if (getname_res != 0) {
+            LOG_ERROR("[Master]: getnameinfo failed. %s", strerror(errno));
+            goto exit;
+        }
+        printf("[Master]:   - Node %d: IP %s, Port %s\n", i + 1, host_str, port_str);
+    }
+    printf("[Master]: -------------------------\n");
+    run_master_process(&master_ctx);
 //======================================================================
 // Cleanup
 //======================================================================
 exit:
-    memset(&bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
+    master_ctx.listen_port = (uint16_t)0;
+    memset(&master_ctx.bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
 #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))    
 	pthread_join(cleaner_thread, NULL);
     log_close();

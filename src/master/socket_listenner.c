@@ -25,7 +25,7 @@
 #include "poly1305-donna.h"
 #include "aes.h"
 
-status_t setup_socket_listenner(const char *label, master_context *master_ctx, uint16_t *listen_port) {
+status_t setup_socket_listenner(const char *label, master_context *master_ctx) {
     struct sockaddr_in6 addr;
     int opt = 1;
     int v6only = 0;
@@ -50,7 +50,7 @@ status_t setup_socket_listenner(const char *label, master_context *master_ctx, u
     }
     memset(&addr, 0, sizeof(addr));
     addr.sin6_family = AF_INET6;
-    addr.sin6_port = htons(*listen_port);
+    addr.sin6_port = htons(master_ctx->listen_port);
     addr.sin6_addr = in6addr_any;
     if (bind(master_ctx->listen_sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         LOG_ERROR("%sbind failed. %s", label, strerror(errno));
@@ -59,7 +59,7 @@ status_t setup_socket_listenner(const char *label, master_context *master_ctx, u
     return SUCCESS;
 }
 
-status_t handle_listen_sock_event(const char *label, master_context *master_ctx, uint16_t *listen_port) {
+status_t handle_listen_sock_event(const char *label, master_context *master_ctx) {
     struct sockaddr_in6 client_addr;
 	char host_str[NI_MAXHOST];
     char port_str[NI_MAXSERV];
@@ -362,7 +362,7 @@ status_t handle_listen_sock_event(const char *label, master_context *master_ctx,
                 CLOSE_ORILINK_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
-            session->identity.port = *listen_port + session_index + 1;
+            session->identity.port = master_ctx->listen_port + session_index + 1;
 //====================================================================== 
 // SEND HELLO3_ACK                   
 //====================================================================== 

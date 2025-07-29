@@ -20,7 +20,6 @@
 #include "master/worker_selector.h"
 #include "master/worker_ipc_cmds.h"
 #include "master/server_orilink.h"
-#include "node.h"
 #include "pqc.h"
 #include "kalman.h"
 #include "sessions/master_session.h"
@@ -37,7 +36,7 @@ void sigint_handler(int signum) {
     }
 }
 
-status_t setup_master(const char *label, master_context *master_ctx, uint16_t *listen_port) {
+status_t setup_master(const char *label, master_context *master_ctx) {
 //----------------------------------------------------------------------
 // Setup IPC security
 //----------------------------------------------------------------------
@@ -67,7 +66,7 @@ status_t setup_master(const char *label, master_context *master_ctx, uint16_t *l
 		return FAILURE;
 	}
 //======================================================================	
-    if (setup_socket_listenner(label, master_ctx, listen_port) != SUCCESS) {
+    if (setup_socket_listenner(label, master_ctx) != SUCCESS) {
 		return FAILURE; 
 	}	
     if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->listen_sock) != SUCCESS) {
@@ -152,10 +151,10 @@ bool client_disconnected(const char *label, int session_index, async_type_t *mas
     return false;
 }
 
-void run_master_process(master_context *master_ctx, uint16_t *listen_port, bootstrap_nodes_t *bootstrap_nodes) {
+void run_master_process(master_context *master_ctx) {
 	const char *label = "[Master]: ";
 	volatile sig_atomic_t master_shutdown_requested = 0;
-    if (setup_master(label, master_ctx, listen_port) != SUCCESS) goto exit;
+    if (setup_master(label, master_ctx) != SUCCESS) goto exit;
     shutdown_event_fd = &master_ctx->shutdown_event_fd;
     if (setup_workers(master_ctx) != SUCCESS) goto exit;
     
@@ -184,7 +183,7 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
         session = &master_ctx->cow_c_session[i];
         setup_master_cow_session(session);
     }
-    for (int ic = 0; ic < bootstrap_nodes->len; ic++) {
+    for (int ic = 0; ic < master_ctx->bootstrap_nodes.len; ic++) {
         int cow_worker_idx = select_best_worker(label, master_ctx, COW);
         if (cow_worker_idx == -1) {
             LOG_ERROR("%sFailed to select an COW worker for new task.", label);
@@ -195,7 +194,7 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
             if(!master_ctx->cow_c_session[i].in_use) {
                 master_ctx->cow_c_session[i].cow_index = cow_worker_idx;
                 master_ctx->cow_c_session[i].in_use = true;
-                memcpy(&master_ctx->cow_c_session[i].server_addr, &bootstrap_nodes->addr[ic], sizeof(bootstrap_nodes->addr[ic]));
+                memcpy(&master_ctx->cow_c_session[i].server_addr, &master_ctx->bootstrap_nodes.addr[ic], sizeof(struct sockaddr_in6));
                 slot_found = i;
                 break;
             }
@@ -208,9 +207,9 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
             LOG_ERROR("%sFailed to input new task in COW %d metrics.", label, cow_worker_idx);
             goto exit;
         }
-        if (master_cow_connect(master_ctx, &bootstrap_nodes->addr[ic], cow_worker_idx) != SUCCESS) goto exit;
+        if (master_cow_connect(master_ctx, &master_ctx->bootstrap_nodes.addr[ic], cow_worker_idx) != SUCCESS) goto exit;
     }
-    LOG_INFO("%sPID %d UDP Server listening on port %d.", label, master_ctx->master_pid, *listen_port);
+    LOG_INFO("%sPID %d UDP Server listening on port %d.", label, master_ctx->master_pid, master_ctx->listen_port);
     while (!master_shutdown_requested) {
 		int_status_t snfds = async_wait(label, &master_ctx->master_async);
 		if (snfds.status != SUCCESS) continue;
@@ -248,7 +247,7 @@ void run_master_process(master_context *master_ctx, uint16_t *listen_port, boots
 				continue;
 			} else if (current_fd == master_ctx->listen_sock) {
 				if (async_event_is_EPOLLIN(current_events)) {
-					if (handle_listen_sock_event(label, master_ctx, listen_port) != SUCCESS) {
+					if (handle_listen_sock_event(label, master_ctx) != SUCCESS) {
 						continue;
 					}
 				} else {
