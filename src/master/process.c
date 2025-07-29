@@ -36,7 +36,7 @@ void sigint_handler(int signum) {
     }
 }
 
-status_t setup_master(const char *label, master_context *master_ctx) {
+status_t setup_master(const char *label, master_context_t *master_ctx) {
 //----------------------------------------------------------------------
 // Setup IPC security
 //----------------------------------------------------------------------
@@ -151,7 +151,7 @@ bool client_disconnected(const char *label, int session_index, async_type_t *mas
     return false;
 }
 
-void run_master_process(master_context *master_ctx) {
+void run_master_process(master_context_t *master_ctx) {
 	const char *label = "[Master]: ";
 	volatile sig_atomic_t master_shutdown_requested = 0;
     if (setup_master(label, master_ctx) != SUCCESS) goto exit;

@@ -8,7 +8,7 @@
 
 struct sockaddr_in6;
 
-status_t master_workers_shutdown(master_context *master_ctx, shutdown_type_t flag) {
+status_t master_workers_shutdown(master_context_t *master_ctx, shutdown_type_t flag) {
 	const char *label = "[Master]: ";
 	for (int i = 0; i < MAX_SIO_WORKERS; ++i) { 
 		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_shutdown(label, flag);
@@ -88,7 +88,7 @@ status_t master_workers_shutdown(master_context *master_ctx, shutdown_type_t fla
 	return SUCCESS;
 }
 
-status_t master_cow_connect(master_context *master_ctx, struct sockaddr_in6 *addr, int index) {
+status_t master_cow_connect(master_context_t *master_ctx, struct sockaddr_in6 *addr, int index) {
 	const char *label = "[Master]: ";
 	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_cow_connect(label, addr);
     if (cmd_result.status != SUCCESS) {

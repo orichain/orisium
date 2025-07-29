@@ -25,7 +25,7 @@
 #include "poly1305-donna.h"
 #include "aes.h"
 
-status_t setup_socket_listenner(const char *label, master_context *master_ctx) {
+status_t setup_socket_listenner(const char *label, master_context_t *master_ctx) {
     struct sockaddr_in6 addr;
     int opt = 1;
     int v6only = 0;
@@ -59,7 +59,7 @@ status_t setup_socket_listenner(const char *label, master_context *master_ctx) {
     return SUCCESS;
 }
 
-status_t handle_listen_sock_event(const char *label, master_context *master_ctx) {
+status_t handle_listen_sock_event(const char *label, master_context_t *master_ctx) {
     struct sockaddr_in6 client_addr;
 	char host_str[NI_MAXHOST];
     char port_str[NI_MAXSERV];

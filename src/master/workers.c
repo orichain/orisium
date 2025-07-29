@@ -10,11 +10,7 @@
 #include "utilities.h"
 #include "constants.h"
 #include "types.h"
-#include "workers/sio.h"
-#include "workers/logic.h"
-#include "workers/cow.h"
-#include "workers/dbr.h"
-#include "workers/dbw.h"
+#include "workers/worker.h"
 #include "master/workers.h"
 #include "master/worker_metrics.h"
 #include "async.h"
@@ -24,7 +20,7 @@
 #include "sessions/master_session.h"
 #include "pqc.h"
 
-status_t close_worker(const char *label, master_context *master_ctx, worker_type_t wot, int index) {
+status_t close_worker(const char *label, master_context_t *master_ctx, worker_type_t wot, int index) {
 	if (wot == SIO) {
         for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
             master_sio_c_session_t *session;
@@ -133,7 +129,7 @@ status_t close_worker(const char *label, master_context *master_ctx, worker_type
 	return SUCCESS;
 }
 
-status_t create_socket_pair(const char *label, master_context *master_ctx, worker_type_t wot, int index) {
+status_t create_socket_pair(const char *label, master_context_t *master_ctx, worker_type_t wot, int index) {
 	if (wot == SIO) {
 		const char *worker_name = "SIO";
 		if (socketpair(AF_UNIX, SOCK_STREAM, 0, master_ctx->sio_session[index].upp.uds) == -1) {
@@ -218,7 +214,7 @@ status_t create_socket_pair(const char *label, master_context *master_ctx, worke
 	return SUCCESS;
 }
 
-status_t setup_fork_worker(const char* label, master_context *master_ctx, worker_type_t wot, int index) {
+status_t setup_fork_worker(const char* label, master_context_t *master_ctx, worker_type_t wot, int index) {
 	if (wot == SIO) {
 		const char *worker_name = "SIO";
         double initial_delay_ms = (double)0;
@@ -402,7 +398,7 @@ status_t setup_fork_worker(const char* label, master_context *master_ctx, worker
     return SUCCESS;
 }
 
-void workers_cleanup(master_context *master_ctx) {
+void workers_cleanup(master_context_t *master_ctx) {
     LOG_INFO("[Master]: Performing cleanup...");
     const char *label = "[Master]: ";
     for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
@@ -423,7 +419,7 @@ void workers_cleanup(master_context *master_ctx) {
     LOG_INFO("[Master]: Cleanup complete.");
 }
 
-status_t setup_workers(master_context *master_ctx) {
+status_t setup_workers(master_context_t *master_ctx) {
 	const char *label = "[Master]: ";
     for (int index = 0; index < MAX_SIO_WORKERS; ++index) {
 		master_ctx->sio_session[index].upp.uds[0] = 0; 
@@ -558,7 +554,7 @@ status_t setup_workers(master_context *master_ctx) {
     return SUCCESS;
 }
 
-status_t calculate_avgtt(const char *label, master_context *master_ctx, worker_type_t wot, int index) {
+status_t calculate_avgtt(const char *label, master_context_t *master_ctx, worker_type_t wot, int index) {
     const char *worker_name = "Unknown";
     switch (wot) {
         case SIO: { worker_name = "SIO"; break; }
@@ -627,7 +623,7 @@ status_t calculate_avgtt(const char *label, master_context *master_ctx, worker_t
     return SUCCESS;
 }
 
-status_t calculate_healthy(const char* label, master_context *master_ctx, worker_type_t wot, int index) {
+status_t calculate_healthy(const char* label, master_context_t *master_ctx, worker_type_t wot, int index) {
     const char *worker_name = "Unknown";
     switch (wot) {
         case SIO: { worker_name = "SIO"; break; }
@@ -691,7 +687,7 @@ status_t calculate_healthy(const char* label, master_context *master_ctx, worker
     return SUCCESS;
 }
 
-status_t check_workers_healthy(master_context *master_ctx) {
+status_t check_workers_healthy(master_context_t *master_ctx) {
 	const char *label = "[Master]: ";
 	for (int i = 0; i < MAX_SIO_WORKERS; ++i) { 
 		if (calculate_healthy(label, master_ctx, SIO, i) != SUCCESS) {

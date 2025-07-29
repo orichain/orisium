@@ -34,10 +34,10 @@ typedef struct {
     master_sio_c_session_t sio_c_session[MAX_MASTER_SIO_SESSIONS];
     master_cow_c_session_t cow_c_session[MAX_MASTER_COW_SESSIONS];
 //----------------------------------------------------------------------
-} master_context;
+} master_context_t;
 
 void sigint_handler(int signum);
-void run_master_process(master_context *master_ctx);
+void run_master_process(master_context_t *master_ctx);
 void cleanup_master_sio_session(const char *label, async_type_t *master_async, master_sio_c_session_t *session);
 void cleanup_master_cow_session(master_cow_c_session_t *session);
 

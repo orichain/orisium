@@ -1,6 +1,0 @@
-#ifndef WORKERS_SIO_H
-#define WORKERS_SIO_H
-
-void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd);
-
-#endif

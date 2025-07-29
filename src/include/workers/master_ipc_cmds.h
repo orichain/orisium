@@ -1,7 +1,10 @@
 #ifndef WORKERS_MASTER_IPC_CMDS_H
 #define WORKERS_MASTER_IPC_CMDS_H
 
-status_t worker_master_heartbeat(const char *label, worker_type_t wot, int worker_idx, double new_heartbeat_interval_double, int *master_uds_fd);
-status_t cow_master_connection(const char *label, worker_type_t wot, int worker_idx, struct sockaddr_in6 *addr, connection_type_t flag, int *master_uds_fd);
+#include "workers/worker.h"
+
+status_t worker_master_heartbeat(worker_context_t *ctx, double new_heartbeat_interval_double);
+status_t worker_master_hello1(worker_context_t *ctx, uint8_t *kem_publickey);
+status_t cow_master_connection(worker_context_t *ctx, struct sockaddr_in6 *addr, connection_type_t flag);
 
 #endif

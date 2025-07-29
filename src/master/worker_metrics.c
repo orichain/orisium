@@ -32,7 +32,7 @@ double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_t
     return initial_delay_ms;
 }
 
-status_t new_task_metrics(const char *label, master_context *master_ctx, worker_type_t wot, int index) {
+status_t new_task_metrics(const char *label, master_context_t *master_ctx, worker_type_t wot, int index) {
     uint64_t_status_t rt = get_realtime_time_ns(label);
     if (rt.status != SUCCESS) return rt.status;
     worker_metrics_t *metrics = NULL;

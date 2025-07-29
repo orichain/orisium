@@ -13,7 +13,7 @@
 #include "master/process.h"
 #include "master/workers.h"
 
-worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context *master_ctx, int *current_fd) {
+worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context_t *master_ctx, int *current_fd) {
 	worker_type_t_status_t result;
 	result.r_worker_type_t = UNKNOWN;
 	result.status = FAILURE;
@@ -82,7 +82,7 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
 	return result;
 }
 
-status_t handle_ipc_event(const char *label, master_context *master_ctx, int *current_fd) {
+status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *current_fd) {
     ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(label, current_fd);
 	if (ircvdi.status != SUCCESS) {
 		LOG_ERROR("%srecv_ipc_message from worker. %s", label, strerror(errno));

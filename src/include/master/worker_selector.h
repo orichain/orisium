@@ -3,6 +3,6 @@
 
 #include "master/process.h"
 
-int select_best_worker(const char *label, master_context *master_ctx, worker_type_t wot);
+int select_best_worker(const char *label, master_context_t *master_ctx, worker_type_t wot);
 
 #endif

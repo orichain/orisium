@@ -41,7 +41,7 @@ int main() {
 //======================================================================
 // Master
 //======================================================================
-	master_context master_ctx;
+	master_context_t master_ctx;
     master_ctx.listen_port = (uint16_t)0;
     memset(&master_ctx.bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
     if (read_listen_port_and_bootstrap_nodes_from_json("[Orisium]: ", "config.json", &master_ctx.listen_port, &master_ctx.bootstrap_nodes) != SUCCESS) {
