@@ -16,10 +16,10 @@
 #include "master/ipc.h"
 #include "master/workers.h"
 #include "master/process.h"
-#include "master/worker_metrics.h"
-#include "master/worker_selector.h"
 #include "master/worker_ipc_cmds.h"
 #include "master/server_orilink.h"
+#include "master/worker_metrics.h"
+#include "master/worker_selector.h"
 #include "pqc.h"
 #include "kalman.h"
 #include "sessions/master_session.h"
@@ -63,13 +63,6 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
 		return FAILURE;
 	}
 	if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->shutdown_event_fd) != SUCCESS) {
-		return FAILURE;
-	}
-//======================================================================	
-    if (setup_socket_listenner(label, master_ctx) != SUCCESS) {
-		return FAILURE; 
-	}	
-    if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->listen_sock) != SUCCESS) {
 		return FAILURE;
 	}
     return SUCCESS;
@@ -157,8 +150,6 @@ void run_master_process(master_context_t *master_ctx) {
     if (setup_master(label, master_ctx) != SUCCESS) goto exit;
     shutdown_event_fd = &master_ctx->shutdown_event_fd;
     if (setup_workers(master_ctx) != SUCCESS) goto exit;
-    
-    
 	if (async_create_timerfd(label, &master_ctx->master_timer_fd) != SUCCESS) {
 		goto exit;
 	}
@@ -168,11 +159,6 @@ void run_master_process(master_context_t *master_ctx) {
     {
 		goto exit;
 	}
-    if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->master_timer_fd) != SUCCESS) {
-		goto exit;
-	}
-
-    if (sleep_s(1) != SUCCESS) goto exit;   
     for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
         master_sio_c_session_t *session;
         session = &master_ctx->sio_c_session[i];
@@ -183,33 +169,7 @@ void run_master_process(master_context_t *master_ctx) {
         session = &master_ctx->cow_c_session[i];
         setup_master_cow_session(session);
     }
-    for (int ic = 0; ic < master_ctx->bootstrap_nodes.len; ic++) {
-        int cow_worker_idx = select_best_worker(label, master_ctx, COW);
-        if (cow_worker_idx == -1) {
-            LOG_ERROR("%sFailed to select an COW worker for new task.", label);
-            goto exit;
-        }
-        int slot_found = -1;
-        for(int i = 0; i < MAX_MASTER_COW_SESSIONS; ++i) {
-            if(!master_ctx->cow_c_session[i].in_use) {
-                master_ctx->cow_c_session[i].cow_index = cow_worker_idx;
-                master_ctx->cow_c_session[i].in_use = true;
-                memcpy(&master_ctx->cow_c_session[i].server_addr, &master_ctx->bootstrap_nodes.addr[ic], sizeof(struct sockaddr_in6));
-                slot_found = i;
-                break;
-            }
-        }
-        if (slot_found == -1) {
-            LOG_ERROR("%sWARNING: No free session slots in master_ctx->cow_c_session.", label);
-            goto exit;
-        }
-        if (new_task_metrics(label, master_ctx, COW, cow_worker_idx) != SUCCESS) {
-            LOG_ERROR("%sFailed to input new task in COW %d metrics.", label, cow_worker_idx);
-            goto exit;
-        }
-        if (master_cow_connect(master_ctx, &master_ctx->bootstrap_nodes.addr[ic], cow_worker_idx) != SUCCESS) goto exit;
-    }
-    LOG_INFO("%sPID %d UDP Server listening on port %d.", label, master_ctx->master_pid, master_ctx->listen_port);
+    master_workers_info(master_ctx, IT_READY);
     while (!master_shutdown_requested) {
 		int_status_t snfds = async_wait(label, &master_ctx->master_async);
 		if (snfds.status != SUCCESS) continue;
@@ -234,7 +194,7 @@ void run_master_process(master_context_t *master_ctx) {
                 {
                     LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
                     master_shutdown_requested = 1;
-                    master_workers_shutdown(master_ctx, IMMEDIATELY);
+                    master_workers_info(master_ctx, IT_SHUTDOWN);
                     continue;
                 }
                 if (check_workers_healthy(master_ctx) != SUCCESS) continue;
@@ -243,7 +203,7 @@ void run_master_process(master_context_t *master_ctx) {
 				read(master_ctx->shutdown_event_fd, &u, sizeof(u));
 				LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
 				master_shutdown_requested = 1;
-				master_workers_shutdown(master_ctx, IMMEDIATELY);
+				master_workers_info(master_ctx, IT_SHUTDOWN);
 				continue;
 			} else if (current_fd == master_ctx->listen_sock) {
 				if (async_event_is_EPOLLIN(current_events)) {
@@ -316,7 +276,64 @@ void run_master_process(master_context_t *master_ctx) {
                         }
 //======================================================================
                     } else {
-                        if (handle_ipc_event(label, master_ctx, &current_fd) != SUCCESS) {
+                        status_t hie_rslt = handle_ipc_event(label, master_ctx, &current_fd);
+//----------------------------------------------------------------------
+// All Worker Ready To Comunication In Secure Encrypter
+//----------------------------------------------------------------------
+                        if (hie_rslt == SUCCESS_WRKSRDY) {
+                            if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->master_timer_fd) != SUCCESS) {
+                                LOG_INFO("%sGagal async_create_incoming_event hb checker. Initiating graceful shutdown...", label);
+                                master_shutdown_requested = 1;
+                                master_workers_info(master_ctx, IT_SHUTDOWN);
+                                continue;
+                            }
+                            for (int ic = 0; ic < master_ctx->bootstrap_nodes.len; ic++) {
+                                int cow_worker_idx = select_best_worker(label, master_ctx, COW);
+                                if (cow_worker_idx == -1) {
+                                    LOG_ERROR("%sFailed to select an COW worker for new task. Initiating graceful shutdown...", label);
+                                    master_shutdown_requested = 1;
+                                    master_workers_info(master_ctx, IT_SHUTDOWN);
+                                    continue;
+                                }
+                                int slot_found = -1;
+                                for(int i = 0; i < MAX_MASTER_COW_SESSIONS; ++i) {
+                                    if(!master_ctx->cow_c_session[i].in_use) {
+                                        master_ctx->cow_c_session[i].cow_index = cow_worker_idx;
+                                        master_ctx->cow_c_session[i].in_use = true;
+                                        memcpy(&master_ctx->cow_c_session[i].server_addr, &master_ctx->bootstrap_nodes.addr[ic], sizeof(struct sockaddr_in6));
+                                        slot_found = i;
+                                        break;
+                                    }
+                                }
+                                if (slot_found == -1) {
+                                    LOG_ERROR("%sWARNING: No free session slots in master_ctx->cow_c_session. Initiating graceful shutdown...", label);
+                                    master_shutdown_requested = 1;
+                                    master_workers_info(master_ctx, IT_SHUTDOWN);
+                                    continue;
+                                }
+                                if (new_task_metrics(label, master_ctx, COW, cow_worker_idx) != SUCCESS) {
+                                    LOG_ERROR("%sFailed to input new task in COW %d metrics. Initiating graceful shutdown...", label, cow_worker_idx);
+                                    master_shutdown_requested = 1;
+                                    master_workers_info(master_ctx, IT_SHUTDOWN);
+                                    continue;
+                                }
+                                if (master_cow_connect(master_ctx, &master_ctx->bootstrap_nodes.addr[ic], cow_worker_idx) != SUCCESS) goto exit;
+                            }
+                            if (setup_socket_listenner(label, master_ctx) != SUCCESS) {
+                                LOG_ERROR("%sFailed to setup_socket_listenner. Initiating graceful shutdown...", label);
+                                master_shutdown_requested = 1;
+                                master_workers_info(master_ctx, IT_SHUTDOWN);
+                                continue;
+                            }	
+                            if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->listen_sock) != SUCCESS) {
+                                LOG_ERROR("%sFailed to async_create_incoming_event socket_listenner. Initiating graceful shutdown...", label);
+                                master_shutdown_requested = 1;
+                                master_workers_info(master_ctx, IT_SHUTDOWN);
+                                continue;
+                            }
+                            LOG_INFO("%sPID %d UDP Server listening on port %d.", label, master_ctx->master_pid, master_ctx->listen_port);
+//----------------------------------------------------------------------
+                        } else {
                             continue;
                         }
                     }

@@ -20,7 +20,7 @@
 #include "sessions/master_session.h"
 #include "pqc.h"
 
-status_t close_worker(const char *label, master_context_t *master_ctx, worker_type_t wot, int index) {
+status_t close_worker(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
 	if (wot == SIO) {
         for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
             master_sio_c_session_t *session;
@@ -33,6 +33,7 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         cleanup_oricle_double(&master_ctx->sio_session[index].healthy);
         master_ctx->sio_session[index].isactive = false;
         master_ctx->sio_session[index].ishealthy = false;
+        master_ctx->sio_session[index].isready = false;
         memset(master_ctx->sio_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->sio_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->sio_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
@@ -40,7 +41,7 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         master_ctx->sio_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->sio_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
         master_ctx->sio_session[index].security.remote_ctr = (uint32_t)0;
-		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->sio_session[index].upp.uds[0]) != SUCCESS) {		
+        if (async_delete_event(label, &master_ctx->master_async, &master_ctx->sio_session[index].upp.uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
         CLOSE_UDS(&master_ctx->sio_session[index].upp.uds[0]);
@@ -51,6 +52,7 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         cleanup_oricle_double(&master_ctx->logic_session[index].healthy);
         master_ctx->logic_session[index].isactive = false;
         master_ctx->logic_session[index].ishealthy = false;
+        master_ctx->logic_session[index].isready = false;
         memset(master_ctx->logic_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->logic_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->logic_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
@@ -58,7 +60,7 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         master_ctx->logic_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->logic_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
         master_ctx->logic_session[index].security.remote_ctr = (uint32_t)0;
-		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->logic_session[index].upp.uds[0]) != SUCCESS) {		
+        if (async_delete_event(label, &master_ctx->master_async, &master_ctx->logic_session[index].upp.uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
         CLOSE_UDS(&master_ctx->logic_session[index].upp.uds[0]);
@@ -76,6 +78,7 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         cleanup_oricle_double(&master_ctx->cow_session[index].healthy);
         master_ctx->cow_session[index].isactive = false;
         master_ctx->cow_session[index].ishealthy = false;
+        master_ctx->cow_session[index].isready = false;
         memset(master_ctx->cow_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->cow_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->cow_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
@@ -83,7 +86,7 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         master_ctx->cow_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->cow_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
         master_ctx->cow_session[index].security.remote_ctr = (uint32_t)0;
-		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->cow_session[index].upp.uds[0]) != SUCCESS) {		
+        if (async_delete_event(label, &master_ctx->master_async, &master_ctx->cow_session[index].upp.uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
         CLOSE_UDS(&master_ctx->cow_session[index].upp.uds[0]);
@@ -94,6 +97,7 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         cleanup_oricle_double(&master_ctx->dbr_session[index].healthy);
         master_ctx->dbr_session[index].isactive = false;
         master_ctx->dbr_session[index].ishealthy = false;
+        master_ctx->dbr_session[index].isready = false;
         memset(master_ctx->dbr_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->dbr_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->dbr_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
@@ -101,7 +105,7 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         master_ctx->dbr_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->dbr_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
         master_ctx->dbr_session[index].security.remote_ctr = (uint32_t)0;
-		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->dbr_session[index].upp.uds[0]) != SUCCESS) {		
+        if (async_delete_event(label, &master_ctx->master_async, &master_ctx->dbr_session[index].upp.uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
         CLOSE_UDS(&master_ctx->dbr_session[index].upp.uds[0]);
@@ -112,6 +116,7 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         cleanup_oricle_double(&master_ctx->dbw_session[index].healthy);
         master_ctx->dbw_session[index].isactive = false;
         master_ctx->dbw_session[index].ishealthy = false;
+        master_ctx->dbw_session[index].isready = false;
         memset(master_ctx->dbw_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->dbw_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->dbw_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
@@ -119,17 +124,19 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         master_ctx->dbw_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->dbw_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
         master_ctx->dbw_session[index].security.remote_ctr = (uint32_t)0;
-		if (async_delete_event(label, &master_ctx->master_async, &master_ctx->dbw_session[index].upp.uds[0]) != SUCCESS) {		
+        if (async_delete_event(label, &master_ctx->master_async, &master_ctx->dbw_session[index].upp.uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
         CLOSE_UDS(&master_ctx->dbw_session[index].upp.uds[0]);
 		CLOSE_UDS(&master_ctx->dbw_session[index].upp.uds[1]);
 		CLOSE_PID(&master_ctx->dbw_session[index].upp.pid);
-	}
+	} else {
+        return FAILURE;
+    }
 	return SUCCESS;
 }
 
-status_t create_socket_pair(const char *label, master_context_t *master_ctx, worker_type_t wot, int index) {
+status_t create_socket_pair(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
 	if (wot == SIO) {
 		const char *worker_name = "SIO";
 		if (socketpair(AF_UNIX, SOCK_STREAM, 0, master_ctx->sio_session[index].upp.uds) == -1) {
@@ -210,11 +217,13 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
 			return FAILURE;
 		}
 		LOG_DEBUG("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, master_ctx->dbw_session[index].upp.uds[0], master_ctx->dbw_session[index].upp.uds[1]);
-	}
+	} else {
+        return FAILURE;
+    }
 	return SUCCESS;
 }
 
-status_t setup_fork_worker(const char* label, master_context_t *master_ctx, worker_type_t wot, int index) {
+status_t setup_fork_worker(const char* label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
 	if (wot == SIO) {
 		const char *worker_name = "SIO";
         double initial_delay_ms = (double)0;
@@ -394,7 +403,9 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
 //======================================================================
             LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->dbw_session[index].upp.pid);
         }
-	}
+	} else {
+        return FAILURE;
+    }
     return SUCCESS;
 }
 
@@ -428,6 +439,7 @@ status_t setup_workers(master_context_t *master_ctx) {
         setup_oricle_double(&master_ctx->sio_session[index].healthy, (double)100);
         master_ctx->sio_session[index].isactive = true;
         master_ctx->sio_session[index].ishealthy = true;        
+        master_ctx->sio_session[index].isready = false;     
         memset(master_ctx->sio_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->sio_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->sio_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
@@ -446,6 +458,7 @@ status_t setup_workers(master_context_t *master_ctx) {
         setup_oricle_double(&master_ctx->logic_session[index].healthy, (double)100);
         master_ctx->logic_session[index].isactive = true;
         master_ctx->logic_session[index].ishealthy = true;
+        master_ctx->logic_session[index].isready = false;
         memset(master_ctx->logic_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->logic_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->logic_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
@@ -464,6 +477,7 @@ status_t setup_workers(master_context_t *master_ctx) {
         setup_oricle_double(&master_ctx->cow_session[index].healthy, (double)100);
         master_ctx->cow_session[index].isactive = true;
         master_ctx->cow_session[index].ishealthy = true;
+        master_ctx->cow_session[index].isready = false;
         memset(master_ctx->cow_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->cow_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->cow_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
@@ -482,6 +496,7 @@ status_t setup_workers(master_context_t *master_ctx) {
         setup_oricle_double(&master_ctx->dbr_session[index].healthy, (double)100);
         master_ctx->dbr_session[index].isactive = true;
         master_ctx->dbr_session[index].ishealthy = true;
+        master_ctx->dbr_session[index].isready = false;
         memset(master_ctx->dbr_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->dbr_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->dbr_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
@@ -500,6 +515,7 @@ status_t setup_workers(master_context_t *master_ctx) {
         setup_oricle_double(&master_ctx->dbw_session[index].healthy, (double)100);
         master_ctx->dbw_session[index].isactive = true;
         master_ctx->dbw_session[index].ishealthy = true;
+        master_ctx->dbw_session[index].isready = false;
         memset(master_ctx->dbw_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->dbw_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->dbw_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
@@ -526,27 +542,27 @@ status_t setup_workers(master_context_t *master_ctx) {
     for (int index = 0; index < MAX_DBW_WORKERS; ++index) {
 		if (create_socket_pair(label, master_ctx, DBW, index) != SUCCESS) return FAILURE;
     }    
-	for (int index = 0; index < MAX_SIO_WORKERS; ++index) {
+	for (uint8_t index = 0; index < MAX_SIO_WORKERS; ++index) {
 		if (setup_fork_worker(label, master_ctx, SIO, index) != SUCCESS) {
 			return FAILURE;
 		}
     }
-    for (int index = 0; index < MAX_LOGIC_WORKERS; ++index) {
+    for (uint8_t index = 0; index < MAX_LOGIC_WORKERS; ++index) {
 		if (setup_fork_worker(label, master_ctx, LOGIC, index) != SUCCESS) {
 			return FAILURE;
 		}
     }
-    for (int index = 0; index < MAX_COW_WORKERS; ++index) {
+    for (uint8_t index = 0; index < MAX_COW_WORKERS; ++index) {
 		if (setup_fork_worker(label, master_ctx, COW, index) != SUCCESS) {
 			return FAILURE;
 		}
     }
-    for (int index = 0; index < MAX_DBR_WORKERS; ++index) {
+    for (uint8_t index = 0; index < MAX_DBR_WORKERS; ++index) {
 		if (setup_fork_worker(label, master_ctx, DBR, index) != SUCCESS) {
 			return FAILURE;
 		}
     }
-    for (int index = 0; index < MAX_DBW_WORKERS; ++index) {
+    for (uint8_t index = 0; index < MAX_DBW_WORKERS; ++index) {
 		if (setup_fork_worker(label, master_ctx, DBW, index) != SUCCESS) {
 			return FAILURE;
 		}
@@ -554,7 +570,7 @@ status_t setup_workers(master_context_t *master_ctx) {
     return SUCCESS;
 }
 
-status_t calculate_avgtt(const char *label, master_context_t *master_ctx, worker_type_t wot, int index) {
+status_t calculate_avgtt(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
     const char *worker_name = "Unknown";
     switch (wot) {
         case SIO: { worker_name = "SIO"; break; }
@@ -623,7 +639,7 @@ status_t calculate_avgtt(const char *label, master_context_t *master_ctx, worker
     return SUCCESS;
 }
 
-status_t calculate_healthy(const char* label, master_context_t *master_ctx, worker_type_t wot, int index) {
+status_t calculate_healthy(const char* label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
     const char *worker_name = "Unknown";
     switch (wot) {
         case SIO: { worker_name = "SIO"; break; }
@@ -658,6 +674,8 @@ status_t calculate_healthy(const char* label, master_context_t *master_ctx, work
         metrics = &master_ctx->dbw_session[index].metrics;
         oricle = &master_ctx->dbw_session[index].healthy;
         ishealthy = &master_ctx->dbw_session[index].ishealthy;
+    } else {
+        return FAILURE;
     }
     if (!metrics || !oricle || !ishealthy) return FAILURE;
     uint64_t now_ns = rt.r_uint64_t;

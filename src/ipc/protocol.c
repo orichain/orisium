@@ -13,7 +13,7 @@
 #include "ipc/protocol.h"
 #include "types.h"
 #include "log.h"
-#include "ipc/master_worker_shutdown.h"
+#include "ipc/master_worker_info.h"
 #include "ipc/worker_master_heartbeat.h"
 #include "ipc/master_cow_connect.h"
 #include "ipc/master_sio_orilink_identity.h"
@@ -33,10 +33,10 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
     size_t payload_dynamic_size = 0;
     
     switch (p->type) {
-		case IPC_MASTER_WORKER_SHUTDOWN: {
+		case IPC_MASTER_WORKER_INFO: {
             if (!checkfixheader) {
-                if (!p->payload.ipc_master_worker_shutdown) {
-                    LOG_ERROR("%sIPC_MASTER_WORKER_SHUTDOWN payload is NULL.", label);
+                if (!p->payload.ipc_master_worker_info) {
+                    LOG_ERROR("%sIPC_MASTER_WORKER_INFO payload is NULL.", label);
                     result.status = FAILURE;
                     return result;
                 }
@@ -146,7 +146,7 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
                     return result;
                 }
             }
-            payload_fixed_size = AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES;
+            payload_fixed_size = sizeof(uint8_t) + sizeof(uint8_t) + AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES;
             payload_dynamic_size = 0;
             break;
         }
@@ -237,8 +237,8 @@ ssize_t_status_t ipc_serialize(const char *label, const ipc_protocol_t* p, uint8
     offset += sizeof(uint8_t);
     status_t result_pyld = FAILURE;
     switch (p->type) {
-        case IPC_MASTER_WORKER_SHUTDOWN:
-            result_pyld = ipc_serialize_master_worker_shutdown(label, p->payload.ipc_master_worker_shutdown, current_buffer, *buffer_size, &offset);
+        case IPC_MASTER_WORKER_INFO:
+            result_pyld = ipc_serialize_master_worker_info(label, p->payload.ipc_master_worker_info, current_buffer, *buffer_size, &offset);
             break;
         case IPC_WORKER_MASTER_HEARTBEAT:
             result_pyld = ipc_serialize_worker_master_heartbeat(label, p->payload.ipc_worker_master_heartbeat, current_buffer, *buffer_size, &offset);
@@ -309,22 +309,22 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, const uint8_t* buffer
     LOG_DEBUG("%sDeserializing type 0x%02x. Current offset: %zu", label, p->type, current_buffer_offset);
     status_t result_pyld = FAILURE;
     switch (p->type) {
-        case IPC_MASTER_WORKER_SHUTDOWN: {
+        case IPC_MASTER_WORKER_INFO: {
             if (current_buffer_offset + fixed_header_size > len) {
-                LOG_ERROR("%sBuffer terlalu kecil untuk IPC_MASTER_WORKER_SHUTDOWN fixed header.", label);
+                LOG_ERROR("%sBuffer terlalu kecil untuk IPC_MASTER_WORKER_INFO fixed header.", label);
                 CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_master_worker_shutdown_t *payload = (ipc_master_worker_shutdown_t*) calloc(1, sizeof(ipc_master_worker_shutdown_t));
+            ipc_master_worker_info_t *payload = (ipc_master_worker_info_t*) calloc(1, sizeof(ipc_master_worker_info_t));
             if (!payload) {
-                LOG_ERROR("%sFailed to allocate ipc_master_worker_shutdown_t without FAM. %s", label, strerror(errno));
+                LOG_ERROR("%sFailed to allocate ipc_master_worker_info_t without FAM. %s", label, strerror(errno));
                 CLOSE_IPC_PROTOCOL(&p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
-            p->payload.ipc_master_worker_shutdown = payload;
-            result_pyld = ipc_deserialize_master_worker_shutdown(label, p, buffer, len, &current_buffer_offset);
+            p->payload.ipc_master_worker_info = payload;
+            result_pyld = ipc_deserialize_master_worker_info(label, p, buffer, len, &current_buffer_offset);
             break;
 		}
         case IPC_WORKER_MASTER_HEARTBEAT: {

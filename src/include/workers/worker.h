@@ -14,7 +14,7 @@
 typedef struct {
     int pid;
     worker_type_t wot;
-    int idx;
+    uint16_t idx;
     int master_uds_fd;
     sig_atomic_t shutdown_requested;
     async_type_t async;
@@ -52,12 +52,12 @@ typedef struct {
     worker_context_t worker;
 } dbw_context_t;
 
-status_t setup_worker(worker_context_t *ctx, const char *worker_name, worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd);
+status_t setup_worker(worker_context_t *ctx, const char *worker_name, worker_type_t wot, uint8_t worker_idx, int master_uds_fd);
 void cleanup_worker(worker_context_t *ctx);
-void run_sio_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd);
-void run_logic_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd);
-void run_cow_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd);
-void run_dbr_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd);
-void run_dbw_worker(worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd);
+void run_sio_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms, int master_uds_fd);
+void run_logic_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms, int master_uds_fd);
+void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms, int master_uds_fd);
+void run_dbr_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms, int master_uds_fd);
+void run_dbw_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms, int master_uds_fd);
 
 #endif

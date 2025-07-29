@@ -521,8 +521,8 @@ status_t handle_listen_sock_event(const char *label, master_context_t *master_ct
             uint32_t remote_ctr_be = htobe32(temp_remote_ctr);
             memcpy(iv + AES_NONCE_BYTES, &remote_ctr_be, sizeof(uint32_t));
 //=========================================IV===========================    
-            aes256_ctr(keystream_buffer, sizeof(uint64_t) + sizeof(uint16_t), iv, &aes_ctx);
-            for (size_t i = 0; i < sizeof(uint64_t) + sizeof(uint16_t); i++) {
+            aes256_ctr(keystream_buffer, sizeof(uint64_t) + sizeof(uint64_t), iv, &aes_ctx);
+            for (size_t i = 0; i < sizeof(uint64_t) + sizeof(uint64_t); i++) {
                 decrypted_server_id_new_client_id[i] = encrypted_server_id_new_client_id[i] ^ keystream_buffer[i];
             }
             aes256_ctx_release(&aes_ctx);

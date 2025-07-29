@@ -44,6 +44,7 @@ typedef struct {
 typedef struct {
     bool isactive;
     bool ishealthy;
+    bool isready;
     uint16_t task_count;
     uds_pair_pid_t upp;
 	worker_metrics_t metrics;
@@ -55,6 +56,7 @@ typedef struct {
 typedef struct {
     bool isactive;
     bool ishealthy;
+    bool isready;
     uint16_t task_count;
     uds_pair_pid_t upp;
 	worker_metrics_t metrics;
@@ -66,6 +68,7 @@ typedef struct {
 typedef struct {
     bool isactive;
     bool ishealthy;
+    bool isready;
     uint16_t task_count;
     uds_pair_pid_t upp;
 	worker_metrics_t metrics;
@@ -84,6 +87,7 @@ typedef struct {
 	bool in_use;
     bool isactive;
     bool ishealthy;
+    bool isready;
     uds_pair_pid_t upp;
 	worker_metrics_t metrics;
     oricle_double_t healthy;
@@ -94,6 +98,7 @@ typedef struct {
 typedef struct {
     bool isactive;
     bool ishealthy;
+    bool isready;
     uint16_t task_count;
     uds_pair_pid_t upp;
     worker_metrics_t metrics;

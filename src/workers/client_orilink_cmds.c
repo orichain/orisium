@@ -92,8 +92,8 @@ status_t hello_end(const char *label, cow_c_session_t *session) {
     uint64_t new_client_id_be = htobe64(session->new_client_id);
     memcpy(server_id_new_client_id + sizeof(uint64_t), &new_client_id_be, sizeof(uint64_t));
 //======================================================================    
-    aes256ctx ctx;
-    aes256_ctr_keyexp(&ctx, session->identity.kem_sharedsecret);
+    aes256ctx aes_ctx;
+    aes256_ctr_keyexp(&aes_ctx, session->identity.kem_sharedsecret);
 //=========================================IV===========================    
     uint8_t keystream_buffer[sizeof(uint64_t) + sizeof(uint64_t)];
     uint8_t iv[AES_IV_BYTES];
@@ -101,19 +101,19 @@ status_t hello_end(const char *label, cow_c_session_t *session) {
     uint32_t local_ctr_be = htobe32(session->identity.local_ctr);
     memcpy(iv + AES_NONCE_BYTES, &local_ctr_be, sizeof(uint32_t));
 //=========================================IV===========================    
-    aes256_ctr(keystream_buffer, sizeof(uint64_t) + sizeof(uint64_t), iv, &ctx);
+    aes256_ctr(keystream_buffer, sizeof(uint64_t) + sizeof(uint64_t), iv, &aes_ctx);
     for (size_t i = 0; i < sizeof(uint64_t) + sizeof(uint64_t); i++) {
         encrypted_server_id_new_client_id[i] = server_id_new_client_id[i] ^ keystream_buffer[i];
     }
-    aes256_ctx_release(&ctx);
+    aes256_ctx_release(&aes_ctx);
 //======================================================================    
     memcpy(encrypted_server_id_new_client_id1 + AES_NONCE_BYTES, encrypted_server_id_new_client_id, sizeof(uint64_t) + sizeof(uint64_t));
 //======================================================================    
     uint8_t mac[AES_TAG_BYTES];
-    poly1305_context ctxx;
-	poly1305_init(&ctxx, session->identity.kem_sharedsecret);
-	poly1305_update(&ctxx, encrypted_server_id_new_client_id1, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t));
-	poly1305_finish(&ctxx, mac);
+    poly1305_context mac_ctx;
+	poly1305_init(&mac_ctx, session->identity.kem_sharedsecret);
+	poly1305_update(&mac_ctx, encrypted_server_id_new_client_id1, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t));
+	poly1305_finish(&mac_ctx, mac);
 //====================================================================== 
     memcpy(encrypted_server_id_new_client_id2, encrypted_server_id_new_client_id1, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t));
     memcpy(encrypted_server_id_new_client_id2 + AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint64_t), mac, AES_TAG_BYTES);

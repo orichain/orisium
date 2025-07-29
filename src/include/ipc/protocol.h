@@ -20,7 +20,7 @@ typedef enum {
     IPC_COW_MASTER_CONNECTION = (uint8_t)0x23,
     
     IPC_WORKER_MASTER_HEARTBEAT = (uint8_t)0xfe,
-    IPC_MASTER_WORKER_SHUTDOWN = (uint8_t)0xff
+    IPC_MASTER_WORKER_INFO = (uint8_t)0xff
 } ipc_protocol_type_t;
 
 typedef struct {  
@@ -73,8 +73,8 @@ typedef struct {
 } ipc_cow_master_connection_t;
 
 typedef struct {
-    shutdown_type_t flag;
-} ipc_master_worker_shutdown_t;
+    info_type_t flag;
+} ipc_master_worker_info_t;
 
 typedef struct {
     worker_type_t wot;
@@ -89,6 +89,8 @@ typedef struct {
 } ipc_worker_master_hello1_t;
 
 typedef struct {
+    worker_type_t wot;
+    uint8_t index;
     uint8_t encrypted_wot_index[AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES];
 } ipc_worker_master_hello2_t;
 
@@ -106,7 +108,7 @@ typedef struct {
 	uint8_t version[IPC_VERSION_BYTES];
 	ipc_protocol_type_t type;
 	union {
-		ipc_master_worker_shutdown_t *ipc_master_worker_shutdown;
+		ipc_master_worker_info_t *ipc_master_worker_info;
 		ipc_worker_master_heartbeat_t *ipc_worker_master_heartbeat;
         ipc_master_cow_connect_t *ipc_master_cow_connect;
         ipc_cow_master_connection_t *ipc_cow_master_connection;
@@ -130,8 +132,8 @@ static inline void CLOSE_IPC_PROTOCOL(ipc_protocol_t **protocol_ptr) {
         ipc_protocol_t *x = *protocol_ptr;
         if (x->type == IPC_WORKER_MASTER_HEARTBEAT) {
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_worker_master_heartbeat);
-        } else if (x->type == IPC_MASTER_WORKER_SHUTDOWN) {
-            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_worker_shutdown);
+        } else if (x->type == IPC_MASTER_WORKER_INFO) {
+            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_worker_info);
         } else if (x->type == IPC_MASTER_COW_CONNECT) {
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_cow_connect);
         } else if (x->type == IPC_COW_MASTER_CONNECTION) {

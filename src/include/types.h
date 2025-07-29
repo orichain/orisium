@@ -7,7 +7,11 @@
 #include "constants.h"
 
 typedef enum {
+//----------------------------------------------------------------------
     SUCCESS = (uint8_t)0x00,
+//----------------------------------------------------------------------
+    SUCCESS_WRKSRDY = (uint8_t)0x01,
+//----------------------------------------------------------------------
     FAILURE_MACMSMTCH = (uint8_t)0xea,
     FAILURE_DIFCLID = (uint8_t)0xeb,
     FAILURE_IVLDHDLD = (uint8_t)0xec,
@@ -30,7 +34,9 @@ typedef enum {
     FAILURE_IPYLD = (uint8_t)0xfc,
     FAILURE_OOBUF = (uint8_t)0xfd,
     FAILURE_OOIDX = (uint8_t)0xfe,
+//----------------------------------------------------------------------
     FAILURE = (uint8_t)0xff
+//----------------------------------------------------------------------
 } status_t;
 
 typedef enum {
@@ -43,8 +49,9 @@ typedef enum {
 } worker_type_t;
 
 typedef enum {
-	IMMEDIATELY = (uint8_t)0x00
-} shutdown_type_t;
+	IT_READY = (uint8_t)0x00,
+    IT_SHUTDOWN = (uint8_t)0x01
+} info_type_t;
 
 typedef enum {
 	CONNECTED = (uint8_t)0x00,
@@ -59,7 +66,7 @@ typedef enum {
 } pqc_algo_type_t;
 
 typedef struct {
-	int index;
+	uint8_t index;
 	worker_type_t r_worker_type_t;
 	status_t status;
 } worker_type_t_status_t;

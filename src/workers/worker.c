@@ -13,7 +13,7 @@
 #include "workers/worker.h"
 #include "pqc.h"
 
-status_t setup_worker(worker_context_t *ctx, const char *worker_name, worker_type_t wot, int worker_idx, long initial_delay_ms, int master_uds_fd) {
+status_t setup_worker(worker_context_t *ctx, const char *worker_name, worker_type_t wot, uint8_t worker_idx, int master_uds_fd) {
     ctx->pid = getpid();
     ctx->shutdown_requested = 0;
     ctx->async.async_fd = -1;
@@ -46,12 +46,7 @@ status_t setup_worker(worker_context_t *ctx, const char *worker_name, worker_typ
 //----------------------------------------------------------------------	
 	if (async_create(ctx->label, &ctx->async) != SUCCESS) return FAILURE;
 	if (async_create_incoming_event_with_disconnect(ctx->label, &ctx->async, &ctx->master_uds_fd) != SUCCESS) return FAILURE;
-//======================================================================
-	if (initial_delay_ms > 0) {
-        LOG_DEVEL_DEBUG("%sApplying initial delay of %ld ms...", ctx->label, initial_delay_ms);
-        sleep_ms(initial_delay_ms);
-    }
-//======================================================================
+//----------------------------------------------------------------------
 	if (async_create_timerfd(ctx->label, &ctx->heartbeat_timer_fd) != SUCCESS) {
 		 return FAILURE;
 	}
@@ -61,7 +56,11 @@ status_t setup_worker(worker_context_t *ctx, const char *worker_name, worker_typ
     {
 		 return FAILURE;
 	}
-	if (async_create_incoming_event(ctx->label, &ctx->async, &ctx->heartbeat_timer_fd) != SUCCESS) return FAILURE;
+//----------------------------------------------------------------------
+// Tangguhkan heartbeat timer sampai security/enkripsi ready
+//----------------------------------------------------------------------
+	//if (async_create_incoming_event(ctx->label, &ctx->async, &ctx->heartbeat_timer_fd) != SUCCESS) return FAILURE;
+//----------------------------------------------------------------------
     return SUCCESS;
 }
 
