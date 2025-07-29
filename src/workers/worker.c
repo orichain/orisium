@@ -12,6 +12,7 @@
 #include "constants.h"
 #include "workers/worker.h"
 #include "pqc.h"
+#include "stdbool.h"
 
 status_t setup_worker(worker_context_t *ctx, const char *worker_name, worker_type_t wot, uint8_t worker_idx, int master_uds_fd) {
     ctx->pid = getpid();
@@ -56,11 +57,10 @@ status_t setup_worker(worker_context_t *ctx, const char *worker_name, worker_typ
     {
 		 return FAILURE;
 	}
-//----------------------------------------------------------------------
-// Tangguhkan heartbeat timer sampai security/enkripsi ready
-//----------------------------------------------------------------------
-	//if (async_create_incoming_event(ctx->label, &ctx->async, &ctx->heartbeat_timer_fd) != SUCCESS) return FAILURE;
-//----------------------------------------------------------------------
+    ctx->hello1_sent = false;
+    ctx->hello1_ack_rcvd = false;
+    ctx->hello2_sent = false;
+    ctx->hello2_ack_rcvd = false;
     return SUCCESS;
 }
 
@@ -78,5 +78,9 @@ void cleanup_worker(worker_context_t *ctx) {
     ctx->local_ctr = (uint32_t)0;
     memset(ctx->remote_nonce, 0, AES_NONCE_BYTES);
     ctx->remote_ctr = (uint32_t)0;
+    ctx->hello1_sent = false;
+    ctx->hello1_ack_rcvd = false;
+    ctx->hello2_sent = false;
+    ctx->hello2_ack_rcvd = false;
     free(ctx->label);
 }

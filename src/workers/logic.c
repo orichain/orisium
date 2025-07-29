@@ -16,6 +16,7 @@
 #include "pqc.h"
 #include "poly1305-donna.h"
 #include "aes.h"
+#include "stdbool.h"
 
 void cleanup_logic_worker(logic_context_t *logic_ctx) {
 	cleanup_worker(&logic_ctx->worker);
@@ -123,6 +124,16 @@ void run_logic_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_
                         continue;
                     }
 				} else if (ircvdi.r_ipc_raw_protocol_t->type == IPC_MASTER_WORKER_HELLO1_ACK) {
+                    if (!logic_ctx.worker.hello1_sent) {
+                        LOG_ERROR("%sBelum pernah mengirim HELLO1", logic_ctx.worker.label);
+                        CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                        continue;
+                    }
+                    if (logic_ctx.worker.hello1_ack_rcvd) {
+                        LOG_ERROR("%sSudah ada HELLO1_ACK", logic_ctx.worker.label);
+                        CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                        continue;
+                    }
 					ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(logic_ctx.worker.label,
                         (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
@@ -149,9 +160,20 @@ void run_logic_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
+                    logic_ctx.worker.hello1_ack_rcvd = true;
                     CLOSE_IPC_PROTOCOL(&received_protocol);
 					continue;
 				} else if (ircvdi.r_ipc_raw_protocol_t->type == IPC_MASTER_WORKER_HELLO2_ACK) {
+                    if (!logic_ctx.worker.hello2_sent) {
+                        LOG_ERROR("%sBelum pernah mengirim HELLO2", logic_ctx.worker.label);
+                        CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                        continue;
+                    }
+                    if (logic_ctx.worker.hello2_ack_rcvd) {
+                        LOG_ERROR("%sSudah ada HELLO2_ACK", logic_ctx.worker.label);
+                        CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                        continue;
+                    }
 					ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(logic_ctx.worker.label,
                         (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
@@ -245,6 +267,7 @@ void run_logic_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_
 // Menganggap data valid dengan integritas
 //---------------------------------------------------------------------- 
                     logic_ctx.worker.remote_ctr = (uint32_t)1;//sudah melakukan dekripsi data valid 1 kali
+                    logic_ctx.worker.hello2_ack_rcvd = true;
 //---------------------------------------------------------------------- 
                     CLOSE_IPC_PROTOCOL(&received_protocol);
 					continue;

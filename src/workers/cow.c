@@ -319,6 +319,16 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         continue;
                     }
 				} else if (ircvdi.r_ipc_raw_protocol_t->type == IPC_MASTER_WORKER_HELLO1_ACK) {
+                    if (!cow_ctx.worker.hello1_sent) {
+                        LOG_ERROR("%sBelum pernah mengirim HELLO1", cow_ctx.worker.label);
+                        CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                        continue;
+                    }
+                    if (cow_ctx.worker.hello1_ack_rcvd) {
+                        LOG_ERROR("%sSudah ada HELLO1_ACK", cow_ctx.worker.label);
+                        CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                        continue;
+                    }
 					ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(cow_ctx.worker.label,
                         (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
@@ -345,9 +355,20 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
+                    cow_ctx.worker.hello1_ack_rcvd = true;
                     CLOSE_IPC_PROTOCOL(&received_protocol);
 					continue;
 				} else if (ircvdi.r_ipc_raw_protocol_t->type == IPC_MASTER_WORKER_HELLO2_ACK) {
+                    if (!cow_ctx.worker.hello2_sent) {
+                        LOG_ERROR("%sBelum pernah mengirim HELLO2", cow_ctx.worker.label);
+                        CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                        continue;
+                    }
+                    if (cow_ctx.worker.hello2_ack_rcvd) {
+                        LOG_ERROR("%sSudah ada HELLO2_ACK", cow_ctx.worker.label);
+                        CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                        continue;
+                    }
 					ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(cow_ctx.worker.label,
                         (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
@@ -441,6 +462,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 // Menganggap data valid dengan integritas
 //---------------------------------------------------------------------- 
                     cow_ctx.worker.remote_ctr = (uint32_t)1;//sudah melakukan dekripsi data valid 1 kali
+                    cow_ctx.worker.hello2_ack_rcvd = true;
 //---------------------------------------------------------------------- 
                     CLOSE_IPC_PROTOCOL(&received_protocol);
 					continue;

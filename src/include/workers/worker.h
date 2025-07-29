@@ -28,6 +28,10 @@ typedef struct {
     uint32_t local_ctr;
     uint8_t remote_nonce[AES_NONCE_BYTES];
     uint32_t remote_ctr;
+    bool hello1_sent;
+    bool hello1_ack_rcvd;
+    bool hello2_sent;
+    bool hello2_ack_rcvd;
 } worker_context_t;
 
 typedef struct {

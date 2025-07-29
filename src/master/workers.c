@@ -41,6 +41,10 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         master_ctx->sio_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->sio_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
         master_ctx->sio_session[index].security.remote_ctr = (uint32_t)0;
+        master_ctx->sio_session[index].security.hello1_rcvd = false;
+        master_ctx->sio_session[index].security.hello1_ack_sent = false;
+        master_ctx->sio_session[index].security.hello2_rcvd = false;
+        master_ctx->sio_session[index].security.hello2_ack_sent = false;
         if (async_delete_event(label, &master_ctx->master_async, &master_ctx->sio_session[index].upp.uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
@@ -60,6 +64,10 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         master_ctx->logic_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->logic_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
         master_ctx->logic_session[index].security.remote_ctr = (uint32_t)0;
+        master_ctx->logic_session[index].security.hello1_rcvd = false;
+        master_ctx->logic_session[index].security.hello1_ack_sent = false;
+        master_ctx->logic_session[index].security.hello2_rcvd = false;
+        master_ctx->logic_session[index].security.hello2_ack_sent = false;
         if (async_delete_event(label, &master_ctx->master_async, &master_ctx->logic_session[index].upp.uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
@@ -86,6 +94,10 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         master_ctx->cow_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->cow_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
         master_ctx->cow_session[index].security.remote_ctr = (uint32_t)0;
+        master_ctx->cow_session[index].security.hello1_rcvd = false;
+        master_ctx->cow_session[index].security.hello1_ack_sent = false;
+        master_ctx->cow_session[index].security.hello2_rcvd = false;
+        master_ctx->cow_session[index].security.hello2_ack_sent = false;
         if (async_delete_event(label, &master_ctx->master_async, &master_ctx->cow_session[index].upp.uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
@@ -105,6 +117,10 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         master_ctx->dbr_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->dbr_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
         master_ctx->dbr_session[index].security.remote_ctr = (uint32_t)0;
+        master_ctx->dbr_session[index].security.hello1_rcvd = false;
+        master_ctx->dbr_session[index].security.hello1_ack_sent = false;
+        master_ctx->dbr_session[index].security.hello2_rcvd = false;
+        master_ctx->dbr_session[index].security.hello2_ack_sent = false;
         if (async_delete_event(label, &master_ctx->master_async, &master_ctx->dbr_session[index].upp.uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
@@ -124,6 +140,10 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         master_ctx->dbw_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->dbw_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
         master_ctx->dbw_session[index].security.remote_ctr = (uint32_t)0;
+        master_ctx->dbw_session[index].security.hello1_rcvd = false;
+        master_ctx->dbw_session[index].security.hello1_ack_sent = false;
+        master_ctx->dbw_session[index].security.hello2_rcvd = false;
+        master_ctx->dbw_session[index].security.hello2_ack_sent = false;
         if (async_delete_event(label, &master_ctx->master_async, &master_ctx->dbw_session[index].upp.uds[0]) != SUCCESS) {		
 			return FAILURE;
 		}
@@ -450,6 +470,10 @@ status_t setup_workers(master_context_t *master_ctx) {
         master_ctx->sio_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->sio_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
         master_ctx->sio_session[index].security.remote_ctr = (uint32_t)0;
+        master_ctx->sio_session[index].security.hello1_rcvd = false;
+        master_ctx->sio_session[index].security.hello1_ack_sent = false;
+        master_ctx->sio_session[index].security.hello2_rcvd = false;
+        master_ctx->sio_session[index].security.hello2_ack_sent = false;
 	}
     for (int index = 0; index < MAX_LOGIC_WORKERS; ++index) { 
 		master_ctx->logic_session[index].upp.uds[0] = 0; 
@@ -469,6 +493,10 @@ status_t setup_workers(master_context_t *master_ctx) {
         master_ctx->logic_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->logic_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
         master_ctx->logic_session[index].security.remote_ctr = (uint32_t)0;
+        master_ctx->logic_session[index].security.hello1_rcvd = false;
+        master_ctx->logic_session[index].security.hello1_ack_sent = false;
+        master_ctx->logic_session[index].security.hello2_rcvd = false;
+        master_ctx->logic_session[index].security.hello2_ack_sent = false;
 	}
     for (int index = 0; index < MAX_COW_WORKERS; ++index) { 
 		master_ctx->cow_session[index].upp.uds[0] = 0; 
@@ -488,6 +516,10 @@ status_t setup_workers(master_context_t *master_ctx) {
         master_ctx->cow_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->cow_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
         master_ctx->cow_session[index].security.remote_ctr = (uint32_t)0;
+        master_ctx->cow_session[index].security.hello1_rcvd = false;
+        master_ctx->cow_session[index].security.hello1_ack_sent = false;
+        master_ctx->cow_session[index].security.hello2_rcvd = false;
+        master_ctx->cow_session[index].security.hello2_ack_sent = false;
 	}
     for (int index = 0; index < MAX_DBR_WORKERS; ++index) { 
 		master_ctx->dbr_session[index].upp.uds[0] = 0; 
@@ -507,6 +539,10 @@ status_t setup_workers(master_context_t *master_ctx) {
         master_ctx->dbr_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->dbr_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
         master_ctx->dbr_session[index].security.remote_ctr = (uint32_t)0;
+        master_ctx->dbr_session[index].security.hello1_rcvd = false;
+        master_ctx->dbr_session[index].security.hello1_ack_sent = false;
+        master_ctx->dbr_session[index].security.hello2_rcvd = false;
+        master_ctx->dbr_session[index].security.hello2_ack_sent = false;
 	}
     for (int index = 0; index < MAX_DBW_WORKERS; ++index) { 
 		master_ctx->dbw_session[index].upp.uds[0] = 0; 
@@ -526,6 +562,10 @@ status_t setup_workers(master_context_t *master_ctx) {
         master_ctx->dbw_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->dbw_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
         master_ctx->dbw_session[index].security.remote_ctr = (uint32_t)0;
+        master_ctx->dbw_session[index].security.hello1_rcvd = false;
+        master_ctx->dbw_session[index].security.hello1_ack_sent = false;
+        master_ctx->dbw_session[index].security.hello2_rcvd = false;
+        master_ctx->dbw_session[index].security.hello2_ack_sent = false;
 	}
     for (int index = 0; index < MAX_SIO_WORKERS; ++index) {
 		if (create_socket_pair(label, master_ctx, SIO, index) != SUCCESS) return FAILURE;

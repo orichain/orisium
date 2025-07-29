@@ -15,6 +15,7 @@
 #include "poly1305-donna.h"
 #include "aes.h"
 #include "sessions/master_session.h"
+#include "stdbool.h"
 
 struct sockaddr_in6;
 
@@ -119,32 +120,38 @@ status_t master_cow_connect(master_context_t *master_ctx, struct sockaddr_in6 *a
 status_t master_worker_hello1_ack(master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
 	const char *label = "[Master]: ";
     uint8_t *kem_ciphertext = NULL;
+    worker_security_t *security;
     int *worker_uds_fd = NULL;
     const char *worker_name = "Unknown";
     if (wot == SIO) {
         kem_ciphertext = master_ctx->sio_session[index].security.kem_ciphertext;
+        security = &master_ctx->sio_session[index].security;
         worker_uds_fd = &master_ctx->sio_session[index].upp.uds[0];
         worker_name = "SIO";
     } else if (wot == LOGIC) {
         kem_ciphertext = master_ctx->logic_session[index].security.kem_ciphertext;
+        security = &master_ctx->logic_session[index].security;
         worker_uds_fd = &master_ctx->logic_session[index].upp.uds[0];
         worker_name = "Logic";
     } else if (wot == COW) {
         kem_ciphertext = master_ctx->cow_session[index].security.kem_ciphertext;
+        security = &master_ctx->cow_session[index].security;
         worker_uds_fd = &master_ctx->cow_session[index].upp.uds[0];
         worker_name = "COW";
     } else if (wot == DBR) {
         kem_ciphertext = master_ctx->dbr_session[index].security.kem_ciphertext;
+        security = &master_ctx->dbr_session[index].security;
         worker_uds_fd = &master_ctx->dbr_session[index].upp.uds[0];
         worker_name = "DBR";
     } else if (wot == DBW) {
         kem_ciphertext = master_ctx->dbw_session[index].security.kem_ciphertext;
+        security = &master_ctx->dbw_session[index].security;
         worker_uds_fd = &master_ctx->dbw_session[index].upp.uds[0];
         worker_name = "DBW";
     } else {
         return FAILURE;
     }
-    if (!kem_ciphertext || *worker_uds_fd == -1) return FAILURE;
+    if (!security || !kem_ciphertext || *worker_uds_fd == -1) return FAILURE;
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_hello1_ack(
         label, 
         wot, 
@@ -162,6 +169,7 @@ status_t master_worker_hello1_ack(master_context_t *master_ctx, worker_type_t wo
     } else {
         LOG_DEBUG("%sSent master_worker_hello1_ack to %s %ld.", label, worker_name, index);
     }
+    security->hello1_ack_sent = true;
     CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t); 
 	return SUCCESS;
 }
@@ -251,6 +259,7 @@ status_t master_worker_hello2_ack(master_context_t *master_ctx, worker_type_t wo
     } else {
         LOG_DEBUG("%sSent master_worker_hello2_ack to %s %ld.", label, worker_name, index);
     }
+    security->hello2_ack_sent = true;
     CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t); 
 	return SUCCESS;
 }

@@ -95,7 +95,7 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
 		return ircvdi.status;
 	}
 	switch (ircvdi.r_ipc_raw_protocol_t->type) {
-        case IPC_WORKER_MASTER_HELLO1: {
+        case IPC_WORKER_MASTER_HELLO1: {           
             ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
                 (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
             );
@@ -130,7 +130,12 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
-            if (!security) return FAILURE;
+            if (!security) return FAILURE;            
+            if (security->hello1_rcvd) {
+                LOG_ERROR("%sSudah ada HELLO1", label);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
             memcpy(security->kem_publickey, ihello1i->kem_publickey, KEM_PUBLICKEY_BYTES);
             if (KEM_ENCODE_SHAREDSECRET(
                 security->kem_ciphertext, 
@@ -149,6 +154,7 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
             }
             memcpy(security->kem_sharedsecret, kem_sharedsecret, KEM_SHAREDSECRET_BYTES);
             memset(kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+            security->hello1_rcvd = true;
             CLOSE_IPC_PROTOCOL(&received_protocol);
 			break;
 		}
@@ -187,6 +193,16 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
                 return FAILURE;
             }
             if (!security) return FAILURE;
+            if (!security->hello1_ack_sent) {
+                LOG_ERROR("%sBelum pernah mengirim HELLO1_ACK", label);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            if (security->hello2_rcvd) {
+                LOG_ERROR("%sSudah ada HELLO2", label);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
 //======================================================================
 // Ambil remote_nonce
 // Set remote_ctr = 0

@@ -13,6 +13,7 @@
 #include "constants.h"
 #include "poly1305-donna.h"
 #include "aes.h"
+#include "stdbool.h"
 
 struct sockaddr_in6;
 
@@ -46,6 +47,7 @@ status_t worker_master_hello1(worker_context_t *ctx) {
     } else {
         LOG_DEBUG("%sSent worker_master_hello1 to Master.", ctx->label);
     }
+    ctx->hello1_sent = true;
     CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
     return SUCCESS;
 }
@@ -103,6 +105,7 @@ status_t worker_master_hello2(worker_context_t *ctx) {
     } else {
         LOG_DEBUG("%sSent worker_master_hello2 to Master.", ctx->label);
     }
+    ctx->hello2_sent = true;
     CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
     return SUCCESS;
 }
