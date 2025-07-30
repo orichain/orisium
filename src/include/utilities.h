@@ -27,6 +27,32 @@
 #include "types.h"
 #include "constants.h"
 
+static inline void increment_ctr(uint32_t *ctr, uint8_t *nonce) {
+    if (*ctr == 0xFFFFFFFFUL) {
+        *ctr = 0;
+        uint8_t carry = 1;
+        for (int i = 11; i >= 0; i--) {
+            uint16_t temp_sum = nonce[i] + carry;
+            if (temp_sum > 255) {
+                nonce[i] = 0;
+                carry = 1;
+            } else {
+                nonce[i] = (uint8_t)temp_sum;
+                carry = 0;
+                break;
+            }
+        }
+    } else {
+//----------------------------------------------------------------------
+// Operator ++ memiliki prioritas lebih tinggi daripada operator dereference *.
+// Jadi, *ctr++ sebenarnya berarti: ambil nilai yang ditunjuk oleh ctr, 
+// lalu inkremen pointer ctr itu sendiri (membuatnya menunjuk ke alamat memori berikutnya)
+// yang benar adalah (*ctr)++;
+//----------------------------------------------------------------------
+        (*ctr)++;
+    }
+}
+
 static inline status_t generate_nonce(const char* label, uint8_t *out_nonce) {
     if (out_nonce == NULL) {
         LOG_ERROR("%sError: out_nonce cannot be NULL.", label);
