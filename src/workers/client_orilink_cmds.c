@@ -122,7 +122,7 @@ status_t hello_end(const char *label, cow_c_session_t *session) {
 // Tambah Local Counter Jika Berhasil Encrypt    
 // Tambah Remote Counter Jika Mac Cocok dan Berhasil Decrypt
 //======================================================================
-    session->identity.local_ctr++;
+    increment_ctr(&session->identity.local_ctr, session->identity.local_nonce);
 //======================================================================
 	orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello_end(label, session->identity.client_id, encrypted_server_id_new_client_id2, session->hello_end.sent_try_count);
     if (cmd_result.status != SUCCESS) {

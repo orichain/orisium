@@ -16,17 +16,25 @@
 #include "aes.h"
 #include "sessions/master_session.h"
 #include "stdbool.h"
+#include "utilities.h"
 
 struct sockaddr_in6;
 
 status_t master_workers_info(master_context_t *master_ctx, info_type_t flag) {
 	const char *label = "[Master]: ";
 	for (uint8_t i = 0; i < MAX_SIO_WORKERS; ++i) { 
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_info(label, flag);
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_info(label, SIO, i, flag);
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}
-		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->sio_session[i].upp.uds[0], cmd_result.r_ipc_protocol_t);
+		ssize_t_status_t send_result = send_ipc_protocol_message(
+            label, 
+            master_ctx->sio_session[i].security.kem_sharedsecret,
+            master_ctx->sio_session[i].security.local_nonce,
+            &master_ctx->sio_session[i].security.local_ctr,
+            &master_ctx->sio_session[i].upp.uds[0], 
+            cmd_result.r_ipc_protocol_t
+        );
 		if (send_result.status != SUCCESS) {
 			LOG_ERROR("%sFailed to sent master_worker_info to SIO %ld.", label, i);
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
@@ -37,11 +45,18 @@ status_t master_workers_info(master_context_t *master_ctx, info_type_t flag) {
 		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t); 
 	}
 	for (uint8_t i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_info(label, flag);
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_info(label, LOGIC, i, flag);
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}	
-		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->logic_session[i].upp.uds[0], cmd_result.r_ipc_protocol_t);
+		ssize_t_status_t send_result = send_ipc_protocol_message(
+            label, 
+            master_ctx->logic_session[i].security.kem_sharedsecret,
+            master_ctx->logic_session[i].security.local_nonce,
+            &master_ctx->logic_session[i].security.local_ctr,
+            &master_ctx->logic_session[i].upp.uds[0], 
+            cmd_result.r_ipc_protocol_t
+        );
 		if (send_result.status != SUCCESS) {
 			LOG_ERROR("%sFailed to sent master_worker_info to Logic %ld.", label, i);
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
@@ -52,11 +67,18 @@ status_t master_workers_info(master_context_t *master_ctx, info_type_t flag) {
 		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
 	}
 	for (uint8_t i = 0; i < MAX_COW_WORKERS; ++i) { 
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_info(label, flag);
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_info(label, COW, i, flag);
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}	
-		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->cow_session[i].upp.uds[0], cmd_result.r_ipc_protocol_t);
+		ssize_t_status_t send_result = send_ipc_protocol_message(
+            label, 
+            master_ctx->cow_session[i].security.kem_sharedsecret,
+            master_ctx->cow_session[i].security.local_nonce,
+            &master_ctx->cow_session[i].security.local_ctr,
+            &master_ctx->cow_session[i].upp.uds[0], 
+            cmd_result.r_ipc_protocol_t
+        );
 		if (send_result.status != SUCCESS) {
 			LOG_ERROR("%sFailed to sent master_worker_info to COW %ld.", label, i);
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
@@ -67,11 +89,18 @@ status_t master_workers_info(master_context_t *master_ctx, info_type_t flag) {
 		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
 	}
     for (uint8_t i = 0; i < MAX_DBR_WORKERS; ++i) { 
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_info(label, flag);
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_info(label, DBR, i, flag);
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}	
-		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->dbr_session[i].upp.uds[0], cmd_result.r_ipc_protocol_t);
+		ssize_t_status_t send_result = send_ipc_protocol_message(
+            label, 
+            master_ctx->dbr_session[i].security.kem_sharedsecret,
+            master_ctx->dbr_session[i].security.local_nonce,
+            &master_ctx->dbr_session[i].security.local_ctr,
+            &master_ctx->dbr_session[i].upp.uds[0], 
+            cmd_result.r_ipc_protocol_t
+        );
 		if (send_result.status != SUCCESS) {
 			LOG_ERROR("%sFailed to sent master_worker_info to DBR %ld.", label, i);
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
@@ -82,11 +111,18 @@ status_t master_workers_info(master_context_t *master_ctx, info_type_t flag) {
 		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
 	}
     for (uint8_t i = 0; i < MAX_DBW_WORKERS; ++i) { 
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_info(label, flag);
+		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_info(label, DBW, i, flag);
 		if (cmd_result.status != SUCCESS) {
 			return FAILURE;
 		}	
-		ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->dbw_session[i].upp.uds[0], cmd_result.r_ipc_protocol_t);
+		ssize_t_status_t send_result = send_ipc_protocol_message(
+            label, 
+            master_ctx->dbw_session[i].security.kem_sharedsecret,
+            master_ctx->dbw_session[i].security.local_nonce,
+            &master_ctx->dbw_session[i].security.local_ctr,
+            &master_ctx->dbw_session[i].upp.uds[0], 
+            cmd_result.r_ipc_protocol_t
+        );
 		if (send_result.status != SUCCESS) {
 			LOG_ERROR("%sFailed to sent master_worker_info to DBW %ld.", label, i);
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
@@ -101,11 +137,18 @@ status_t master_workers_info(master_context_t *master_ctx, info_type_t flag) {
 
 status_t master_cow_connect(master_context_t *master_ctx, struct sockaddr_in6 *addr, uint8_t index) {
 	const char *label = "[Master]: ";
-	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_cow_connect(label, addr);
+	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_cow_connect(label, COW, index, addr);
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
-    ssize_t_status_t send_result = send_ipc_protocol_message(label, &master_ctx->cow_session[index].upp.uds[0], cmd_result.r_ipc_protocol_t);
+    ssize_t_status_t send_result = send_ipc_protocol_message(
+        label, 
+        master_ctx->cow_session[index].security.kem_sharedsecret,
+        master_ctx->cow_session[index].security.local_nonce,
+        &master_ctx->cow_session[index].security.local_ctr,
+        &master_ctx->cow_session[index].upp.uds[0], 
+        cmd_result.r_ipc_protocol_t
+    );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent master_cow_connect to COW %ld.", label, index);
         CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
@@ -161,7 +204,14 @@ status_t master_worker_hello1_ack(master_context_t *master_ctx, worker_type_t wo
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
-    ssize_t_status_t send_result = send_ipc_protocol_message(label, worker_uds_fd, cmd_result.r_ipc_protocol_t);
+    ssize_t_status_t send_result = send_ipc_protocol_message(
+        label, 
+        security->kem_sharedsecret,
+        security->local_nonce,
+        &security->local_ctr,
+        worker_uds_fd, 
+        cmd_result.r_ipc_protocol_t
+    );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent master_worker_hello1_ack to %s %ld.", label, worker_name, index);
         CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
@@ -242,16 +292,25 @@ status_t master_worker_hello2_ack(master_context_t *master_ctx, worker_type_t wo
 // Tambah Local Counter Jika Berhasil Encrypt    
 // Tambah Remote Counter Jika Mac Cocok dan Berhasil Decrypt
 //======================================================================
-    security->local_ctr++;
+    increment_ctr(&security->local_ctr, security->local_nonce);
 //======================================================================
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_hello2_ack(
         label, 
+        wot,
+        index,
         encrypted_wot_index2
     );
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
-    ssize_t_status_t send_result = send_ipc_protocol_message(label, worker_uds_fd, cmd_result.r_ipc_protocol_t);
+    ssize_t_status_t send_result = send_ipc_protocol_message(
+        label, 
+        security->kem_sharedsecret,
+        security->local_nonce,
+        &security->local_ctr,
+        worker_uds_fd, 
+        cmd_result.r_ipc_protocol_t
+    );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent master_worker_hello2_ack to %s %ld.", label, worker_name, index);
         CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);

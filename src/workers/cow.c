@@ -279,9 +279,14 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 					LOG_ERROR("%sError receiving or deserializing IPC message from Master: %d", cow_ctx.worker.label, ircvdi.status);
 					continue;
 				}
+                if (check_mac(cow_ctx.worker.label, cow_ctx.worker.kem_sharedsecret, ircvdi.r_ipc_raw_protocol_t->type, ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n) != SUCCESS) {
+                    CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                    continue;
+                }
 				if (ircvdi.r_ipc_raw_protocol_t->type == IPC_MASTER_WORKER_INFO) {
                     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(cow_ctx.worker.label,
-                        (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+                        cow_ctx.worker.kem_sharedsecret, cow_ctx.worker.remote_nonce, &cow_ctx.worker.remote_ctr,
+                        (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
                     if (deserialized_ircvdi.status != SUCCESS) {
                         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", cow_ctx.worker.label, deserialized_ircvdi.status);
@@ -330,7 +335,8 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         continue;
                     }
 					ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(cow_ctx.worker.label,
-                        (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+                        cow_ctx.worker.kem_sharedsecret, cow_ctx.worker.remote_nonce, &cow_ctx.worker.remote_ctr,
+                        (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
                     if (deserialized_ircvdi.status != SUCCESS) {
                         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", cow_ctx.worker.label, deserialized_ircvdi.status);
@@ -370,7 +376,8 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         continue;
                     }
 					ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(cow_ctx.worker.label,
-                        (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+                        cow_ctx.worker.kem_sharedsecret, cow_ctx.worker.remote_nonce, &cow_ctx.worker.remote_ctr,
+                        (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
                     if (deserialized_ircvdi.status != SUCCESS) {
                         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", cow_ctx.worker.label, deserialized_ircvdi.status);
@@ -468,7 +475,8 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 					continue;
 				} else if (ircvdi.r_ipc_raw_protocol_t->type == IPC_MASTER_COW_CONNECT) {                    
                     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(cow_ctx.worker.label,
-                        (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+                        cow_ctx.worker.kem_sharedsecret, cow_ctx.worker.remote_nonce, &cow_ctx.worker.remote_ctr,
+                        (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
                     if (deserialized_ircvdi.status != SUCCESS) {
                         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", cow_ctx.worker.label, deserialized_ircvdi.status);
@@ -901,7 +909,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                         decrypted_server_id_port[i] = encrypted_server_id_port[i] ^ keystream_buffer[i];
                                     }
                                     aes256_ctx_release(&aes_ctx);
-                                    session->identity.remote_ctr++;
+                                    increment_ctr(&session->identity.remote_ctr, session->identity.remote_nonce);
 //---------------------------------------------------------------------- 
 // Mengisi identity
 //---------------------------------------------------------------------- 

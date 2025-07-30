@@ -12,6 +12,7 @@
 #include "sessions/master_session.h"
 #include "poly1305-donna.h"
 #include "constants.h"
+#include "utilities.h"
 
 status_t hello1_ack(const char *label, int *listen_sock, master_sio_c_session_t *session) {
 	orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello1_ack(label, session->identity.client_id, session->hello1_ack.ack_sent_try_count);
@@ -95,7 +96,7 @@ status_t hello3_ack(const char *label, int *listen_sock, master_sio_c_session_t 
 // Tambah Local Counter Jika Berhasil Encrypt    
 // Tambah Remote Counter Jika Mac Cocok dan Berhasil Decrypt
 //======================================================================
-    session->identity.local_ctr++;
+    increment_ctr(&session->identity.local_ctr, session->identity.local_nonce);
 //======================================================================    
     orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello3_ack(label, session->identity.client_id, session->identity.kem_ciphertext, encrypted_server_id_port2, session->hello3_ack.ack_sent_try_count);
     if (cmd_result.status != SUCCESS) {

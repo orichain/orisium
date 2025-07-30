@@ -57,6 +57,19 @@ status_t setup_worker(worker_context_t *ctx, const char *worker_name, worker_typ
     {
 		 return FAILURE;
 	}
+    if (KEM_GENERATE_KEYPAIR(ctx->kem_publickey, ctx->kem_privatekey) != 0) {
+        LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", ctx->label);
+        return FAILURE;
+    }
+    memset(ctx->kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+    memset(ctx->kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+    if (generate_nonce(ctx->label, ctx->local_nonce) != SUCCESS) {
+        LOG_ERROR("%sFailed to generate_nonce.", ctx->label);
+        return FAILURE;
+    }
+    ctx->local_ctr = (uint32_t)0;
+    memset(ctx->remote_nonce, 0, AES_NONCE_BYTES);
+    ctx->remote_ctr = (uint32_t)0;
     ctx->hello1_sent = false;
     ctx->hello1_ack_rcvd = false;
     ctx->hello2_sent = false;

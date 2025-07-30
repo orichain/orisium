@@ -49,7 +49,7 @@ status_t ipc_deserialize_master_cow_connect(const char *label, ipc_protocol_t *p
     return SUCCESS;
 }
 
-ipc_protocol_t_status_t ipc_prepare_cmd_master_cow_connect(const char *label, struct sockaddr_in6 *server_addr) {
+ipc_protocol_t_status_t ipc_prepare_cmd_master_cow_connect(const char *label, worker_type_t wot, uint8_t index, struct sockaddr_in6 *server_addr) {
 	ipc_protocol_t_status_t result;
 	result.r_ipc_protocol_t = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
 	result.status = FAILURE;
@@ -60,6 +60,8 @@ ipc_protocol_t_status_t ipc_prepare_cmd_master_cow_connect(const char *label, st
 	memset(result.r_ipc_protocol_t, 0, sizeof(ipc_protocol_t));
 	result.r_ipc_protocol_t->version[0] = IPC_VERSION_MAJOR;
 	result.r_ipc_protocol_t->version[1] = IPC_VERSION_MINOR;
+    result.r_ipc_protocol_t->wot = wot;
+    result.r_ipc_protocol_t->index = index;
 	result.r_ipc_protocol_t->type = IPC_MASTER_COW_CONNECT;
 	ipc_master_cow_connect_t *payload = (ipc_master_cow_connect_t *)calloc(1, sizeof(ipc_master_cow_connect_t));
 	if (!payload) {

@@ -547,7 +547,6 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key, uint8_t* non
         return result;
     }
     uint8_t mac[AES_TAG_BYTES];
-    //shake256(key, HASHES_BYTES, current_buffer + offset_mac_payload, offset - offset_mac_payload);
     poly1305_context ctx;
 	poly1305_init(&ctx, key);
 	poly1305_update(&ctx, current_buffer + offset_mac_payload, offset - offset_mac_payload);
@@ -564,7 +563,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key,
     result.status = FAILURE;
 
     if (!buffer || len < (AES_TAG_BYTES + ORILINK_VERSION_BYTES + sizeof(uint8_t))) {
-        LOG_ERROR("%sBuffer terlalu kecil untuk Version, Type dan Mac. Len: %zu", label, len);
+        LOG_ERROR("%sBuffer terlalu kecil untuk Mac, Version dan Type. Len: %zu", label, len);
         result.status = FAILURE_OOBUF;
         return result;
     }
@@ -590,6 +589,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key,
     current_buffer_offset += sizeof(uint8_t);
     size_t_status_t psize = calculate_orilink_payload_size(label, p, true);
     if (psize.status != SUCCESS) {
+        CLOSE_ORILINK_PROTOCOL(&p);
 		result.status = psize.status;
 		return result;
 	}
@@ -1100,7 +1100,6 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key,
         return result;
     }
     uint8_t mac[AES_TAG_BYTES];
-    //shake256(key, HASHES_BYTES, buffer + offset_mac_payload, current_buffer_offset - offset_mac_payload);
     poly1305_context ctx;
 	poly1305_init(&ctx, key);
 	poly1305_update(&ctx, buffer + offset_mac_payload, current_buffer_offset - offset_mac_payload);

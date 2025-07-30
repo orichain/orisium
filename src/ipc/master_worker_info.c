@@ -43,7 +43,7 @@ status_t ipc_deserialize_master_worker_info(const char *label, ipc_protocol_t *p
     return SUCCESS;
 }
 
-ipc_protocol_t_status_t ipc_prepare_cmd_master_worker_info(const char *label, info_type_t flag) {
+ipc_protocol_t_status_t ipc_prepare_cmd_master_worker_info(const char *label, worker_type_t wot, uint8_t index, info_type_t flag) {
 	ipc_protocol_t_status_t result;
 	result.r_ipc_protocol_t = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
 	result.status = FAILURE;
@@ -54,6 +54,8 @@ ipc_protocol_t_status_t ipc_prepare_cmd_master_worker_info(const char *label, in
 	memset(result.r_ipc_protocol_t, 0, sizeof(ipc_protocol_t));
 	result.r_ipc_protocol_t->version[0] = IPC_VERSION_MAJOR;
 	result.r_ipc_protocol_t->version[1] = IPC_VERSION_MINOR;
+    result.r_ipc_protocol_t->wot = wot;
+    result.r_ipc_protocol_t->index = index;
 	result.r_ipc_protocol_t->type = IPC_MASTER_WORKER_INFO;
 	ipc_master_worker_info_t *payload = (ipc_master_worker_info_t *)calloc(1, sizeof(ipc_master_worker_info_t));
 	if (!payload) {

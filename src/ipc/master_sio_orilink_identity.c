@@ -499,6 +499,8 @@ status_t ipc_deserialize_master_sio_orilink_identity(const char *label, ipc_prot
 
 ipc_protocol_t_status_t ipc_prepare_cmd_master_sio_orilink_identity(
     const char *label,
+    worker_type_t wot,
+    uint8_t index,
     struct sockaddr_in6 *remote_addr,
     uint64_t server_id,
     uint64_t client_id,
@@ -550,6 +552,8 @@ ipc_protocol_t_status_t ipc_prepare_cmd_master_sio_orilink_identity(
 	memset(result.r_ipc_protocol_t, 0, sizeof(ipc_protocol_t));
 	result.r_ipc_protocol_t->version[0] = IPC_VERSION_MAJOR;
 	result.r_ipc_protocol_t->version[1] = IPC_VERSION_MINOR;
+    result.r_ipc_protocol_t->wot = wot;
+    result.r_ipc_protocol_t->index = index;
 	result.r_ipc_protocol_t->type = IPC_MASTER_SIO_ORILINK_IDENTITY;
 	ipc_master_sio_orilink_identity_t *payload = (ipc_master_sio_orilink_identity_t *)calloc(1, sizeof(ipc_master_sio_orilink_identity_t) + (rtt_kcs_len * sizeof(double)) + (retry_kcs_len * sizeof(double)));
 	if (!payload) {

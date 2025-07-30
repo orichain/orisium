@@ -94,10 +94,36 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
 		LOG_ERROR("%srecv_ipc_message from worker. %s", label, strerror(errno));
 		return ircvdi.status;
 	}
+    worker_security_t *security = NULL;
+    worker_type_t rcvd_wot = ircvdi.r_ipc_raw_protocol_t->wot;
+    uint8_t rcvd_index = ircvdi.r_ipc_raw_protocol_t->index;
+    if (rcvd_wot == SIO) {
+        security = &master_ctx->sio_session[rcvd_index].security;
+    } else if (rcvd_wot == LOGIC) {
+        security = &master_ctx->logic_session[rcvd_index].security;
+    } else if (rcvd_wot == COW) {
+        security = &master_ctx->cow_session[rcvd_index].security;
+    } else if (rcvd_wot == DBR) {
+        security = &master_ctx->dbr_session[rcvd_index].security;
+    } else if (rcvd_wot == DBW) {
+        security = &master_ctx->dbw_session[rcvd_index].security;
+    } else {
+        CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+        return FAILURE;
+    }
+    if (!security) {
+        CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+        return FAILURE;
+    }
+    if (check_mac(label, security->kem_sharedsecret, ircvdi.r_ipc_raw_protocol_t->type, ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n) != SUCCESS) {
+        CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+        return FAILURE;
+    }
 	switch (ircvdi.r_ipc_raw_protocol_t->type) {
-        case IPC_WORKER_MASTER_HELLO1: {           
+        case IPC_WORKER_MASTER_HELLO1: {
             ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
-                (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+                security->kem_sharedsecret, security->remote_nonce, &security->remote_ctr,
+                (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
             );
             if (deserialized_ircvdi.status != SUCCESS) {
                 LOG_ERROR("%sipc_deserialize gagal dengan status %d.", label, deserialized_ircvdi.status);
@@ -110,27 +136,6 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
             ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
             ipc_worker_master_hello1_t *ihello1i = received_protocol->payload.ipc_worker_master_hello1;
             uint8_t kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
-            worker_security_t *security = NULL;
-            if (ihello1i->wot == SIO) {
-                LOG_DEBUG("%sSIO %d HELLO1.", label, ihello1i->index);
-                security = &master_ctx->sio_session[ihello1i->index].security;
-            } else if (ihello1i->wot == LOGIC) {
-                LOG_DEBUG("%sLogic %d HELLO1.", label, ihello1i->index);
-                security = &master_ctx->logic_session[ihello1i->index].security;
-            } else if (ihello1i->wot == COW) {
-                LOG_DEBUG("%sCOW %d HELLO1.", label, ihello1i->index);
-                security = &master_ctx->cow_session[ihello1i->index].security;
-            } else if (ihello1i->wot == DBR) {
-                LOG_DEBUG("%sDBR %d HELLO1.", label, ihello1i->index);
-                security = &master_ctx->dbr_session[ihello1i->index].security;
-            } else if (ihello1i->wot == DBW) {
-                LOG_DEBUG("%sDBW %d HELLO1.", label, ihello1i->index);
-                security = &master_ctx->dbw_session[ihello1i->index].security;
-            } else {
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                return FAILURE;
-            }
-            if (!security) return FAILURE;            
             if (security->hello1_rcvd) {
                 LOG_ERROR("%sSudah ada HELLO1", label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -147,20 +152,31 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
-            if (master_worker_hello1_ack(master_ctx, ihello1i->wot, ihello1i->index) != SUCCESS) {
+//----------------------------------------------------------------------
+// hello1_ack masih memakai security->kem_sharedsecret kosong
+// karena worker belum siap enkripsi
+//----------------------------------------------------------------------
+            if (master_worker_hello1_ack(master_ctx, rcvd_wot, rcvd_index) != SUCCESS) {
                 LOG_ERROR("%sFailed to master_worker_hello1_ack.", label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
+//----------------------------------------------------------------------
+// setelah kirim hello1_ack
+// pasang shared_secret di security->kem_sharedsecret
+// untuk menerima pesan hello2 yang sudah terenkripsi
+//----------------------------------------------------------------------
             memcpy(security->kem_sharedsecret, kem_sharedsecret, KEM_SHAREDSECRET_BYTES);
             memset(kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+//----------------------------------------------------------------------
             security->hello1_rcvd = true;
             CLOSE_IPC_PROTOCOL(&received_protocol);
 			break;
 		}
         case IPC_WORKER_MASTER_HELLO2: {
             ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
-                (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+                security->kem_sharedsecret, security->remote_nonce, &security->remote_ctr,
+                (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
             );
             if (deserialized_ircvdi.status != SUCCESS) {
                 LOG_ERROR("%sipc_deserialize gagal dengan status %d.", label, deserialized_ircvdi.status);
@@ -172,27 +188,6 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
             }           
             ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
             ipc_worker_master_hello2_t *ihello2i = received_protocol->payload.ipc_worker_master_hello2;
-            worker_security_t *security = NULL;
-            if (ihello2i->wot == SIO) {
-                LOG_DEBUG("%sSIO %d HELLO2.", label, ihello2i->index);
-                security = &master_ctx->sio_session[ihello2i->index].security;
-            } else if (ihello2i->wot == LOGIC) {
-                LOG_DEBUG("%sLogic %d HELLO2.", label, ihello2i->index);
-                security = &master_ctx->logic_session[ihello2i->index].security;
-            } else if (ihello2i->wot == COW) {
-                LOG_DEBUG("%sCOW %d HELLO2.", label, ihello2i->index);
-                security = &master_ctx->cow_session[ihello2i->index].security;
-            } else if (ihello2i->wot == DBR) {
-                LOG_DEBUG("%sDBR %d HELLO2.", label, ihello2i->index);
-                security = &master_ctx->dbr_session[ihello2i->index].security;
-            } else if (ihello2i->wot == DBW) {
-                LOG_DEBUG("%sDBW %d HELLO2.", label, ihello2i->index);
-                security = &master_ctx->dbw_session[ihello2i->index].security;
-            } else {
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                return FAILURE;
-            }
-            if (!security) return FAILURE;
             if (!security->hello1_ack_sent) {
                 LOG_ERROR("%sBelum pernah mengirim HELLO1_ACK", label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -255,19 +250,19 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
 //----------------------------------------------------------------------
             worker_type_t data_wot;
             memcpy((uint8_t *)&data_wot, decrypted_wot_index, sizeof(uint8_t));
-            if (*(uint8_t *)&ihello2i->wot != *(uint8_t *)&data_wot) {
+            if (*(uint8_t *)&rcvd_wot != *(uint8_t *)&data_wot) {
                 LOG_ERROR("%sberbeda wot.", label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
             uint8_t data_index;
             memcpy(&data_index, decrypted_wot_index + sizeof(uint8_t), sizeof(uint8_t));
-            if (ihello2i->index != data_index) {
+            if (rcvd_index != data_index) {
                 LOG_ERROR("%sberbeda index.", label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
-            if (master_worker_hello2_ack(master_ctx, ihello2i->wot, ihello2i->index) != SUCCESS) {
+            if (master_worker_hello2_ack(master_ctx, rcvd_wot, rcvd_index) != SUCCESS) {
                 LOG_ERROR("%sFailed to master_worker_hello2_ack.", label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
@@ -276,16 +271,16 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
 // Menganggap data valid dengan integritas
 //---------------------------------------------------------------------- 
             security->remote_ctr = (uint32_t)1;//sudah melakukan dekripsi data valid 1 kali
-            if (ihello2i->wot == SIO) {
-                master_ctx->sio_session[ihello2i->index].isready = true;
-            } else if (ihello2i->wot == LOGIC) {
-                master_ctx->logic_session[ihello2i->index].isready = true;
-            } else if (ihello2i->wot == COW) {
-                master_ctx->cow_session[ihello2i->index].isready = true;
-            } else if (ihello2i->wot == DBR) {
-                master_ctx->dbr_session[ihello2i->index].isready = true;
-            } else if (ihello2i->wot == DBW) {
-                master_ctx->dbw_session[ihello2i->index].isready = true;
+            if (rcvd_wot == SIO) {
+                master_ctx->sio_session[rcvd_index].isready = true;
+            } else if (rcvd_wot == LOGIC) {
+                master_ctx->logic_session[rcvd_index].isready = true;
+            } else if (rcvd_wot == COW) {
+                master_ctx->cow_session[rcvd_index].isready = true;
+            } else if (rcvd_wot == DBR) {
+                master_ctx->dbr_session[rcvd_index].isready = true;
+            } else if (rcvd_wot == DBW) {
+                master_ctx->dbw_session[rcvd_index].isready = true;
             }
             bool is_all_workers_ready = true;
             for (uint8_t indexrdy = 0; indexrdy < MAX_SIO_WORKERS; ++indexrdy) {
@@ -339,7 +334,8 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
 		}
 		case IPC_WORKER_MASTER_HEARTBEAT: {
             ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
-                (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+                security->kem_sharedsecret, security->remote_nonce, &security->remote_ctr,
+                (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
             );
             if (deserialized_ircvdi.status != SUCCESS) {
                 LOG_ERROR("%sipc_deserialize gagal dengan status %d.", label, deserialized_ircvdi.status);
@@ -350,38 +346,38 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
                 CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
             }           
             ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
-            ipc_worker_master_heartbeat_t *hbt = received_protocol->payload.ipc_worker_master_heartbeat;
+            ipc_worker_master_heartbeat_t *iheartbeati = received_protocol->payload.ipc_worker_master_heartbeat;
             uint64_t_status_t rt = get_realtime_time_ns(label);
-            if (hbt->wot == SIO) {
-                LOG_DEBUG("%sSIO %d set last_ack to %llu.", label, hbt->index, rt.r_uint64_t);
-                master_ctx->sio_session[hbt->index].metrics.last_ack = rt.r_uint64_t;
-                master_ctx->sio_session[hbt->index].metrics.count_ack += (double)1;
-                master_ctx->sio_session[hbt->index].metrics.sum_hbtime += hbt->hbtime;
-                master_ctx->sio_session[hbt->index].metrics.hbtime = hbt->hbtime;
-            } else if (hbt->wot == LOGIC) {
-                LOG_DEBUG("%sLogic %d set last_ack to %llu.", label, hbt->index, rt.r_uint64_t);
-                master_ctx->logic_session[hbt->index].metrics.last_ack = rt.r_uint64_t;
-                master_ctx->logic_session[hbt->index].metrics.count_ack += (double)1;
-                master_ctx->logic_session[hbt->index].metrics.sum_hbtime += hbt->hbtime;
-                master_ctx->logic_session[hbt->index].metrics.hbtime = hbt->hbtime;
-            } else if (hbt->wot == COW) {
-                LOG_DEBUG("%sCOW %d set last_ack to %llu.", label, hbt->index, rt.r_uint64_t);
-                master_ctx->cow_session[hbt->index].metrics.last_ack = rt.r_uint64_t;
-                master_ctx->cow_session[hbt->index].metrics.count_ack += (double)1;
-                master_ctx->cow_session[hbt->index].metrics.sum_hbtime += hbt->hbtime;
-                master_ctx->cow_session[hbt->index].metrics.hbtime = hbt->hbtime;
-            } else if (hbt->wot == DBR) {
-                LOG_DEBUG("%sDBR %d set last_ack to %llu.", label, hbt->index, rt.r_uint64_t);
-                master_ctx->dbr_session[hbt->index].metrics.last_ack = rt.r_uint64_t;
-                master_ctx->dbr_session[hbt->index].metrics.count_ack += (double)1;
-                master_ctx->dbr_session[hbt->index].metrics.sum_hbtime += hbt->hbtime;
-                master_ctx->dbr_session[hbt->index].metrics.hbtime = hbt->hbtime;
-            } else if (hbt->wot == DBW) {
-                LOG_DEBUG("%sDBW %d set last_ack to %llu.", label, hbt->index, rt.r_uint64_t);
-                master_ctx->dbw_session[hbt->index].metrics.last_ack = rt.r_uint64_t;
-                master_ctx->dbw_session[hbt->index].metrics.count_ack += (double)1;
-                master_ctx->dbw_session[hbt->index].metrics.sum_hbtime += hbt->hbtime;
-                master_ctx->dbw_session[hbt->index].metrics.hbtime = hbt->hbtime;
+            if (rcvd_wot == SIO) {
+                LOG_DEBUG("%sSIO %d set last_ack to %llu.", label, rcvd_index, rt.r_uint64_t);
+                master_ctx->sio_session[rcvd_index].metrics.last_ack = rt.r_uint64_t;
+                master_ctx->sio_session[rcvd_index].metrics.count_ack += (double)1;
+                master_ctx->sio_session[rcvd_index].metrics.sum_hbtime += iheartbeati->hbtime;
+                master_ctx->sio_session[rcvd_index].metrics.hbtime = iheartbeati->hbtime;
+            } else if (rcvd_wot == LOGIC) {
+                LOG_DEBUG("%sLogic %d set last_ack to %llu.", label, rcvd_index, rt.r_uint64_t);
+                master_ctx->logic_session[rcvd_index].metrics.last_ack = rt.r_uint64_t;
+                master_ctx->logic_session[rcvd_index].metrics.count_ack += (double)1;
+                master_ctx->logic_session[rcvd_index].metrics.sum_hbtime += iheartbeati->hbtime;
+                master_ctx->logic_session[rcvd_index].metrics.hbtime = iheartbeati->hbtime;
+            } else if (rcvd_wot == COW) {
+                LOG_DEBUG("%sCOW %d set last_ack to %llu.", label, rcvd_index, rt.r_uint64_t);
+                master_ctx->cow_session[rcvd_index].metrics.last_ack = rt.r_uint64_t;
+                master_ctx->cow_session[rcvd_index].metrics.count_ack += (double)1;
+                master_ctx->cow_session[rcvd_index].metrics.sum_hbtime += iheartbeati->hbtime;
+                master_ctx->cow_session[rcvd_index].metrics.hbtime = iheartbeati->hbtime;
+            } else if (rcvd_wot == DBR) {
+                LOG_DEBUG("%sDBR %d set last_ack to %llu.", label, rcvd_index, rt.r_uint64_t);
+                master_ctx->dbr_session[rcvd_index].metrics.last_ack = rt.r_uint64_t;
+                master_ctx->dbr_session[rcvd_index].metrics.count_ack += (double)1;
+                master_ctx->dbr_session[rcvd_index].metrics.sum_hbtime += iheartbeati->hbtime;
+                master_ctx->dbr_session[rcvd_index].metrics.hbtime = iheartbeati->hbtime;
+            } else if (rcvd_wot == DBW) {
+                LOG_DEBUG("%sDBW %d set last_ack to %llu.", label, rcvd_index, rt.r_uint64_t);
+                master_ctx->dbw_session[rcvd_index].metrics.last_ack = rt.r_uint64_t;
+                master_ctx->dbw_session[rcvd_index].metrics.count_ack += (double)1;
+                master_ctx->dbw_session[rcvd_index].metrics.sum_hbtime += iheartbeati->hbtime;
+                master_ctx->dbw_session[rcvd_index].metrics.hbtime = iheartbeati->hbtime;
             } else {
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
@@ -391,7 +387,8 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
 		}
         case IPC_COW_MASTER_CONNECTION: {
             ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
-                (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+                security->kem_sharedsecret, security->remote_nonce, &security->remote_ctr,
+                (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
             );
             if (deserialized_ircvdi.status != SUCCESS) {
                 LOG_ERROR("%sipc_deserialize gagal dengan status %d.", label, deserialized_ircvdi.status);
@@ -402,14 +399,14 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
                 CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
             }           
             ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
-            ipc_cow_master_connection_t *cmc = received_protocol->payload.ipc_cow_master_connection;
+            ipc_cow_master_connection_t *icowconni = received_protocol->payload.ipc_cow_master_connection;
             for (int i = 0; i < MAX_MASTER_COW_SESSIONS; ++i) {
                 if (
                     master_ctx->cow_c_session[i].in_use &&
-                    sockaddr_equal((const struct sockaddr *)&master_ctx->cow_c_session[i].server_addr, (const struct sockaddr *)&cmc->server_addr)
+                    sockaddr_equal((const struct sockaddr *)&master_ctx->cow_c_session[i].server_addr, (const struct sockaddr *)&icowconni->server_addr)
                    )
                 {
-                    calculate_avgtt(label, master_ctx, cmc->wot, cmc->index);
+                    calculate_avgtt(label, master_ctx, rcvd_wot, rcvd_index);
                     master_ctx->cow_c_session[i].cow_index = -1;
                     master_ctx->cow_c_session[i].in_use = false;
                     memset(&master_ctx->cow_c_session[i].server_addr, 0, sizeof(struct sockaddr_in6));

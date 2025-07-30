@@ -66,8 +66,6 @@ typedef struct {
 } ipc_master_sio_orilink_identity_t;
 
 typedef struct {
-    worker_type_t wot;
-    uint8_t index;
     struct sockaddr_in6 server_addr;
     connection_type_t flag;
 } ipc_cow_master_connection_t;
@@ -77,26 +75,18 @@ typedef struct {
 } ipc_master_worker_info_t;
 
 typedef struct {
-    worker_type_t wot;
-    uint8_t index;
     double hbtime;
 } ipc_worker_master_heartbeat_t;
 
 typedef struct {
-    worker_type_t wot;
-    uint8_t index;
     uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
 } ipc_worker_master_hello1_t;
 
 typedef struct {
-    worker_type_t wot;
-    uint8_t index;
     uint8_t encrypted_wot_index[AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES];
 } ipc_worker_master_hello2_t;
 
 typedef struct {
-    worker_type_t wot;
-    uint8_t index;
     uint8_t kem_ciphertext[KEM_CIPHERTEXT_BYTES];
 } ipc_master_worker_hello1_ack_t;
 
@@ -105,7 +95,10 @@ typedef struct {
 } ipc_master_worker_hello2_ack_t;
 
 typedef struct {
+    uint8_t mac[AES_TAG_BYTES];
 	uint8_t version[IPC_VERSION_BYTES];
+    worker_type_t wot;
+    uint8_t index;
 	ipc_protocol_type_t type;
 	union {
 		ipc_master_worker_info_t *ipc_master_worker_info;
@@ -158,6 +151,8 @@ typedef struct {
     uint8_t *recv_buffer;
     uint32_t n;
     uint8_t version[IPC_VERSION_BYTES];
+    worker_type_t wot;
+    uint8_t index;
 	ipc_protocol_type_t type;
 } ipc_raw_protocol_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan
@@ -187,10 +182,9 @@ typedef struct {
     status_t status;
 } ipc_raw_protocol_t_status_t;
 
-ssize_t_status_t send_ipc_protocol_message(const char *label, int *uds_fd, const ipc_protocol_t* p);
-ssize_t_status_t send_ipc_protocol_message_wfdtopass(const char *label, int *uds_fd, const ipc_protocol_t* p, int *fd_to_pass);
+ssize_t_status_t send_ipc_protocol_message(const char *label, uint8_t *key, uint8_t *nonce, uint32_t *ctr, int *uds_fd, const ipc_protocol_t *p);
 ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, int *uds_fd);
-ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message_wfdrcvd(const char *label, int *uds_fd, int *fd_received);
-ipc_protocol_t_status_t ipc_deserialize(const char *label, const uint8_t* buffer, size_t len);
+status_t check_mac(const char *label, uint8_t *key, ipc_protocol_type_t ptype, uint8_t *recv_buffer, ssize_t recv_buffer_len);
+ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t *key, uint8_t *nonce, uint32_t *ctr, uint8_t *buffer, size_t len);
 
 #endif

@@ -5,6 +5,8 @@ status_t ipc_serialize_master_sio_orilink_identity(const char *label, const ipc_
 status_t ipc_deserialize_master_sio_orilink_identity(const char *label, ipc_protocol_t *p, const uint8_t *buffer, size_t total_buffer_len, size_t *offset_ptr);
 ipc_protocol_t_status_t ipc_prepare_cmd_master_sio_orilink_identity(
     const char *label,
+    worker_type_t wot, 
+    uint8_t index,
     struct sockaddr_in6 *remote_addr,
     uint64_t server_id,
     uint64_t client_id,

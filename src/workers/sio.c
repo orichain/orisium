@@ -84,9 +84,14 @@ void run_sio_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 					LOG_ERROR("%sError receiving or deserializing IPC message from Master: %d", sio_ctx.worker.label, ircvdi.status);
 					continue;
 				}
+                if (check_mac(sio_ctx.worker.label, sio_ctx.worker.kem_sharedsecret, ircvdi.r_ipc_raw_protocol_t->type, ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n) != SUCCESS) {
+                    CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                    continue;
+                }
 				if (ircvdi.r_ipc_raw_protocol_t->type == IPC_MASTER_WORKER_INFO) {
                     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(sio_ctx.worker.label,
-                        (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+                        sio_ctx.worker.kem_sharedsecret, sio_ctx.worker.remote_nonce, &sio_ctx.worker.remote_ctr,
+                        (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
                     if (deserialized_ircvdi.status != SUCCESS) {
                         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", sio_ctx.worker.label, deserialized_ircvdi.status);
@@ -135,7 +140,8 @@ void run_sio_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         continue;
                     }
 					ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(sio_ctx.worker.label,
-                        (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+                        sio_ctx.worker.kem_sharedsecret, sio_ctx.worker.remote_nonce, &sio_ctx.worker.remote_ctr,
+                        (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
                     if (deserialized_ircvdi.status != SUCCESS) {
                         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", sio_ctx.worker.label, deserialized_ircvdi.status);
@@ -175,7 +181,8 @@ void run_sio_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         continue;
                     }
 					ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(sio_ctx.worker.label,
-                        (const uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+                        sio_ctx.worker.kem_sharedsecret, sio_ctx.worker.remote_nonce, &sio_ctx.worker.remote_ctr,
+                        (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
                     if (deserialized_ircvdi.status != SUCCESS) {
                         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", sio_ctx.worker.label, deserialized_ircvdi.status);
