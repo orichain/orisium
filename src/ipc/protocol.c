@@ -25,7 +25,6 @@
 #include "constants.h"
 #include "pqc.h"
 #include "poly1305-donna.h"
-#include "aes.h"
 
 static inline size_t_status_t calculate_ipc_payload_size(const char *label, const ipc_protocol_t* p, bool checkfixheader) {
 	size_t_status_t result;
@@ -637,7 +636,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key, uint8_t
         return result;
     }
         
-    if (memcmp(key, key0, KEM_SHAREDSECRET_BYTES) != 0) {
+    if (memcmp(key, key0, KEM_SHAREDSECRET_BYTES) != 0 && p->type != IPC_WORKER_MASTER_HELLO2 && p->type != IPC_MASTER_WORKER_HELLO2_ACK) {
         increment_ctr(ctr, nonce);
     }
         
