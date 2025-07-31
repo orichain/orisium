@@ -190,11 +190,10 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
     return result;
 }
 
-ssize_t_status_t ipc_serialize(const char *label, uint8_t* key, uint8_t* nonce, uint32_t *ctr, const ipc_protocol_t* p, uint8_t** ptr_buffer, size_t* buffer_size) {
+ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, const ipc_protocol_t* p, uint8_t** ptr_buffer, size_t* buffer_size) {
     ssize_t_status_t result;
     result.r_ssize_t = 0;
     result.status = FAILURE;
-
     if (!p || !ptr_buffer || !buffer_size) {
         return result;
     }
@@ -225,7 +224,6 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key, uint8_t* nonce, 
         LOG_DEBUG("%sBuffer size %zu is sufficient for %zu bytes. No reallocation needed.", label, *buffer_size, total_required_size);
     }
     size_t offset = 0;
-    
     if (CHECK_BUFFER_BOUNDS(offset, AES_TAG_BYTES, *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
@@ -307,12 +305,24 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key, uint8_t* nonce, 
         return result;
     }
     uint8_t key0[KEM_SHAREDSECRET_BYTES] = {0};
-    if (memcmp(key, key0, KEM_SHAREDSECRET_BYTES) != 0 && p->type != IPC_WORKER_MASTER_HELLO2 && p->type != IPC_MASTER_WORKER_HELLO2_ACK) {
-        
+    if (memcmp(
+            key_aes, 
+            key0, 
+            KEM_SHAREDSECRET_BYTES
+        ) != 0 &&
+        p->type != IPC_WORKER_MASTER_HELLO2 &&
+        p->type != IPC_MASTER_WORKER_HELLO2_ACK
+    )
+    {
         uint32_t ctr_be = htobe32(*(uint32_t *)ctr);
         memcpy(current_buffer + AES_TAG_BYTES, &ctr_be, sizeof(uint32_t));
-        
-        size_t data_len = offset - AES_TAG_BYTES - sizeof(uint32_t) - IPC_VERSION_BYTES - sizeof(uint8_t) - sizeof(uint8_t) - sizeof(uint8_t);
+        size_t data_len = offset - 
+                          AES_TAG_BYTES -
+                          sizeof(uint32_t) -
+                          IPC_VERSION_BYTES -
+                          sizeof(uint8_t) -
+                          sizeof(uint8_t) -
+                          sizeof(uint8_t);
         size_t data_4mac_len = offset - AES_TAG_BYTES;
         uint8_t *data = (uint8_t *)calloc(1, data_len);
         if (!data) {
@@ -344,11 +354,19 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key, uint8_t* nonce, 
             result.status = FAILURE_NOMEM;
             return result;
         }
-        
-        memcpy(data, current_buffer + AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t), data_len);
-        
+        memcpy(
+            data, 
+            current_buffer +
+                AES_TAG_BYTES +
+                sizeof(uint32_t) +
+                IPC_VERSION_BYTES +
+                sizeof(uint8_t) +
+                sizeof(uint8_t) +
+                sizeof(uint8_t),
+            data_len
+        );
         aes256ctx aes_ctx;
-        aes256_ctr_keyexp(&aes_ctx, key);
+        aes256_ctr_keyexp(&aes_ctx, key_aes);
         uint8_t iv[AES_IV_BYTES];
         memcpy(iv, nonce, AES_NONCE_BYTES);
         uint32_t local_ctr_be = htobe32(*(uint32_t *)ctr);
@@ -358,36 +376,59 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key, uint8_t* nonce, 
             encrypted_data[i] = data[i] ^ keystream_buffer[i];
         }
         aes256_ctx_release(&aes_ctx);
-        
-        memcpy(current_buffer + AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t), encrypted_data, data_len);  
-
-        memcpy(data_4mac, current_buffer + AES_TAG_BYTES, data_4mac_len);
-        
+        memcpy(
+            current_buffer +
+                AES_TAG_BYTES +
+                sizeof(uint32_t) +
+                IPC_VERSION_BYTES +
+                sizeof(uint8_t) +
+                sizeof(uint8_t) +
+                sizeof(uint8_t),
+            encrypted_data,
+            data_len
+        );  
+        memcpy(data_4mac,
+            current_buffer +
+                AES_TAG_BYTES,
+            data_4mac_len
+        );
         uint8_t mac[AES_TAG_BYTES];
         poly1305_context ctx;
-        poly1305_init(&ctx, key);
+        poly1305_init(&ctx, key_mac);
         poly1305_update(&ctx, data_4mac, data_4mac_len);
         poly1305_finish(&ctx, mac);
-        
         memcpy(current_buffer, mac, AES_TAG_BYTES);
-        
         free(data);
         free(data_4mac);
         free(encrypted_data);
         free(keystream_buffer);
-        
         increment_ctr(ctr, nonce);
+    } else {
+        size_t data_4mac_len = offset - AES_TAG_BYTES;
+        uint8_t *data_4mac = (uint8_t *)calloc(1, data_4mac_len);
+        if (!data_4mac) {
+            LOG_ERROR("%sError calloc data_4mac for mac: %s", label, strerror(errno));
+            result.status = FAILURE_NOMEM;
+            return result;
+        }
+        memcpy(data_4mac, current_buffer + AES_TAG_BYTES, data_4mac_len);
+        uint8_t mac[AES_TAG_BYTES];
+        poly1305_context ctx;
+        poly1305_init(&ctx, key_mac);
+        poly1305_update(&ctx, data_4mac, data_4mac_len);
+        poly1305_finish(&ctx, mac);
+        memcpy(current_buffer, mac, AES_TAG_BYTES);
+        free(data_4mac);
     }
     result.r_ssize_t = (ssize_t)offset;
     result.status = SUCCESS;
     return result;
 }
 
-ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key, uint8_t* nonce, uint32_t *ctr, uint8_t* buffer, size_t len) {
+ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uint8_t* nonce, uint32_t *ctr, uint8_t* buffer, size_t len) {
     ipc_protocol_t_status_t result;
     result.r_ipc_protocol_t = NULL;
     result.status = FAILURE;
-
     if (!buffer || len < (IPC_VERSION_BYTES + sizeof(uint8_t))) {
         LOG_ERROR("%sBuffer terlalu kecil untuk Version dan Type. Len: %zu", label, len);
         result.status = FAILURE_OOBUF;
@@ -400,15 +441,12 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key, uint8_t
         return result;
     }
     LOG_DEBUG("%sAllocating ipc_protocol_t struct: %zu bytes.", label, sizeof(ipc_protocol_t));
-    
     size_t current_buffer_offset = 0;
     memcpy(p->mac, buffer + current_buffer_offset, AES_TAG_BYTES);
     current_buffer_offset += AES_TAG_BYTES;
-    
     uint32_t data_ctr_be;
     memcpy(&data_ctr_be, buffer + current_buffer_offset, sizeof(uint32_t));
     current_buffer_offset += sizeof(uint32_t);
-    
     memcpy(p->version, buffer + current_buffer_offset, IPC_VERSION_BYTES);
     current_buffer_offset += IPC_VERSION_BYTES;
     memcpy((uint8_t *)&p->wot, buffer + current_buffer_offset, sizeof(uint8_t));
@@ -417,10 +455,16 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key, uint8_t
     current_buffer_offset += sizeof(uint8_t);
     memcpy((uint8_t *)&p->type, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
-    
     uint8_t key0[KEM_SHAREDSECRET_BYTES] = {0};
-    if (memcmp(key, key0, KEM_SHAREDSECRET_BYTES) != 0 && p->type != IPC_WORKER_MASTER_HELLO2 && p->type != IPC_MASTER_WORKER_HELLO2_ACK) {
-        
+    if (memcmp(
+            key_aes, 
+            key0, 
+            KEM_SHAREDSECRET_BYTES
+        ) != 0 && 
+        p->type != IPC_WORKER_MASTER_HELLO2 && 
+        p->type != IPC_MASTER_WORKER_HELLO2_ACK
+    )
+    {
         uint32_t data_ctr = be32toh(data_ctr_be);
         if (data_ctr != *(uint32_t *)ctr) {
             LOG_ERROR("%sCounter tidak cocok. data_ctr: %ul, *ctr: %ul", label, data_ctr, *(uint32_t *)ctr);
@@ -428,8 +472,13 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key, uint8_t
             result.status = FAILURE_CTRMSMTCH;
             return result;
         }
-        
-        size_t data_len = len - AES_TAG_BYTES - sizeof(uint32_t) - IPC_VERSION_BYTES - sizeof(uint8_t) - sizeof(uint8_t) - sizeof(uint8_t);
+        size_t data_len = len -
+                          AES_TAG_BYTES -
+                          sizeof(uint32_t) - 
+                          IPC_VERSION_BYTES - 
+                          sizeof(uint8_t) - 
+                          sizeof(uint8_t) - 
+                          sizeof(uint8_t);
         uint8_t *data = (uint8_t *)calloc(1, data_len);
         if (!data) {
             LOG_ERROR("%sError calloc data for encryption: %s", label, strerror(errno));
@@ -454,11 +503,19 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key, uint8_t
             result.status = FAILURE_NOMEM;
             return result;
         }
-        
-        memcpy(data, buffer + AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t), data_len);
-        
+        memcpy(
+            data, 
+            buffer +
+                AES_TAG_BYTES + 
+                sizeof(uint32_t) + 
+                IPC_VERSION_BYTES + 
+                sizeof(uint8_t) + 
+                sizeof(uint8_t) + 
+                sizeof(uint8_t), 
+            data_len
+        );
         aes256ctx aes_ctx;
-        aes256_ctr_keyexp(&aes_ctx, key);
+        aes256_ctr_keyexp(&aes_ctx, key_aes);
         uint8_t iv[AES_IV_BYTES];
         memcpy(iv, nonce, AES_NONCE_BYTES);
         uint32_t local_ctr_be = htobe32(*(uint32_t *)ctr);
@@ -468,14 +525,21 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key, uint8_t
             decrypted_data[i] = data[i] ^ keystream_buffer[i];
         }
         aes256_ctx_release(&aes_ctx);
-        
-        memcpy(buffer + AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t), decrypted_data, data_len); 
-
+        memcpy(
+            buffer + 
+                AES_TAG_BYTES + 
+                sizeof(uint32_t) + 
+                IPC_VERSION_BYTES + 
+                sizeof(uint8_t) + 
+                sizeof(uint8_t) + 
+                sizeof(uint8_t), 
+            decrypted_data, 
+            data_len
+        );
         free(data);
         free(decrypted_data);
         free(keystream_buffer);
     }
-    
     size_t_status_t psize = calculate_ipc_payload_size(label, p, true);
     if (psize.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&p);
@@ -666,25 +730,31 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key, uint8_t
         result.status = FAILURE_IPYLD;
         return result;
     }
-        
-    if (memcmp(key, key0, KEM_SHAREDSECRET_BYTES) != 0 && p->type != IPC_WORKER_MASTER_HELLO2 && p->type != IPC_MASTER_WORKER_HELLO2_ACK) {
+    if (memcmp(
+            key_aes, 
+            key0, 
+            KEM_SHAREDSECRET_BYTES
+        ) != 0 &&
+        p->type != IPC_WORKER_MASTER_HELLO2 &&
+        p->type != IPC_MASTER_WORKER_HELLO2_ACK
+    )
+    {
         increment_ctr(ctr, nonce);
     }
-        
     result.r_ipc_protocol_t = p;
     result.status = SUCCESS;
     LOG_DEBUG("%sipc_deserialize BERHASIL.", label);
     return result;
 }
 
-ssize_t_status_t send_ipc_protocol_message(const char *label, uint8_t* key, uint8_t* nonce, uint32_t *ctr, int *uds_fd, const ipc_protocol_t* p) {
+ssize_t_status_t send_ipc_protocol_message(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, int *uds_fd, const ipc_protocol_t* p) {
 	ssize_t_status_t result;
     result.r_ssize_t = 0;
     result.status = FAILURE;
     uint8_t* serialized_ipc_data_buffer = NULL;
     size_t serialized_ipc_data_len = 0;
 
-    ssize_t_status_t serialize_result = ipc_serialize(label, key, nonce, ctr, p, &serialized_ipc_data_buffer, &serialized_ipc_data_len);
+    ssize_t_status_t serialize_result = ipc_serialize(label, key_aes, key_mac, nonce, ctr, p, &serialized_ipc_data_buffer, &serialized_ipc_data_len);
     if (serialize_result.status != SUCCESS) {
         LOG_ERROR("%sError serializing IPC protocol: %d", serialize_result.status);
         if (serialized_ipc_data_buffer) {
@@ -743,49 +813,51 @@ ssize_t_status_t send_ipc_protocol_message(const char *label, uint8_t* key, uint
     return result;
 }
 
-status_t check_mac_ctr(const char *label, uint8_t* key, uint32_t* ctr, ipc_raw_protocol_t *r) {
+status_t check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint32_t* ctr, ipc_raw_protocol_t *r) {
     uint8_t key0[KEM_SHAREDSECRET_BYTES] = {0};
-    if (memcmp(key, key0, KEM_SHAREDSECRET_BYTES) != 0 && r->type != IPC_WORKER_MASTER_HELLO2 && r->type != IPC_MASTER_WORKER_HELLO2_ACK) {
-        
+    if (memcmp(
+            key_aes, 
+            key0, 
+            KEM_SHAREDSECRET_BYTES
+        ) != 0 && 
+        r->type != IPC_WORKER_MASTER_HELLO2 && 
+        r->type != IPC_MASTER_WORKER_HELLO2_ACK
+    )
+    {
         if (r->ctr != *(uint32_t *)ctr) {
             LOG_ERROR("%sCounter tidak cocok. data_ctr: %ul, *ctr: %ul", label, r->ctr, *(uint32_t *)ctr);
             return FAILURE_CTRMSMTCH;
         }
-        
-        uint8_t *dtmac = (uint8_t*) calloc(1, AES_TAG_BYTES);
-        if (!dtmac) {
-            LOG_ERROR("%sFailed to allocate dtmac buffer. %s", label, strerror(errno));
-            return FAILURE_NOMEM;
-        }
-        uint8_t *dt = (uint8_t*) calloc(1, r->n - AES_TAG_BYTES);
-        if (!dt) {
-            LOG_ERROR("%sFailed to allocate dt buffer. %s", label, strerror(errno));
-            free(dtmac);
-            return FAILURE_NOMEM;
-        }
-        
-        memcpy(dtmac, r->recv_buffer, AES_TAG_BYTES);
-        memcpy(dt, r->recv_buffer + AES_TAG_BYTES, r->n - AES_TAG_BYTES);
-        uint8_t mac[AES_TAG_BYTES];
-        poly1305_context ctx;
-        poly1305_init(&ctx, key);
-        poly1305_update(&ctx, dt, r->n - AES_TAG_BYTES);
-        poly1305_finish(&ctx, mac);
-        if (poly1305_verify(mac, dtmac)) {
-            LOG_DEBUG("%sMac cocok", label);
-            free(dtmac);
-            free(dt);
-            return SUCCESS;
-        } else {
-            LOG_ERROR("%sMac mismatch!", label);
-            free(dtmac);
-            free(dt);
-            return FAILURE_MACMSMTCH;
-        }
-    } else {
-        return SUCCESS;
     }
-    return SUCCESS;
+    uint8_t *data_4mac = (uint8_t*) calloc(1, AES_TAG_BYTES);
+    if (!data_4mac) {
+        LOG_ERROR("%sFailed to allocate data_4mac buffer. %s", label, strerror(errno));
+        return FAILURE_NOMEM;
+    }
+    uint8_t *dt = (uint8_t*) calloc(1, r->n - AES_TAG_BYTES);
+    if (!dt) {
+        LOG_ERROR("%sFailed to allocate dt buffer. %s", label, strerror(errno));
+        free(data_4mac);
+        return FAILURE_NOMEM;
+    }
+    memcpy(data_4mac, r->recv_buffer, AES_TAG_BYTES);
+    memcpy(dt, r->recv_buffer + AES_TAG_BYTES, r->n - AES_TAG_BYTES);
+    uint8_t mac[AES_TAG_BYTES];
+    poly1305_context ctx;
+    poly1305_init(&ctx, key_mac);
+    poly1305_update(&ctx, dt, r->n - AES_TAG_BYTES);
+    poly1305_finish(&ctx, mac);
+    if (poly1305_verify(mac, data_4mac)) {
+        LOG_DEBUG("%sMac cocok", label);
+        free(data_4mac);
+        free(dt);
+        return SUCCESS;
+    } else {
+        LOG_ERROR("%sMac mismatch!", label);
+        free(data_4mac);
+        free(dt);
+        return FAILURE_MACMSMTCH;
+    }
 }
 
 ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, int *uds_fd) {

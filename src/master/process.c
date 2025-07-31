@@ -3,9 +3,9 @@
 #include <stdint.h>
 #include <netinet/in.h>
 #include <string.h>
-#include <bits/types/sig_atomic_t.h>
 #include <math.h>
 #include <stdio.h>
+#include <signal.h>
 
 #include "log.h"
 #include "constants.h"

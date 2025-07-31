@@ -23,9 +23,11 @@
 #include <inttypes.h>
 #include <endian.h>
 #include <common/randombytes.h>
+#include <common/fips202.h>
 #include "log.h"
 #include "types.h"
 #include "constants.h"
+#include "pqc.h"
 
 static inline void increment_ctr(uint32_t *ctr, uint8_t *nonce) {
     if (*ctr == 0xFFFFFFFFUL) {
@@ -51,6 +53,14 @@ static inline void increment_ctr(uint32_t *ctr, uint8_t *nonce) {
 //----------------------------------------------------------------------
         (*ctr)++;
     }
+}
+
+static inline void kdf1(uint8_t *key, uint8_t *key_deriv) {
+    shake256(key_deriv, HASHES_BYTES, key, KEM_SHAREDSECRET_BYTES);
+}
+
+static inline void kdf2(uint8_t *key, uint8_t *key_deriv) {
+    shake256(key_deriv, HASHES_BYTES, key, HASHES_BYTES);
 }
 
 static inline status_t generate_nonce(const char* label, uint8_t *out_nonce) {

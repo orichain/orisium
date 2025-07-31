@@ -63,6 +63,8 @@ status_t setup_worker(worker_context_t *ctx, const char *worker_name, worker_typ
     }
     memset(ctx->kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
     memset(ctx->kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+    memset(ctx->aes_key, 0, HASHES_BYTES);
+    memset(ctx->mac_key, 0, HASHES_BYTES);
     if (generate_nonce(ctx->label, ctx->local_nonce) != SUCCESS) {
         LOG_ERROR("%sFailed to generate_nonce.", ctx->label);
         return FAILURE;
@@ -87,6 +89,8 @@ void cleanup_worker(worker_context_t *ctx) {
     memset(ctx->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
     memset(ctx->kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
     memset(ctx->kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+    memset(ctx->aes_key, 0, HASHES_BYTES);
+    memset(ctx->mac_key, 0, HASHES_BYTES);
     memset(ctx->local_nonce, 0, AES_NONCE_BYTES);
     ctx->local_ctr = (uint32_t)0;
     memset(ctx->remote_nonce, 0, AES_NONCE_BYTES);

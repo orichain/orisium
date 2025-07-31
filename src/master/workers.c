@@ -37,6 +37,8 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         memset(master_ctx->sio_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->sio_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->sio_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        memset(master_ctx->sio_session[index].security.aes_key, 0, HASHES_BYTES);
+        memset(master_ctx->sio_session[index].security.mac_key, 0, HASHES_BYTES);
         memset(master_ctx->sio_session[index].security.local_nonce, 0, AES_NONCE_BYTES);
         master_ctx->sio_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->sio_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
@@ -60,6 +62,8 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         memset(master_ctx->logic_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->logic_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->logic_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        memset(master_ctx->logic_session[index].security.aes_key, 0, HASHES_BYTES);
+        memset(master_ctx->logic_session[index].security.mac_key, 0, HASHES_BYTES);
         memset(master_ctx->logic_session[index].security.local_nonce, 0, AES_NONCE_BYTES);
         master_ctx->logic_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->logic_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
@@ -90,6 +94,8 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         memset(master_ctx->cow_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->cow_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->cow_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        memset(master_ctx->cow_session[index].security.aes_key, 0, HASHES_BYTES);
+        memset(master_ctx->cow_session[index].security.mac_key, 0, HASHES_BYTES);
         memset(master_ctx->cow_session[index].security.local_nonce, 0, AES_NONCE_BYTES);
         master_ctx->cow_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->cow_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
@@ -113,6 +119,8 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         memset(master_ctx->dbr_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->dbr_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->dbr_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        memset(master_ctx->dbr_session[index].security.aes_key, 0, HASHES_BYTES);
+        memset(master_ctx->dbr_session[index].security.mac_key, 0, HASHES_BYTES);
         memset(master_ctx->dbr_session[index].security.local_nonce, 0, AES_NONCE_BYTES);
         master_ctx->dbr_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->dbr_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
@@ -136,6 +144,8 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         memset(master_ctx->dbw_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->dbw_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->dbw_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        memset(master_ctx->dbw_session[index].security.aes_key, 0, HASHES_BYTES);
+        memset(master_ctx->dbw_session[index].security.mac_key, 0, HASHES_BYTES);
         memset(master_ctx->dbw_session[index].security.local_nonce, 0, AES_NONCE_BYTES);
         master_ctx->dbw_session[index].security.local_ctr = (uint32_t)0;
         memset(master_ctx->dbw_session[index].security.remote_nonce, 0, AES_NONCE_BYTES);
@@ -463,6 +473,8 @@ status_t setup_workers(master_context_t *master_ctx) {
         memset(master_ctx->sio_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->sio_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->sio_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        memset(master_ctx->sio_session[index].security.aes_key, 0, HASHES_BYTES);
+        memset(master_ctx->sio_session[index].security.mac_key, 0, HASHES_BYTES);
         if (generate_nonce(label, master_ctx->sio_session[index].security.local_nonce) != SUCCESS) {
             LOG_ERROR("%sFailed to generate_nonce.", label);
             return FAILURE;
@@ -486,6 +498,8 @@ status_t setup_workers(master_context_t *master_ctx) {
         memset(master_ctx->logic_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->logic_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->logic_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        memset(master_ctx->logic_session[index].security.aes_key, 0, HASHES_BYTES);
+        memset(master_ctx->logic_session[index].security.mac_key, 0, HASHES_BYTES);
         if (generate_nonce(label, master_ctx->logic_session[index].security.local_nonce) != SUCCESS) {
             LOG_ERROR("%sFailed to generate_nonce.", label);
             return FAILURE;
@@ -509,6 +523,8 @@ status_t setup_workers(master_context_t *master_ctx) {
         memset(master_ctx->cow_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->cow_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->cow_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        memset(master_ctx->cow_session[index].security.aes_key, 0, HASHES_BYTES);
+        memset(master_ctx->cow_session[index].security.mac_key, 0, HASHES_BYTES);
         if (generate_nonce(label, master_ctx->cow_session[index].security.local_nonce) != SUCCESS) {
             LOG_ERROR("%sFailed to generate_nonce.", label);
             return FAILURE;
@@ -532,6 +548,8 @@ status_t setup_workers(master_context_t *master_ctx) {
         memset(master_ctx->dbr_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->dbr_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->dbr_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        memset(master_ctx->dbr_session[index].security.aes_key, 0, HASHES_BYTES);
+        memset(master_ctx->dbr_session[index].security.mac_key, 0, HASHES_BYTES);
         if (generate_nonce(label, master_ctx->dbr_session[index].security.local_nonce) != SUCCESS) {
             LOG_ERROR("%sFailed to generate_nonce.", label);
             return FAILURE;
@@ -555,6 +573,8 @@ status_t setup_workers(master_context_t *master_ctx) {
         memset(master_ctx->dbw_session[index].security.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
         memset(master_ctx->dbw_session[index].security.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
         memset(master_ctx->dbw_session[index].security.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+        memset(master_ctx->dbw_session[index].security.aes_key, 0, HASHES_BYTES);
+        memset(master_ctx->dbw_session[index].security.mac_key, 0, HASHES_BYTES);
         if (generate_nonce(label, master_ctx->dbw_session[index].security.local_nonce) != SUCCESS) {
             LOG_ERROR("%sFailed to generate_nonce.", label);
             return FAILURE;

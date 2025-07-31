@@ -35,6 +35,8 @@ typedef struct {
     uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
     uint8_t kem_ciphertext[KEM_CIPHERTEXT_BYTES];
     uint8_t kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
+    uint8_t aes_key[HASHES_BYTES];
+    uint8_t mac_key[HASHES_BYTES];
     uint8_t local_nonce[AES_NONCE_BYTES];
     uint32_t local_ctr;
     uint8_t remote_nonce[AES_NONCE_BYTES];

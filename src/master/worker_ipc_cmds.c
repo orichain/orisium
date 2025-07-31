@@ -29,7 +29,8 @@ status_t master_workers_info(master_context_t *master_ctx, info_type_t flag) {
 		}
 		ssize_t_status_t send_result = send_ipc_protocol_message(
             label, 
-            master_ctx->sio_session[i].security.kem_sharedsecret,
+            master_ctx->sio_session[i].security.aes_key,
+            master_ctx->sio_session[i].security.mac_key,
             master_ctx->sio_session[i].security.local_nonce,
             &master_ctx->sio_session[i].security.local_ctr,
             &master_ctx->sio_session[i].upp.uds[0], 
@@ -51,7 +52,8 @@ status_t master_workers_info(master_context_t *master_ctx, info_type_t flag) {
 		}	
 		ssize_t_status_t send_result = send_ipc_protocol_message(
             label, 
-            master_ctx->logic_session[i].security.kem_sharedsecret,
+            master_ctx->logic_session[i].security.aes_key,
+            master_ctx->logic_session[i].security.mac_key,
             master_ctx->logic_session[i].security.local_nonce,
             &master_ctx->logic_session[i].security.local_ctr,
             &master_ctx->logic_session[i].upp.uds[0], 
@@ -73,7 +75,8 @@ status_t master_workers_info(master_context_t *master_ctx, info_type_t flag) {
 		}	
 		ssize_t_status_t send_result = send_ipc_protocol_message(
             label, 
-            master_ctx->cow_session[i].security.kem_sharedsecret,
+            master_ctx->cow_session[i].security.aes_key,
+            master_ctx->cow_session[i].security.mac_key,
             master_ctx->cow_session[i].security.local_nonce,
             &master_ctx->cow_session[i].security.local_ctr,
             &master_ctx->cow_session[i].upp.uds[0], 
@@ -95,7 +98,8 @@ status_t master_workers_info(master_context_t *master_ctx, info_type_t flag) {
 		}	
 		ssize_t_status_t send_result = send_ipc_protocol_message(
             label, 
-            master_ctx->dbr_session[i].security.kem_sharedsecret,
+            master_ctx->dbr_session[i].security.aes_key,
+            master_ctx->dbr_session[i].security.mac_key,
             master_ctx->dbr_session[i].security.local_nonce,
             &master_ctx->dbr_session[i].security.local_ctr,
             &master_ctx->dbr_session[i].upp.uds[0], 
@@ -117,7 +121,8 @@ status_t master_workers_info(master_context_t *master_ctx, info_type_t flag) {
 		}	
 		ssize_t_status_t send_result = send_ipc_protocol_message(
             label, 
-            master_ctx->dbw_session[i].security.kem_sharedsecret,
+            master_ctx->dbw_session[i].security.aes_key,
+            master_ctx->dbw_session[i].security.mac_key,
             master_ctx->dbw_session[i].security.local_nonce,
             &master_ctx->dbw_session[i].security.local_ctr,
             &master_ctx->dbw_session[i].upp.uds[0], 
@@ -143,7 +148,8 @@ status_t master_cow_connect(master_context_t *master_ctx, struct sockaddr_in6 *a
     }
     ssize_t_status_t send_result = send_ipc_protocol_message(
         label, 
-        master_ctx->cow_session[index].security.kem_sharedsecret,
+        master_ctx->cow_session[index].security.aes_key,
+        master_ctx->cow_session[index].security.mac_key,
         master_ctx->cow_session[index].security.local_nonce,
         &master_ctx->cow_session[index].security.local_ctr,
         &master_ctx->cow_session[index].upp.uds[0], 
@@ -206,7 +212,8 @@ status_t master_worker_hello1_ack(master_context_t *master_ctx, worker_type_t wo
     }
     ssize_t_status_t send_result = send_ipc_protocol_message(
         label, 
-        security->kem_sharedsecret,
+        security->aes_key,
+        security->mac_key,
         security->local_nonce,
         &security->local_ctr,
         worker_uds_fd, 
@@ -305,7 +312,8 @@ status_t master_worker_hello2_ack(master_context_t *master_ctx, worker_type_t wo
     }
     ssize_t_status_t send_result = send_ipc_protocol_message(
         label, 
-        security->kem_sharedsecret,
+        security->aes_key,
+        security->mac_key,
         security->local_nonce,
         &security->local_ctr,
         worker_uds_fd, 

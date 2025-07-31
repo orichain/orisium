@@ -115,14 +115,22 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
         CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
         return FAILURE;
     }
-    if (check_mac_ctr(label, security->kem_sharedsecret, &security->remote_ctr, ircvdi.r_ipc_raw_protocol_t) != SUCCESS) {
+    if (check_mac_ctr(
+            label, 
+            security->aes_key, 
+            security->mac_key, 
+            &security->remote_ctr, 
+            ircvdi.r_ipc_raw_protocol_t
+        ) != SUCCESS
+    )
+    {
         CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
         return FAILURE;
     }
 	switch (ircvdi.r_ipc_raw_protocol_t->type) {
         case IPC_WORKER_MASTER_HELLO1: {
             ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
-                security->kem_sharedsecret, security->remote_nonce, &security->remote_ctr,
+                security->aes_key, security->remote_nonce, &security->remote_ctr,
                 (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
             );
             if (deserialized_ircvdi.status != SUCCESS) {
@@ -167,6 +175,8 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
 // untuk menerima pesan hello2 yang sudah terenkripsi
 //----------------------------------------------------------------------
             memcpy(security->kem_sharedsecret, kem_sharedsecret, KEM_SHAREDSECRET_BYTES);
+            kdf1(security->kem_sharedsecret, security->aes_key);
+            kdf2(security->aes_key, security->mac_key);
             memset(kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
 //----------------------------------------------------------------------
             security->hello1_rcvd = true;
@@ -175,7 +185,7 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
 		}
         case IPC_WORKER_MASTER_HELLO2: {
             ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
-                security->kem_sharedsecret, security->remote_nonce, &security->remote_ctr,
+                security->aes_key, security->remote_nonce, &security->remote_ctr,
                 (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
             );
             if (deserialized_ircvdi.status != SUCCESS) {
@@ -334,7 +344,7 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
 		}
 		case IPC_WORKER_MASTER_HEARTBEAT: {
             ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
-                security->kem_sharedsecret, security->remote_nonce, &security->remote_ctr,
+                security->aes_key, security->remote_nonce, &security->remote_ctr,
                 (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
             );
             if (deserialized_ircvdi.status != SUCCESS) {
@@ -387,7 +397,7 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
 		}
         case IPC_COW_MASTER_CONNECTION: {
             ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
-                security->kem_sharedsecret, security->remote_nonce, &security->remote_ctr,
+                security->aes_key, security->remote_nonce, &security->remote_ctr,
                 (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
             );
             if (deserialized_ircvdi.status != SUCCESS) {

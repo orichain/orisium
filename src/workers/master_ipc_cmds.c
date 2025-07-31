@@ -30,7 +30,8 @@ status_t worker_master_heartbeat(worker_context_t *ctx, double new_heartbeat_int
     }
     ssize_t_status_t send_result = send_ipc_protocol_message(
         ctx->label, 
-        ctx->kem_sharedsecret,
+        ctx->aes_key,
+        ctx->mac_key,
         ctx->local_nonce,
         &ctx->local_ctr,
         &ctx->master_uds_fd, 
@@ -59,7 +60,8 @@ status_t worker_master_hello1(worker_context_t *ctx) {
     }
     ssize_t_status_t send_result = send_ipc_protocol_message(
         ctx->label, 
-        ctx->kem_sharedsecret,
+        ctx->aes_key,
+        ctx->mac_key,
         ctx->local_nonce,
         &ctx->local_ctr,
         &ctx->master_uds_fd, 
@@ -129,7 +131,8 @@ status_t worker_master_hello2(worker_context_t *ctx) {
     }
     ssize_t_status_t send_result = send_ipc_protocol_message(
         ctx->label, 
-        ctx->kem_sharedsecret,
+        ctx->aes_key,
+        ctx->mac_key,
         ctx->local_nonce,
         &ctx->local_ctr,
         &ctx->master_uds_fd, 
@@ -160,7 +163,8 @@ status_t cow_master_connection(worker_context_t *ctx, struct sockaddr_in6 *addr,
     }
     ssize_t_status_t send_result = send_ipc_protocol_message(
         ctx->label, 
-        ctx->kem_sharedsecret,
+        ctx->aes_key,
+        ctx->mac_key,
         ctx->local_nonce,
         &ctx->local_ctr,
         &ctx->master_uds_fd, 

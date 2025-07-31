@@ -279,13 +279,21 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 					LOG_ERROR("%sError receiving or deserializing IPC message from Master: %d", cow_ctx.worker.label, ircvdi.status);
 					continue;
 				}
-                if (check_mac_ctr(cow_ctx.worker.label, cow_ctx.worker.kem_sharedsecret, &cow_ctx.worker.remote_ctr, ircvdi.r_ipc_raw_protocol_t) != SUCCESS) {
+                if (check_mac_ctr(
+                        cow_ctx.worker.label, 
+                        cow_ctx.worker.aes_key, 
+                        cow_ctx.worker.mac_key, 
+                        &cow_ctx.worker.remote_ctr, 
+                        ircvdi.r_ipc_raw_protocol_t
+                    ) != SUCCESS
+                )
+                {
                     CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
                     continue;
                 }
 				if (ircvdi.r_ipc_raw_protocol_t->type == IPC_MASTER_WORKER_INFO) {
                     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(cow_ctx.worker.label,
-                        cow_ctx.worker.kem_sharedsecret, cow_ctx.worker.remote_nonce, &cow_ctx.worker.remote_ctr,
+                        cow_ctx.worker.aes_key, cow_ctx.worker.remote_nonce, &cow_ctx.worker.remote_ctr,
                         (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
                     if (deserialized_ircvdi.status != SUCCESS) {
@@ -335,7 +343,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         continue;
                     }
 					ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(cow_ctx.worker.label,
-                        cow_ctx.worker.kem_sharedsecret, cow_ctx.worker.remote_nonce, &cow_ctx.worker.remote_ctr,
+                        cow_ctx.worker.aes_key, cow_ctx.worker.remote_nonce, &cow_ctx.worker.remote_ctr,
                         (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
                     if (deserialized_ircvdi.status != SUCCESS) {
@@ -355,6 +363,8 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
+                    kdf1(cow_ctx.worker.kem_sharedsecret, cow_ctx.worker.aes_key);
+                    kdf2(cow_ctx.worker.aes_key, cow_ctx.worker.mac_key);
                     if (worker_master_hello2(&cow_ctx.worker) != SUCCESS) {
                         LOG_ERROR("%sFailed to worker_master_hello2. Worker error. Initiating graceful shutdown...", cow_ctx.worker.label);
                         cow_ctx.worker.shutdown_requested = 1;
@@ -376,7 +386,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         continue;
                     }
 					ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(cow_ctx.worker.label,
-                        cow_ctx.worker.kem_sharedsecret, cow_ctx.worker.remote_nonce, &cow_ctx.worker.remote_ctr,
+                        cow_ctx.worker.aes_key, cow_ctx.worker.remote_nonce, &cow_ctx.worker.remote_ctr,
                         (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
                     if (deserialized_ircvdi.status != SUCCESS) {
@@ -475,7 +485,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 					continue;
 				} else if (ircvdi.r_ipc_raw_protocol_t->type == IPC_MASTER_COW_CONNECT) {                    
                     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(cow_ctx.worker.label,
-                        cow_ctx.worker.kem_sharedsecret, cow_ctx.worker.remote_nonce, &cow_ctx.worker.remote_ctr,
+                        cow_ctx.worker.aes_key, cow_ctx.worker.remote_nonce, &cow_ctx.worker.remote_ctr,
                         (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
                     if (deserialized_ircvdi.status != SUCCESS) {

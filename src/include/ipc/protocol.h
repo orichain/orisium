@@ -184,9 +184,9 @@ typedef struct {
     status_t status;
 } ipc_raw_protocol_t_status_t;
 
-ssize_t_status_t send_ipc_protocol_message(const char *label, uint8_t *key, uint8_t *nonce, uint32_t *ctr, int *uds_fd, const ipc_protocol_t *p);
+ssize_t_status_t send_ipc_protocol_message(const char *label, uint8_t *key_aes, uint8_t *key_mac, uint8_t *nonce, uint32_t *ctr, int *uds_fd, const ipc_protocol_t *p);
 ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, int *uds_fd);
-status_t check_mac_ctr(const char *label, uint8_t* key, uint32_t* ctr, ipc_raw_protocol_t *r);
-ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t *key, uint8_t *nonce, uint32_t *ctr, uint8_t *buffer, size_t len);
+status_t check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint32_t* ctr, ipc_raw_protocol_t *r);
+ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t *key_aes, uint8_t *nonce, uint32_t *ctr, uint8_t *buffer, size_t len);
 
 #endif
