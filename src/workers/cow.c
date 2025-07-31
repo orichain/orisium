@@ -279,7 +279,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 					LOG_ERROR("%sError receiving or deserializing IPC message from Master: %d", cow_ctx.worker.label, ircvdi.status);
 					continue;
 				}
-                if (check_mac(cow_ctx.worker.label, cow_ctx.worker.kem_sharedsecret, ircvdi.r_ipc_raw_protocol_t->type, ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n) != SUCCESS) {
+                if (check_mac_ctr(cow_ctx.worker.label, cow_ctx.worker.kem_sharedsecret, &cow_ctx.worker.remote_ctr, ircvdi.r_ipc_raw_protocol_t) != SUCCESS) {
                     CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
                     continue;
                 }

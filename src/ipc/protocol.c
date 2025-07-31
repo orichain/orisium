@@ -25,6 +25,7 @@
 #include "constants.h"
 #include "pqc.h"
 #include "poly1305-donna.h"
+#include "aes.h"
 
 static inline size_t_status_t calculate_ipc_payload_size(const char *label, const ipc_protocol_t* p, bool checkfixheader) {
 	size_t_status_t result;
@@ -183,7 +184,7 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
     if (checkfixheader) {
         result.r_size_t = payload_fixed_size;
     } else {
-        result.r_size_t = AES_TAG_BYTES + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + payload_fixed_size + payload_dynamic_size;
+        result.r_size_t = AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + payload_fixed_size + payload_dynamic_size;
     }
     result.status = SUCCESS;
     return result;
@@ -224,12 +225,23 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key, uint8_t* nonce, 
         LOG_DEBUG("%sBuffer size %zu is sufficient for %zu bytes. No reallocation needed.", label, *buffer_size, total_required_size);
     }
     size_t offset = 0;
+    
     if (CHECK_BUFFER_BOUNDS(offset, AES_TAG_BYTES, *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
     }
     memset(current_buffer + offset, 0, AES_TAG_BYTES);
     offset += AES_TAG_BYTES;
+//----------------------------------------------------------------------
+// Counter
+//----------------------------------------------------------------------    
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint32_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memset(current_buffer + offset, 0, sizeof(uint32_t));
+    offset += sizeof(uint32_t);
+//----------------------------------------------------------------------    
     if (CHECK_BUFFER_BOUNDS(offset, IPC_VERSION_BYTES, *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
@@ -297,7 +309,10 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key, uint8_t* nonce, 
     uint8_t key0[KEM_SHAREDSECRET_BYTES] = {0};
     if (memcmp(key, key0, KEM_SHAREDSECRET_BYTES) != 0 && p->type != IPC_WORKER_MASTER_HELLO2 && p->type != IPC_MASTER_WORKER_HELLO2_ACK) {
         
-        size_t data_len = offset - AES_TAG_BYTES - IPC_VERSION_BYTES - sizeof(uint8_t) - sizeof(uint8_t) - sizeof(uint8_t);
+        uint32_t ctr_be = htobe32(*(uint32_t *)ctr);
+        memcpy(current_buffer + AES_TAG_BYTES, &ctr_be, sizeof(uint32_t));
+        
+        size_t data_len = offset - AES_TAG_BYTES - sizeof(uint32_t) - IPC_VERSION_BYTES - sizeof(uint8_t) - sizeof(uint8_t) - sizeof(uint8_t);
         size_t data_4mac_len = offset - AES_TAG_BYTES;
         uint8_t *data = (uint8_t *)calloc(1, data_len);
         if (!data) {
@@ -330,13 +345,13 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key, uint8_t* nonce, 
             return result;
         }
         
-        memcpy(data, current_buffer + AES_TAG_BYTES + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t), data_len);
+        memcpy(data, current_buffer + AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t), data_len);
         
         aes256ctx aes_ctx;
         aes256_ctr_keyexp(&aes_ctx, key);
         uint8_t iv[AES_IV_BYTES];
         memcpy(iv, nonce, AES_NONCE_BYTES);
-        uint32_t local_ctr_be = htobe32(*ctr);
+        uint32_t local_ctr_be = htobe32(*(uint32_t *)ctr);
         memcpy(iv + AES_NONCE_BYTES, &local_ctr_be, sizeof(uint32_t));
         aes256_ctr(keystream_buffer, data_len, iv, &aes_ctx);
         for (size_t i = 0; i < data_len; i++) {
@@ -344,7 +359,7 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key, uint8_t* nonce, 
         }
         aes256_ctx_release(&aes_ctx);
         
-        memcpy(current_buffer + AES_TAG_BYTES + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t), encrypted_data, data_len);  
+        memcpy(current_buffer + AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t), encrypted_data, data_len);  
 
         memcpy(data_4mac, current_buffer + AES_TAG_BYTES, data_4mac_len);
         
@@ -389,6 +404,11 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key, uint8_t
     size_t current_buffer_offset = 0;
     memcpy(p->mac, buffer + current_buffer_offset, AES_TAG_BYTES);
     current_buffer_offset += AES_TAG_BYTES;
+    
+    uint32_t data_ctr_be;
+    memcpy(&data_ctr_be, buffer + current_buffer_offset, sizeof(uint32_t));
+    current_buffer_offset += sizeof(uint32_t);
+    
     memcpy(p->version, buffer + current_buffer_offset, IPC_VERSION_BYTES);
     current_buffer_offset += IPC_VERSION_BYTES;
     memcpy((uint8_t *)&p->wot, buffer + current_buffer_offset, sizeof(uint8_t));
@@ -401,16 +421,26 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key, uint8_t
     uint8_t key0[KEM_SHAREDSECRET_BYTES] = {0};
     if (memcmp(key, key0, KEM_SHAREDSECRET_BYTES) != 0 && p->type != IPC_WORKER_MASTER_HELLO2 && p->type != IPC_MASTER_WORKER_HELLO2_ACK) {
         
-        size_t data_len = len - AES_TAG_BYTES - IPC_VERSION_BYTES - sizeof(uint8_t) - sizeof(uint8_t) - sizeof(uint8_t);
+        uint32_t data_ctr = be32toh(data_ctr_be);
+        if (data_ctr != *(uint32_t *)ctr) {
+            LOG_ERROR("%sCounter tidak cocok. data_ctr: %ul, *ctr: %ul", label, data_ctr, *(uint32_t *)ctr);
+            CLOSE_IPC_PROTOCOL(&p);
+            result.status = FAILURE_CTRMSMTCH;
+            return result;
+        }
+        
+        size_t data_len = len - AES_TAG_BYTES - sizeof(uint32_t) - IPC_VERSION_BYTES - sizeof(uint8_t) - sizeof(uint8_t) - sizeof(uint8_t);
         uint8_t *data = (uint8_t *)calloc(1, data_len);
         if (!data) {
             LOG_ERROR("%sError calloc data for encryption: %s", label, strerror(errno));
+            CLOSE_IPC_PROTOCOL(&p);
             result.status = FAILURE_NOMEM;
             return result;
         }
         uint8_t *decrypted_data = (uint8_t *)calloc(1, data_len);
         if (!decrypted_data) {
             LOG_ERROR("%sError calloc decrypted_data for encryption: %s", label, strerror(errno));
+            CLOSE_IPC_PROTOCOL(&p);
             free(data);
             result.status = FAILURE_NOMEM;
             return result;
@@ -418,19 +448,20 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key, uint8_t
         uint8_t *keystream_buffer = (uint8_t *)calloc(1, data_len);
         if (!keystream_buffer) {
             LOG_ERROR("%sError calloc keystream_buffer for encryption: %s", label, strerror(errno));
+            CLOSE_IPC_PROTOCOL(&p);
             free(data);
             free(decrypted_data);
             result.status = FAILURE_NOMEM;
             return result;
         }
         
-        memcpy(data, buffer + AES_TAG_BYTES + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t), data_len);
+        memcpy(data, buffer + AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t), data_len);
         
         aes256ctx aes_ctx;
         aes256_ctr_keyexp(&aes_ctx, key);
         uint8_t iv[AES_IV_BYTES];
         memcpy(iv, nonce, AES_NONCE_BYTES);
-        uint32_t local_ctr_be = htobe32(*ctr);
+        uint32_t local_ctr_be = htobe32(*(uint32_t *)ctr);
         memcpy(iv + AES_NONCE_BYTES, &local_ctr_be, sizeof(uint32_t));
         aes256_ctr(keystream_buffer, data_len, iv, &aes_ctx);
         for (size_t i = 0; i < data_len; i++) {
@@ -438,7 +469,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key, uint8_t
         }
         aes256_ctx_release(&aes_ctx);
         
-        memcpy(buffer + AES_TAG_BYTES + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t), decrypted_data, data_len); 
+        memcpy(buffer + AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t), decrypted_data, data_len); 
 
         free(data);
         free(decrypted_data);
@@ -712,27 +743,33 @@ ssize_t_status_t send_ipc_protocol_message(const char *label, uint8_t* key, uint
     return result;
 }
 
-status_t check_mac(const char *label, uint8_t* key, ipc_protocol_type_t ptype, uint8_t *recv_buffer, ssize_t recv_buffer_len) {
+status_t check_mac_ctr(const char *label, uint8_t* key, uint32_t* ctr, ipc_raw_protocol_t *r) {
     uint8_t key0[KEM_SHAREDSECRET_BYTES] = {0};
-    if (memcmp(key, key0, KEM_SHAREDSECRET_BYTES) != 0 && ptype != IPC_WORKER_MASTER_HELLO2 && ptype != IPC_MASTER_WORKER_HELLO2_ACK) {
+    if (memcmp(key, key0, KEM_SHAREDSECRET_BYTES) != 0 && r->type != IPC_WORKER_MASTER_HELLO2 && r->type != IPC_MASTER_WORKER_HELLO2_ACK) {
+        
+        if (r->ctr != *(uint32_t *)ctr) {
+            LOG_ERROR("%sCounter tidak cocok. data_ctr: %ul, *ctr: %ul", label, r->ctr, *(uint32_t *)ctr);
+            return FAILURE_CTRMSMTCH;
+        }
+        
         uint8_t *dtmac = (uint8_t*) calloc(1, AES_TAG_BYTES);
         if (!dtmac) {
             LOG_ERROR("%sFailed to allocate dtmac buffer. %s", label, strerror(errno));
             return FAILURE_NOMEM;
         }
-        uint8_t *dt = (uint8_t*) calloc(1, recv_buffer_len - AES_TAG_BYTES);
+        uint8_t *dt = (uint8_t*) calloc(1, r->n - AES_TAG_BYTES);
         if (!dt) {
             LOG_ERROR("%sFailed to allocate dt buffer. %s", label, strerror(errno));
             free(dtmac);
             return FAILURE_NOMEM;
         }
         
-        memcpy(dtmac, recv_buffer, AES_TAG_BYTES);
-        memcpy(dt, recv_buffer + AES_TAG_BYTES, recv_buffer_len - AES_TAG_BYTES);
+        memcpy(dtmac, r->recv_buffer, AES_TAG_BYTES);
+        memcpy(dt, r->recv_buffer + AES_TAG_BYTES, r->n - AES_TAG_BYTES);
         uint8_t mac[AES_TAG_BYTES];
         poly1305_context ctx;
         poly1305_init(&ctx, key);
-        poly1305_update(&ctx, dt, recv_buffer_len - AES_TAG_BYTES);
+        poly1305_update(&ctx, dt, r->n - AES_TAG_BYTES);
         poly1305_finish(&ctx, mac);
         if (poly1305_verify(mac, dtmac)) {
             LOG_DEBUG("%sMac cocok", label);
@@ -743,7 +780,7 @@ status_t check_mac(const char *label, uint8_t* key, ipc_protocol_type_t ptype, u
             LOG_ERROR("%sMac mismatch!", label);
             free(dtmac);
             free(dt);
-            return FAILURE_CHKSUM;
+            return FAILURE_MACMSMTCH;
         }
     } else {
         return SUCCESS;
@@ -811,7 +848,7 @@ ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, 
         free(full_ipc_payload_buffer);
         result.status = FAILURE;
         return result;
-    } else if (bytes_read_payload < (ssize_t)(AES_TAG_BYTES + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t))) {
+    } else if (bytes_read_payload < (ssize_t)(AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t))) {
         LOG_ERROR("%sreceive_ipc_raw_protocol_message received 0 bytes (unexpected for IPC).", label);
         free(full_ipc_payload_buffer);
         result.status = FAILURE_OOBUF;
@@ -841,10 +878,13 @@ ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, 
     free(full_ipc_payload_buffer);
     r->recv_buffer = b;
     r->n = (uint32_t)bytes_read_payload;
-    memcpy(r->version, b + AES_TAG_BYTES, IPC_VERSION_BYTES);
-    memcpy((uint8_t *)&r->wot, b + AES_TAG_BYTES + IPC_VERSION_BYTES, sizeof(uint8_t));
-    memcpy((uint8_t *)&r->index, b + AES_TAG_BYTES + IPC_VERSION_BYTES + sizeof(uint8_t), sizeof(uint8_t));
-    memcpy((uint8_t *)&r->type, b + AES_TAG_BYTES + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t), sizeof(uint8_t));
+    uint32_t ctr_be;
+    memcpy(&ctr_be, b + AES_TAG_BYTES, sizeof(uint32_t));
+    r->ctr = be32toh(ctr_be);
+    memcpy(r->version, b + AES_TAG_BYTES + sizeof(uint32_t), IPC_VERSION_BYTES);
+    memcpy((uint8_t *)&r->wot, b + AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES, sizeof(uint8_t));
+    memcpy((uint8_t *)&r->index, b + AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES + sizeof(uint8_t), sizeof(uint8_t));
+    memcpy((uint8_t *)&r->type, b + AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t), sizeof(uint8_t));
     result.r_ipc_raw_protocol_t = r;
     result.status = SUCCESS;
     return result;

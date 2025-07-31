@@ -84,7 +84,7 @@ void run_logic_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_
 					LOG_ERROR("%sError receiving or deserializing IPC message from Master: %d", logic_ctx.worker.label, ircvdi.status);
 					continue;
 				}
-                if (check_mac(logic_ctx.worker.label, logic_ctx.worker.kem_sharedsecret, ircvdi.r_ipc_raw_protocol_t->type, ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n) != SUCCESS) {
+                if (check_mac_ctr(logic_ctx.worker.label, logic_ctx.worker.kem_sharedsecret, &logic_ctx.worker.remote_ctr, ircvdi.r_ipc_raw_protocol_t) != SUCCESS) {
                     CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
                     continue;
                 }

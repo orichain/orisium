@@ -96,6 +96,7 @@ typedef struct {
 
 typedef struct {
     uint8_t mac[AES_TAG_BYTES];
+    uint32_t ctr;
 	uint8_t version[IPC_VERSION_BYTES];
     worker_type_t wot;
     uint8_t index;
@@ -150,6 +151,7 @@ static inline void CLOSE_IPC_PROTOCOL(ipc_protocol_t **protocol_ptr) {
 typedef struct {
     uint8_t *recv_buffer;
     uint32_t n;
+    uint32_t ctr;
     uint8_t version[IPC_VERSION_BYTES];
     worker_type_t wot;
     uint8_t index;
@@ -184,7 +186,7 @@ typedef struct {
 
 ssize_t_status_t send_ipc_protocol_message(const char *label, uint8_t *key, uint8_t *nonce, uint32_t *ctr, int *uds_fd, const ipc_protocol_t *p);
 ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, int *uds_fd);
-status_t check_mac(const char *label, uint8_t *key, ipc_protocol_type_t ptype, uint8_t *recv_buffer, ssize_t recv_buffer_len);
+status_t check_mac_ctr(const char *label, uint8_t* key, uint32_t* ctr, ipc_raw_protocol_t *r);
 ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t *key, uint8_t *nonce, uint32_t *ctr, uint8_t *buffer, size_t len);
 
 #endif
