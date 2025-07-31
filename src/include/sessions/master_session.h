@@ -1,16 +1,9 @@
 #ifndef SESSIONS_MASTER_SESSION_H
 #define SESSIONS_MASTER_SESSION_H
 
-#include <stdbool.h>
-#include <netinet/in.h>
-#include <stdint.h>
-#include <sys/types.h>
-
-#include "types.h"
-#include "constants.h"
 #include "kalman.h"
-#include "pqc.h"
 #include "orilink/protocol.h"
+#include "pqc.h"
 #include "async.h"
 
 typedef struct {
@@ -32,14 +25,14 @@ typedef struct {
 } uds_pair_pid_t;
 
 typedef struct {
-    uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
-    uint8_t kem_ciphertext[KEM_CIPHERTEXT_BYTES];
-    uint8_t kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
-    uint8_t aes_key[HASHES_BYTES];
-    uint8_t mac_key[HASHES_BYTES];
-    uint8_t local_nonce[AES_NONCE_BYTES];
+    uint8_t *kem_publickey;
+    uint8_t *kem_ciphertext;
+    uint8_t *kem_sharedsecret;
+    uint8_t *aes_key;
+    uint8_t *mac_key;
+    uint8_t *local_nonce;
     uint32_t local_ctr;
-    uint8_t remote_nonce[AES_NONCE_BYTES];
+    uint8_t *remote_nonce;
     uint32_t remote_ctr;
     bool hello1_rcvd;
     bool hello1_ack_sent;

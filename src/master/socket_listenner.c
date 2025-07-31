@@ -144,7 +144,7 @@ status_t handle_listen_sock_event(const char *label, master_context_t *master_ct
                 CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 return FAILURE;
             }
-            LOG_DEVEL_DEBUG("%sNew client connected from IP %s.", label, host_str);
+            LOG_DEBUG("%sNew client connected from IP %s.", label, host_str);
             master_sio_c_session_t *session = &master_ctx->sio_c_session[slot_found];
             orilink_protocol_t_status_t deserialized_orcvdo = orilink_deserialize(label,
                 session->identity.kem_sharedsecret, session->identity.remote_nonce, session->identity.remote_ctr,

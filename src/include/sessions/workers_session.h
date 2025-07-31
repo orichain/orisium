@@ -1,15 +1,9 @@
 #ifndef SESSIONS_WORKERS_SESSION_H
 #define SESSIONS_WORKERS_SESSION_H
 
-#include <netinet/in.h>
-#include <stdint.h>
-
 #include "kalman.h"
-#include "pqc.h"
 #include "orilink/protocol.h"
 #include "async.h"
-#include "stdbool.h"
-#include "constants.h"
 
 typedef struct {
     bool in_use;

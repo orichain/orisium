@@ -1,8 +1,7 @@
-#include "kalman.h"
-
-#include <stddef.h>
 #include <stdlib.h>
+#include <stddef.h>
 
+#include "kalman.h"
 #include "log.h"
 #include "utilities.h"
 #include "constants.h"

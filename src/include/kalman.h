@@ -1,10 +1,8 @@
 #ifndef KALMAN_H
 #define KALMAN_H
 
-#include <stdbool.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <stddef.h>
+#include <stdbool.h>
 
 typedef struct {
     float process_noise;

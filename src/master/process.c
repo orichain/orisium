@@ -6,6 +6,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <signal.h>
+#include <stdlib.h>
 
 #include "log.h"
 #include "constants.h"
@@ -37,6 +38,15 @@ void sigint_handler(int signum) {
 }
 
 status_t setup_master(const char *label, master_context_t *master_ctx) {
+    master_ctx->sio_session = (master_sio_session_t *)calloc(1, MAX_SIO_WORKERS * sizeof(master_sio_session_t));
+    master_ctx->logic_session = (master_logic_session_t *)calloc(1, MAX_LOGIC_WORKERS * sizeof(master_logic_session_t));
+    master_ctx->cow_session = (master_cow_session_t *)calloc(1, MAX_COW_WORKERS * sizeof(master_cow_session_t));
+    master_ctx->dbr_session = (master_dbr_session_t *)calloc(1, MAX_DBR_WORKERS * sizeof(master_dbr_session_t));
+    master_ctx->dbw_session = (master_dbw_session_t *)calloc(1, MAX_DBW_WORKERS * sizeof(master_dbw_session_t));
+    master_ctx->sio_c_session = (master_sio_c_session_t *)calloc(1, MAX_MASTER_SIO_SESSIONS * sizeof(master_sio_c_session_t));
+    master_ctx->cow_c_session = (master_cow_c_session_t *)calloc(1, MAX_MASTER_COW_SESSIONS * sizeof(master_cow_c_session_t));
+    master_ctx->kem_privatekey = (uint8_t *)calloc(1, KEM_PRIVATEKEY_BYTES);
+    master_ctx->kem_publickey = (uint8_t *)calloc(1, KEM_PUBLICKEY_BYTES);
 //----------------------------------------------------------------------
 // Setup IPC security
 //----------------------------------------------------------------------
@@ -45,27 +55,69 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
         return FAILURE;
     }
 //----------------------------------------------------------------------
+    master_ctx->all_workers_is_ready = false;
     master_ctx->last_sio_rr_idx = 0;
     master_ctx->last_cow_rr_idx = 0;
 	master_ctx->master_pid = -1;
 	master_ctx->shutdown_event_fd = -1;
     master_ctx->listen_sock = -1;
-    master_ctx->master_timer_fd = -1;
+    master_ctx->heartbeat_timer_fd = -1;
     master_ctx->master_async.async_fd = -1;
     master_ctx->master_pid = getpid();
 //======================================================================
 // Master setup socket listenner & timer heartbeat
 //======================================================================
 	if (async_create(label, &master_ctx->master_async) != SUCCESS) {
-		return FAILURE;
+        return FAILURE;
 	}
 	if (async_create_eventfd_nonblock_close_after_exec(label, &master_ctx->shutdown_event_fd) != SUCCESS) {
-		return FAILURE;
+        return FAILURE;
 	}
 	if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->shutdown_event_fd) != SUCCESS) {
-		return FAILURE;
+        return FAILURE;
 	}
     return SUCCESS;
+}
+
+void cleanup_master(const char *label, master_context_t *master_ctx) {
+    for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
+        master_sio_c_session_t *session;
+        session = &master_ctx->sio_c_session[i];
+        if (session->in_use) {
+            cleanup_master_sio_session(label, &master_ctx->master_async, session);
+        }
+    }
+    for (int i = 0; i < MAX_MASTER_COW_SESSIONS; ++i) {
+        master_cow_c_session_t *session;
+        session = &master_ctx->cow_c_session[i];
+        if (session->in_use) {
+            cleanup_master_cow_session(session);
+        }
+    }
+    free(master_ctx->sio_session);
+    free(master_ctx->logic_session);
+    free(master_ctx->cow_session);
+    free(master_ctx->dbr_session);
+    free(master_ctx->dbw_session);
+    free(master_ctx->sio_c_session);
+    free(master_ctx->cow_c_session);
+    memset(master_ctx->kem_privatekey, 0, KEM_PRIVATEKEY_BYTES);
+    memset(master_ctx->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+    free(master_ctx->kem_privatekey);
+    free(master_ctx->kem_publickey);
+    master_ctx->all_workers_is_ready = false;
+    master_ctx->last_sio_rr_idx = 0;
+    master_ctx->last_cow_rr_idx = 0;
+	master_ctx->master_pid = -1;
+	master_ctx->shutdown_event_fd = -1;
+    master_ctx->listen_sock = -1;
+    master_ctx->heartbeat_timer_fd = -1;
+    master_ctx->master_async.async_fd = -1;
+    master_ctx->master_pid = 0;
+    CLOSE_FD(&master_ctx->listen_sock);
+    async_delete_event(label, &master_ctx->master_async, &master_ctx->heartbeat_timer_fd);
+    CLOSE_FD(&master_ctx->heartbeat_timer_fd);
+    CLOSE_FD(&master_ctx->master_async.async_fd);
 }
 
 void setup_master_cow_session(master_cow_c_session_t *session) {
@@ -137,7 +189,7 @@ void cleanup_master_sio_session(const char *label, async_type_t *master_async, m
 
 bool client_disconnected(const char *label, int session_index, async_type_t *master_async, master_sio_c_session_t *session, uint8_t try_count) {
     if (try_count > (uint8_t)MAX_RETRY) {
-        LOG_DEVEL_DEBUG("%s session %d: disconnect => try count %d.", label, session_index, try_count);
+        LOG_DEBUG("%s session %d: disconnect => try count %d.", label, session_index, try_count);
         cleanup_master_sio_session(label, master_async, session);
         return true;
     }
@@ -147,13 +199,14 @@ bool client_disconnected(const char *label, int session_index, async_type_t *mas
 void run_master_process(master_context_t *master_ctx) {
 	const char *label = "[Master]: ";
 	volatile sig_atomic_t master_shutdown_requested = 0;
+    bool test_rekeying_finished = true;
     if (setup_master(label, master_ctx) != SUCCESS) goto exit;
     shutdown_event_fd = &master_ctx->shutdown_event_fd;
-    if (setup_workers(master_ctx) != SUCCESS) goto exit;
-	if (async_create_timerfd(label, &master_ctx->master_timer_fd) != SUCCESS) {
+    if (setup_workers(label, master_ctx) != SUCCESS) goto exit;
+	if (async_create_timerfd(label, &master_ctx->heartbeat_timer_fd) != SUCCESS) {
 		goto exit;
 	}
-	if (async_set_timerfd_time(label, &master_ctx->master_timer_fd,
+	if (async_set_timerfd_time(label, &master_ctx->heartbeat_timer_fd,
 		WORKER_HEARTBEATSEC_TIMEOUT, 0,
         WORKER_HEARTBEATSEC_TIMEOUT, 0) != SUCCESS)
     {
@@ -169,7 +222,7 @@ void run_master_process(master_context_t *master_ctx) {
         session = &master_ctx->cow_c_session[i];
         setup_master_cow_session(session);
     }
-    master_workers_info(master_ctx, IT_READY);
+    master_workers_info(label, master_ctx, IT_READY);
     while (!master_shutdown_requested) {
 		int_status_t snfds = async_wait(label, &master_ctx->master_async);
 		if (snfds.status != SUCCESS) continue;
@@ -183,10 +236,10 @@ void run_master_process(master_context_t *master_ctx) {
 			uint32_t_status_t events_status = async_getevents(label, &master_ctx->master_async, n);
 			if (events_status.status != SUCCESS) continue;
 			uint32_t current_events = events_status.r_uint32_t;	
-			if (current_fd == master_ctx->master_timer_fd) {
+			if (current_fd == master_ctx->heartbeat_timer_fd) {
 				uint64_t u;
-				read(master_ctx->master_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                if (async_set_timerfd_time(label, &master_ctx->master_timer_fd,
+				read(master_ctx->heartbeat_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                if (async_set_timerfd_time(label, &master_ctx->heartbeat_timer_fd,
                     WORKER_HEARTBEATSEC_TIMEOUT,
                     0,
                     WORKER_HEARTBEATSEC_TIMEOUT,
@@ -194,16 +247,16 @@ void run_master_process(master_context_t *master_ctx) {
                 {
                     LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
                     master_shutdown_requested = 1;
-                    master_workers_info(master_ctx, IT_SHUTDOWN);
+                    master_workers_info(label, master_ctx, IT_SHUTDOWN);
                     continue;
                 }
-                if (check_workers_healthy(master_ctx) != SUCCESS) continue;
+                if (check_workers_healthy(label, master_ctx) != SUCCESS) continue;
 			} else if (current_fd == master_ctx->shutdown_event_fd) {
 				uint64_t u;
 				read(master_ctx->shutdown_event_fd, &u, sizeof(u));
 				LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
 				master_shutdown_requested = 1;
-				master_workers_info(master_ctx, IT_SHUTDOWN);
+				master_workers_info(label, master_ctx,IT_SHUTDOWN);
 				continue;
 			} else if (current_fd == master_ctx->listen_sock) {
 				if (async_event_is_EPOLLIN(current_events)) {
@@ -274,17 +327,20 @@ void run_master_process(master_context_t *master_ctx) {
                         if (setup_fork_worker(label, master_ctx, worker_closed.r_worker_type_t, worker_closed.index) != SUCCESS) {
                             continue;
                         }
+                        if (master_worker_info(label, master_ctx, worker_closed.r_worker_type_t, worker_closed.index, IT_READY) != SUCCESS) {
+                            continue;
+                        }
 //======================================================================
                     } else {
                         status_t hie_rslt = handle_ipc_event(label, master_ctx, &current_fd);
 //----------------------------------------------------------------------
-// All Worker Ready To Comunication In Secure Encrypter
+// All Worker Ready To Comunication In Secure Encription
 //----------------------------------------------------------------------
                         if (hie_rslt == SUCCESS_WRKSRDY) {
-                            if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->master_timer_fd) != SUCCESS) {
+                            if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->heartbeat_timer_fd) != SUCCESS) {
                                 LOG_INFO("%sGagal async_create_incoming_event hb checker. Initiating graceful shutdown...", label);
                                 master_shutdown_requested = 1;
-                                master_workers_info(master_ctx, IT_SHUTDOWN);
+                                master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                 continue;
                             }
                             for (int ic = 0; ic < master_ctx->bootstrap_nodes.len; ic++) {
@@ -292,7 +348,7 @@ void run_master_process(master_context_t *master_ctx) {
                                 if (cow_worker_idx == -1) {
                                     LOG_ERROR("%sFailed to select an COW worker for new task. Initiating graceful shutdown...", label);
                                     master_shutdown_requested = 1;
-                                    master_workers_info(master_ctx, IT_SHUTDOWN);
+                                    master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                     continue;
                                 }
                                 int slot_found = -1;
@@ -308,30 +364,81 @@ void run_master_process(master_context_t *master_ctx) {
                                 if (slot_found == -1) {
                                     LOG_ERROR("%sWARNING: No free session slots in master_ctx->cow_c_session. Initiating graceful shutdown...", label);
                                     master_shutdown_requested = 1;
-                                    master_workers_info(master_ctx, IT_SHUTDOWN);
+                                    master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                     continue;
                                 }
                                 if (new_task_metrics(label, master_ctx, COW, cow_worker_idx) != SUCCESS) {
                                     LOG_ERROR("%sFailed to input new task in COW %d metrics. Initiating graceful shutdown...", label, cow_worker_idx);
                                     master_shutdown_requested = 1;
-                                    master_workers_info(master_ctx, IT_SHUTDOWN);
+                                    master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                     continue;
                                 }
-                                if (master_cow_connect(master_ctx, &master_ctx->bootstrap_nodes.addr[ic], cow_worker_idx) != SUCCESS) goto exit;
+                                if (master_cow_connect(label, master_ctx, &master_ctx->bootstrap_nodes.addr[ic], cow_worker_idx) != SUCCESS) goto exit;
                             }
                             if (setup_socket_listenner(label, master_ctx) != SUCCESS) {
                                 LOG_ERROR("%sFailed to setup_socket_listenner. Initiating graceful shutdown...", label);
                                 master_shutdown_requested = 1;
-                                master_workers_info(master_ctx, IT_SHUTDOWN);
+                                master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                 continue;
                             }	
                             if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->listen_sock) != SUCCESS) {
                                 LOG_ERROR("%sFailed to async_create_incoming_event socket_listenner. Initiating graceful shutdown...", label);
                                 master_shutdown_requested = 1;
-                                master_workers_info(master_ctx, IT_SHUTDOWN);
+                                master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                 continue;
                             }
                             LOG_INFO("%sPID %d UDP Server listening on port %d.", label, master_ctx->master_pid, master_ctx->listen_port);
+//----------------------------------------------------------------------                            
+// Test Rekeying
+//----------------------------------------------------------------------
+                            if (!test_rekeying_finished) {
+                                test_rekeying_finished = true;
+                                if (async_delete_event(label, &master_ctx->master_async, &master_ctx->heartbeat_timer_fd) != SUCCESS) {		
+                                    LOG_INFO("%sGagal async_delete_event hb checker, Untuk Rekeying", label);
+                                    continue;
+                                }
+                                for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
+                                    worker_security_t *security = NULL;;
+                                    security = &master_ctx->sio_session[i].security;
+                                    security->hello1_rcvd = false;
+                                    security->hello1_ack_sent = false;
+                                    security->hello2_rcvd = false;
+                                    security->hello2_ack_sent = false;
+                                }
+                                for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) { 
+                                    worker_security_t *security = NULL;;
+                                    security = &master_ctx->logic_session[i].security;
+                                    security->hello1_rcvd = false;
+                                    security->hello1_ack_sent = false;
+                                    security->hello2_rcvd = false;
+                                    security->hello2_ack_sent = false;
+                                }
+                                for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
+                                    worker_security_t *security = NULL;;
+                                    security = &master_ctx->cow_session[i].security;
+                                    security->hello1_rcvd = false;
+                                    security->hello1_ack_sent = false;
+                                    security->hello2_rcvd = false;
+                                    security->hello2_ack_sent = false;
+                                }
+                                for (int i = 0; i < MAX_DBR_WORKERS; ++i) { 
+                                    worker_security_t *security = NULL;;
+                                    security = &master_ctx->dbr_session[i].security;
+                                    security->hello1_rcvd = false;
+                                    security->hello1_ack_sent = false;
+                                    security->hello2_rcvd = false;
+                                    security->hello2_ack_sent = false;
+                                }
+                                for (int i = 0; i < MAX_DBW_WORKERS; ++i) { 
+                                    worker_security_t *security = NULL;;
+                                    security = &master_ctx->dbw_session[i].security;
+                                    security->hello1_rcvd = false;
+                                    security->hello1_ack_sent = false;
+                                    security->hello2_rcvd = false;
+                                    security->hello2_ack_sent = false;
+                                }
+                                master_workers_info(label, master_ctx, IT_REKEYING);
+                            }
 //----------------------------------------------------------------------
                         } else {
                             continue;
@@ -351,7 +458,7 @@ void run_master_process(master_context_t *master_ctx) {
                                 event_founded_in_sio_c_session = true;
                                 break;
                             }
-                            LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", label, i, session->hello1_ack.interval_ack_timer_fd);
+                            LOG_DEBUG("%s session %d: interval = %lf.", label, i, session->hello1_ack.interval_ack_timer_fd);
                             double try_count = (double)session->hello1_ack.ack_sent_try_count;
                             sio_c_calculate_retry(label, session, i, try_count);
                             session->hello1_ack.interval_ack_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);
@@ -365,7 +472,7 @@ void run_master_process(master_context_t *master_ctx) {
                                 event_founded_in_sio_c_session = true;
                                 break;
                             }
-                            LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", label, i, session->hello2_ack.interval_ack_timer_fd);
+                            LOG_DEBUG("%s session %d: interval = %lf.", label, i, session->hello2_ack.interval_ack_timer_fd);
                             double try_count = (double)session->hello2_ack.ack_sent_try_count;
                             sio_c_calculate_retry(label, session, i, try_count);
                             session->hello2_ack.interval_ack_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);
@@ -379,7 +486,7 @@ void run_master_process(master_context_t *master_ctx) {
                                 event_founded_in_sio_c_session = true;
                                 break;
                             }
-                            LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", label, i, session->hello3_ack.interval_ack_timer_fd);
+                            LOG_DEBUG("%s session %d: interval = %lf.", label, i, session->hello3_ack.interval_ack_timer_fd);
                             double try_count = (double)session->hello3_ack.ack_sent_try_count;
                             sio_c_calculate_retry(label, session, i, try_count);
                             session->hello3_ack.interval_ack_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);
@@ -404,25 +511,6 @@ void run_master_process(master_context_t *master_ctx) {
 // async_create_eventfd_nonblock_close_after_exec <= close after exec/read
 //======================================================================
 exit:
-    for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
-        master_sio_c_session_t *session;
-        session = &master_ctx->sio_c_session[i];
-        if (session->in_use) {
-            cleanup_master_sio_session(label, &master_ctx->master_async, session);
-        }
-    }
-    for (int i = 0; i < MAX_MASTER_COW_SESSIONS; ++i) {
-        master_cow_c_session_t *session;
-        session = &master_ctx->cow_c_session[i];
-        if (session->in_use) {
-            cleanup_master_cow_session(session);
-        }
-    }
-    workers_cleanup(master_ctx);
-    CLOSE_FD(&master_ctx->listen_sock);
-    async_delete_event(label, &master_ctx->master_async, &master_ctx->master_timer_fd);
-    CLOSE_FD(&master_ctx->master_timer_fd);
-    CLOSE_FD(&master_ctx->master_async.async_fd);
-    memset(master_ctx->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
-    memset(master_ctx->kem_publickey, 0, KEM_PRIVATEKEY_BYTES);
+    cleanup_workers(label, master_ctx);
+    cleanup_master(label, master_ctx);    
 }

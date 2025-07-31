@@ -20,128 +20,72 @@
 
 struct sockaddr_in6;
 
-status_t master_workers_info(master_context_t *master_ctx, info_type_t flag) {
-	const char *label = "[Master]: ";
+status_t master_worker_info(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index, info_type_t flag) {
+    worker_security_t * security = NULL;
+    uds_pair_pid_t *upp = NULL;
+    if (wot == SIO) {
+        security = &master_ctx->sio_session[index].security;
+        upp = &master_ctx->sio_session[index].upp;
+    } else if (wot == LOGIC) {
+        security = &master_ctx->logic_session[index].security;
+        upp = &master_ctx->logic_session[index].upp;
+    } else if (wot == COW) {
+        security = &master_ctx->cow_session[index].security;
+        upp = &master_ctx->cow_session[index].upp;
+    } else if (wot == DBR) {
+        security = &master_ctx->dbr_session[index].security;
+        upp = &master_ctx->dbr_session[index].upp;
+    } else if (wot == DBW) {
+        security = &master_ctx->dbw_session[index].security;
+        upp = &master_ctx->dbw_session[index].upp;
+    } else {
+        return FAILURE;
+    }
+    if (!security || !upp) return FAILURE;
+    ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_info(label, wot, index, flag);
+    if (cmd_result.status != SUCCESS) {
+        return FAILURE;
+    }
+    ssize_t_status_t send_result = send_ipc_protocol_message(
+        label, 
+        security->aes_key,
+        security->mac_key,
+        security->local_nonce,
+        &security->local_ctr,
+        &upp->uds[0], 
+        cmd_result.r_ipc_protocol_t
+    );
+    if (send_result.status != SUCCESS) {
+        LOG_ERROR("%sFailed to sent master_worker_info to worker.", label);
+        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        return FAILURE;
+    } else {
+        LOG_DEBUG("%sSent master_worker_info to worker.", label);
+    }
+    CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t); 
+	return SUCCESS;
+}
+
+status_t master_workers_info(const char *label, master_context_t *master_ctx, info_type_t flag) {
 	for (uint8_t i = 0; i < MAX_SIO_WORKERS; ++i) { 
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_info(label, SIO, i, flag);
-		if (cmd_result.status != SUCCESS) {
-			return FAILURE;
-		}
-		ssize_t_status_t send_result = send_ipc_protocol_message(
-            label, 
-            master_ctx->sio_session[i].security.aes_key,
-            master_ctx->sio_session[i].security.mac_key,
-            master_ctx->sio_session[i].security.local_nonce,
-            &master_ctx->sio_session[i].security.local_ctr,
-            &master_ctx->sio_session[i].upp.uds[0], 
-            cmd_result.r_ipc_protocol_t
-        );
-		if (send_result.status != SUCCESS) {
-			LOG_ERROR("%sFailed to sent master_worker_info to SIO %ld.", label, i);
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
-            return FAILURE;
-		} else {
-			LOG_DEBUG("%sSent master_worker_info to SIO %ld.", label, i);
-		}
-		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t); 
+		if (master_worker_info(label, master_ctx, SIO, i, flag) != SUCCESS) return FAILURE;
 	}
 	for (uint8_t i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_info(label, LOGIC, i, flag);
-		if (cmd_result.status != SUCCESS) {
-			return FAILURE;
-		}	
-		ssize_t_status_t send_result = send_ipc_protocol_message(
-            label, 
-            master_ctx->logic_session[i].security.aes_key,
-            master_ctx->logic_session[i].security.mac_key,
-            master_ctx->logic_session[i].security.local_nonce,
-            &master_ctx->logic_session[i].security.local_ctr,
-            &master_ctx->logic_session[i].upp.uds[0], 
-            cmd_result.r_ipc_protocol_t
-        );
-		if (send_result.status != SUCCESS) {
-			LOG_ERROR("%sFailed to sent master_worker_info to Logic %ld.", label, i);
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
-            return FAILURE;
-		} else {
-			LOG_DEBUG("%sSent master_worker_info to Logic %ld.", label, i);
-		}
-		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+		if (master_worker_info(label, master_ctx, LOGIC, i, flag) != SUCCESS) return FAILURE;
 	}
 	for (uint8_t i = 0; i < MAX_COW_WORKERS; ++i) { 
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_info(label, COW, i, flag);
-		if (cmd_result.status != SUCCESS) {
-			return FAILURE;
-		}	
-		ssize_t_status_t send_result = send_ipc_protocol_message(
-            label, 
-            master_ctx->cow_session[i].security.aes_key,
-            master_ctx->cow_session[i].security.mac_key,
-            master_ctx->cow_session[i].security.local_nonce,
-            &master_ctx->cow_session[i].security.local_ctr,
-            &master_ctx->cow_session[i].upp.uds[0], 
-            cmd_result.r_ipc_protocol_t
-        );
-		if (send_result.status != SUCCESS) {
-			LOG_ERROR("%sFailed to sent master_worker_info to COW %ld.", label, i);
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
-            return FAILURE;
-		} else {
-			LOG_DEBUG("%sSent master_worker_info to COW %ld.", label, i);
-		}
-		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+		if (master_worker_info(label, master_ctx, COW, i, flag) != SUCCESS) return FAILURE;
 	}
     for (uint8_t i = 0; i < MAX_DBR_WORKERS; ++i) { 
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_info(label, DBR, i, flag);
-		if (cmd_result.status != SUCCESS) {
-			return FAILURE;
-		}	
-		ssize_t_status_t send_result = send_ipc_protocol_message(
-            label, 
-            master_ctx->dbr_session[i].security.aes_key,
-            master_ctx->dbr_session[i].security.mac_key,
-            master_ctx->dbr_session[i].security.local_nonce,
-            &master_ctx->dbr_session[i].security.local_ctr,
-            &master_ctx->dbr_session[i].upp.uds[0], 
-            cmd_result.r_ipc_protocol_t
-        );
-		if (send_result.status != SUCCESS) {
-			LOG_ERROR("%sFailed to sent master_worker_info to DBR %ld.", label, i);
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
-            return FAILURE;
-		} else {
-			LOG_DEBUG("%sSent master_worker_info to DBR %ld.", label, i);
-		}
-		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+		if (master_worker_info(label, master_ctx, DBR, i, flag) != SUCCESS) return FAILURE;
 	}
     for (uint8_t i = 0; i < MAX_DBW_WORKERS; ++i) { 
-		ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_info(label, DBW, i, flag);
-		if (cmd_result.status != SUCCESS) {
-			return FAILURE;
-		}	
-		ssize_t_status_t send_result = send_ipc_protocol_message(
-            label, 
-            master_ctx->dbw_session[i].security.aes_key,
-            master_ctx->dbw_session[i].security.mac_key,
-            master_ctx->dbw_session[i].security.local_nonce,
-            &master_ctx->dbw_session[i].security.local_ctr,
-            &master_ctx->dbw_session[i].upp.uds[0], 
-            cmd_result.r_ipc_protocol_t
-        );
-		if (send_result.status != SUCCESS) {
-			LOG_ERROR("%sFailed to sent master_worker_info to DBW %ld.", label, i);
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
-            return FAILURE;
-		} else {
-			LOG_DEBUG("%sSent master_worker_info to DBW %ld.", label, i);
-		}
-		CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+		if (master_worker_info(label, master_ctx, DBW, i, flag) != SUCCESS) return FAILURE;
 	}
 	return SUCCESS;
 }
 
-status_t master_cow_connect(master_context_t *master_ctx, struct sockaddr_in6 *addr, uint8_t index) {
-	const char *label = "[Master]: ";
+status_t master_cow_connect(const char *label, master_context_t *master_ctx, struct sockaddr_in6 *addr, uint8_t index) {
 	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_cow_connect(label, COW, index, addr);
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
@@ -166,10 +110,9 @@ status_t master_cow_connect(master_context_t *master_ctx, struct sockaddr_in6 *a
 	return SUCCESS;
 }
 
-status_t master_worker_hello1_ack(master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
-	const char *label = "[Master]: ";
+status_t master_worker_hello1_ack(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
     uint8_t *kem_ciphertext = NULL;
-    worker_security_t *security;
+    worker_security_t *security = NULL;
     int *worker_uds_fd = NULL;
     const char *worker_name = "Unknown";
     if (wot == SIO) {
@@ -231,9 +174,8 @@ status_t master_worker_hello1_ack(master_context_t *master_ctx, worker_type_t wo
 	return SUCCESS;
 }
 
-status_t master_worker_hello2_ack(master_context_t *master_ctx, worker_type_t wot, int index) {
-	const char *label = "[Master]: ";
-    worker_security_t *security;
+status_t master_worker_hello2_ack(const char *label, master_context_t *master_ctx, worker_type_t wot, int index) {
+    worker_security_t *security = NULL;
     int *worker_uds_fd = NULL;
     const char *worker_name = "Unknown";
     if (wot == SIO) {

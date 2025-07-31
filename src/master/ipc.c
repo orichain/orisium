@@ -4,6 +4,7 @@
 #include <netinet/in.h>
 #include <stdint.h>
 #include <endian.h>
+#include <stdio.h>
 
 #include "log.h"
 #include "constants.h"
@@ -164,7 +165,7 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
 // hello1_ack masih memakai security->kem_sharedsecret kosong
 // karena worker belum siap enkripsi
 //----------------------------------------------------------------------
-            if (master_worker_hello1_ack(master_ctx, rcvd_wot, rcvd_index) != SUCCESS) {
+            if (master_worker_hello1_ack(label, master_ctx, rcvd_wot, rcvd_index) != SUCCESS) {
                 LOG_ERROR("%sFailed to master_worker_hello1_ack.", label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
@@ -272,7 +273,7 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
-            if (master_worker_hello2_ack(master_ctx, rcvd_wot, rcvd_index) != SUCCESS) {
+            if (master_worker_hello2_ack(label, master_ctx, rcvd_wot, rcvd_index) != SUCCESS) {
                 LOG_ERROR("%sFailed to master_worker_hello2_ack.", label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
@@ -292,51 +293,53 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
             } else if (rcvd_wot == DBW) {
                 master_ctx->dbw_session[rcvd_index].isready = true;
             }
-            bool is_all_workers_ready = true;
-            for (uint8_t indexrdy = 0; indexrdy < MAX_SIO_WORKERS; ++indexrdy) {
-                if (!master_ctx->sio_session[indexrdy].isready) {
-                    is_all_workers_ready = false;
-                    break;
-                }
-            }
-            if (is_all_workers_ready) {
-                for (uint8_t indexrdy = 0; indexrdy < MAX_LOGIC_WORKERS; ++indexrdy) {
-                    if (!master_ctx->logic_session[indexrdy].isready) {
-                        is_all_workers_ready = false;
+            if (!master_ctx->all_workers_is_ready) {
+                master_ctx->all_workers_is_ready = true;
+                for (uint8_t indexrdy = 0; indexrdy < MAX_SIO_WORKERS; ++indexrdy) {
+                    if (!master_ctx->sio_session[indexrdy].isready) {
+                        master_ctx->all_workers_is_ready = false;
                         break;
                     }
                 }
-            }
-            if (is_all_workers_ready) {
-                for (uint8_t indexrdy = 0; indexrdy < MAX_COW_WORKERS; ++indexrdy) {
-                    if (!master_ctx->cow_session[indexrdy].isready) {
-                        is_all_workers_ready = false;
-                        break;
+                if (master_ctx->all_workers_is_ready) {
+                    for (uint8_t indexrdy = 0; indexrdy < MAX_LOGIC_WORKERS; ++indexrdy) {
+                        if (!master_ctx->logic_session[indexrdy].isready) {
+                            master_ctx->all_workers_is_ready = false;
+                            break;
+                        }
                     }
                 }
-            }
-            if (is_all_workers_ready) {
-                for (uint8_t indexrdy = 0; indexrdy < MAX_DBR_WORKERS; ++indexrdy) {
-                    if (!master_ctx->dbr_session[indexrdy].isready) {
-                        is_all_workers_ready = false;
-                        break;
+                if (master_ctx->all_workers_is_ready) {
+                    for (uint8_t indexrdy = 0; indexrdy < MAX_COW_WORKERS; ++indexrdy) {
+                        if (!master_ctx->cow_session[indexrdy].isready) {
+                            master_ctx->all_workers_is_ready = false;
+                            break;
+                        }
                     }
                 }
-            }
-            if (is_all_workers_ready) {
-                for (uint8_t indexrdy = 0; indexrdy < MAX_DBW_WORKERS; ++indexrdy) {
-                    if (!master_ctx->dbw_session[indexrdy].isready) {
-                        is_all_workers_ready = false;
-                        break;
+                if (master_ctx->all_workers_is_ready) {
+                    for (uint8_t indexrdy = 0; indexrdy < MAX_DBR_WORKERS; ++indexrdy) {
+                        if (!master_ctx->dbr_session[indexrdy].isready) {
+                            master_ctx->all_workers_is_ready = false;
+                            break;
+                        }
                     }
                 }
-            }
-            if (is_all_workers_ready) {
-                LOG_INFO("%s====================================================", label);
-                LOG_INFO("%sSEMUA WORKER SUDAH READY", label);
-                LOG_INFO("%s====================================================", label);
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                return SUCCESS_WRKSRDY;
+                if (master_ctx->all_workers_is_ready) {
+                    for (uint8_t indexrdy = 0; indexrdy < MAX_DBW_WORKERS; ++indexrdy) {
+                        if (!master_ctx->dbw_session[indexrdy].isready) {
+                            master_ctx->all_workers_is_ready = false;
+                            break;
+                        }
+                    }
+                }
+                if (master_ctx->all_workers_is_ready) {
+                    LOG_INFO("%s====================================================", label);
+                    LOG_INFO("%sSEMUA WORKER SUDAH READY", label);
+                    LOG_INFO("%s====================================================", label);
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    return SUCCESS_WRKSRDY;
+                }
             }
 //---------------------------------------------------------------------- 
             CLOSE_IPC_PROTOCOL(&received_protocol);

@@ -1,7 +1,8 @@
-#include <stdint.h>
-#include <endian.h>
 #include <string.h>
+#include <inttypes.h>
+#include <endian.h>
 
+#include "workers/master_ipc_cmds.h"
 #include "log.h"
 #include "types.h"
 #include "ipc/protocol.h"

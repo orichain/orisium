@@ -48,13 +48,13 @@ int select_best_worker(const char *label, master_context_t *master_ctx, worker_t
     if (temp_best_idx_t1 != -1) {
         if (min_avg_task_time > 0.0L) {
             selected_worker_idx = temp_best_idx_t1;
-            LOG_DEVEL_DEBUG("%sSelecting %s worker %d based on lowest Avg Task Time: %Lf", 
+            LOG_DEBUG("%sSelecting %s worker %d based on lowest Avg Task Time: %Lf", 
                       label, worker_name, selected_worker_idx, min_avg_task_time);
             return selected_worker_idx;
         }
-        LOG_DEVEL_DEBUG("%sAll not-full %s workers have 0 Avg Task Time. Falling back to Longest Task Time / Round Robin.", label, worker_name);
+        LOG_DEBUG("%sAll not-full %s workers have 0 Avg Task Time. Falling back to Longest Task Time / Round Robin.", label, worker_name);
     } else {
-        LOG_DEVEL_DEBUG("%sNo not-full %s workers found for Avg Task Time check. All might be full. Falling back.", label, worker_name);
+        LOG_DEBUG("%sNo not-full %s workers found for Avg Task Time check. All might be full. Falling back.", label, worker_name);
     }
     int temp_best_idx_t2 = -1;
     if (wot == SIO) {
@@ -83,13 +83,13 @@ int select_best_worker(const char *label, master_context_t *master_ctx, worker_t
     if (temp_best_idx_t2 != -1) {
         if (min_longest_task_time > 0ULL) {
             selected_worker_idx = temp_best_idx_t2;
-            LOG_DEVEL_DEBUG("%sSelecting %s worker %d based on lowest Longest Task Time: %" PRIu64, 
+            LOG_DEBUG("%sSelecting %s worker %d based on lowest Longest Task Time: %" PRIu64, 
                       label, worker_name, selected_worker_idx, min_longest_task_time);
             return selected_worker_idx; 
         }
-        LOG_DEVEL_DEBUG("%sAll not-full %s workers have 0 Longest Task Time. Falling back to Round Robin.", label, worker_name);
+        LOG_DEBUG("%sAll not-full %s workers have 0 Longest Task Time. Falling back to Round Robin.", label, worker_name);
     } else {
-        LOG_DEVEL_DEBUG("%sNo not-full %s workers found for Longest Task Time check. All might be full. Falling back to Round Robin.", label, worker_name);
+        LOG_DEBUG("%sNo not-full %s workers found for Longest Task Time check. All might be full. Falling back to Round Robin.", label, worker_name);
     }
     int temp_best_idx_t3 = -1;
     if (wot == SIO) {
@@ -119,7 +119,7 @@ int select_best_worker(const char *label, master_context_t *master_ctx, worker_t
     }
     if (temp_best_idx_t3 != -1) {
         selected_worker_idx = temp_best_idx_t3;
-        LOG_DEVEL_DEBUG("%sSelecting %s worker %d using Round Robin (fallback).", label, worker_name, selected_worker_idx);
+        LOG_DEBUG("%sSelecting %s worker %d using Round Robin (fallback).", label, worker_name, selected_worker_idx);
         return selected_worker_idx;
     } else {
         LOG_ERROR("%sNo %s worker available (all might be full/unhealthy/nonactive).", label, worker_name);

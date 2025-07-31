@@ -1,3 +1,4 @@
+#include "async.h"
 #include "sessions/workers_session.h"
 #include "utilities.h"
 

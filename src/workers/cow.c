@@ -83,7 +83,7 @@ void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_sessi
 
 bool server_disconnected(cow_context_t *cow_ctx, int session_index, cow_c_session_t *session, uint8_t try_count) {
     if (try_count > (uint8_t)MAX_RETRY) {
-        LOG_DEVEL_DEBUG("%s session %d: disconnect => try count %d.", cow_ctx->worker.label, session_index, try_count);
+        LOG_DEBUG("%s session %d: disconnect => try count %d.", cow_ctx->worker.label, session_index, try_count);
         cow_master_connection(&cow_ctx->worker, &session->identity.remote_addr, CANNOTCONNECT);
         cleanup_cow_session(cow_ctx->worker.label, &cow_ctx->worker.async, session);
         return true;
@@ -315,7 +315,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         LOG_INFO("%sMaster Ready ...", cow_ctx.worker.label);
 //----------------------------------------------------------------------
                         if (initial_delay_ms > 0) {
-                            LOG_DEVEL_DEBUG("%sApplying initial delay of %ld ms...", cow_ctx.worker.label, initial_delay_ms);
+                            LOG_DEBUG("%sApplying initial delay of %ld ms...", cow_ctx.worker.label, initial_delay_ms);
                             sleep_ms(initial_delay_ms);
                         }
 //----------------------------------------------------------------------
@@ -548,14 +548,14 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                             CLOSE_IPC_PROTOCOL(&received_protocol);
                             continue;
                         }
-                        LOG_DEVEL_DEBUG("%sUDP Socket FD %d created.", cow_ctx.worker.label, session->sock_fd);
+                        LOG_DEBUG("%sUDP Socket FD %d created.", cow_ctx.worker.label, session->sock_fd);
                         status_t r_snbkg = set_nonblocking(cow_ctx.worker.label, session->sock_fd);
                         if (r_snbkg != SUCCESS) {
                             LOG_ERROR("%sset_nonblocking failed.", cow_ctx.worker.label);
                             CLOSE_IPC_PROTOCOL(&received_protocol);
                             continue;
                         }
-                        LOG_DEVEL_DEBUG("%sUDP Socket FD %d set to non-blocking.", cow_ctx.worker.label, session->sock_fd);
+                        LOG_DEBUG("%sUDP Socket FD %d set to non-blocking.", cow_ctx.worker.label, session->sock_fd);
                         int conn_res = connect(session->sock_fd, rp->ai_addr, rp->ai_addrlen);
                         if (conn_res == 0) {
                             LOG_INFO("%sUDP socket 'connected' to %s:%s (FD %d).", cow_ctx.worker.label, host_str, port_str, session->sock_fd);
@@ -995,7 +995,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                 event_founded_in_session = true;
                                 break;
                             }
-                            LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", cow_ctx.worker.label, i, session->hello1.interval_timer_fd);
+                            LOG_DEBUG("%s session %d: interval = %lf.", cow_ctx.worker.label, i, session->hello1.interval_timer_fd);
                             double try_count = (double)session->hello1.sent_try_count;
                             cow_calculate_retry(&cow_ctx, session, i, try_count);
                             session->hello1.interval_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);
@@ -1009,7 +1009,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                 event_founded_in_session = true;
                                 break;
                             }
-                            LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", cow_ctx.worker.label, i, session->hello2.interval_timer_fd);
+                            LOG_DEBUG("%s session %d: interval = %lf.", cow_ctx.worker.label, i, session->hello2.interval_timer_fd);
                             double try_count = (double)session->hello2.sent_try_count;
                             cow_calculate_retry(&cow_ctx, session, i, try_count);
                             session->hello2.interval_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);
@@ -1023,7 +1023,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                 event_founded_in_session = true;
                                 break;
                             }
-                            LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", cow_ctx.worker.label, i, session->hello3.interval_timer_fd);
+                            LOG_DEBUG("%s session %d: interval = %lf.", cow_ctx.worker.label, i, session->hello3.interval_timer_fd);
                             double try_count = (double)session->hello3.sent_try_count;
                             cow_calculate_retry(&cow_ctx, session, i, try_count);
                             session->hello3.interval_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);
@@ -1037,7 +1037,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                 event_founded_in_session = true;
                                 break;
                             }
-                            LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", cow_ctx.worker.label, i, session->hello_end.interval_timer_fd);
+                            LOG_DEBUG("%s session %d: interval = %lf.", cow_ctx.worker.label, i, session->hello_end.interval_timer_fd);
                             double try_count = (double)session->hello_end.sent_try_count;
                             cow_calculate_retry(&cow_ctx, session, i, try_count);
                             session->hello_end.interval_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);

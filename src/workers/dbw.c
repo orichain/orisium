@@ -120,7 +120,7 @@ void run_dbw_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         LOG_INFO("%sMaster Ready ...", dbw_ctx.worker.label);
 //----------------------------------------------------------------------
                         if (initial_delay_ms > 0) {
-                            LOG_DEVEL_DEBUG("%sApplying initial delay of %ld ms...", dbw_ctx.worker.label, initial_delay_ms);
+                            LOG_DEBUG("%sApplying initial delay of %ld ms...", dbw_ctx.worker.label, initial_delay_ms);
                             sleep_ms(initial_delay_ms);
                         }
 //----------------------------------------------------------------------
