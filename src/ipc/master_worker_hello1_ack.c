@@ -18,6 +18,9 @@ status_t ipc_serialize_master_worker_hello1_ack(const char *label, const ipc_mas
         return FAILURE;
     }
     size_t current_offset_local = *offset;
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, AES_NONCE_BYTES, buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(current_buffer + current_offset_local, payload->nonce, AES_NONCE_BYTES);
+    current_offset_local += AES_NONCE_BYTES;
     if (CHECK_BUFFER_BOUNDS(current_offset_local, KEM_CIPHERTEXT_BYTES, buffer_size) != SUCCESS) return FAILURE_OOBUF;
     memcpy(current_buffer + current_offset_local, payload->kem_ciphertext, KEM_CIPHERTEXT_BYTES);
     current_offset_local += KEM_CIPHERTEXT_BYTES;
@@ -33,6 +36,13 @@ status_t ipc_deserialize_master_worker_hello1_ack(const char *label, ipc_protoco
     size_t current_offset = *offset_ptr;
     const uint8_t *cursor = buffer + current_offset;
     ipc_master_worker_hello1_ack_t *payload = p->payload.ipc_master_worker_hello1_ack;
+    if (current_offset + AES_NONCE_BYTES > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading nonce.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(payload->nonce, cursor, AES_NONCE_BYTES);
+    cursor += AES_NONCE_BYTES;
+    current_offset += AES_NONCE_BYTES;
     if (current_offset + KEM_CIPHERTEXT_BYTES > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading kem_ciphertext.", label);
         return FAILURE_OOBUF;
@@ -44,7 +54,7 @@ status_t ipc_deserialize_master_worker_hello1_ack(const char *label, ipc_protoco
     return SUCCESS;
 }
 
-ipc_protocol_t_status_t ipc_prepare_cmd_master_worker_hello1_ack(const char *label, worker_type_t wot, uint8_t index, uint8_t *kem_ciphertext) {
+ipc_protocol_t_status_t ipc_prepare_cmd_master_worker_hello1_ack(const char *label, worker_type_t wot, uint8_t index, uint8_t *nonce, uint8_t *kem_ciphertext) {
 	ipc_protocol_t_status_t result;
 	result.r_ipc_protocol_t = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
 	result.status = FAILURE;
@@ -64,6 +74,7 @@ ipc_protocol_t_status_t ipc_prepare_cmd_master_worker_hello1_ack(const char *lab
 		CLOSE_IPC_PROTOCOL(&result.r_ipc_protocol_t);
 		return result;
 	}
+    memcpy(payload->nonce, nonce, AES_NONCE_BYTES);
     memcpy(payload->kem_ciphertext, kem_ciphertext, KEM_CIPHERTEXT_BYTES);
 	result.r_ipc_protocol_t->payload.ipc_master_worker_hello1_ack = payload;
 	result.status = SUCCESS;

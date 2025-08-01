@@ -176,9 +176,17 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
 // untuk menerima pesan hello2 yang sudah terenkripsi
 //----------------------------------------------------------------------
             memcpy(security->kem_sharedsecret, kem_sharedsecret, KEM_SHAREDSECRET_BYTES);
-            kdf1(security->kem_sharedsecret, security->aes_key);
-            kdf2(security->aes_key, security->mac_key);
             memset(kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+            uint8_t tmp_aes_key[HASHES_BYTES];
+            kdf1(security->kem_sharedsecret, tmp_aes_key);
+//----------------------------------------------------------------------
+// Di workers
+// 1. HELLO2 harus sudah pakai mac_key baru
+// 2. HELLO2 harus masih memakai aes_key lama
+//----------------------------------------------------------------------
+            kdf2(tmp_aes_key, security->mac_key);
+//----------------------------------------------------------------------
+            memset(tmp_aes_key, 0, HASHES_BYTES);
 //----------------------------------------------------------------------
             security->hello1_rcvd = true;
             CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -199,6 +207,7 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
             }           
             ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
             ipc_worker_master_hello2_t *ihello2i = received_protocol->payload.ipc_worker_master_hello2;
+            
             if (!security->hello1_ack_sent) {
                 LOG_ERROR("%sBelum pernah mengirim HELLO1_ACK", label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -217,11 +226,17 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
 // Cocokkan MAc
 // Decrypt wot dan index
 //======================================================================
-            memcpy(security->remote_nonce, ihello2i->encrypted_wot_index, AES_NONCE_BYTES);
+            uint8_t tmp_remote_nonce[AES_NONCE_BYTES];
+            memcpy(tmp_remote_nonce, ihello2i->encrypted_wot_index, AES_NONCE_BYTES);
             uint8_t encrypted_wot_index[sizeof(uint8_t) + sizeof(uint8_t)];   
             memcpy(encrypted_wot_index, ihello2i->encrypted_wot_index + AES_NONCE_BYTES, sizeof(uint8_t) + sizeof(uint8_t));
             uint8_t data_mac[AES_TAG_BYTES];
             memcpy(data_mac, ihello2i->encrypted_wot_index + AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t), AES_TAG_BYTES);
+//----------------------------------------------------------------------
+// Temporary Key
+//----------------------------------------------------------------------
+            uint8_t temp_aes_key[HASHES_BYTES];
+            kdf1(security->kem_sharedsecret, temp_aes_key);
 //----------------------------------------------------------------------
 // cek Mac
 //----------------------------------------------------------------------  
@@ -229,26 +244,25 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
             memcpy(encrypted_wot_index1, ihello2i->encrypted_wot_index, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t));
             uint8_t mac[AES_TAG_BYTES];
             poly1305_context mac_ctx;
-            poly1305_init(&mac_ctx, security->kem_sharedsecret);
+            poly1305_init(&mac_ctx, security->mac_key);
             poly1305_update(&mac_ctx, encrypted_wot_index1, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t));
             poly1305_finish(&mac_ctx, mac);
             if (!poly1305_verify(mac, data_mac)) {
                 LOG_ERROR("%sFailed to Mac Tidak Sesuai.", label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
-            }            
-            uint32_t temp_remote_ctr = (uint32_t)0;
+            }
 //----------------------------------------------------------------------
 // Decrypt
 //---------------------------------------------------------------------- 
             uint8_t decrypted_wot_index[sizeof(uint8_t) + sizeof(uint8_t)];
             aes256ctx aes_ctx;
-            aes256_ctr_keyexp(&aes_ctx, security->kem_sharedsecret);
+            aes256_ctr_keyexp(&aes_ctx, temp_aes_key);
 //=========================================IV===========================    
             uint8_t keystream_buffer[sizeof(uint8_t) + sizeof(uint8_t)];
             uint8_t iv[AES_IV_BYTES];
-            memcpy(iv, security->remote_nonce, AES_NONCE_BYTES);
-            uint32_t remote_ctr_be = htobe32(temp_remote_ctr);
+            memcpy(iv, tmp_remote_nonce, AES_NONCE_BYTES);
+            uint32_t remote_ctr_be = htobe32(security->remote_ctr);
             memcpy(iv + AES_NONCE_BYTES, &remote_ctr_be, sizeof(uint32_t));
 //=========================================IV===========================    
             aes256_ctr(keystream_buffer, sizeof(uint8_t) + sizeof(uint8_t), iv, &aes_ctx);
@@ -272,16 +286,18 @@ status_t handle_ipc_event(const char *label, master_context_t *master_ctx, int *
                 LOG_ERROR("%sberbeda index.", label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
-            }
+            }      
             if (master_worker_hello2_ack(label, master_ctx, rcvd_wot, rcvd_index) != SUCCESS) {
                 LOG_ERROR("%sFailed to master_worker_hello2_ack.", label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
+            memcpy(security->remote_nonce, tmp_remote_nonce, AES_NONCE_BYTES);
+            memset (tmp_remote_nonce, 0, AES_NONCE_BYTES);
+            security->remote_ctr = (uint32_t)0;
 //----------------------------------------------------------------------
 // Menganggap data valid dengan integritas
-//---------------------------------------------------------------------- 
-            security->remote_ctr = (uint32_t)1;//sudah melakukan dekripsi data valid 1 kali
+//----------------------------------------------------------------------
             if (rcvd_wot == SIO) {
                 master_ctx->sio_session[rcvd_index].isready = true;
             } else if (rcvd_wot == LOGIC) {

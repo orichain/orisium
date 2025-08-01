@@ -224,23 +224,24 @@ status_t setup_cow_worker(cow_context_t *cow_ctx, worker_type_t wot, int worker_
 
 void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms, int master_uds_fd) {
     cow_context_t cow_ctx;
+    worker_context_t *ctx = &cow_ctx.worker;
     if (setup_cow_worker(&cow_ctx, wot, worker_idx, master_uds_fd) != SUCCESS) goto exit;
-    while (!cow_ctx.worker.shutdown_requested) {
-        int_status_t snfds = async_wait(cow_ctx.worker.label, &cow_ctx.worker.async);
+    while (!ctx->shutdown_requested) {
+        int_status_t snfds = async_wait(ctx->label, &ctx->async);
 		if (snfds.status != SUCCESS) continue;
         for (int n = 0; n < snfds.r_int; ++n) {
-            if (cow_ctx.worker.shutdown_requested) {
+            if (ctx->shutdown_requested) {
 				break;
 			}
-			int_status_t fd_status = async_getfd(cow_ctx.worker.label, &cow_ctx.worker.async, n);
+			int_status_t fd_status = async_getfd(ctx->label, &ctx->async, n);
 			if (fd_status.status != SUCCESS) continue;
 			int current_fd = fd_status.r_int;
-			uint32_t_status_t events_status = async_getevents(cow_ctx.worker.label, &cow_ctx.worker.async, n);
+			uint32_t_status_t events_status = async_getevents(ctx->label, &ctx->async, n);
 			if (events_status.status != SUCCESS) continue;
 			uint32_t current_events = events_status.r_uint32_t;
-            if (current_fd == cow_ctx.worker.heartbeat_timer_fd) {
+            if (current_fd == ctx->heartbeat_timer_fd) {
 				uint64_t u;
-				read(cow_ctx.worker.heartbeat_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+				read(ctx->heartbeat_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
 //----------------------------------------------------------------------
 // Heartbeat dengan jitter
 //----------------------------------------------------------------------
@@ -249,14 +250,14 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                 if (new_heartbeat_interval_double < 0.1) {
                     new_heartbeat_interval_double = 0.1;
                 }
-                if (async_set_timerfd_time(cow_ctx.worker.label, &cow_ctx.worker.heartbeat_timer_fd,
+                if (async_set_timerfd_time(ctx->label, &ctx->heartbeat_timer_fd,
 					(time_t)new_heartbeat_interval_double,
                     (long)((new_heartbeat_interval_double - (time_t)new_heartbeat_interval_double) * 1e9),
                     (time_t)new_heartbeat_interval_double,
                     (long)((new_heartbeat_interval_double - (time_t)new_heartbeat_interval_double) * 1e9)) != SUCCESS)
                 {
-                    cow_ctx.worker.shutdown_requested = 1;
-					LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", cow_ctx.worker.label);
+                    ctx->shutdown_requested = 1;
+					LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", ctx->label);
 					continue;
                 }
                 if (worker_master_heartbeat(&cow_ctx.worker, new_heartbeat_interval_double) != SUCCESS) {
@@ -270,20 +271,20 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                     async_event_is_EPOLLERR(current_events) ||
                     async_event_is_EPOLLRDHUP(current_events))
                 {
-                    cow_ctx.worker.shutdown_requested = 1;
-                    LOG_INFO("%sMaster disconnected. Initiating graceful shutdown...", cow_ctx.worker.label);
+                    ctx->shutdown_requested = 1;
+                    LOG_INFO("%sMaster disconnected. Initiating graceful shutdown...", ctx->label);
                     continue;
                 }
-                ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(cow_ctx.worker.label, &master_uds_fd);
+                ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(ctx->label, &master_uds_fd);
 				if (ircvdi.status != SUCCESS) {
-					LOG_ERROR("%sError receiving or deserializing IPC message from Master: %d", cow_ctx.worker.label, ircvdi.status);
+					LOG_ERROR("%sError receiving or deserializing IPC message from Master: %d", ctx->label, ircvdi.status);
 					continue;
 				}
                 if (check_mac_ctr(
-                        cow_ctx.worker.label, 
-                        cow_ctx.worker.aes_key, 
-                        cow_ctx.worker.mac_key, 
-                        &cow_ctx.worker.remote_ctr, 
+                        ctx->label, 
+                        ctx->aes_key, 
+                        ctx->mac_key, 
+                        &ctx->remote_ctr, 
                         ircvdi.r_ipc_raw_protocol_t
                     ) != SUCCESS
                 )
@@ -292,36 +293,75 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                     continue;
                 }
 				if (ircvdi.r_ipc_raw_protocol_t->type == IPC_MASTER_WORKER_INFO) {
-                    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(cow_ctx.worker.label,
-                        cow_ctx.worker.aes_key, cow_ctx.worker.remote_nonce, &cow_ctx.worker.remote_ctr,
+                    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(ctx->label,
+                        ctx->aes_key, ctx->remote_nonce, &ctx->remote_ctr,
                         (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
                     if (deserialized_ircvdi.status != SUCCESS) {
-                        LOG_ERROR("%sipc_deserialize gagal dengan status %d.", cow_ctx.worker.label, deserialized_ircvdi.status);
+                        LOG_ERROR("%sipc_deserialize gagal dengan status %d.", ctx->label, deserialized_ircvdi.status);
                         CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
                         continue;
                     } else {
-                        LOG_DEBUG("%sipc_deserialize BERHASIL.", cow_ctx.worker.label);
+                        LOG_DEBUG("%sipc_deserialize BERHASIL.", ctx->label);
                         CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
                     }           
                     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
 					ipc_master_worker_info_t *iinfoi = received_protocol->payload.ipc_master_worker_info;
                     if (iinfoi->flag == IT_SHUTDOWN) {
-                        LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", cow_ctx.worker.label);
+                        LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", ctx->label);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
-                        cow_ctx.worker.shutdown_requested = 1;
+                        ctx->shutdown_requested = 1;
                         continue;
                     } else if (iinfoi->flag == IT_READY) {
-                        LOG_INFO("%sMaster Ready ...", cow_ctx.worker.label);
+                        LOG_INFO("%sMaster Ready ...", ctx->label);
 //----------------------------------------------------------------------
                         if (initial_delay_ms > 0) {
-                            LOG_DEBUG("%sApplying initial delay of %ld ms...", cow_ctx.worker.label, initial_delay_ms);
+                            LOG_DEBUG("%sApplying initial delay of %ld ms...", ctx->label, initial_delay_ms);
                             sleep_ms(initial_delay_ms);
                         }
 //----------------------------------------------------------------------
+                        if (KEM_GENERATE_KEYPAIR(ctx->kem_publickey, ctx->kem_privatekey) != 0) {
+                            LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", ctx->label);
+                            ctx->shutdown_requested = 1;
+                            CLOSE_IPC_PROTOCOL(&received_protocol);
+                            continue;
+                        }
                         if (worker_master_hello1(&cow_ctx.worker) != SUCCESS) {
-                            LOG_ERROR("%sWorker error. Initiating graceful shutdown...", cow_ctx.worker.label);
-                            cow_ctx.worker.shutdown_requested = 1;
+                            LOG_ERROR("%sWorker error. Initiating graceful shutdown...", ctx->label);
+                            ctx->shutdown_requested = 1;
+                            CLOSE_IPC_PROTOCOL(&received_protocol);
+                            continue;
+                        }
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        continue;
+                    } else if (iinfoi->flag == IT_REKEYING) {
+                        LOG_INFO("%sMaster Rekeying ...", ctx->label);
+//----------------------------------------------------------------------
+                        if (initial_delay_ms > 0) {
+                            LOG_DEBUG("%sApplying initial delay of %ld ms...", ctx->label, initial_delay_ms);
+                            sleep_ms(initial_delay_ms);
+                        }
+//----------------------------------------------------------------------
+                        if (KEM_GENERATE_KEYPAIR(ctx->kem_publickey, ctx->kem_privatekey) != 0) {
+                            LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", ctx->label);
+                            ctx->shutdown_requested = 1;
+                            CLOSE_IPC_PROTOCOL(&received_protocol);
+                            continue;
+                        }
+                        if (async_delete_event(ctx->label, &ctx->async, &ctx->heartbeat_timer_fd) != SUCCESS) {		
+                            LOG_INFO("%sGagal async_delete_event hb timer, Untuk Rekeying", ctx->label);
+                            ctx->shutdown_requested = 1;
+                            CLOSE_IPC_PROTOCOL(&received_protocol);
+                            continue;
+                        }
+                        CLOSE_FD(&ctx->heartbeat_timer_fd);
+                        ctx->hello1_sent = false;
+                        ctx->hello1_ack_rcvd = false;
+                        ctx->hello2_sent = false;
+                        ctx->hello2_ack_rcvd = false;
+                        if (worker_master_hello1(&cow_ctx.worker) != SUCCESS) {
+                            LOG_ERROR("%sWorker error. Initiating graceful shutdown...", ctx->label);
+                            ctx->shutdown_requested = 1;
                             CLOSE_IPC_PROTOCOL(&received_protocol);
                             continue;
                         }
@@ -332,69 +372,68 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         continue;
                     }
 				} else if (ircvdi.r_ipc_raw_protocol_t->type == IPC_MASTER_WORKER_HELLO1_ACK) {
-                    if (!cow_ctx.worker.hello1_sent) {
-                        LOG_ERROR("%sBelum pernah mengirim HELLO1", cow_ctx.worker.label);
+                    if (!ctx->hello1_sent) {
+                        LOG_ERROR("%sBelum pernah mengirim HELLO1", ctx->label);
                         CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
                         continue;
                     }
-                    if (cow_ctx.worker.hello1_ack_rcvd) {
-                        LOG_ERROR("%sSudah ada HELLO1_ACK", cow_ctx.worker.label);
+                    if (ctx->hello1_ack_rcvd) {
+                        LOG_ERROR("%sSudah ada HELLO1_ACK", ctx->label);
                         CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
                         continue;
                     }
-					ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(cow_ctx.worker.label,
-                        cow_ctx.worker.aes_key, cow_ctx.worker.remote_nonce, &cow_ctx.worker.remote_ctr,
+					ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(ctx->label,
+                        ctx->aes_key, ctx->remote_nonce, &ctx->remote_ctr,
                         (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
                     if (deserialized_ircvdi.status != SUCCESS) {
-                        LOG_ERROR("%sipc_deserialize gagal dengan status %d.", cow_ctx.worker.label, deserialized_ircvdi.status);
+                        LOG_ERROR("%sipc_deserialize gagal dengan status %d.", ctx->label, deserialized_ircvdi.status);
                         CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
                         continue;
                     } else {
-                        LOG_DEBUG("%sipc_deserialize BERHASIL.", cow_ctx.worker.label);
+                        LOG_DEBUG("%sipc_deserialize BERHASIL.", ctx->label);
                         CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
                     }           
                     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
 					ipc_master_worker_hello1_ack_t *ihello1_acki = received_protocol->payload.ipc_master_worker_hello1_ack;
-                    memcpy(cow_ctx.worker.kem_ciphertext, ihello1_acki->kem_ciphertext, KEM_CIPHERTEXT_BYTES);
-                    if (KEM_DECODE_SHAREDSECRET(cow_ctx.worker.kem_sharedsecret, cow_ctx.worker.kem_ciphertext, cow_ctx.worker.kem_privatekey) != 0) {
-                        LOG_ERROR("%sFailed to KEM_DECODE_SHAREDSECRET. Worker error. Initiating graceful shutdown...", cow_ctx.worker.label);
-                        cow_ctx.worker.shutdown_requested = 1;
+                    memcpy(ctx->kem_ciphertext, ihello1_acki->kem_ciphertext, KEM_CIPHERTEXT_BYTES);
+                    if (KEM_DECODE_SHAREDSECRET(ctx->kem_sharedsecret, ctx->kem_ciphertext, ctx->kem_privatekey) != 0) {
+                        LOG_ERROR("%sFailed to KEM_DECODE_SHAREDSECRET. Worker error. Initiating graceful shutdown...", ctx->label);
+                        ctx->shutdown_requested = 1;
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
-                    kdf1(cow_ctx.worker.kem_sharedsecret, cow_ctx.worker.aes_key);
-                    kdf2(cow_ctx.worker.aes_key, cow_ctx.worker.mac_key);
                     if (worker_master_hello2(&cow_ctx.worker) != SUCCESS) {
-                        LOG_ERROR("%sFailed to worker_master_hello2. Worker error. Initiating graceful shutdown...", cow_ctx.worker.label);
-                        cow_ctx.worker.shutdown_requested = 1;
+                        LOG_ERROR("%sFailed to worker_master_hello2. Worker error. Initiating graceful shutdown...", ctx->label);
+                        ctx->shutdown_requested = 1;
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
-                    cow_ctx.worker.hello1_ack_rcvd = true;
+                    memcpy(ctx->remote_nonce, ihello1_acki->nonce, AES_NONCE_BYTES);
+                    ctx->hello1_ack_rcvd = true;
                     CLOSE_IPC_PROTOCOL(&received_protocol);
 					continue;
 				} else if (ircvdi.r_ipc_raw_protocol_t->type == IPC_MASTER_WORKER_HELLO2_ACK) {
-                    if (!cow_ctx.worker.hello2_sent) {
-                        LOG_ERROR("%sBelum pernah mengirim HELLO2", cow_ctx.worker.label);
+                    if (!ctx->hello2_sent) {
+                        LOG_ERROR("%sBelum pernah mengirim HELLO2", ctx->label);
                         CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
                         continue;
                     }
-                    if (cow_ctx.worker.hello2_ack_rcvd) {
-                        LOG_ERROR("%sSudah ada HELLO2_ACK", cow_ctx.worker.label);
+                    if (ctx->hello2_ack_rcvd) {
+                        LOG_ERROR("%sSudah ada HELLO2_ACK", ctx->label);
                         CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
                         continue;
                     }
-					ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(cow_ctx.worker.label,
-                        cow_ctx.worker.aes_key, cow_ctx.worker.remote_nonce, &cow_ctx.worker.remote_ctr,
+					ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(ctx->label,
+                        ctx->aes_key, ctx->remote_nonce, &ctx->remote_ctr,
                         (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
                     if (deserialized_ircvdi.status != SUCCESS) {
-                        LOG_ERROR("%sipc_deserialize gagal dengan status %d.", cow_ctx.worker.label, deserialized_ircvdi.status);
+                        LOG_ERROR("%sipc_deserialize gagal dengan status %d.", ctx->label, deserialized_ircvdi.status);
                         CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
                         continue;
                     } else {
-                        LOG_DEBUG("%sipc_deserialize BERHASIL.", cow_ctx.worker.label);
+                        LOG_DEBUG("%sipc_deserialize BERHASIL.", ctx->label);
                         CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
                     }           
                     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
@@ -407,39 +446,39 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 // Cocokkan MAc
 // Decrypt wot dan index
 //======================================================================
-                    memcpy(cow_ctx.worker.remote_nonce, ihello2_acki->encrypted_wot_index, AES_NONCE_BYTES);
                     uint8_t encrypted_wot_index[sizeof(uint8_t) + sizeof(uint8_t)];   
-                    memcpy(encrypted_wot_index, ihello2_acki->encrypted_wot_index + AES_NONCE_BYTES, sizeof(uint8_t) + sizeof(uint8_t));
+                    memcpy(encrypted_wot_index, ihello2_acki->encrypted_wot_index, sizeof(uint8_t) + sizeof(uint8_t));
                     uint8_t data_mac[AES_TAG_BYTES];
-                    memcpy(data_mac, ihello2_acki->encrypted_wot_index + AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t), AES_TAG_BYTES);
+                    memcpy(data_mac, ihello2_acki->encrypted_wot_index + sizeof(uint8_t) + sizeof(uint8_t), AES_TAG_BYTES);
+//----------------------------------------------------------------------
+// Tmp aes_key
+//----------------------------------------------------------------------
+                    uint8_t tmp_aes_key[HASHES_BYTES];
+                    kdf1(ctx->kem_sharedsecret, tmp_aes_key);
 //----------------------------------------------------------------------
 // cek Mac
 //----------------------------------------------------------------------  
-                    uint8_t encrypted_wot_index1[AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t)];
-                    memcpy(encrypted_wot_index1, ihello2_acki->encrypted_wot_index, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t));
                     uint8_t mac[AES_TAG_BYTES];
                     poly1305_context mac_ctx;
-                    poly1305_init(&mac_ctx, cow_ctx.worker.kem_sharedsecret);
-                    poly1305_update(&mac_ctx, encrypted_wot_index1, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t));
+                    poly1305_init(&mac_ctx, ctx->mac_key);
+                    poly1305_update(&mac_ctx, encrypted_wot_index, sizeof(uint8_t) + sizeof(uint8_t));
                     poly1305_finish(&mac_ctx, mac);
                     if (!poly1305_verify(mac, data_mac)) {
-                        LOG_ERROR("%sFailed to Mac Tidak Sesuai. Worker error. Initiating graceful shutdown...", cow_ctx.worker.label);
-                        cow_ctx.worker.shutdown_requested = 1;
+                        LOG_ERROR("%sFailed to Mac Tidak Sesuai. Worker error...", ctx->label);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }            
-                    uint32_t temp_remote_ctr = (uint32_t)0;
 //----------------------------------------------------------------------
 // Decrypt
 //---------------------------------------------------------------------- 
                     uint8_t decrypted_wot_index[sizeof(uint8_t) + sizeof(uint8_t)];
                     aes256ctx aes_ctx;
-                    aes256_ctr_keyexp(&aes_ctx, cow_ctx.worker.kem_sharedsecret);
+                    aes256_ctr_keyexp(&aes_ctx, tmp_aes_key);
 //=========================================IV===========================    
                     uint8_t keystream_buffer[sizeof(uint8_t) + sizeof(uint8_t)];
                     uint8_t iv[AES_IV_BYTES];
-                    memcpy(iv, cow_ctx.worker.remote_nonce, AES_NONCE_BYTES);
-                    uint32_t remote_ctr_be = htobe32(temp_remote_ctr);
+                    memcpy(iv, ctx->remote_nonce, AES_NONCE_BYTES);
+                    uint32_t remote_ctr_be = htobe32(ctx->remote_ctr);
                     memcpy(iv + AES_NONCE_BYTES, &remote_ctr_be, sizeof(uint32_t));
 //=========================================IV===========================    
                     aes256_ctr(keystream_buffer, sizeof(uint8_t) + sizeof(uint8_t), iv, &aes_ctx);
@@ -452,48 +491,60 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //----------------------------------------------------------------------
                     worker_type_t data_wot;
                     memcpy((uint8_t *)&data_wot, decrypted_wot_index, sizeof(uint8_t));
-                    if (*(uint8_t *)&cow_ctx.worker.wot != *(uint8_t *)&data_wot) {
-                        LOG_ERROR("%sberbeda wot. Worker error. Initiating graceful shutdown...", cow_ctx.worker.label);
-                        cow_ctx.worker.shutdown_requested = 1;
+                    if (*(uint8_t *)&ctx->wot != *(uint8_t *)&data_wot) {
+                        LOG_ERROR("%sberbeda wot. Worker error...", ctx->label);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
                     uint8_t data_index;
                     memcpy(&data_index, decrypted_wot_index + sizeof(uint8_t), sizeof(uint8_t));
-                    if (cow_ctx.worker.idx != data_index) {
-                        LOG_ERROR("%sberbeda index. Worker error. Initiating graceful shutdown...", cow_ctx.worker.label);
-                        cow_ctx.worker.shutdown_requested = 1;
+                    if (ctx->idx != data_index) {
+                        LOG_ERROR("%sberbeda index. Worker error...", ctx->label);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
 //----------------------------------------------------------------------
 // Aktifkan Heartbeat Karna security/Enkripsi Sudah Ready
 //---------------------------------------------------------------------- 
-                    if (async_create_incoming_event(cow_ctx.worker.label, &cow_ctx.worker.async, &cow_ctx.worker.heartbeat_timer_fd) != SUCCESS) {
-                        LOG_ERROR("%sWorker error. Initiating graceful shutdown...", cow_ctx.worker.label);
-                        cow_ctx.worker.shutdown_requested = 1;
+                    if (async_create_timerfd(ctx->label, &ctx->heartbeat_timer_fd) != SUCCESS) {
+                        LOG_ERROR("%sWorker error async_create_timerfd...", ctx->label);
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        continue;
+                    }
+                    if (async_set_timerfd_time(ctx->label, &ctx->heartbeat_timer_fd,
+                        WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT, 0,
+                        WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT, 0) != SUCCESS)
+                    {
+                        LOG_ERROR("%sWorker error async_set_timerfd_time...", ctx->label);
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        continue;
+                    }
+                    if (async_create_incoming_event(ctx->label, &ctx->async, &ctx->heartbeat_timer_fd) != SUCCESS) {
+                        LOG_ERROR("%sWorker error async_create_incoming_event...", ctx->label);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
 //----------------------------------------------------------------------
 // Menganggap data valid dengan integritas
 //---------------------------------------------------------------------- 
-                    cow_ctx.worker.remote_ctr = (uint32_t)1;//sudah melakukan dekripsi data valid 1 kali
-                    cow_ctx.worker.hello2_ack_rcvd = true;
+                    memcpy(ctx->aes_key, tmp_aes_key, HASHES_BYTES);
+                    memset (tmp_aes_key, 0, HASHES_BYTES);
+                    ctx->remote_ctr = (uint32_t)0;
+                    ctx->hello2_ack_rcvd = true;
 //---------------------------------------------------------------------- 
                     CLOSE_IPC_PROTOCOL(&received_protocol);
 					continue;
 				} else if (ircvdi.r_ipc_raw_protocol_t->type == IPC_MASTER_COW_CONNECT) {                    
-                    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(cow_ctx.worker.label,
-                        cow_ctx.worker.aes_key, cow_ctx.worker.remote_nonce, &cow_ctx.worker.remote_ctr,
+                    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(ctx->label,
+                        ctx->aes_key, ctx->remote_nonce, &ctx->remote_ctr,
                         (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
                     );
                     if (deserialized_ircvdi.status != SUCCESS) {
-                        LOG_ERROR("%sipc_deserialize gagal dengan status %d.", cow_ctx.worker.label, deserialized_ircvdi.status);
+                        LOG_ERROR("%sipc_deserialize gagal dengan status %d.", ctx->label, deserialized_ircvdi.status);
                         CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
                         continue;
                     } else {
-                        LOG_DEBUG("%sipc_deserialize BERHASIL.", cow_ctx.worker.label);
+                        LOG_DEBUG("%sipc_deserialize BERHASIL.", ctx->label);
                         CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
                     }           
                     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
@@ -508,8 +559,8 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         }
                     }
                     if (slot_found == -1) {
-                        LOG_INFO("%sNO SLOT. master_cow_session_t <> cow_c_session_t. Tidak singkron. Worker error. Initiating graceful shutdown...", cow_ctx.worker.label);
-                        cow_ctx.worker.shutdown_requested = 1;
+                        LOG_INFO("%sNO SLOT. master_cow_session_t <> cow_c_session_t. Tidak singkron. Worker error. Initiating graceful shutdown...", ctx->label);
+                        ctx->shutdown_requested = 1;
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
@@ -531,38 +582,38 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                         NI_NUMERICHOST | NI_NUMERICSERV
                                       );
                     if (getname_res != 0) {
-                        LOG_ERROR("%sgetnameinfo failed. %s", cow_ctx.worker.label, strerror(errno));
+                        LOG_ERROR("%sgetnameinfo failed. %s", ctx->label, strerror(errno));
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
                     int gai_err = getaddrinfo(host_str, port_str, &hints, &res);
                     if (gai_err != 0) {
-                        LOG_ERROR("%sgetaddrinfo error for UDP %s:%s: %s", cow_ctx.worker.label, host_str, port_str, gai_strerror(gai_err));
+                        LOG_ERROR("%sgetaddrinfo error for UDP %s:%s: %s", ctx->label, host_str, port_str, gai_strerror(gai_err));
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
                     for (rp = res; rp != NULL; rp = rp->ai_next) {
                         session->sock_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
                         if (session->sock_fd == -1) {
-                            LOG_ERROR("%sUDP Socket creation failed: %s", cow_ctx.worker.label, strerror(errno));
+                            LOG_ERROR("%sUDP Socket creation failed: %s", ctx->label, strerror(errno));
                             CLOSE_IPC_PROTOCOL(&received_protocol);
                             continue;
                         }
-                        LOG_DEBUG("%sUDP Socket FD %d created.", cow_ctx.worker.label, session->sock_fd);
-                        status_t r_snbkg = set_nonblocking(cow_ctx.worker.label, session->sock_fd);
+                        LOG_DEBUG("%sUDP Socket FD %d created.", ctx->label, session->sock_fd);
+                        status_t r_snbkg = set_nonblocking(ctx->label, session->sock_fd);
                         if (r_snbkg != SUCCESS) {
-                            LOG_ERROR("%sset_nonblocking failed.", cow_ctx.worker.label);
+                            LOG_ERROR("%sset_nonblocking failed.", ctx->label);
                             CLOSE_IPC_PROTOCOL(&received_protocol);
                             continue;
                         }
-                        LOG_DEBUG("%sUDP Socket FD %d set to non-blocking.", cow_ctx.worker.label, session->sock_fd);
+                        LOG_DEBUG("%sUDP Socket FD %d set to non-blocking.", ctx->label, session->sock_fd);
                         int conn_res = connect(session->sock_fd, rp->ai_addr, rp->ai_addrlen);
                         if (conn_res == 0) {
-                            LOG_INFO("%sUDP socket 'connected' to %s:%s (FD %d).", cow_ctx.worker.label, host_str, port_str, session->sock_fd);
+                            LOG_INFO("%sUDP socket 'connected' to %s:%s (FD %d).", ctx->label, host_str, port_str, session->sock_fd);
                             CLOSE_IPC_PROTOCOL(&received_protocol);
                             break;
                         } else {
-                            LOG_ERROR("%sUDP 'connect' failed for %s:%s (FD %d): %s", cow_ctx.worker.label, host_str, port_str, session->sock_fd, strerror(errno));
+                            LOG_ERROR("%sUDP 'connect' failed for %s:%s (FD %d): %s", ctx->label, host_str, port_str, session->sock_fd, strerror(errno));
                             CLOSE_IPC_PROTOCOL(&received_protocol);
                             CLOSE_FD(&session->sock_fd);
                             continue;
@@ -570,45 +621,45 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                     }
                     freeaddrinfo(res);
                     if (session->sock_fd == -1) {
-                        LOG_ERROR("%sFailed to set up any UDP socket for %s:%s.", cow_ctx.worker.label, host_str, port_str);
+                        LOG_ERROR("%sFailed to set up any UDP socket for %s:%s.", ctx->label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
-                    if (async_create_incoming_event(cow_ctx.worker.label, &cow_ctx.worker.async, &session->sock_fd) != SUCCESS) {
-                        LOG_ERROR("%sFailed to async_create_incoming_event for %s:%s.", cow_ctx.worker.label, host_str, port_str);
+                    if (async_create_incoming_event(ctx->label, &ctx->async, &session->sock_fd) != SUCCESS) {
+                        LOG_ERROR("%sFailed to async_create_incoming_event for %s:%s.", ctx->label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
 //======================================================================
 // Generate Identity                    
 //======================================================================
-                    if (generate_connection_id(cow_ctx.worker.label, &session->identity.client_id) != SUCCESS) {
-                        LOG_ERROR("%sFailed to generate_connection_id for %s:%s.", cow_ctx.worker.label, host_str, port_str);
+                    if (generate_connection_id(ctx->label, &session->identity.client_id) != SUCCESS) {
+                        LOG_ERROR("%sFailed to generate_connection_id for %s:%s.", ctx->label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
                     if (KEM_GENERATE_KEYPAIR(session->identity.kem_publickey, session->identity.kem_privatekey) != 0) {
-                        LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR for %s:%s.", cow_ctx.worker.label, host_str, port_str);
+                        LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR for %s:%s.", ctx->label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
 //======================================================================
 // Send HELLO1                    
 //======================================================================           
-                    if (async_create_timerfd(cow_ctx.worker.label, &session->hello1.timer_fd) != SUCCESS) {
-                        LOG_ERROR("%sFailed to async_create_timerfd for %s:%s.", cow_ctx.worker.label, host_str, port_str);
+                    if (async_create_timerfd(ctx->label, &session->hello1.timer_fd) != SUCCESS) {
+                        LOG_ERROR("%sFailed to async_create_timerfd for %s:%s.", ctx->label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
 //----------------------------------------------------------------------
                     if (send_hello1(&cow_ctx, session) != SUCCESS) {
-                        LOG_ERROR("%sFailed to send_hello1 for %s:%s.", cow_ctx.worker.label, host_str, port_str);
+                        LOG_ERROR("%sFailed to send_hello1 for %s:%s.", ctx->label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
 //----------------------------------------------------------------------
-                    if (async_create_incoming_event(cow_ctx.worker.label, &cow_ctx.worker.async, &session->hello1.timer_fd) != SUCCESS) {
-                        LOG_ERROR("%sFailed to async_create_incoming_event for %s:%s.", cow_ctx.worker.label, host_str, port_str);
+                    if (async_create_incoming_event(ctx->label, &ctx->async, &session->hello1.timer_fd) != SUCCESS) {
+                        LOG_ERROR("%sFailed to async_create_incoming_event for %s:%s.", ctx->label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }        
@@ -616,7 +667,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                     CLOSE_IPC_PROTOCOL(&received_protocol);
 					continue;
 				} else {
-                    LOG_ERROR("%sUnknown protocol type %d from Master. Ignoring.", cow_ctx.worker.label, ircvdi.r_ipc_raw_protocol_t->type);
+                    LOG_ERROR("%sUnknown protocol type %d from Master. Ignoring.", ctx->label, ircvdi.r_ipc_raw_protocol_t->type);
                     CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
                     continue;
                 }
@@ -632,7 +683,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                             char port_str[NI_MAXSERV];
                             
                             orilink_raw_protocol_t_status_t orcvdo = receive_orilink_raw_protocol_packet(
-                                cow_ctx.worker.label,
+                                ctx->label,
                                 &session->sock_fd,
                                 (struct sockaddr *)&server_addr
                             );
@@ -646,14 +697,14 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                                 NI_NUMERICHOST | NI_NUMERICSERV
                                               );
                             if (getname_res != 0) {
-                                LOG_ERROR("%sgetnameinfo failed. %s", cow_ctx.worker.label, strerror(errno));
+                                LOG_ERROR("%sgetnameinfo failed. %s", ctx->label, strerror(errno));
                                 CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                 event_founded_in_session = true;
                                 break;
                             }
                             size_t host_str_len = strlen(host_str);
                             if (host_str_len >= INET6_ADDRSTRLEN) {
-                                LOG_ERROR("%sKoneksi ditolak dari IP %s. IP terlalu panjang.", cow_ctx.worker.label, host_str);
+                                LOG_ERROR("%sKoneksi ditolak dari IP %s. IP terlalu panjang.", ctx->label, host_str);
                                 CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                 event_founded_in_session = true;
                                 break;
@@ -661,7 +712,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                             char *endptr;
                             long port_num = strtol(port_str, &endptr, 10);
                             if (*endptr != '\0' || port_num <= 0 || port_num > 65535) {
-                                LOG_ERROR("%sKoneksi ditolak dari IP %s. PORT di luar rentang (1-65535).", cow_ctx.worker.label, host_str);
+                                LOG_ERROR("%sKoneksi ditolak dari IP %s. PORT di luar rentang (1-65535).", ctx->label, host_str);
                                 CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                 event_founded_in_session = true;
                                 break;
@@ -672,23 +723,23 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                         session->hello1.sent
                                    )
                                 {
-                                    orilink_protocol_t_status_t deserialized_orcvdo = orilink_deserialize(cow_ctx.worker.label,
+                                    orilink_protocol_t_status_t deserialized_orcvdo = orilink_deserialize(ctx->label,
                                         session->identity.kem_sharedsecret, session->identity.remote_nonce, session->identity.remote_ctr,
                                         (const uint8_t*)orcvdo.r_orilink_raw_protocol_t->recv_buffer, orcvdo.r_orilink_raw_protocol_t->n
                                     );
                                     if (deserialized_orcvdo.status != SUCCESS) {
-                                        LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", cow_ctx.worker.label, deserialized_orcvdo.status);
+                                        LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", ctx->label, deserialized_orcvdo.status);
                                         CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                         event_founded_in_session = true;
                                         break;
                                     } else {
-                                        LOG_DEBUG("%sorilink_deserialize BERHASIL.", cow_ctx.worker.label);
+                                        LOG_DEBUG("%sorilink_deserialize BERHASIL.", ctx->label);
                                         CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                     }  
                                     orilink_protocol_t* received_protocol = deserialized_orcvdo.r_orilink_protocol_t;
                                     orilink_hello1_ack_t *ohello1_ack = received_protocol->payload.orilink_hello1_ack;
                                     if (session->identity.client_id != ohello1_ack->client_id) {
-                                        LOG_WARN("%sHELLO1_ACK ditolak dari IP %s. client_id berbeda.", cow_ctx.worker.label, host_str);
+                                        LOG_WARN("%sHELLO1_ACK ditolak dari IP %s. client_id berbeda.", ctx->label, host_str);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -696,8 +747,8 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //======================================================================
 // Send HELLO2                   
 //======================================================================           
-                                    if (async_create_timerfd(cow_ctx.worker.label, &session->hello2.timer_fd) != SUCCESS) {
-                                        LOG_ERROR("%sFailed to async_create_timerfd.", cow_ctx.worker.label);
+                                    if (async_create_timerfd(ctx->label, &session->hello2.timer_fd) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to async_create_timerfd.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -707,9 +758,9 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //----------------------------------------------------------------------
                                     double try_count = (double)session->hello1.sent_try_count-(double)1;
                                     cow_calculate_retry(&cow_ctx, session, i, try_count);
-                                    uint64_t_status_t rt = get_realtime_time_ns(cow_ctx.worker.label);
+                                    uint64_t_status_t rt = get_realtime_time_ns(ctx->label);
                                     if (rt.status != SUCCESS) {
-                                        LOG_ERROR("%sFailed to get_realtime_time_ns.", cow_ctx.worker.label);
+                                        LOG_ERROR("%sFailed to get_realtime_time_ns.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -721,14 +772,14 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                     cow_calculate_rtt(&cow_ctx, session, i, rtt_value);
 //----------------------------------------------------------------------
                                     if (send_hello2(&cow_ctx, session) != SUCCESS) {
-                                        LOG_ERROR("%sFailed to send_hello2.", cow_ctx.worker.label);
+                                        LOG_ERROR("%sFailed to send_hello2.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
                                     }
 //----------------------------------------------------------------------
-                                    if (async_create_incoming_event(cow_ctx.worker.label, &cow_ctx.worker.async, &session->hello2.timer_fd) != SUCCESS) {
-                                        LOG_ERROR("%sFailed to async_create_incoming_event.", cow_ctx.worker.label);
+                                    if (async_create_incoming_event(ctx->label, &ctx->async, &session->hello2.timer_fd) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to async_create_incoming_event.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -736,13 +787,13 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //----------------------------------------------------------------------
 // Semua sudah bersih
 //----------------------------------------------------------------------
-                                    cleanup_hello(cow_ctx.worker.label, &cow_ctx.worker.async, &session->hello1);
+                                    cleanup_hello(ctx->label, &ctx->async, &session->hello1);
 //======================================================================  
                                     CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                     event_founded_in_session = true;
                                     break;
                                 } else {
-                                    LOG_ERROR("%sKoneksi ditolak Tidak pernah mengirim HELLO1 ke IP %s.", cow_ctx.worker.label, host_str);
+                                    LOG_ERROR("%sKoneksi ditolak Tidak pernah mengirim HELLO1 ke IP %s.", ctx->label, host_str);
                                     CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                     event_founded_in_session = true;
                                     break;
@@ -754,23 +805,23 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                         session->hello2.sent
                                    )
                                 {
-                                    orilink_protocol_t_status_t deserialized_orcvdo = orilink_deserialize(cow_ctx.worker.label,
+                                    orilink_protocol_t_status_t deserialized_orcvdo = orilink_deserialize(ctx->label,
                                         session->identity.kem_sharedsecret, session->identity.remote_nonce, session->identity.remote_ctr,
                                         (const uint8_t*)orcvdo.r_orilink_raw_protocol_t->recv_buffer, orcvdo.r_orilink_raw_protocol_t->n
                                     );
                                     if (deserialized_orcvdo.status != SUCCESS) {
-                                        LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", cow_ctx.worker.label, deserialized_orcvdo.status);
+                                        LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", ctx->label, deserialized_orcvdo.status);
                                         CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                         event_founded_in_session = true;
                                         break;
                                     } else {
-                                        LOG_DEBUG("%sorilink_deserialize BERHASIL.", cow_ctx.worker.label);
+                                        LOG_DEBUG("%sorilink_deserialize BERHASIL.", ctx->label);
                                         CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                     }  
                                     orilink_protocol_t* received_protocol = deserialized_orcvdo.r_orilink_protocol_t;
                                     orilink_hello2_ack_t *ohello2_ack = received_protocol->payload.orilink_hello2_ack;
                                     if (session->identity.client_id != ohello2_ack->client_id) {
-                                        LOG_WARN("%HELLO2_ACK ditolak dari IP %s. client_id berbeda.", cow_ctx.worker.label, host_str);
+                                        LOG_WARN("%HELLO2_ACK ditolak dari IP %s. client_id berbeda.", ctx->label, host_str);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -779,8 +830,8 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //======================================================================
 // Send HELLO3
 //======================================================================           
-                                    if (async_create_timerfd(cow_ctx.worker.label, &session->hello3.timer_fd) != SUCCESS) {
-                                        LOG_ERROR("%sFailed to async_create_timerfd.", cow_ctx.worker.label);
+                                    if (async_create_timerfd(ctx->label, &session->hello3.timer_fd) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to async_create_timerfd.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -790,9 +841,9 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //----------------------------------------------------------------------
                                     double try_count = (double)session->hello2.sent_try_count-(double)1;
                                     cow_calculate_retry(&cow_ctx, session, i, try_count);
-                                    uint64_t_status_t rt = get_realtime_time_ns(cow_ctx.worker.label);
+                                    uint64_t_status_t rt = get_realtime_time_ns(ctx->label);
                                     if (rt.status != SUCCESS) {
-                                        LOG_ERROR("%sFailed to get_realtime_time_ns.", cow_ctx.worker.label);
+                                        LOG_ERROR("%sFailed to get_realtime_time_ns.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -804,14 +855,14 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                     cow_calculate_rtt(&cow_ctx, session, i, rtt_value);
 //----------------------------------------------------------------------
                                     if (send_hello3(&cow_ctx, session) != SUCCESS) {
-                                        LOG_ERROR("%sFailed to send_hello3.", cow_ctx.worker.label);
+                                        LOG_ERROR("%sFailed to send_hello3.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
                                     }
 //----------------------------------------------------------------------
-                                    if (async_create_incoming_event(cow_ctx.worker.label, &cow_ctx.worker.async, &session->hello3.timer_fd) != SUCCESS) {
-                                        LOG_ERROR("%sFailed to async_create_incoming_event.", cow_ctx.worker.label);
+                                    if (async_create_incoming_event(ctx->label, &ctx->async, &session->hello3.timer_fd) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to async_create_incoming_event.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -819,13 +870,13 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //----------------------------------------------------------------------
 // Semua sudah bersih
 //----------------------------------------------------------------------
-                                    cleanup_hello(cow_ctx.worker.label, &cow_ctx.worker.async, &session->hello2);
+                                    cleanup_hello(ctx->label, &ctx->async, &session->hello2);
 //======================================================================  
                                     CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                     event_founded_in_session = true;
                                     break;
                                 } else {
-                                    LOG_ERROR("%sKoneksi ditolak Tidak pernah mengirim HELLO1 dan atau HELLO2 ke IP %s.", cow_ctx.worker.label, host_str);
+                                    LOG_ERROR("%sKoneksi ditolak Tidak pernah mengirim HELLO1 dan atau HELLO2 ke IP %s.", ctx->label, host_str);
                                     CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                     event_founded_in_session = true;
                                     break;
@@ -838,23 +889,23 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                         session->hello3.sent
                                    )
                                 {
-                                    orilink_protocol_t_status_t deserialized_orcvdo = orilink_deserialize(cow_ctx.worker.label,
+                                    orilink_protocol_t_status_t deserialized_orcvdo = orilink_deserialize(ctx->label,
                                         session->identity.kem_sharedsecret, session->identity.remote_nonce, session->identity.remote_ctr,
                                         (const uint8_t*)orcvdo.r_orilink_raw_protocol_t->recv_buffer, orcvdo.r_orilink_raw_protocol_t->n
                                     );
                                     if (deserialized_orcvdo.status != SUCCESS) {
-                                        LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", cow_ctx.worker.label, deserialized_orcvdo.status);
+                                        LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", ctx->label, deserialized_orcvdo.status);
                                         CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                         event_founded_in_session = true;
                                         break;
                                     } else {
-                                        LOG_DEBUG("%sorilink_deserialize BERHASIL.", cow_ctx.worker.label);
+                                        LOG_DEBUG("%sorilink_deserialize BERHASIL.", ctx->label);
                                         CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                     }  
                                     orilink_protocol_t* received_protocol = deserialized_orcvdo.r_orilink_protocol_t;
                                     orilink_hello3_ack_t *ohello3_ack = received_protocol->payload.orilink_hello3_ack;
                                     if (session->identity.client_id != ohello3_ack->client_id) {
-                                        LOG_WARN("%HELLO3_ACK ditolak dari IP %s. client_id berbeda.", cow_ctx.worker.label, host_str);
+                                        LOG_WARN("%HELLO3_ACK ditolak dari IP %s. client_id berbeda.", ctx->label, host_str);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -868,7 +919,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 // temp_kem_sharedsecret ke identity
 //----------------------------------------------------------------------
                                     if (KEM_DECODE_SHAREDSECRET(session->temp_kem_sharedsecret, session->identity.kem_ciphertext, session->identity.kem_privatekey) != 0) {
-                                        LOG_ERROR("%sFailed to KEM_DECODE_SHAREDSECRET.", cow_ctx.worker.label);
+                                        LOG_ERROR("%sFailed to KEM_DECODE_SHAREDSECRET.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -889,7 +940,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                     poly1305_update(&mac_ctx, encrypted_server_id_port1, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t));
                                     poly1305_finish(&mac_ctx, mac);
                                     if (!poly1305_verify(mac, data_mac)) {
-                                        LOG_ERROR("%sFailed to Mac Tidak Sesuai.", cow_ctx.worker.label);
+                                        LOG_ERROR("%sFailed to Mac Tidak Sesuai.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -932,8 +983,8 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //======================================================================
 // Send HELLO_END
 //======================================================================   
-                                    if (async_create_timerfd(cow_ctx.worker.label, &session->hello_end.timer_fd) != SUCCESS) {
-                                        LOG_ERROR("%sFailed to async_create_timerfd.", cow_ctx.worker.label);
+                                    if (async_create_timerfd(ctx->label, &session->hello_end.timer_fd) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to async_create_timerfd.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -943,9 +994,9 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //----------------------------------------------------------------------
                                     double try_count = (double)session->hello3.sent_try_count-(double)1;
                                     cow_calculate_retry(&cow_ctx, session, i, try_count);
-                                    uint64_t_status_t rt = get_realtime_time_ns(cow_ctx.worker.label);
+                                    uint64_t_status_t rt = get_realtime_time_ns(ctx->label);
                                     if (rt.status != SUCCESS) {
-                                        LOG_ERROR("%sFailed to get_realtime_time_ns.", cow_ctx.worker.label);
+                                        LOG_ERROR("%sFailed to get_realtime_time_ns.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -957,14 +1008,14 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                     cow_calculate_rtt(&cow_ctx, session, i, rtt_value);
 //----------------------------------------------------------------------
                                     if (send_hello_end(&cow_ctx, session) != SUCCESS) {
-                                        LOG_ERROR("%sFailed to send_hello_end.", cow_ctx.worker.label);
+                                        LOG_ERROR("%sFailed to send_hello_end.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
                                     }
 //----------------------------------------------------------------------
-                                    if (async_create_incoming_event(cow_ctx.worker.label, &cow_ctx.worker.async, &session->hello_end.timer_fd) != SUCCESS) {
-                                        LOG_ERROR("%sFailed to async_create_incoming_event.", cow_ctx.worker.label);
+                                    if (async_create_incoming_event(ctx->label, &ctx->async, &session->hello_end.timer_fd) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to async_create_incoming_event.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
@@ -972,13 +1023,13 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //----------------------------------------------------------------------
 // Semua sudah bersih
 //----------------------------------------------------------------------
-                                    cleanup_hello(cow_ctx.worker.label, &cow_ctx.worker.async, &session->hello3);
+                                    cleanup_hello(ctx->label, &ctx->async, &session->hello3);
 //======================================================================  
                                     CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                     event_founded_in_session = true;
                                     break;
                                 } else {
-                                    LOG_ERROR("%sKoneksi ditolak Tidak pernah mengirim HELLO1 dan atau HELLO2 dan atau HELLO3 ke IP %s.", cow_ctx.worker.label, host_str);
+                                    LOG_ERROR("%sKoneksi ditolak Tidak pernah mengirim HELLO1 dan atau HELLO2 dan atau HELLO3 ke IP %s.", ctx->label, host_str);
                                     CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                                     event_founded_in_session = true;
                                     break;
@@ -995,7 +1046,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                 event_founded_in_session = true;
                                 break;
                             }
-                            LOG_DEBUG("%s session %d: interval = %lf.", cow_ctx.worker.label, i, session->hello1.interval_timer_fd);
+                            LOG_DEBUG("%s session %d: interval = %lf.", ctx->label, i, session->hello1.interval_timer_fd);
                             double try_count = (double)session->hello1.sent_try_count;
                             cow_calculate_retry(&cow_ctx, session, i, try_count);
                             session->hello1.interval_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);
@@ -1009,7 +1060,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                 event_founded_in_session = true;
                                 break;
                             }
-                            LOG_DEBUG("%s session %d: interval = %lf.", cow_ctx.worker.label, i, session->hello2.interval_timer_fd);
+                            LOG_DEBUG("%s session %d: interval = %lf.", ctx->label, i, session->hello2.interval_timer_fd);
                             double try_count = (double)session->hello2.sent_try_count;
                             cow_calculate_retry(&cow_ctx, session, i, try_count);
                             session->hello2.interval_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);
@@ -1023,7 +1074,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                 event_founded_in_session = true;
                                 break;
                             }
-                            LOG_DEBUG("%s session %d: interval = %lf.", cow_ctx.worker.label, i, session->hello3.interval_timer_fd);
+                            LOG_DEBUG("%s session %d: interval = %lf.", ctx->label, i, session->hello3.interval_timer_fd);
                             double try_count = (double)session->hello3.sent_try_count;
                             cow_calculate_retry(&cow_ctx, session, i, try_count);
                             session->hello3.interval_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);
@@ -1037,7 +1088,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                 event_founded_in_session = true;
                                 break;
                             }
-                            LOG_DEBUG("%s session %d: interval = %lf.", cow_ctx.worker.label, i, session->hello_end.interval_timer_fd);
+                            LOG_DEBUG("%s session %d: interval = %lf.", ctx->label, i, session->hello_end.interval_timer_fd);
                             double try_count = (double)session->hello_end.sent_try_count;
                             cow_calculate_retry(&cow_ctx, session, i, try_count);
                             session->hello_end.interval_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);
@@ -1051,15 +1102,12 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //======================================================================
 // Event yang belum ditangkap
 //======================================================================                 
-                LOG_ERROR("%sUnknown FD event %d.", cow_ctx.worker.label, current_fd);
+                LOG_ERROR("%sUnknown FD event %d.", ctx->label, current_fd);
 //======================================================================
             }
         }
     }
 
-//======================================================================
-// COW Cleanup
-//======================================================================    
 exit:    
     cleanup_cow_worker(&cow_ctx);
 }

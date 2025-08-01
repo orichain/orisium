@@ -25,6 +25,7 @@ typedef struct {
     bootstrap_nodes_t bootstrap_nodes;
 //----------------------------------------------------------------------
     bool all_workers_is_ready;
+    bool is_rekeying;
 //----------------------------------------------------------------------
     uint8_t *kem_privatekey;
     uint8_t *kem_publickey;

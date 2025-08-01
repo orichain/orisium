@@ -87,11 +87,12 @@ typedef struct {
 } ipc_worker_master_hello2_t;
 
 typedef struct {
+    uint8_t nonce[AES_NONCE_BYTES];
     uint8_t kem_ciphertext[KEM_CIPHERTEXT_BYTES];
 } ipc_master_worker_hello1_ack_t;
 
 typedef struct {
-    uint8_t encrypted_wot_index[AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES];
+    uint8_t encrypted_wot_index[sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES];
 } ipc_master_worker_hello2_ack_t;
 
 typedef struct {
@@ -135,12 +136,17 @@ static inline void CLOSE_IPC_PROTOCOL(ipc_protocol_t **protocol_ptr) {
         } else if (x->type == IPC_MASTER_SIO_ORILINK_IDENTITY) {
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_sio_orilink_identity);
         } else if (x->type == IPC_WORKER_MASTER_HELLO1) {
+            memset(x->payload.ipc_worker_master_hello1->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_worker_master_hello1);
         } else if (x->type == IPC_MASTER_WORKER_HELLO1_ACK) {
+            memset(x->payload.ipc_master_worker_hello1_ack->nonce, 0, AES_NONCE_BYTES);
+            memset(x->payload.ipc_master_worker_hello1_ack->kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_worker_hello1_ack);
         } else if (x->type == IPC_WORKER_MASTER_HELLO2) {
+            memset(x->payload.ipc_worker_master_hello2->encrypted_wot_index, 0, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES);
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_worker_master_hello2);
         } else if (x->type == IPC_MASTER_WORKER_HELLO2_ACK) {
+            memset(x->payload.ipc_master_worker_hello2_ack->encrypted_wot_index, 0, sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES);
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_worker_hello2_ack);
         }
         free(x);

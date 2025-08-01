@@ -5,6 +5,7 @@
 
 #include "log.h"
 #include "constants.h"
+#include "utilities.h"
 #include "types.h"
 #include "master/process.h"
 #include "ipc/protocol.h"
@@ -16,7 +17,6 @@
 #include "aes.h"
 #include "sessions/master_session.h"
 #include "stdbool.h"
-#include "utilities.h"
 
 struct sockaddr_in6;
 
@@ -144,10 +144,16 @@ status_t master_worker_hello1_ack(const char *label, master_context_t *master_ct
         return FAILURE;
     }
     if (!security || !kem_ciphertext || *worker_uds_fd == -1) return FAILURE;
+    uint8_t tmp_local_nonce[AES_NONCE_BYTES];
+    if (generate_nonce(label, tmp_local_nonce) != SUCCESS) {
+        LOG_ERROR("%sFailed to generate_nonce.", label);
+        return FAILURE;
+    }
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_hello1_ack(
         label, 
         wot, 
         index, 
+        tmp_local_nonce,
         kem_ciphertext
     );
     if (cmd_result.status != SUCCESS) {
@@ -169,6 +175,8 @@ status_t master_worker_hello1_ack(const char *label, master_context_t *master_ct
     } else {
         LOG_DEBUG("%sSent master_worker_hello1_ack to %s %ld.", label, worker_name, index);
     }
+    memcpy(security->local_nonce, tmp_local_nonce, AES_NONCE_BYTES);
+    memset(tmp_local_nonce, 0, AES_NONCE_BYTES);
     security->hello1_ack_sent = true;
     CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t); 
 	return SUCCESS;
@@ -202,17 +210,19 @@ status_t master_worker_hello2_ack(const char *label, master_context_t *master_ct
         return FAILURE;
     }
     if (!security || *worker_uds_fd == -1) return FAILURE;
-//======================================================================    
     uint8_t wot_index[sizeof(uint8_t) + sizeof(uint8_t)];
     uint8_t encrypted_wot_index[sizeof(uint8_t) + sizeof(uint8_t)];   
-    uint8_t encrypted_wot_index1[AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t)];
-    uint8_t encrypted_wot_index2[AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES];
-    memcpy(encrypted_wot_index1, security->local_nonce, AES_NONCE_BYTES);
+    uint8_t encrypted_wot_index1[sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES];
     memcpy(wot_index, (uint8_t *)&wot, sizeof(uint8_t));
     memcpy(wot_index + sizeof(uint8_t), &index, sizeof(uint8_t));
+//----------------------------------------------------------------------
+// Tmp aes_key
+//----------------------------------------------------------------------
+    uint8_t tmp_aes_key[HASHES_BYTES];
+    kdf1(security->kem_sharedsecret, tmp_aes_key);
 //======================================================================    
     aes256ctx aes_ctx;
-    aes256_ctr_keyexp(&aes_ctx, security->kem_sharedsecret);
+    aes256_ctr_keyexp(&aes_ctx, tmp_aes_key);
 //=========================================IV===========================    
     uint8_t keystream_buffer[sizeof(uint8_t) + sizeof(uint8_t)];
     uint8_t iv[AES_IV_BYTES];
@@ -226,28 +236,20 @@ status_t master_worker_hello2_ack(const char *label, master_context_t *master_ct
     }
     aes256_ctx_release(&aes_ctx);
 //======================================================================    
-    memcpy(encrypted_wot_index1 + AES_NONCE_BYTES, encrypted_wot_index, sizeof(uint8_t) + sizeof(uint8_t));
-//======================================================================    
     uint8_t mac[AES_TAG_BYTES];
     poly1305_context mac_ctx;
-    poly1305_init(&mac_ctx, security->kem_sharedsecret);
-    poly1305_update(&mac_ctx, encrypted_wot_index1, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t));
+    poly1305_init(&mac_ctx, security->mac_key);
+    poly1305_update(&mac_ctx, encrypted_wot_index, sizeof(uint8_t) + sizeof(uint8_t));
     poly1305_finish(&mac_ctx, mac);
 //====================================================================== 
-    memcpy(encrypted_wot_index2, encrypted_wot_index1, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t));
-    memcpy(encrypted_wot_index2 + AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t), mac, AES_TAG_BYTES);
-//======================================================================
-// Prinsip Local Crt dan Remote Crt
-// Tambah Local Counter Jika Berhasil Encrypt    
-// Tambah Remote Counter Jika Mac Cocok dan Berhasil Decrypt
-//======================================================================
-    increment_ctr(&security->local_ctr, security->local_nonce);
+    memcpy(encrypted_wot_index1, encrypted_wot_index, sizeof(uint8_t) + sizeof(uint8_t));
+    memcpy(encrypted_wot_index1 + sizeof(uint8_t) + sizeof(uint8_t), mac, AES_TAG_BYTES);
 //======================================================================
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_hello2_ack(
         label, 
         wot,
         index,
-        encrypted_wot_index2
+        encrypted_wot_index1
     );
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
@@ -268,6 +270,9 @@ status_t master_worker_hello2_ack(const char *label, master_context_t *master_ct
     } else {
         LOG_DEBUG("%sSent master_worker_hello2_ack to %s %ld.", label, worker_name, index);
     }
+    memcpy(security->aes_key, tmp_aes_key, HASHES_BYTES);
+    memset (tmp_aes_key, 0, HASHES_BYTES);
+    security->local_ctr = (uint32_t)0;
     security->hello2_ack_sent = true;
     CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t); 
 	return SUCCESS;

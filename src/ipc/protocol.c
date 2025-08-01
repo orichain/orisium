@@ -160,7 +160,7 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
                     return result;
                 }
             }
-            payload_fixed_size = KEM_CIPHERTEXT_BYTES;
+            payload_fixed_size = AES_NONCE_BYTES + KEM_CIPHERTEXT_BYTES;
             payload_dynamic_size = 0;
             break;
         }
@@ -172,7 +172,7 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
                     return result;
                 }
             }
-            payload_fixed_size = AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES;
+            payload_fixed_size = sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES;
             payload_dynamic_size = 0;
             break;
         }
@@ -309,9 +309,7 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes, uint8_t* key
             key_aes, 
             key0, 
             KEM_SHAREDSECRET_BYTES
-        ) != 0 &&
-        p->type != IPC_WORKER_MASTER_HELLO2 &&
-        p->type != IPC_MASTER_WORKER_HELLO2_ACK
+        ) != 0
     )
     {
         uint32_t ctr_be = htobe32(*(uint32_t *)ctr);
@@ -460,9 +458,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
             key_aes, 
             key0, 
             KEM_SHAREDSECRET_BYTES
-        ) != 0 && 
-        p->type != IPC_WORKER_MASTER_HELLO2 && 
-        p->type != IPC_MASTER_WORKER_HELLO2_ACK
+        ) != 0
     )
     {
         uint32_t data_ctr = be32toh(data_ctr_be);
@@ -734,9 +730,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
             key_aes, 
             key0, 
             KEM_SHAREDSECRET_BYTES
-        ) != 0 &&
-        p->type != IPC_WORKER_MASTER_HELLO2 &&
-        p->type != IPC_MASTER_WORKER_HELLO2_ACK
+        ) != 0
     )
     {
         increment_ctr(ctr, nonce);
@@ -819,9 +813,7 @@ status_t check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac, ui
             key_aes, 
             key0, 
             KEM_SHAREDSECRET_BYTES
-        ) != 0 && 
-        r->type != IPC_WORKER_MASTER_HELLO2 && 
-        r->type != IPC_MASTER_WORKER_HELLO2_ACK
+        ) != 0
     )
     {
         if (r->ctr != *(uint32_t *)ctr) {
