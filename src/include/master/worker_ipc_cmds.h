@@ -1,7 +1,7 @@
 #ifndef MASTER_WORKER_IPC_CMDS_H
 #define MASTER_WORKER_IPC_CMDS_H
 
-#include "master/process.h"
+#include "master/master.h"
 
 status_t master_worker_info(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index, info_type_t flag);
 status_t master_workers_info(const char *label, master_context_t *master_ctx, info_type_t flag);

@@ -1,7 +1,7 @@
 #ifndef WORKERS_MASTER_IPC_CMDS_H
 #define WORKERS_MASTER_IPC_CMDS_H
 
-#include "workers/worker.h"
+#include "workers/workers.h"
 
 status_t worker_master_heartbeat(worker_context_t *ctx, double new_heartbeat_interval_double);
 status_t worker_master_hello1(worker_context_t *ctx);

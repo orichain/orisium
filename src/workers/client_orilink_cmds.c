@@ -9,7 +9,7 @@
 #include "orilink/hello2.h"
 #include "orilink/hello3.h"
 #include "orilink/hello_end.h"
-#include "sessions/workers_session.h"
+#include "workers/workers.h"
 #include "poly1305-donna.h"
 #include "utilities.h"
 #include "aes.h"

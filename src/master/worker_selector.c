@@ -5,7 +5,7 @@
 #include "log.h"
 #include "constants.h"
 #include "types.h"
-#include "master/process.h"
+#include "master/master.h"
 
 int select_best_worker(const char *label, master_context_t *master_ctx, worker_type_t wot) {
     const char *worker_name = "Unknown";

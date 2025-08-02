@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 #include "types.h"
-#include "sessions/master_session.h"
+#include "master/master.h"
 #include "utilities.h"
 #include "async.h"
 #include "master/server_orilink_cmds.h"

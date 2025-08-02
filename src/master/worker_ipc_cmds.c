@@ -7,7 +7,7 @@
 #include "constants.h"
 #include "utilities.h"
 #include "types.h"
-#include "master/process.h"
+#include "master/master.h"
 #include "ipc/protocol.h"
 #include "ipc/master_worker_info.h"
 #include "ipc/master_worker_hello1_ack.h"
@@ -15,7 +15,6 @@
 #include "ipc/master_cow_connect.h"
 #include "poly1305-donna.h"
 #include "aes.h"
-#include "sessions/master_session.h"
 #include "stdbool.h"
 
 struct sockaddr_in6;

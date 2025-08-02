@@ -1,10 +1,17 @@
-#ifndef SESSIONS_MASTER_SESSION_H
-#define SESSIONS_MASTER_SESSION_H
+#ifndef MASTER_MASTER_H
+#define MASTER_MASTER_H
 
+#include <sys/types.h>
+#include <stdbool.h>
+#include <signal.h>
+
+#include "async.h"
+#include "constants.h"
+#include "types.h"
+#include "node.h"
 #include "kalman.h"
 #include "orilink/protocol.h"
 #include "pqc.h"
-#include "async.h"
 
 typedef struct {
     double hbtime;
@@ -142,7 +149,51 @@ typedef struct {
     struct sockaddr_in6 server_addr;
 } master_cow_c_session_t;
 
+typedef struct {
+//----------------------------------------------------------------------
+	int master_pid;
+    int listen_sock;
+    int heartbeat_timer_fd;
+    int shutdown_event_fd;
+    async_type_t master_async;
+//----------------------------------------------------------------------
+    int last_sio_rr_idx;
+    int last_cow_rr_idx;
+//----------------------------------------------------------------------
+    uint16_t listen_port;
+    bootstrap_nodes_t bootstrap_nodes;
+    sig_atomic_t shutdown_requested;
+    uint16_t hb_check_times;
+//----------------------------------------------------------------------
+    bool all_workers_is_ready;
+    bool is_rekeying;
+//----------------------------------------------------------------------
+    uint8_t *kem_privatekey;
+    uint8_t *kem_publickey;
+//----------------------------------------------------------------------    
+    master_sio_session_t *sio_session;
+    master_logic_session_t *logic_session;
+    master_cow_session_t *cow_session;
+    master_dbr_session_t *dbr_session;
+    master_dbw_session_t *dbw_session;    
+//----------------------------------------------------------------------
+    master_sio_c_session_t *sio_c_session;
+    master_cow_c_session_t *cow_c_session;
+//----------------------------------------------------------------------
+} master_context_t;
+
+//----------------------------------------------------------------------
+void sigint_handler(int signum);
+//----------------------------------------------------------------------
+status_t setup_master(const char *label, master_context_t *master_ctx);
+void cleanup_master(const char *label, master_context_t *master_ctx);
+void run_master(const char *label, master_context_t *master_ctx);
+//----------------------------------------------------------------------
+void cleanup_master_sio_session(const char *label, async_type_t *master_async, master_sio_c_session_t *session);
+void cleanup_master_cow_session(master_cow_c_session_t *session);
+//----------------------------------------------------------------------
 void cleanup_hello_ack(const char *label, async_type_t *async, hello_ack_t *h);
 void setup_hello_ack(hello_ack_t *h);
+//----------------------------------------------------------------------
 
 #endif

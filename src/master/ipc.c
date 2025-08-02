@@ -12,13 +12,12 @@
 #include "types.h"
 #include "utilities.h"
 #include "master/ipc.h"
-#include "master/process.h"
+#include "master/master.h"
 #include "master/workers.h"
 #include "master/worker_ipc_cmds.h"
 #include "pqc.h"
 #include "poly1305-donna.h"
 #include "aes.h"
-#include "sessions/master_session.h"
 
 worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context_t *master_ctx, int *current_fd) {
 	worker_type_t_status_t result;

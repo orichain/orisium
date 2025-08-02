@@ -9,17 +9,17 @@
 #include "utilities.h"
 #include "types.h"
 #include "constants.h"
-#include "workers/worker.h"
+#include "workers/workers.h"
 #include "pqc.h"
 #include "stdbool.h"
 
-status_t setup_worker(worker_context_t *ctx, const char *worker_name, worker_type_t wot, uint8_t worker_idx, int master_uds_fd) {
+status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
     ctx->pid = getpid();
     ctx->shutdown_requested = 0;
     ctx->async.async_fd = -1;
     ctx->heartbeat_timer_fd = -1;
     ctx->wot = wot;
-    ctx->idx = worker_idx;
+    ctx->index = index;
     ctx->master_uds_fd = master_uds_fd;
 //----------------------------------------------------------------------
 // Inisialisasi seed dengan waktu saat ini untuk hasil yang berbeda setiap kali
@@ -29,9 +29,9 @@ status_t setup_worker(worker_context_t *ctx, const char *worker_name, worker_typ
 //----------------------------------------------------------------------
 // Setup label
 //----------------------------------------------------------------------
-	int needed = snprintf(NULL, 0, "[%s %d]: ", worker_name, worker_idx);
+	int needed = snprintf(NULL, 0, "[%s %d]: ", woname, *ctx->index);
 	ctx->label = malloc(needed + 1);
-	snprintf(ctx->label, needed + 1, "[%s %d]: ", worker_name, worker_idx);  
+	snprintf(ctx->label, needed + 1, "[%s %d]: ", woname, *ctx->index);  
 //----------------------------------------------------------------------
 // Setup IPC security
 //----------------------------------------------------------------------
@@ -51,7 +51,7 @@ status_t setup_worker(worker_context_t *ctx, const char *worker_name, worker_typ
     ctx->hello2_ack_rcvd = false;
 //----------------------------------------------------------------------	
 	if (async_create(ctx->label, &ctx->async) != SUCCESS) return FAILURE;
-	if (async_create_incoming_event_with_disconnect(ctx->label, &ctx->async, &ctx->master_uds_fd) != SUCCESS) return FAILURE;
+	if (async_create_incoming_event_with_disconnect(ctx->label, &ctx->async, ctx->master_uds_fd) != SUCCESS) return FAILURE;
 //----------------------------------------------------------------------
     return SUCCESS;
 }
@@ -79,10 +79,24 @@ void cleanup_worker(worker_context_t *ctx) {
     ctx->hello1_ack_rcvd = false;
     ctx->hello2_sent = false;
     ctx->hello2_ack_rcvd = false;
-    async_delete_event(ctx->label, &ctx->async, &ctx->master_uds_fd);
-    CLOSE_FD(&ctx->master_uds_fd);
+    async_delete_event(ctx->label, &ctx->async, ctx->master_uds_fd);
+    CLOSE_FD(ctx->master_uds_fd);
 	async_delete_event(ctx->label, &ctx->async, &ctx->heartbeat_timer_fd);
     CLOSE_FD(&ctx->heartbeat_timer_fd);
     CLOSE_FD(&ctx->async.async_fd);
     free(ctx->label);
 }
+
+void cleanup_hello(const char *label, async_type_t *async, hello_t *h) {
+    h->interval_timer_fd = (double)1;
+    h->sent_try_count = 0x00;
+    async_delete_event(label, async, &h->timer_fd);
+    CLOSE_FD(&h->timer_fd);
+}
+
+void setup_hello(hello_t *h) {
+    h->interval_timer_fd = (double)1;
+    h->sent_try_count = 0x00;
+    CLOSE_FD(&h->timer_fd);
+}
+

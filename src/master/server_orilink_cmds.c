@@ -9,7 +9,7 @@
 #include "orilink/hello1_ack.h"
 #include "orilink/hello2_ack.h"
 #include "orilink/hello3_ack.h"
-#include "sessions/master_session.h"
+#include "master/master.h"
 #include "poly1305-donna.h"
 #include "constants.h"
 #include "utilities.h"

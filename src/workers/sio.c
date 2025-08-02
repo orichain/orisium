@@ -12,25 +12,46 @@
 #include "utilities.h"
 #include "types.h"
 #include "constants.h"
+#include "workers/workers.h"
 #include "workers/master_ipc_cmds.h"
-#include "workers/worker.h"
 #include "pqc.h"
 #include "poly1305-donna.h"
 #include "aes.h"
 
-void cleanup_sio_worker(sio_context_t *sio_ctx) {
-	cleanup_worker(&sio_ctx->worker);
+void setup_sio_session(sio_c_session_t *single_session) {
+    //
 }
 
-status_t setup_sio_worker(sio_context_t *sio_ctx, worker_type_t wot, int worker_idx, int master_uds_fd) {
-    if (setup_worker(&sio_ctx->worker, "COW", wot, worker_idx, master_uds_fd) != SUCCESS) return FAILURE;
+void cleanup_sio_session(const char *label, async_type_t *sio_async, sio_c_session_t *single_session) {
+    //
+}
+
+void cleanup_sio_worker(worker_context_t *ctx, sio_c_session_t *sessions) {
+    for (int i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
+        sio_c_session_t *single_session;
+        single_session = &sessions[i];
+        if (single_session->in_use) {
+            cleanup_sio_session(ctx->label, &ctx->async, single_session);
+        }
+    }
+	cleanup_worker(ctx);
+}
+
+status_t setup_sio_worker(worker_context_t *ctx, sio_c_session_t *sessions, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
+    if (setup_worker(ctx, "SIO", wot, index, master_uds_fd) != SUCCESS) return FAILURE;
+    for (int i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
+        sio_c_session_t *single_session;
+        single_session = &sessions[i];
+        setup_sio_session(single_session);
+    }
     return SUCCESS;
 }
 
-void run_sio_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms, int master_uds_fd) {
-    sio_context_t sio_ctx;
-    worker_context_t *ctx = &sio_ctx.worker;
-    if (setup_sio_worker(&sio_ctx, wot, worker_idx, master_uds_fd) != SUCCESS) goto exit;
+void run_sio_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd) {
+    worker_context_t x_ctx;
+    worker_context_t *ctx = &x_ctx;
+    sio_c_session_t sessions[MAX_CONNECTION_PER_SIO_WORKER];
+    if (setup_sio_worker(ctx, sessions, wot, index, master_uds_fd) != SUCCESS) goto exit;
     while (!ctx->shutdown_requested) {
         int_status_t snfds = async_wait(ctx->label, &ctx->async);
 		if (snfds.status != SUCCESS) continue;
@@ -65,13 +86,13 @@ void run_sio_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 					LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", ctx->label);
 					continue;
                 }
-                if (worker_master_heartbeat(&sio_ctx.worker, new_heartbeat_interval_double) != SUCCESS) {
+                if (worker_master_heartbeat(ctx, new_heartbeat_interval_double) != SUCCESS) {
                     continue;
                 } else {
                     continue;
                 }
 //----------------------------------------------------------------------
-			} else if (current_fd == master_uds_fd) {
+			} else if (current_fd == *ctx->master_uds_fd) {
                 if (async_event_is_EPOLLHUP(current_events) ||
                     async_event_is_EPOLLERR(current_events) ||
                     async_event_is_EPOLLRDHUP(current_events))
@@ -80,7 +101,7 @@ void run_sio_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                     LOG_INFO("%sMaster disconnected. Initiating graceful shutdown...", ctx->label);
                     continue;
                 }
-                ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(ctx->label, &master_uds_fd);
+                ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(ctx->label, ctx->master_uds_fd);
 				if (ircvdi.status != SUCCESS) {
 					LOG_ERROR("%sError receiving or deserializing IPC message from Master: %d", ctx->label, ircvdi.status);
 					continue;
@@ -120,9 +141,9 @@ void run_sio_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                     } else if (iinfoi->flag == IT_READY) {
                         LOG_INFO("%sMaster Ready ...", ctx->label);
 //----------------------------------------------------------------------
-                        if (initial_delay_ms > 0) {
-                            LOG_DEBUG("%sApplying initial delay of %ld ms...", ctx->label, initial_delay_ms);
-                            sleep_ms(initial_delay_ms);
+                        if (*initial_delay_ms > 0) {
+                            LOG_DEBUG("%sApplying initial delay of %ld ms...", ctx->label, *initial_delay_ms);
+                            sleep_ms(*initial_delay_ms);
                         }
 //----------------------------------------------------------------------
                         if (KEM_GENERATE_KEYPAIR(ctx->kem_publickey, ctx->kem_privatekey) != 0) {
@@ -131,7 +152,7 @@ void run_sio_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                             CLOSE_IPC_PROTOCOL(&received_protocol);
                             continue;
                         }
-                        if (worker_master_hello1(&sio_ctx.worker) != SUCCESS) {
+                        if (worker_master_hello1(ctx) != SUCCESS) {
                             LOG_ERROR("%sWorker error. Initiating graceful shutdown...", ctx->label);
                             ctx->shutdown_requested = 1;
                             CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -142,9 +163,9 @@ void run_sio_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                     } else if (iinfoi->flag == IT_REKEYING) {
                         LOG_INFO("%sMaster Rekeying ...", ctx->label);
 //----------------------------------------------------------------------
-                        if (initial_delay_ms > 0) {
-                            LOG_DEBUG("%sApplying initial delay of %ld ms...", ctx->label, initial_delay_ms);
-                            sleep_ms(initial_delay_ms);
+                        if (*initial_delay_ms > 0) {
+                            LOG_DEBUG("%sApplying initial delay of %ld ms...", ctx->label, *initial_delay_ms);
+                            sleep_ms(*initial_delay_ms);
                         }
 //----------------------------------------------------------------------
                         if (KEM_GENERATE_KEYPAIR(ctx->kem_publickey, ctx->kem_privatekey) != 0) {
@@ -164,7 +185,7 @@ void run_sio_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         ctx->hello1_ack_rcvd = false;
                         ctx->hello2_sent = false;
                         ctx->hello2_ack_rcvd = false;
-                        if (worker_master_hello1(&sio_ctx.worker) != SUCCESS) {
+                        if (worker_master_hello1(ctx) != SUCCESS) {
                             LOG_ERROR("%sWorker error. Initiating graceful shutdown...", ctx->label);
                             ctx->shutdown_requested = 1;
                             CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -208,7 +229,7 @@ void run_sio_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
-                    if (worker_master_hello2(&sio_ctx.worker) != SUCCESS) {
+                    if (worker_master_hello2(ctx) != SUCCESS) {
                         LOG_ERROR("%sFailed to worker_master_hello2. Worker error. Initiating graceful shutdown...", ctx->label);
                         ctx->shutdown_requested = 1;
                         CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -296,14 +317,14 @@ void run_sio_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //----------------------------------------------------------------------
                     worker_type_t data_wot;
                     memcpy((uint8_t *)&data_wot, decrypted_wot_index, sizeof(uint8_t));
-                    if (*(uint8_t *)&ctx->wot != *(uint8_t *)&data_wot) {
+                    if (*(uint8_t *)ctx->wot != *(uint8_t *)&data_wot) {
                         LOG_ERROR("%sberbeda wot. Worker error...", ctx->label);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
                     uint8_t data_index;
                     memcpy(&data_index, decrypted_wot_index + sizeof(uint8_t), sizeof(uint8_t));
-                    if (ctx->idx != data_index) {
+                    if (*ctx->index != data_index) {
                         LOG_ERROR("%sberbeda index. Worker error...", ctx->label);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
@@ -355,5 +376,5 @@ void run_sio_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
     }
 
 exit:    
-    cleanup_sio_worker(&sio_ctx);
+    cleanup_sio_worker(ctx, sessions);
 }

@@ -10,14 +10,13 @@
 #include "utilities.h"
 #include "constants.h"
 #include "types.h"
-#include "workers/worker.h"
+#include "workers/workers.h"
 #include "master/workers.h"
 #include "master/worker_metrics.h"
 #include "async.h"
-#include "master/process.h"
+#include "master/master.h"
 #include "stdbool.h"
 #include "kalman.h"
-#include "sessions/master_session.h"
 #include "pqc.h"
 
 status_t close_worker(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
@@ -484,7 +483,11 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
             for (int j = 0; j < MAX_COW_WORKERS; ++j) { CLOSE_FD(&master_ctx->cow_session[j].upp.uds[1]); }            
             for (int j = 0; j < MAX_DBR_WORKERS; ++j) { CLOSE_FD(&master_ctx->dbr_session[j].upp.uds[1]); }
             for (int j = 0; j < MAX_DBW_WORKERS; ++j) { CLOSE_FD(&master_ctx->dbw_session[j].upp.uds[1]); }          
-            run_sio_worker(wot, index, initial_delay_ms, master_ctx->sio_session[index].upp.uds[1]);
+            worker_type_t x_wot = wot;
+            uint8_t x_index = index;
+            double x_initial_delay_ms = initial_delay_ms;
+            int *master_uds_fd = &master_ctx->sio_session[index].upp.uds[1];
+            run_sio_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
             exit(EXIT_SUCCESS);
         } else {
 			CLOSE_FD(&master_ctx->sio_session[index].upp.uds[1]);
@@ -514,7 +517,11 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
             for (int j = 0; j < MAX_COW_WORKERS; ++j) { CLOSE_FD(&master_ctx->cow_session[j].upp.uds[1]); }
             for (int j = 0; j < MAX_DBR_WORKERS; ++j) { CLOSE_FD(&master_ctx->dbr_session[j].upp.uds[1]); }
             for (int j = 0; j < MAX_DBW_WORKERS; ++j) { CLOSE_FD(&master_ctx->dbw_session[j].upp.uds[1]); }
-            run_logic_worker(wot, index, initial_delay_ms, master_ctx->logic_session[index].upp.uds[1]);
+            worker_type_t x_wot = wot;
+            uint8_t x_index = index;
+            double x_initial_delay_ms = initial_delay_ms;
+            int *master_uds_fd = &master_ctx->logic_session[index].upp.uds[1];
+            run_logic_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
             exit(EXIT_SUCCESS);
         } else {
 			CLOSE_FD(&master_ctx->logic_session[index].upp.uds[1]);
@@ -544,7 +551,11 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
 			}
             for (int j = 0; j < MAX_DBR_WORKERS; ++j) { CLOSE_FD(&master_ctx->dbr_session[j].upp.uds[1]); }
             for (int j = 0; j < MAX_DBW_WORKERS; ++j) { CLOSE_FD(&master_ctx->dbw_session[j].upp.uds[1]); }
-            run_cow_worker(wot, index, initial_delay_ms, master_ctx->cow_session[index].upp.uds[1]);
+            worker_type_t x_wot = wot;
+            uint8_t x_index = index;
+            double x_initial_delay_ms = initial_delay_ms;
+            int *master_uds_fd = &master_ctx->cow_session[index].upp.uds[1];
+            run_cow_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
             exit(EXIT_SUCCESS);
         } else {
 			CLOSE_FD(&master_ctx->cow_session[index].upp.uds[1]);
@@ -574,7 +585,11 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
                 }
             }
             for (int j = 0; j < MAX_DBW_WORKERS; ++j) { CLOSE_FD(&master_ctx->dbw_session[j].upp.uds[1]); }
-            run_dbr_worker(wot, index, initial_delay_ms, master_ctx->dbr_session[index].upp.uds[1]);
+            worker_type_t x_wot = wot;
+            uint8_t x_index = index;
+            double x_initial_delay_ms = initial_delay_ms;
+            int *master_uds_fd = &master_ctx->dbr_session[index].upp.uds[1];
+            run_dbr_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
             exit(EXIT_SUCCESS);
         } else {
 			CLOSE_FD(&master_ctx->dbr_session[index].upp.uds[1]);
@@ -609,7 +624,11 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
                     CLOSE_FD(&master_ctx->dbw_session[j].upp.uds[1]);
                 }
             }
-            run_dbw_worker(wot, index, initial_delay_ms, master_ctx->dbw_session[index].upp.uds[1]);
+            worker_type_t x_wot = wot;
+            uint8_t x_index = index;
+            double x_initial_delay_ms = initial_delay_ms;
+            int *master_uds_fd = &master_ctx->dbw_session[index].upp.uds[1];
+            run_dbw_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
             exit(EXIT_SUCCESS);
         } else {
 			CLOSE_FD(&master_ctx->dbw_session[index].upp.uds[1]);

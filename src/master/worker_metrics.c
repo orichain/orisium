@@ -4,8 +4,7 @@
 #include "constants.h"
 #include "utilities.h"
 #include "types.h"
-#include "master/process.h"
-#include "sessions/master_session.h"
+#include "master/master.h"
 
 double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_type_t wot, int index) {
     int worker_type_id = (int)wot;

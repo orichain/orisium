@@ -10,7 +10,7 @@
 #include "ipc/worker_master_hello1.h"
 #include "ipc/worker_master_hello2.h"
 #include "ipc/cow_master_connection.h"
-#include "workers/worker.h"
+#include "workers/workers.h"
 #include "constants.h"
 #include "poly1305-donna.h"
 #include "aes.h"
@@ -22,8 +22,8 @@ struct sockaddr_in6;
 status_t worker_master_heartbeat(worker_context_t *ctx, double new_heartbeat_interval_double) {
 	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_master_heartbeat(
         ctx->label, 
-        ctx->wot, 
-        ctx->idx, 
+        *ctx->wot, 
+        *ctx->index, 
         new_heartbeat_interval_double
     );
     if (cmd_result.status != SUCCESS) {
@@ -35,7 +35,7 @@ status_t worker_master_heartbeat(worker_context_t *ctx, double new_heartbeat_int
         ctx->mac_key,
         ctx->local_nonce,
         &ctx->local_ctr,
-        &ctx->master_uds_fd, 
+        ctx->master_uds_fd, 
         cmd_result.r_ipc_protocol_t
     );
     if (send_result.status != SUCCESS) {
@@ -52,8 +52,8 @@ status_t worker_master_heartbeat(worker_context_t *ctx, double new_heartbeat_int
 status_t worker_master_hello1(worker_context_t *ctx) {
 	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_master_hello1(
         ctx->label, 
-        ctx->wot, 
-        ctx->idx, 
+        *ctx->wot, 
+        *ctx->index, 
         ctx->kem_publickey
     );
     if (cmd_result.status != SUCCESS) {
@@ -65,7 +65,7 @@ status_t worker_master_hello1(worker_context_t *ctx) {
         ctx->mac_key,
         ctx->local_nonce,
         &ctx->local_ctr,
-        &ctx->master_uds_fd, 
+        ctx->master_uds_fd, 
         cmd_result.r_ipc_protocol_t
     );
     if (send_result.status != SUCCESS) {
@@ -101,8 +101,8 @@ status_t worker_master_hello2(worker_context_t *ctx) {
     uint8_t encrypted_wot_index1[AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t)];
     uint8_t encrypted_wot_index2[AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES];
     memcpy(encrypted_wot_index1, tmp_local_nonce, AES_NONCE_BYTES);
-    memcpy(wot_index, (uint8_t *)&ctx->wot, sizeof(uint8_t));
-    memcpy(wot_index + sizeof(uint8_t), &ctx->idx, sizeof(uint8_t));
+    memcpy(wot_index, (uint8_t *)ctx->wot, sizeof(uint8_t));
+    memcpy(wot_index + sizeof(uint8_t), ctx->index, sizeof(uint8_t));
 //======================================================================    
     aes256ctx aes_ctx;
     aes256_ctr_keyexp(&aes_ctx, tmp_aes_key);
@@ -132,8 +132,8 @@ status_t worker_master_hello2(worker_context_t *ctx) {
 //======================================================================
 	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_master_hello2(
         ctx->label, 
-        ctx->wot, 
-        ctx->idx, 
+        *ctx->wot, 
+        *ctx->index, 
         encrypted_wot_index2
     );
     if (cmd_result.status != SUCCESS) {
@@ -145,7 +145,7 @@ status_t worker_master_hello2(worker_context_t *ctx) {
         ctx->mac_key,
         ctx->local_nonce,
         &ctx->local_ctr,
-        &ctx->master_uds_fd, 
+        ctx->master_uds_fd, 
         cmd_result.r_ipc_protocol_t
     );
     if (send_result.status != SUCCESS) {
@@ -167,8 +167,8 @@ status_t worker_master_hello2(worker_context_t *ctx) {
 status_t cow_master_connection(worker_context_t *ctx, struct sockaddr_in6 *addr, connection_type_t flag) {
 	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_cow_master_connection(
         ctx->label, 
-        ctx->wot, 
-        ctx->idx, 
+        *ctx->wot, 
+        *ctx->index, 
         addr, 
         flag
     );
@@ -181,7 +181,7 @@ status_t cow_master_connection(worker_context_t *ctx, struct sockaddr_in6 *addr,
         ctx->mac_key,
         ctx->local_nonce,
         &ctx->local_ctr,
-        &ctx->master_uds_fd, 
+        ctx->master_uds_fd, 
         cmd_result.r_ipc_protocol_t
     );
     if (send_result.status != SUCCESS) {

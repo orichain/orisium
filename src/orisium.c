@@ -12,7 +12,7 @@
 
 #include "log.h"
 #include "node.h"
-#include "master/process.h"
+#include "master/master.h"
 #include "utilities.h"
 #include "types.h"
 
@@ -66,13 +66,13 @@ int main() {
         printf("[Master]:   - Node %d: IP %s, Port %s\n", i + 1, host_str, port_str);
     }
     printf("[Master]: -------------------------\n");
-    run_master_process(&master_ctx);
+    if (setup_master("[Master]: ", &master_ctx) != SUCCESS) goto exit;
+    run_master("[Master]: ", &master_ctx);
 //======================================================================
 // Cleanup
 //======================================================================
 exit:
-    master_ctx.listen_port = (uint16_t)0;
-    memset(&master_ctx.bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
+    cleanup_master("[Master]: ", &master_ctx);
 #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))    
 	pthread_join(cleaner_thread, NULL);
     log_close();

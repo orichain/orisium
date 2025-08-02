@@ -19,213 +19,213 @@
 #include "utilities.h"
 #include "types.h"
 #include "constants.h"
-#include "sessions/workers_session.h"
+#include "workers/workers.h"
 #include "workers/master_ipc_cmds.h"
 #include "workers/client_orilink_cmds.h"
-#include "workers/worker.h"
 #include "kalman.h"
 #include "pqc.h"
 #include "poly1305-donna.h"
 #include "aes.h"
 
-void setup_cow_session(cow_c_session_t *session) {
-    session->in_use = false;
-    memset(&session->identity.remote_addr, 0, sizeof(struct sockaddr_in6));
-    memset(session->identity.kem_privatekey, 0, KEM_PRIVATEKEY_BYTES);
-    memset(session->identity.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
-    memset(session->identity.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
-    memset(session->identity.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
-    session->identity.client_id = 0ULL;
-    session->identity.server_id = 0ULL;
-    session->identity.port = 0x0000;
-    memset(session->identity.local_nonce, 0, AES_NONCE_BYTES);
-    session->identity.local_ctr = (uint32_t)0;
-    memset(session->identity.remote_nonce, 0, AES_NONCE_BYTES);
-    session->identity.remote_ctr = (uint32_t)0;
-    memset(session->encrypted_server_id_port, 0, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
-    memset(session->temp_kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
-    session->new_client_id = 0ULL;
-    setup_oricle_double(&session->identity.rtt, (double)0);
-    setup_oricle_double(&session->identity.retry, (double)0);
-    CLOSE_FD(&session->sock_fd);
-    setup_hello(&session->hello1);
-    setup_hello(&session->hello2);
-    setup_hello(&session->hello3);
-    setup_hello(&session->hello_end);
+void setup_cow_session(cow_c_session_t *single_session) {
+    single_session->in_use = false;
+    memset(&single_session->identity.remote_addr, 0, sizeof(struct sockaddr_in6));
+    memset(single_session->identity.kem_privatekey, 0, KEM_PRIVATEKEY_BYTES);
+    memset(single_session->identity.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+    memset(single_session->identity.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+    memset(single_session->identity.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+    single_session->identity.client_id = 0ULL;
+    single_session->identity.server_id = 0ULL;
+    single_session->identity.port = 0x0000;
+    memset(single_session->identity.local_nonce, 0, AES_NONCE_BYTES);
+    single_session->identity.local_ctr = (uint32_t)0;
+    memset(single_session->identity.remote_nonce, 0, AES_NONCE_BYTES);
+    single_session->identity.remote_ctr = (uint32_t)0;
+    memset(single_session->encrypted_server_id_port, 0, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
+    memset(single_session->temp_kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+    single_session->new_client_id = 0ULL;
+    setup_oricle_double(&single_session->identity.rtt, (double)0);
+    setup_oricle_double(&single_session->identity.retry, (double)0);
+    CLOSE_FD(&single_session->sock_fd);
+    setup_hello(&single_session->hello1);
+    setup_hello(&single_session->hello2);
+    setup_hello(&single_session->hello3);
+    setup_hello(&single_session->hello_end);
 }
 
-void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *session) {
-    session->in_use = false;
-    memset(&session->identity.remote_addr, 0, sizeof(struct sockaddr_in6));
-    memset(session->identity.kem_privatekey, 0, KEM_PRIVATEKEY_BYTES);
-    memset(session->identity.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
-    memset(session->identity.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
-    memset(session->identity.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
-    session->identity.client_id = 0ULL;
-    session->identity.server_id = 0ULL;
-    session->identity.port = 0x0000;
-    memset(session->identity.local_nonce, 0, AES_NONCE_BYTES);
-    session->identity.local_ctr = (uint32_t)0;
-    memset(session->identity.remote_nonce, 0, AES_NONCE_BYTES);
-    session->identity.remote_ctr = (uint32_t)0;
-    memset(session->encrypted_server_id_port, 0, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
-    memset(session->temp_kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
-    session->new_client_id = 0ULL;
-    cleanup_oricle_double(&session->identity.rtt);
-    cleanup_oricle_double(&session->identity.retry);
-    async_delete_event(label, cow_async, &session->sock_fd);
-    CLOSE_FD(&session->sock_fd);
-    cleanup_hello(label, cow_async, &session->hello1);
-    cleanup_hello(label, cow_async, &session->hello2);
-    cleanup_hello(label, cow_async, &session->hello3);
-    cleanup_hello(label, cow_async, &session->hello_end);
+void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session) {
+    single_session->in_use = false;
+    memset(&single_session->identity.remote_addr, 0, sizeof(struct sockaddr_in6));
+    memset(single_session->identity.kem_privatekey, 0, KEM_PRIVATEKEY_BYTES);
+    memset(single_session->identity.kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+    memset(single_session->identity.kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+    memset(single_session->identity.kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+    single_session->identity.client_id = 0ULL;
+    single_session->identity.server_id = 0ULL;
+    single_session->identity.port = 0x0000;
+    memset(single_session->identity.local_nonce, 0, AES_NONCE_BYTES);
+    single_session->identity.local_ctr = (uint32_t)0;
+    memset(single_session->identity.remote_nonce, 0, AES_NONCE_BYTES);
+    single_session->identity.remote_ctr = (uint32_t)0;
+    memset(single_session->encrypted_server_id_port, 0, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
+    memset(single_session->temp_kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+    single_session->new_client_id = 0ULL;
+    cleanup_oricle_double(&single_session->identity.rtt);
+    cleanup_oricle_double(&single_session->identity.retry);
+    async_delete_event(label, cow_async, &single_session->sock_fd);
+    CLOSE_FD(&single_session->sock_fd);
+    cleanup_hello(label, cow_async, &single_session->hello1);
+    cleanup_hello(label, cow_async, &single_session->hello2);
+    cleanup_hello(label, cow_async, &single_session->hello3);
+    cleanup_hello(label, cow_async, &single_session->hello_end);
 }
 
-bool server_disconnected(cow_context_t *cow_ctx, int session_index, cow_c_session_t *session, uint8_t try_count) {
+bool server_disconnected(worker_context_t *ctx, int session_index, cow_c_session_t *single_session, uint8_t try_count) {
     if (try_count > (uint8_t)MAX_RETRY) {
-        LOG_DEBUG("%s session %d: disconnect => try count %d.", cow_ctx->worker.label, session_index, try_count);
-        cow_master_connection(&cow_ctx->worker, &session->identity.remote_addr, CANNOTCONNECT);
-        cleanup_cow_session(cow_ctx->worker.label, &cow_ctx->worker.async, session);
+        LOG_DEBUG("%s single_session %d: disconnect => try count %d.", ctx->label, session_index, try_count);
+        cow_master_connection(ctx, &single_session->identity.remote_addr, CANNOTCONNECT);
+        cleanup_cow_session(ctx->label, &ctx->async, single_session);
         return true;
     }
     return false;
 }
 
-status_t send_hello1(cow_context_t *cow_ctx, cow_c_session_t *session) {
-    uint64_t_status_t rt = get_realtime_time_ns(cow_ctx->worker.label);
+status_t send_hello1(worker_context_t *ctx, cow_c_session_t *single_session) {
+    uint64_t_status_t rt = get_realtime_time_ns(ctx->label);
     if (rt.status != SUCCESS) {
         return FAILURE;
     }
-    session->hello1.sent = true;
-    session->hello1.sent_try_count++;
-    session->hello1.sent_time = rt.r_uint64_t;
-    if (hello1(cow_ctx->worker.label, session) != SUCCESS) {
+    single_session->hello1.sent = true;
+    single_session->hello1.sent_try_count++;
+    single_session->hello1.sent_time = rt.r_uint64_t;
+    if (hello1(ctx->label, single_session) != SUCCESS) {
         printf("Error hello1\n");
         return FAILURE;
     }
-    if (async_set_timerfd_time(cow_ctx->worker.label, &session->hello1.timer_fd,
-        (time_t)session->hello1.interval_timer_fd,
-        (long)((session->hello1.interval_timer_fd - (time_t)session->hello1.interval_timer_fd) * 1e9),
-        (time_t)session->hello1.interval_timer_fd,
-        (long)((session->hello1.interval_timer_fd - (time_t)session->hello1.interval_timer_fd) * 1e9)) != SUCCESS)
+    if (async_set_timerfd_time(ctx->label, &single_session->hello1.timer_fd,
+        (time_t)single_session->hello1.interval_timer_fd,
+        (long)((single_session->hello1.interval_timer_fd - (time_t)single_session->hello1.interval_timer_fd) * 1e9),
+        (time_t)single_session->hello1.interval_timer_fd,
+        (long)((single_session->hello1.interval_timer_fd - (time_t)single_session->hello1.interval_timer_fd) * 1e9)) != SUCCESS)
     {
         return FAILURE;
     }
     return SUCCESS;
 }
 
-status_t send_hello2(cow_context_t *cow_ctx, cow_c_session_t *session) {
-    uint64_t_status_t rt = get_realtime_time_ns(cow_ctx->worker.label);
+status_t send_hello2(worker_context_t *ctx, cow_c_session_t *single_session) {
+    uint64_t_status_t rt = get_realtime_time_ns(ctx->label);
     if (rt.status != SUCCESS) {
         return FAILURE;
     }
-    session->hello2.sent = true;
-    session->hello2.sent_try_count++;
-    session->hello2.sent_time = rt.r_uint64_t;
-    if (hello2(cow_ctx->worker.label, session) != SUCCESS) {
+    single_session->hello2.sent = true;
+    single_session->hello2.sent_try_count++;
+    single_session->hello2.sent_time = rt.r_uint64_t;
+    if (hello2(ctx->label, single_session) != SUCCESS) {
         printf("Error hello2\n");
         return FAILURE;
     }
-    if (async_set_timerfd_time(cow_ctx->worker.label, &session->hello2.timer_fd,
-        (time_t)session->hello2.interval_timer_fd,
-        (long)((session->hello2.interval_timer_fd - (time_t)session->hello2.interval_timer_fd) * 1e9),
-        (time_t)session->hello2.interval_timer_fd,
-        (long)((session->hello2.interval_timer_fd - (time_t)session->hello2.interval_timer_fd) * 1e9)) != SUCCESS)
+    if (async_set_timerfd_time(ctx->label, &single_session->hello2.timer_fd,
+        (time_t)single_session->hello2.interval_timer_fd,
+        (long)((single_session->hello2.interval_timer_fd - (time_t)single_session->hello2.interval_timer_fd) * 1e9),
+        (time_t)single_session->hello2.interval_timer_fd,
+        (long)((single_session->hello2.interval_timer_fd - (time_t)single_session->hello2.interval_timer_fd) * 1e9)) != SUCCESS)
     {
         return FAILURE;
     }
     return SUCCESS;
 }
 
-status_t send_hello3(cow_context_t *cow_ctx, cow_c_session_t *session) {
-    uint64_t_status_t rt = get_realtime_time_ns(cow_ctx->worker.label);
+status_t send_hello3(worker_context_t *ctx, cow_c_session_t *single_session) {
+    uint64_t_status_t rt = get_realtime_time_ns(ctx->label);
     if (rt.status != SUCCESS) {
         return FAILURE;
     }
-    session->hello3.sent = true;
-    session->hello3.sent_try_count++;
-    session->hello3.sent_time = rt.r_uint64_t;
-    if (hello3(cow_ctx->worker.label, session) != SUCCESS) {
+    single_session->hello3.sent = true;
+    single_session->hello3.sent_try_count++;
+    single_session->hello3.sent_time = rt.r_uint64_t;
+    if (hello3(ctx->label, single_session) != SUCCESS) {
         printf("Error hello3\n");
         return FAILURE;
     }
-    if (async_set_timerfd_time(cow_ctx->worker.label, &session->hello3.timer_fd,
-        (time_t)session->hello3.interval_timer_fd,
-        (long)((session->hello3.interval_timer_fd - (time_t)session->hello3.interval_timer_fd) * 1e9),
-        (time_t)session->hello3.interval_timer_fd,
-        (long)((session->hello3.interval_timer_fd - (time_t)session->hello3.interval_timer_fd) * 1e9)) != SUCCESS)
+    if (async_set_timerfd_time(ctx->label, &single_session->hello3.timer_fd,
+        (time_t)single_session->hello3.interval_timer_fd,
+        (long)((single_session->hello3.interval_timer_fd - (time_t)single_session->hello3.interval_timer_fd) * 1e9),
+        (time_t)single_session->hello3.interval_timer_fd,
+        (long)((single_session->hello3.interval_timer_fd - (time_t)single_session->hello3.interval_timer_fd) * 1e9)) != SUCCESS)
     {
         return FAILURE;
     }
     return SUCCESS;
 }
 
-status_t send_hello_end(cow_context_t *cow_ctx, cow_c_session_t *session) {
-    uint64_t_status_t rt = get_realtime_time_ns(cow_ctx->worker.label);
+status_t send_hello_end(worker_context_t *ctx, cow_c_session_t *single_session) {
+    uint64_t_status_t rt = get_realtime_time_ns(ctx->label);
     if (rt.status != SUCCESS) {
         return FAILURE;
     }
-    session->hello_end.sent = true;
-    session->hello_end.sent_try_count++;
-    session->hello_end.sent_time = rt.r_uint64_t;
-    if (hello_end(cow_ctx->worker.label, session) != SUCCESS) {
+    single_session->hello_end.sent = true;
+    single_session->hello_end.sent_try_count++;
+    single_session->hello_end.sent_time = rt.r_uint64_t;
+    if (hello_end(ctx->label, single_session) != SUCCESS) {
         printf("Error hello_end\n");
         return FAILURE;
     }
-    if (async_set_timerfd_time(cow_ctx->worker.label, &session->hello_end.timer_fd,
-        (time_t)session->hello_end.interval_timer_fd,
-        (long)((session->hello_end.interval_timer_fd - (time_t)session->hello_end.interval_timer_fd) * 1e9),
-        (time_t)session->hello_end.interval_timer_fd,
-        (long)((session->hello_end.interval_timer_fd - (time_t)session->hello_end.interval_timer_fd) * 1e9)) != SUCCESS)
+    if (async_set_timerfd_time(ctx->label, &single_session->hello_end.timer_fd,
+        (time_t)single_session->hello_end.interval_timer_fd,
+        (long)((single_session->hello_end.interval_timer_fd - (time_t)single_session->hello_end.interval_timer_fd) * 1e9),
+        (time_t)single_session->hello_end.interval_timer_fd,
+        (long)((single_session->hello_end.interval_timer_fd - (time_t)single_session->hello_end.interval_timer_fd) * 1e9)) != SUCCESS)
     {
         return FAILURE;
     }
     return SUCCESS;
 }
 
-void cow_calculate_retry(cow_context_t *cow_ctx, cow_c_session_t *session, int session_index, double try_count) {
+void cow_calculate_retry(worker_context_t *ctx, cow_c_session_t *single_session, int session_index, double try_count) {
     char *desc;
 	int needed = snprintf(NULL, 0, "ORICLE => RETRY %d", session_index);
 	desc = malloc(needed + 1);
 	snprintf(desc, needed + 1, "ORICLE => RETRY %d", session_index);
-    calculate_oricle_double(cow_ctx->worker.label, desc, &session->identity.retry, try_count, ((double)MAX_RETRY * (double)2));
+    calculate_oricle_double(ctx->label, desc, &single_session->identity.retry, try_count, ((double)MAX_RETRY * (double)2));
     free(desc);
 }
 
-void cow_calculate_rtt(cow_context_t *cow_ctx, cow_c_session_t *session, int session_index, double rtt_value) {
+void cow_calculate_rtt(worker_context_t *ctx, cow_c_session_t *single_session, int session_index, double rtt_value) {
     char *desc;
 	int needed = snprintf(NULL, 0, "ORICLE => RTT %d", session_index);
 	desc = malloc(needed + 1);
 	snprintf(desc, needed + 1, "ORICLE => RTT %d", session_index);
-    calculate_oricle_double(cow_ctx->worker.label, desc, &session->identity.rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
+    calculate_oricle_double(ctx->label, desc, &single_session->identity.rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
     free(desc);
 }
 
-void cleanup_cow_worker(cow_context_t *cow_ctx) {
+void cleanup_cow_worker(worker_context_t *ctx, cow_c_session_t *sessions) {
     for (int i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
-        cow_c_session_t *session;
-        session = &cow_ctx->cow_c_session[i];
-        if (session->in_use) {
-            cleanup_cow_session(cow_ctx->worker.label, &cow_ctx->worker.async, session);
+        cow_c_session_t *single_session;
+        single_session = &sessions[i];
+        if (single_session->in_use) {
+            cleanup_cow_session(ctx->label, &ctx->async, single_session);
         }
     }
-	cleanup_worker(&cow_ctx->worker);
+	cleanup_worker(ctx);
 }
 
-status_t setup_cow_worker(cow_context_t *cow_ctx, worker_type_t wot, int worker_idx, int master_uds_fd) {
-    if (setup_worker(&cow_ctx->worker, "COW", wot, worker_idx, master_uds_fd) != SUCCESS) return FAILURE;
+status_t setup_cow_worker(worker_context_t *ctx, cow_c_session_t *sessions, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
+    if (setup_worker(ctx, "COW", wot, index, master_uds_fd) != SUCCESS) return FAILURE;
     for (int i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
-        cow_c_session_t *session;
-        session = &cow_ctx->cow_c_session[i];
-        setup_cow_session(session);
+        cow_c_session_t *single_session;
+        single_session = &sessions[i];
+        setup_cow_session(single_session);
     }
     return SUCCESS;
 }
 
-void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms, int master_uds_fd) {
-    cow_context_t cow_ctx;
-    worker_context_t *ctx = &cow_ctx.worker;
-    if (setup_cow_worker(&cow_ctx, wot, worker_idx, master_uds_fd) != SUCCESS) goto exit;
+void run_cow_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd) {
+    worker_context_t x_ctx;
+    worker_context_t *ctx = &x_ctx;
+    cow_c_session_t sessions[MAX_CONNECTION_PER_COW_WORKER];
+    if (setup_cow_worker(ctx, sessions, wot, index, master_uds_fd) != SUCCESS) goto exit;
     while (!ctx->shutdown_requested) {
         int_status_t snfds = async_wait(ctx->label, &ctx->async);
 		if (snfds.status != SUCCESS) continue;
@@ -260,13 +260,13 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 					LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", ctx->label);
 					continue;
                 }
-                if (worker_master_heartbeat(&cow_ctx.worker, new_heartbeat_interval_double) != SUCCESS) {
+                if (worker_master_heartbeat(ctx, new_heartbeat_interval_double) != SUCCESS) {
                     continue;
                 } else {
                     continue;
                 }
 //----------------------------------------------------------------------
-			} else if (current_fd == master_uds_fd) {
+			} else if (current_fd == *ctx->master_uds_fd) {
                 if (async_event_is_EPOLLHUP(current_events) ||
                     async_event_is_EPOLLERR(current_events) ||
                     async_event_is_EPOLLRDHUP(current_events))
@@ -275,7 +275,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                     LOG_INFO("%sMaster disconnected. Initiating graceful shutdown...", ctx->label);
                     continue;
                 }
-                ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(ctx->label, &master_uds_fd);
+                ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(ctx->label, ctx->master_uds_fd);
 				if (ircvdi.status != SUCCESS) {
 					LOG_ERROR("%sError receiving or deserializing IPC message from Master: %d", ctx->label, ircvdi.status);
 					continue;
@@ -315,9 +315,9 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                     } else if (iinfoi->flag == IT_READY) {
                         LOG_INFO("%sMaster Ready ...", ctx->label);
 //----------------------------------------------------------------------
-                        if (initial_delay_ms > 0) {
-                            LOG_DEBUG("%sApplying initial delay of %ld ms...", ctx->label, initial_delay_ms);
-                            sleep_ms(initial_delay_ms);
+                        if (*initial_delay_ms > 0) {
+                            LOG_DEBUG("%sApplying initial delay of %ld ms...", ctx->label, *initial_delay_ms);
+                            sleep_ms(*initial_delay_ms);
                         }
 //----------------------------------------------------------------------
                         if (KEM_GENERATE_KEYPAIR(ctx->kem_publickey, ctx->kem_privatekey) != 0) {
@@ -326,7 +326,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                             CLOSE_IPC_PROTOCOL(&received_protocol);
                             continue;
                         }
-                        if (worker_master_hello1(&cow_ctx.worker) != SUCCESS) {
+                        if (worker_master_hello1(ctx) != SUCCESS) {
                             LOG_ERROR("%sWorker error. Initiating graceful shutdown...", ctx->label);
                             ctx->shutdown_requested = 1;
                             CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -337,9 +337,9 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                     } else if (iinfoi->flag == IT_REKEYING) {
                         LOG_INFO("%sMaster Rekeying ...", ctx->label);
 //----------------------------------------------------------------------
-                        if (initial_delay_ms > 0) {
-                            LOG_DEBUG("%sApplying initial delay of %ld ms...", ctx->label, initial_delay_ms);
-                            sleep_ms(initial_delay_ms);
+                        if (*initial_delay_ms > 0) {
+                            LOG_DEBUG("%sApplying initial delay of %ld ms...", ctx->label, *initial_delay_ms);
+                            sleep_ms(*initial_delay_ms);
                         }
 //----------------------------------------------------------------------
                         if (KEM_GENERATE_KEYPAIR(ctx->kem_publickey, ctx->kem_privatekey) != 0) {
@@ -359,7 +359,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         ctx->hello1_ack_rcvd = false;
                         ctx->hello2_sent = false;
                         ctx->hello2_ack_rcvd = false;
-                        if (worker_master_hello1(&cow_ctx.worker) != SUCCESS) {
+                        if (worker_master_hello1(ctx) != SUCCESS) {
                             LOG_ERROR("%sWorker error. Initiating graceful shutdown...", ctx->label);
                             ctx->shutdown_requested = 1;
                             CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -403,7 +403,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
-                    if (worker_master_hello2(&cow_ctx.worker) != SUCCESS) {
+                    if (worker_master_hello2(ctx) != SUCCESS) {
                         LOG_ERROR("%sFailed to worker_master_hello2. Worker error. Initiating graceful shutdown...", ctx->label);
                         ctx->shutdown_requested = 1;
                         CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -491,14 +491,14 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //----------------------------------------------------------------------
                     worker_type_t data_wot;
                     memcpy((uint8_t *)&data_wot, decrypted_wot_index, sizeof(uint8_t));
-                    if (*(uint8_t *)&ctx->wot != *(uint8_t *)&data_wot) {
+                    if (*(uint8_t *)ctx->wot != *(uint8_t *)&data_wot) {
                         LOG_ERROR("%sberbeda wot. Worker error...", ctx->label);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
                     uint8_t data_index;
                     memcpy(&data_index, decrypted_wot_index + sizeof(uint8_t), sizeof(uint8_t));
-                    if (ctx->idx != data_index) {
+                    if (*ctx->index != data_index) {
                         LOG_ERROR("%sberbeda index. Worker error...", ctx->label);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
@@ -551,9 +551,9 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 					ipc_master_cow_connect_t *cc = received_protocol->payload.ipc_master_cow_connect;
                     int slot_found = -1;
                     for (int i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
-                        if (!cow_ctx.cow_c_session[i].in_use) {
-                            cow_ctx.cow_c_session[i].in_use = true;
-                            memcpy(&cow_ctx.cow_c_session[i].identity.remote_addr, &cc->server_addr, sizeof(struct sockaddr_in6));
+                        if (!sessions[i].in_use) {
+                            sessions[i].in_use = true;
+                            memcpy(&sessions[i].identity.remote_addr, &cc->server_addr, sizeof(struct sockaddr_in6));
                             slot_found = i;
                             break;
                         }
@@ -564,8 +564,8 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
-                    cow_c_session_t *session;
-                    session = &cow_ctx.cow_c_session[slot_found];
+                    cow_c_session_t *single_session;
+                    single_session = &sessions[slot_found];
 //======================================================================
 // Setup sock_fd and connect to server
 //======================================================================
@@ -576,7 +576,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                     hints.ai_protocol = IPPROTO_UDP;
                     char host_str[NI_MAXHOST];
                     char port_str[NI_MAXSERV];
-                    int getname_res = getnameinfo((struct sockaddr *)&session->identity.remote_addr, sizeof(struct sockaddr_in6),
+                    int getname_res = getnameinfo((struct sockaddr *)&single_session->identity.remote_addr, sizeof(struct sockaddr_in6),
                                         host_str, NI_MAXHOST,
                                         port_str, NI_MAXSERV,
                                         NI_NUMERICHOST | NI_NUMERICSERV
@@ -593,39 +593,39 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                         continue;
                     }
                     for (rp = res; rp != NULL; rp = rp->ai_next) {
-                        session->sock_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-                        if (session->sock_fd == -1) {
+                        single_session->sock_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+                        if (single_session->sock_fd == -1) {
                             LOG_ERROR("%sUDP Socket creation failed: %s", ctx->label, strerror(errno));
                             CLOSE_IPC_PROTOCOL(&received_protocol);
                             continue;
                         }
-                        LOG_DEBUG("%sUDP Socket FD %d created.", ctx->label, session->sock_fd);
-                        status_t r_snbkg = set_nonblocking(ctx->label, session->sock_fd);
+                        LOG_DEBUG("%sUDP Socket FD %d created.", ctx->label, single_session->sock_fd);
+                        status_t r_snbkg = set_nonblocking(ctx->label, single_session->sock_fd);
                         if (r_snbkg != SUCCESS) {
                             LOG_ERROR("%sset_nonblocking failed.", ctx->label);
                             CLOSE_IPC_PROTOCOL(&received_protocol);
                             continue;
                         }
-                        LOG_DEBUG("%sUDP Socket FD %d set to non-blocking.", ctx->label, session->sock_fd);
-                        int conn_res = connect(session->sock_fd, rp->ai_addr, rp->ai_addrlen);
+                        LOG_DEBUG("%sUDP Socket FD %d set to non-blocking.", ctx->label, single_session->sock_fd);
+                        int conn_res = connect(single_session->sock_fd, rp->ai_addr, rp->ai_addrlen);
                         if (conn_res == 0) {
-                            LOG_INFO("%sUDP socket 'connected' to %s:%s (FD %d).", ctx->label, host_str, port_str, session->sock_fd);
+                            LOG_INFO("%sUDP socket 'connected' to %s:%s (FD %d).", ctx->label, host_str, port_str, single_session->sock_fd);
                             CLOSE_IPC_PROTOCOL(&received_protocol);
                             break;
                         } else {
-                            LOG_ERROR("%sUDP 'connect' failed for %s:%s (FD %d): %s", ctx->label, host_str, port_str, session->sock_fd, strerror(errno));
+                            LOG_ERROR("%sUDP 'connect' failed for %s:%s (FD %d): %s", ctx->label, host_str, port_str, single_session->sock_fd, strerror(errno));
                             CLOSE_IPC_PROTOCOL(&received_protocol);
-                            CLOSE_FD(&session->sock_fd);
+                            CLOSE_FD(&single_session->sock_fd);
                             continue;
                         }
                     }
                     freeaddrinfo(res);
-                    if (session->sock_fd == -1) {
+                    if (single_session->sock_fd == -1) {
                         LOG_ERROR("%sFailed to set up any UDP socket for %s:%s.", ctx->label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
-                    if (async_create_incoming_event(ctx->label, &ctx->async, &session->sock_fd) != SUCCESS) {
+                    if (async_create_incoming_event(ctx->label, &ctx->async, &single_session->sock_fd) != SUCCESS) {
                         LOG_ERROR("%sFailed to async_create_incoming_event for %s:%s.", ctx->label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
@@ -633,12 +633,12 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //======================================================================
 // Generate Identity                    
 //======================================================================
-                    if (generate_connection_id(ctx->label, &session->identity.client_id) != SUCCESS) {
+                    if (generate_connection_id(ctx->label, &single_session->identity.client_id) != SUCCESS) {
                         LOG_ERROR("%sFailed to generate_connection_id for %s:%s.", ctx->label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
-                    if (KEM_GENERATE_KEYPAIR(session->identity.kem_publickey, session->identity.kem_privatekey) != 0) {
+                    if (KEM_GENERATE_KEYPAIR(single_session->identity.kem_publickey, single_session->identity.kem_privatekey) != 0) {
                         LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR for %s:%s.", ctx->label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
@@ -646,19 +646,19 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //======================================================================
 // Send HELLO1                    
 //======================================================================           
-                    if (async_create_timerfd(ctx->label, &session->hello1.timer_fd) != SUCCESS) {
+                    if (async_create_timerfd(ctx->label, &single_session->hello1.timer_fd) != SUCCESS) {
                         LOG_ERROR("%sFailed to async_create_timerfd for %s:%s.", ctx->label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
 //----------------------------------------------------------------------
-                    if (send_hello1(&cow_ctx, session) != SUCCESS) {
+                    if (send_hello1(ctx, single_session) != SUCCESS) {
                         LOG_ERROR("%sFailed to send_hello1 for %s:%s.", ctx->label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
                     }
 //----------------------------------------------------------------------
-                    if (async_create_incoming_event(ctx->label, &ctx->async, &session->hello1.timer_fd) != SUCCESS) {
+                    if (async_create_incoming_event(ctx->label, &ctx->async, &single_session->hello1.timer_fd) != SUCCESS) {
                         LOG_ERROR("%sFailed to async_create_incoming_event for %s:%s.", ctx->label, host_str, port_str);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
                         continue;
@@ -674,17 +674,17 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
             } else {
                 bool event_founded_in_session = false;
                 for (int i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
-                    cow_c_session_t *session;
-                    session = &cow_ctx.cow_c_session[i];
-                    if (session->in_use) {
-                        if (current_fd == session->sock_fd) {
+                    cow_c_session_t *single_session;
+                    single_session = &sessions[i];
+                    if (single_session->in_use) {
+                        if (current_fd == single_session->sock_fd) {
                             struct sockaddr_in6 server_addr;
                             char host_str[NI_MAXHOST];
                             char port_str[NI_MAXSERV];
                             
                             orilink_raw_protocol_t_status_t orcvdo = receive_orilink_raw_protocol_packet(
                                 ctx->label,
-                                &session->sock_fd,
+                                &single_session->sock_fd,
                                 (struct sockaddr *)&server_addr
                             );
                             if (orcvdo.status != SUCCESS) {
@@ -719,12 +719,12 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                             }
                             if (orcvdo.r_orilink_raw_protocol_t->type == ORILINK_HELLO1_ACK) {
                                 if (
-                                        sockaddr_equal((const struct sockaddr *)&session->identity.remote_addr, (const struct sockaddr *)&server_addr) &&
-                                        session->hello1.sent
+                                        sockaddr_equal((const struct sockaddr *)&single_session->identity.remote_addr, (const struct sockaddr *)&server_addr) &&
+                                        single_session->hello1.sent
                                    )
                                 {
                                     orilink_protocol_t_status_t deserialized_orcvdo = orilink_deserialize(ctx->label,
-                                        session->identity.kem_sharedsecret, session->identity.remote_nonce, session->identity.remote_ctr,
+                                        single_session->identity.kem_sharedsecret, single_session->identity.remote_nonce, single_session->identity.remote_ctr,
                                         (const uint8_t*)orcvdo.r_orilink_raw_protocol_t->recv_buffer, orcvdo.r_orilink_raw_protocol_t->n
                                     );
                                     if (deserialized_orcvdo.status != SUCCESS) {
@@ -738,7 +738,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                     }  
                                     orilink_protocol_t* received_protocol = deserialized_orcvdo.r_orilink_protocol_t;
                                     orilink_hello1_ack_t *ohello1_ack = received_protocol->payload.orilink_hello1_ack;
-                                    if (session->identity.client_id != ohello1_ack->client_id) {
+                                    if (single_session->identity.client_id != ohello1_ack->client_id) {
                                         LOG_WARN("%sHELLO1_ACK ditolak dari IP %s. client_id berbeda.", ctx->label, host_str);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
@@ -747,7 +747,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //======================================================================
 // Send HELLO2                   
 //======================================================================           
-                                    if (async_create_timerfd(ctx->label, &session->hello2.timer_fd) != SUCCESS) {
+                                    if (async_create_timerfd(ctx->label, &single_session->hello2.timer_fd) != SUCCESS) {
                                         LOG_ERROR("%sFailed to async_create_timerfd.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
@@ -756,8 +756,8 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //----------------------------------------------------------------------
 // Hitung rtt retry sebelum kirim data
 //----------------------------------------------------------------------
-                                    double try_count = (double)session->hello1.sent_try_count-(double)1;
-                                    cow_calculate_retry(&cow_ctx, session, i, try_count);
+                                    double try_count = (double)single_session->hello1.sent_try_count-(double)1;
+                                    cow_calculate_retry(ctx, single_session, i, try_count);
                                     uint64_t_status_t rt = get_realtime_time_ns(ctx->label);
                                     if (rt.status != SUCCESS) {
                                         LOG_ERROR("%sFailed to get_realtime_time_ns.", ctx->label);
@@ -765,20 +765,20 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                         event_founded_in_session = true;
                                         break;
                                     }
-                                    session->hello1.ack_rcvd = true;
-                                    session->hello1.ack_rcvd_time = rt.r_uint64_t;
-                                    uint64_t interval_ull = session->hello1.ack_rcvd_time - session->hello1.sent_time;
+                                    single_session->hello1.ack_rcvd = true;
+                                    single_session->hello1.ack_rcvd_time = rt.r_uint64_t;
+                                    uint64_t interval_ull = single_session->hello1.ack_rcvd_time - single_session->hello1.sent_time;
                                     double rtt_value = (double)interval_ull;
-                                    cow_calculate_rtt(&cow_ctx, session, i, rtt_value);
+                                    cow_calculate_rtt(ctx, single_session, i, rtt_value);
 //----------------------------------------------------------------------
-                                    if (send_hello2(&cow_ctx, session) != SUCCESS) {
+                                    if (send_hello2(ctx, single_session) != SUCCESS) {
                                         LOG_ERROR("%sFailed to send_hello2.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
                                     }
 //----------------------------------------------------------------------
-                                    if (async_create_incoming_event(ctx->label, &ctx->async, &session->hello2.timer_fd) != SUCCESS) {
+                                    if (async_create_incoming_event(ctx->label, &ctx->async, &single_session->hello2.timer_fd) != SUCCESS) {
                                         LOG_ERROR("%sFailed to async_create_incoming_event.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
@@ -787,7 +787,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //----------------------------------------------------------------------
 // Semua sudah bersih
 //----------------------------------------------------------------------
-                                    cleanup_hello(ctx->label, &ctx->async, &session->hello1);
+                                    cleanup_hello(ctx->label, &ctx->async, &single_session->hello1);
 //======================================================================  
                                     CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                     event_founded_in_session = true;
@@ -800,13 +800,13 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                 }
                             } else if (orcvdo.r_orilink_raw_protocol_t->type == ORILINK_HELLO2_ACK) {
                                 if (
-                                        sockaddr_equal((const struct sockaddr *)&session->identity.remote_addr, (const struct sockaddr *)&server_addr) &&
-                                        session->hello1.sent &&
-                                        session->hello2.sent
+                                        sockaddr_equal((const struct sockaddr *)&single_session->identity.remote_addr, (const struct sockaddr *)&server_addr) &&
+                                        single_session->hello1.sent &&
+                                        single_session->hello2.sent
                                    )
                                 {
                                     orilink_protocol_t_status_t deserialized_orcvdo = orilink_deserialize(ctx->label,
-                                        session->identity.kem_sharedsecret, session->identity.remote_nonce, session->identity.remote_ctr,
+                                        single_session->identity.kem_sharedsecret, single_session->identity.remote_nonce, single_session->identity.remote_ctr,
                                         (const uint8_t*)orcvdo.r_orilink_raw_protocol_t->recv_buffer, orcvdo.r_orilink_raw_protocol_t->n
                                     );
                                     if (deserialized_orcvdo.status != SUCCESS) {
@@ -820,17 +820,17 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                     }  
                                     orilink_protocol_t* received_protocol = deserialized_orcvdo.r_orilink_protocol_t;
                                     orilink_hello2_ack_t *ohello2_ack = received_protocol->payload.orilink_hello2_ack;
-                                    if (session->identity.client_id != ohello2_ack->client_id) {
+                                    if (single_session->identity.client_id != ohello2_ack->client_id) {
                                         LOG_WARN("%HELLO2_ACK ditolak dari IP %s. client_id berbeda.", ctx->label, host_str);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
                                     }
-                                    memcpy(session->identity.kem_ciphertext, ohello2_ack->ciphertext1, KEM_CIPHERTEXT_BYTES / 2);
+                                    memcpy(single_session->identity.kem_ciphertext, ohello2_ack->ciphertext1, KEM_CIPHERTEXT_BYTES / 2);
 //======================================================================
 // Send HELLO3
 //======================================================================           
-                                    if (async_create_timerfd(ctx->label, &session->hello3.timer_fd) != SUCCESS) {
+                                    if (async_create_timerfd(ctx->label, &single_session->hello3.timer_fd) != SUCCESS) {
                                         LOG_ERROR("%sFailed to async_create_timerfd.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
@@ -839,8 +839,8 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //----------------------------------------------------------------------
 // Hitung rtt retry sebelum kirim data
 //----------------------------------------------------------------------
-                                    double try_count = (double)session->hello2.sent_try_count-(double)1;
-                                    cow_calculate_retry(&cow_ctx, session, i, try_count);
+                                    double try_count = (double)single_session->hello2.sent_try_count-(double)1;
+                                    cow_calculate_retry(ctx, single_session, i, try_count);
                                     uint64_t_status_t rt = get_realtime_time_ns(ctx->label);
                                     if (rt.status != SUCCESS) {
                                         LOG_ERROR("%sFailed to get_realtime_time_ns.", ctx->label);
@@ -848,20 +848,20 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                         event_founded_in_session = true;
                                         break;
                                     }
-                                    session->hello2.ack_rcvd = true;
-                                    session->hello2.ack_rcvd_time = rt.r_uint64_t;
-                                    uint64_t interval_ull = session->hello2.ack_rcvd_time - session->hello2.sent_time;
+                                    single_session->hello2.ack_rcvd = true;
+                                    single_session->hello2.ack_rcvd_time = rt.r_uint64_t;
+                                    uint64_t interval_ull = single_session->hello2.ack_rcvd_time - single_session->hello2.sent_time;
                                     double rtt_value = (double)interval_ull;
-                                    cow_calculate_rtt(&cow_ctx, session, i, rtt_value);
+                                    cow_calculate_rtt(ctx, single_session, i, rtt_value);
 //----------------------------------------------------------------------
-                                    if (send_hello3(&cow_ctx, session) != SUCCESS) {
+                                    if (send_hello3(ctx, single_session) != SUCCESS) {
                                         LOG_ERROR("%sFailed to send_hello3.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
                                     }
 //----------------------------------------------------------------------
-                                    if (async_create_incoming_event(ctx->label, &ctx->async, &session->hello3.timer_fd) != SUCCESS) {
+                                    if (async_create_incoming_event(ctx->label, &ctx->async, &single_session->hello3.timer_fd) != SUCCESS) {
                                         LOG_ERROR("%sFailed to async_create_incoming_event.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
@@ -870,7 +870,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //----------------------------------------------------------------------
 // Semua sudah bersih
 //----------------------------------------------------------------------
-                                    cleanup_hello(ctx->label, &ctx->async, &session->hello2);
+                                    cleanup_hello(ctx->label, &ctx->async, &single_session->hello2);
 //======================================================================  
                                     CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                     event_founded_in_session = true;
@@ -883,14 +883,14 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                 }
                             } else if (orcvdo.r_orilink_raw_protocol_t->type == ORILINK_HELLO3_ACK) {
                                 if (
-                                        sockaddr_equal((const struct sockaddr *)&session->identity.remote_addr, (const struct sockaddr *)&server_addr) &&
-                                        session->hello1.sent &&
-                                        session->hello2.sent &&
-                                        session->hello3.sent
+                                        sockaddr_equal((const struct sockaddr *)&single_session->identity.remote_addr, (const struct sockaddr *)&server_addr) &&
+                                        single_session->hello1.sent &&
+                                        single_session->hello2.sent &&
+                                        single_session->hello3.sent
                                    )
                                 {
                                     orilink_protocol_t_status_t deserialized_orcvdo = orilink_deserialize(ctx->label,
-                                        session->identity.kem_sharedsecret, session->identity.remote_nonce, session->identity.remote_ctr,
+                                        single_session->identity.kem_sharedsecret, single_session->identity.remote_nonce, single_session->identity.remote_ctr,
                                         (const uint8_t*)orcvdo.r_orilink_raw_protocol_t->recv_buffer, orcvdo.r_orilink_raw_protocol_t->n
                                     );
                                     if (deserialized_orcvdo.status != SUCCESS) {
@@ -904,13 +904,13 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                     }  
                                     orilink_protocol_t* received_protocol = deserialized_orcvdo.r_orilink_protocol_t;
                                     orilink_hello3_ack_t *ohello3_ack = received_protocol->payload.orilink_hello3_ack;
-                                    if (session->identity.client_id != ohello3_ack->client_id) {
+                                    if (single_session->identity.client_id != ohello3_ack->client_id) {
                                         LOG_WARN("%HELLO3_ACK ditolak dari IP %s. client_id berbeda.", ctx->label, host_str);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
                                     }
-                                    memcpy(session->identity.kem_ciphertext + (KEM_CIPHERTEXT_BYTES / 2), ohello3_ack->ciphertext2, KEM_CIPHERTEXT_BYTES / 2);
+                                    memcpy(single_session->identity.kem_ciphertext + (KEM_CIPHERTEXT_BYTES / 2), ohello3_ack->ciphertext2, KEM_CIPHERTEXT_BYTES / 2);
 //----------------------------------------------------------------------
 // data heloo_end belum terenkripsi karena berisi nonce
 // namun sudah ada pengecekan mac menggunakan sharedsecret
@@ -918,13 +918,13 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 // jika mac sesuai segera pindah
 // temp_kem_sharedsecret ke identity
 //----------------------------------------------------------------------
-                                    if (KEM_DECODE_SHAREDSECRET(session->temp_kem_sharedsecret, session->identity.kem_ciphertext, session->identity.kem_privatekey) != 0) {
+                                    if (KEM_DECODE_SHAREDSECRET(single_session->temp_kem_sharedsecret, single_session->identity.kem_ciphertext, single_session->identity.kem_privatekey) != 0) {
                                         LOG_ERROR("%sFailed to KEM_DECODE_SHAREDSECRET.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
                                     }                                    
-                                    memcpy(session->identity.remote_nonce, ohello3_ack->encrypted_server_id_port, AES_NONCE_BYTES);
+                                    memcpy(single_session->identity.remote_nonce, ohello3_ack->encrypted_server_id_port, AES_NONCE_BYTES);
                                     uint8_t encrypted_server_id_port[sizeof(uint64_t) + sizeof(uint16_t)];
                                     memcpy(encrypted_server_id_port, ohello3_ack->encrypted_server_id_port + AES_NONCE_BYTES, sizeof(uint64_t) + sizeof(uint16_t));
                                     uint8_t data_mac[AES_TAG_BYTES];
@@ -936,7 +936,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                     memcpy(encrypted_server_id_port1, ohello3_ack->encrypted_server_id_port, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t));
                                     uint8_t mac[AES_TAG_BYTES];
                                     poly1305_context mac_ctx;
-                                    poly1305_init(&mac_ctx, session->temp_kem_sharedsecret);
+                                    poly1305_init(&mac_ctx, single_session->temp_kem_sharedsecret);
                                     poly1305_update(&mac_ctx, encrypted_server_id_port1, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t));
                                     poly1305_finish(&mac_ctx, mac);
                                     if (!poly1305_verify(mac, data_mac)) {
@@ -949,20 +949,20 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 // Pindahkan temp_kem_sharedsecret ke identity
 // Menganggap data valid dengan integritas
 //---------------------------------------------------------------------- 
-                                    session->identity.remote_ctr = (uint32_t)0;
-                                    memcpy(session->identity.kem_sharedsecret, session->temp_kem_sharedsecret, KEM_SHAREDSECRET_BYTES);
-                                    memset(session->temp_kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+                                    single_session->identity.remote_ctr = (uint32_t)0;
+                                    memcpy(single_session->identity.kem_sharedsecret, single_session->temp_kem_sharedsecret, KEM_SHAREDSECRET_BYTES);
+                                    memset(single_session->temp_kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
 //----------------------------------------------------------------------
 // Decrypt
 //---------------------------------------------------------------------- 
                                     uint8_t decrypted_server_id_port[sizeof(uint64_t) + sizeof(uint16_t)];
                                     aes256ctx aes_ctx;
-                                    aes256_ctr_keyexp(&aes_ctx, session->identity.kem_sharedsecret);
+                                    aes256_ctr_keyexp(&aes_ctx, single_session->identity.kem_sharedsecret);
 //=========================================IV===========================    
                                     uint8_t keystream_buffer[sizeof(uint64_t) + sizeof(uint16_t)];
                                     uint8_t iv[AES_IV_BYTES];
-                                    memcpy(iv, session->identity.remote_nonce, AES_NONCE_BYTES);
-                                    uint32_t remote_ctr_be = htobe32(session->identity.remote_ctr);
+                                    memcpy(iv, single_session->identity.remote_nonce, AES_NONCE_BYTES);
+                                    uint32_t remote_ctr_be = htobe32(single_session->identity.remote_ctr);
                                     memcpy(iv + AES_NONCE_BYTES, &remote_ctr_be, sizeof(uint32_t));
 //=========================================IV===========================    
                                     aes256_ctr(keystream_buffer, sizeof(uint64_t) + sizeof(uint16_t), iv, &aes_ctx);
@@ -970,20 +970,20 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                         decrypted_server_id_port[i] = encrypted_server_id_port[i] ^ keystream_buffer[i];
                                     }
                                     aes256_ctx_release(&aes_ctx);
-                                    increment_ctr(&session->identity.remote_ctr, session->identity.remote_nonce);
+                                    increment_ctr(&single_session->identity.remote_ctr, single_session->identity.remote_nonce);
 //---------------------------------------------------------------------- 
 // Mengisi identity
 //---------------------------------------------------------------------- 
                                     uint64_t server_id_be;
                                     memcpy(&server_id_be, decrypted_server_id_port, sizeof(uint64_t));
-                                    session->identity.server_id = be64toh(server_id_be);
+                                    single_session->identity.server_id = be64toh(server_id_be);
                                     uint16_t port_be;
                                     memcpy(&port_be, decrypted_server_id_port + sizeof(uint64_t), sizeof(uint16_t));
-                                    session->identity.port = be16toh(port_be);
+                                    single_session->identity.port = be16toh(port_be);
 //======================================================================
 // Send HELLO_END
 //======================================================================   
-                                    if (async_create_timerfd(ctx->label, &session->hello_end.timer_fd) != SUCCESS) {
+                                    if (async_create_timerfd(ctx->label, &single_session->hello_end.timer_fd) != SUCCESS) {
                                         LOG_ERROR("%sFailed to async_create_timerfd.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
@@ -992,8 +992,8 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //----------------------------------------------------------------------
 // Hitung rtt retry sebelum kirim data
 //----------------------------------------------------------------------
-                                    double try_count = (double)session->hello3.sent_try_count-(double)1;
-                                    cow_calculate_retry(&cow_ctx, session, i, try_count);
+                                    double try_count = (double)single_session->hello3.sent_try_count-(double)1;
+                                    cow_calculate_retry(ctx, single_session, i, try_count);
                                     uint64_t_status_t rt = get_realtime_time_ns(ctx->label);
                                     if (rt.status != SUCCESS) {
                                         LOG_ERROR("%sFailed to get_realtime_time_ns.", ctx->label);
@@ -1001,20 +1001,20 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                         event_founded_in_session = true;
                                         break;
                                     }
-                                    session->hello3.ack_rcvd = true;
-                                    session->hello3.ack_rcvd_time = rt.r_uint64_t;
-                                    uint64_t interval_ull = session->hello3.ack_rcvd_time - session->hello3.sent_time;
+                                    single_session->hello3.ack_rcvd = true;
+                                    single_session->hello3.ack_rcvd_time = rt.r_uint64_t;
+                                    uint64_t interval_ull = single_session->hello3.ack_rcvd_time - single_session->hello3.sent_time;
                                     double rtt_value = (double)interval_ull;
-                                    cow_calculate_rtt(&cow_ctx, session, i, rtt_value);
+                                    cow_calculate_rtt(ctx, single_session, i, rtt_value);
 //----------------------------------------------------------------------
-                                    if (send_hello_end(&cow_ctx, session) != SUCCESS) {
+                                    if (send_hello_end(ctx, single_session) != SUCCESS) {
                                         LOG_ERROR("%sFailed to send_hello_end.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
                                         break;
                                     }
 //----------------------------------------------------------------------
-                                    if (async_create_incoming_event(ctx->label, &ctx->async, &session->hello_end.timer_fd) != SUCCESS) {
+                                    if (async_create_incoming_event(ctx->label, &ctx->async, &single_session->hello_end.timer_fd) != SUCCESS) {
                                         LOG_ERROR("%sFailed to async_create_incoming_event.", ctx->label);
                                         CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                         event_founded_in_session = true;
@@ -1023,7 +1023,7 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
 //----------------------------------------------------------------------
 // Semua sudah bersih
 //----------------------------------------------------------------------
-                                    cleanup_hello(ctx->label, &ctx->async, &session->hello3);
+                                    cleanup_hello(ctx->label, &ctx->async, &single_session->hello3);
 //======================================================================  
                                     CLOSE_ORILINK_PROTOCOL(&received_protocol);
                                     event_founded_in_session = true;
@@ -1039,60 +1039,60 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
                                 event_founded_in_session = true;
                                 break;
                             }
-                        } else if (current_fd == session->hello1.timer_fd) {
+                        } else if (current_fd == single_session->hello1.timer_fd) {
                             uint64_t u;
-                            read(session->hello1.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                            if (server_disconnected(&cow_ctx, i, session, session->hello1.sent_try_count)) {
+                            read(single_session->hello1.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                            if (server_disconnected(ctx, i, single_session, single_session->hello1.sent_try_count)) {
                                 event_founded_in_session = true;
                                 break;
                             }
-                            LOG_DEBUG("%s session %d: interval = %lf.", ctx->label, i, session->hello1.interval_timer_fd);
-                            double try_count = (double)session->hello1.sent_try_count;
-                            cow_calculate_retry(&cow_ctx, session, i, try_count);
-                            session->hello1.interval_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);
-                            send_hello1(&cow_ctx, session);
+                            LOG_DEBUG("%s single_session %d: interval = %lf.", ctx->label, i, single_session->hello1.interval_timer_fd);
+                            double try_count = (double)single_session->hello1.sent_try_count;
+                            cow_calculate_retry(ctx, single_session, i, try_count);
+                            single_session->hello1.interval_timer_fd = pow((double)2, (double)single_session->identity.retry.value_prediction);
+                            send_hello1(ctx, single_session);
                             event_founded_in_session = true;
                             break;
-                        } else if (current_fd == session->hello2.timer_fd) {
+                        } else if (current_fd == single_session->hello2.timer_fd) {
                             uint64_t u;
-                            read(session->hello2.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                            if (server_disconnected(&cow_ctx, i, session, session->hello2.sent_try_count)) {
+                            read(single_session->hello2.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                            if (server_disconnected(ctx, i, single_session, single_session->hello2.sent_try_count)) {
                                 event_founded_in_session = true;
                                 break;
                             }
-                            LOG_DEBUG("%s session %d: interval = %lf.", ctx->label, i, session->hello2.interval_timer_fd);
-                            double try_count = (double)session->hello2.sent_try_count;
-                            cow_calculate_retry(&cow_ctx, session, i, try_count);
-                            session->hello2.interval_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);
-                            send_hello2(&cow_ctx, session);
+                            LOG_DEBUG("%s single_session %d: interval = %lf.", ctx->label, i, single_session->hello2.interval_timer_fd);
+                            double try_count = (double)single_session->hello2.sent_try_count;
+                            cow_calculate_retry(ctx, single_session, i, try_count);
+                            single_session->hello2.interval_timer_fd = pow((double)2, (double)single_session->identity.retry.value_prediction);
+                            send_hello2(ctx, single_session);
                             event_founded_in_session = true;
                             break;
-                        } else if (current_fd == session->hello3.timer_fd) {
+                        } else if (current_fd == single_session->hello3.timer_fd) {
                             uint64_t u;
-                            read(session->hello3.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                            if (server_disconnected(&cow_ctx, i, session, session->hello3.sent_try_count)) {
+                            read(single_session->hello3.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                            if (server_disconnected(ctx, i, single_session, single_session->hello3.sent_try_count)) {
                                 event_founded_in_session = true;
                                 break;
                             }
-                            LOG_DEBUG("%s session %d: interval = %lf.", ctx->label, i, session->hello3.interval_timer_fd);
-                            double try_count = (double)session->hello3.sent_try_count;
-                            cow_calculate_retry(&cow_ctx, session, i, try_count);
-                            session->hello3.interval_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);
-                            send_hello3(&cow_ctx, session);
+                            LOG_DEBUG("%s single_session %d: interval = %lf.", ctx->label, i, single_session->hello3.interval_timer_fd);
+                            double try_count = (double)single_session->hello3.sent_try_count;
+                            cow_calculate_retry(ctx, single_session, i, try_count);
+                            single_session->hello3.interval_timer_fd = pow((double)2, (double)single_session->identity.retry.value_prediction);
+                            send_hello3(ctx, single_session);
                             event_founded_in_session = true;
                             break;
-                        } else if (current_fd == session->hello_end.timer_fd) {
+                        } else if (current_fd == single_session->hello_end.timer_fd) {
                             uint64_t u;
-                            read(session->hello_end.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                            if (server_disconnected(&cow_ctx, i, session, session->hello_end.sent_try_count)) {
+                            read(single_session->hello_end.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                            if (server_disconnected(ctx, i, single_session, single_session->hello_end.sent_try_count)) {
                                 event_founded_in_session = true;
                                 break;
                             }
-                            LOG_DEBUG("%s session %d: interval = %lf.", ctx->label, i, session->hello_end.interval_timer_fd);
-                            double try_count = (double)session->hello_end.sent_try_count;
-                            cow_calculate_retry(&cow_ctx, session, i, try_count);
-                            session->hello_end.interval_timer_fd = pow((double)2, (double)session->identity.retry.value_prediction);
-                            send_hello_end(&cow_ctx, session);
+                            LOG_DEBUG("%s single_session %d: interval = %lf.", ctx->label, i, single_session->hello_end.interval_timer_fd);
+                            double try_count = (double)single_session->hello_end.sent_try_count;
+                            cow_calculate_retry(ctx, single_session, i, try_count);
+                            single_session->hello_end.interval_timer_fd = pow((double)2, (double)single_session->identity.retry.value_prediction);
+                            send_hello_end(ctx, single_session);
                             event_founded_in_session = true;
                             break;
                         }
@@ -1109,5 +1109,5 @@ void run_cow_worker(worker_type_t wot, uint8_t worker_idx, long initial_delay_ms
     }
 
 exit:    
-    cleanup_cow_worker(&cow_ctx);
+    cleanup_cow_worker(ctx, sessions);
 }
