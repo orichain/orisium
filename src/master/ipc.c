@@ -25,21 +25,25 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
 	result.status = FAILURE;
 	result.index = (uint8_t)0xff;
     const char* worker_name = "Unknown";
-    bool is_worker_uds = false;
+    bool is_worker_uds_closing = false;
 
     for (uint8_t i = 0; i < MAX_SIO_WORKERS; ++i) {
-        if (*current_fd == master_ctx->sio_session[i].upp.uds[0]) {
-            is_worker_uds = true;
+        master_sio_session_t *session = &master_ctx->sio_session[i];
+        if (*current_fd == session->upp.uds[0]) {
+            session->isactive = false;
+            is_worker_uds_closing = true;
             result.r_worker_type_t = SIO;
             worker_name = "SIO";
             result.index = i;
             break;
         }
     }
-    if (!is_worker_uds) {
+    if (!is_worker_uds_closing) {
         for (uint8_t i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-            if (*current_fd == master_ctx->logic_session[i].upp.uds[0]) {
-                is_worker_uds = true;
+            master_logic_session_t *session = &master_ctx->logic_session[i];
+            if (*current_fd == session->upp.uds[0]) {
+                session->isactive = false;
+                is_worker_uds_closing = true;
                 result.r_worker_type_t = LOGIC;
                 worker_name = "Logic";
                 result.index = i;
@@ -47,10 +51,12 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
             }
         }
     }
-    if (!is_worker_uds) {
+    if (!is_worker_uds_closing) {
         for (uint8_t i = 0; i < MAX_COW_WORKERS; ++i) {
-            if (*current_fd == master_ctx->cow_session[i].upp.uds[0]) {
-                is_worker_uds = true;
+            master_cow_session_t *session = &master_ctx->cow_session[i];
+            if (*current_fd == session->upp.uds[0]) {
+                session->isactive = false;
+                is_worker_uds_closing = true;
                 result.r_worker_type_t = COW;
                 worker_name = "COW";
                 result.index = i;
@@ -58,10 +64,12 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
             }
         }
     }
-    if (!is_worker_uds) {
+    if (!is_worker_uds_closing) {
         for (uint8_t i = 0; i < MAX_DBR_WORKERS; ++i) {
-            if (*current_fd == master_ctx->dbr_session[i].upp.uds[0]) {
-                is_worker_uds = true;
+            master_dbr_session_t *session = &master_ctx->dbr_session[i];
+            if (*current_fd == session->upp.uds[0]) {
+                session->isactive = false;
+                is_worker_uds_closing = true;
                 result.r_worker_type_t = DBR;
                 worker_name = "DBR";
                 result.index = i;
@@ -69,10 +77,12 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
             }
         }
     }
-    if (!is_worker_uds) {
+    if (!is_worker_uds_closing) {
         for (uint8_t i = 0; i < MAX_DBW_WORKERS; ++i) {
-            if (*current_fd == master_ctx->dbw_session[i].upp.uds[0]) {
-                is_worker_uds = true;
+            master_dbw_session_t *session = &master_ctx->dbw_session[i];
+            if (*current_fd == session->upp.uds[0]) {
+                session->isactive = false;
+                is_worker_uds_closing = true;
                 result.r_worker_type_t = DBW;
                 worker_name = "DBW";
                 result.index = i;
@@ -80,7 +90,7 @@ worker_type_t_status_t handle_ipc_closed_event(const char *label, master_context
             }
         }
     }
-    if (is_worker_uds) {
+    if (is_worker_uds_closing) {
 		LOG_DEBUG("%sWorker UDS FD %d (%s Worker %d) terputus.", label, *current_fd, worker_name, result.index);
         result.status = SUCCESS;			
 		return result;

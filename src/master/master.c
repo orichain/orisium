@@ -150,7 +150,7 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
     master_ctx->all_workers_is_ready = false;
     master_ctx->last_sio_rr_idx = 0;
     master_ctx->last_cow_rr_idx = 0;
-	master_ctx->master_pid = -1;
+	master_ctx->master_pid = 0;
 	master_ctx->shutdown_event_fd = -1;
     master_ctx->listen_sock = -1;
     master_ctx->heartbeat_timer_fd = -1;
@@ -202,12 +202,6 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     master_ctx->all_workers_is_ready = false;
     master_ctx->last_sio_rr_idx = 0;
     master_ctx->last_cow_rr_idx = 0;
-	master_ctx->master_pid = -1;
-	master_ctx->shutdown_event_fd = -1;
-    master_ctx->listen_sock = -1;
-    master_ctx->heartbeat_timer_fd = -1;
-    master_ctx->master_async.async_fd = -1;
-    master_ctx->master_pid = 0;
     CLOSE_FD(&master_ctx->listen_sock);
     async_delete_event(label, &master_ctx->master_async, &master_ctx->heartbeat_timer_fd);
     CLOSE_FD(&master_ctx->heartbeat_timer_fd);
@@ -231,7 +225,12 @@ void run_master(const char *label, master_context_t *master_ctx) {
     master_workers_info(label, master_ctx, IT_READY);
     while (!master_ctx->shutdown_requested) {
 		int_status_t snfds = async_wait(label, &master_ctx->master_async);
-		if (snfds.status != SUCCESS) continue;
+		if (snfds.status != SUCCESS) {
+            if (snfds.status == FAILURE_EBADF) {
+                master_ctx->shutdown_requested = 1;
+            }
+            continue;
+        }
 		for (int n = 0; n < snfds.r_int; ++n) {		
 			if (master_ctx->shutdown_requested) {
 				break;
@@ -379,9 +378,9 @@ void run_master(const char *label, master_context_t *master_ctx) {
                         if (worker_closed.status != SUCCESS) {
                             continue;
                         }
-//======================================================================
-// Cleanup and recreate worker
-//======================================================================
+//----------------------------------------------------------------------
+// Recreate Worker                        
+//----------------------------------------------------------------------
                         if (close_worker(label, master_ctx, worker_closed.r_worker_type_t, worker_closed.index) != SUCCESS) {
                             continue;
                         }
@@ -394,7 +393,8 @@ void run_master(const char *label, master_context_t *master_ctx) {
                         if (master_worker_info(label, master_ctx, worker_closed.r_worker_type_t, worker_closed.index, IT_READY) != SUCCESS) {
                             continue;
                         }
-//======================================================================
+//----------------------------------------------------------------------
+                        continue;
                     } else {
                         status_t hie_rslt = handle_ipc_event(label, master_ctx, &current_fd);
 //----------------------------------------------------------------------
@@ -460,6 +460,7 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                 continue;
                             }
                             if (!master_ctx->is_rekeying) {
+                                master_ctx->is_rekeying = false;
                                 for (int ic = 0; ic < master_ctx->bootstrap_nodes.len; ic++) {
                                     int cow_worker_idx = select_best_worker(label, master_ctx, COW);
                                     if (cow_worker_idx == -1) {
@@ -506,11 +507,11 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                 }
                             }
                             LOG_INFO("%sPID %d UDP Server listening on port %d.", label, master_ctx->master_pid, master_ctx->listen_port);
+                            continue;
                         } else {
                             continue;
                         }
                     }
-                    continue;
                 }
                 bool event_founded_in_sio_c_session = false;
                 for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {

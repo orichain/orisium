@@ -74,6 +74,10 @@ int_status_t async_wait(const char* label, async_type_t *async) {
         if (errno == EINTR) {
             result.status = FAILURE_EINTR;
             return result;
+        } else if (errno == EBADF) {
+            result.status = FAILURE_EBADF;
+            LOG_ERROR("%sEBADF %s", label, strerror(errno));
+            return result;
         }
         LOG_ERROR("%s%s", label, strerror(errno));
         result.status = FAILURE;

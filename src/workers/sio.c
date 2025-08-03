@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <endian.h>
+#include <signal.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -47,16 +48,28 @@ status_t setup_sio_worker(worker_context_t *ctx, sio_c_session_t *sessions, work
     return SUCCESS;
 }
 
+volatile sig_atomic_t sio_sigterm_requested = 0;
+
+void sio_sigterm_handler(int sig) {
+    sio_sigterm_requested = 1;
+}
+
 void run_sio_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd) {
     worker_context_t x_ctx;
     worker_context_t *ctx = &x_ctx;
     sio_c_session_t sessions[MAX_CONNECTION_PER_SIO_WORKER];
     if (setup_sio_worker(ctx, sessions, wot, index, master_uds_fd) != SUCCESS) goto exit;
-    while (!ctx->shutdown_requested) {
+    signal(SIGTERM, sio_sigterm_handler);
+    while (!ctx->shutdown_requested && !sio_sigterm_requested) {
         int_status_t snfds = async_wait(ctx->label, &ctx->async);
-		if (snfds.status != SUCCESS) continue;
+		if (snfds.status != SUCCESS) {
+            if (snfds.status == FAILURE_EBADF) {
+                ctx->shutdown_requested = 1;
+            }
+            continue;
+        }
         for (int n = 0; n < snfds.r_int; ++n) {
-            if (ctx->shutdown_requested) {
+            if (ctx->shutdown_requested || sio_sigterm_requested) {
 				break;
 			}
 			int_status_t fd_status = async_getfd(ctx->label, &ctx->async, n);

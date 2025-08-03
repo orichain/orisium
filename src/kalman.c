@@ -1,6 +1,3 @@
-#include <stdlib.h>
-#include <stddef.h>
-
 #include "kalman.h"
 #include "log.h"
 #include "utilities.h"
@@ -9,7 +6,6 @@
 
 void setup_oricle_long_double(oricle_long_double_t *o, long double initial_value) {
     o->first_check = true;
-    o->kalman_calibration_samples = NULL;
     o->kalman_initialized_count = 0;
     o->initial_value = initial_value;
     o->temp_ewma_value = initial_value;
@@ -18,7 +14,6 @@ void setup_oricle_long_double(oricle_long_double_t *o, long double initial_value
 
 void setup_oricle_double(oricle_double_t *o, double initial_value) {
     o->first_check = true;
-    o->kalman_calibration_samples = NULL;
     o->kalman_initialized_count = 0;
     o->initial_value = initial_value;
     o->temp_ewma_value = initial_value;
@@ -26,13 +21,11 @@ void setup_oricle_double(oricle_double_t *o, double initial_value) {
 }
 
 void cleanup_oricle_long_double(oricle_long_double_t *o) {
-    if (o->kalman_calibration_samples) free(o->kalman_calibration_samples);
-    o->kalman_calibration_samples = NULL;
+    
 }
 
 void cleanup_oricle_double(oricle_double_t *o) {
-    if (o->kalman_calibration_samples) free(o->kalman_calibration_samples);
-    o->kalman_calibration_samples = NULL;
+    
 }
 
 void calculate_oricle_double(const char *label, const char *desc, oricle_double_t *o, double value, double max_value) {
@@ -42,11 +35,7 @@ void calculate_oricle_double(const char *label, const char *desc, oricle_double_
         o->value_prediction = o->initial_value;
         o->kalman_filter.is_initialized = false;
         o->kalman_initialized_count = 0;
-        if (o->kalman_calibration_samples != NULL) {
-            free(o->kalman_calibration_samples);
-            o->kalman_calibration_samples = NULL;
-        }
-        LOG_DEBUG("%s[%s]First-time setup.", label, desc);
+        LOG_DEVEL_DEBUG("%s[%s]First-time setup.", label, desc);
         if (o->initial_value != (double)0) value = o->initial_value;
     }
     if (value < (double)0) value = (double)0;
@@ -54,13 +43,7 @@ void calculate_oricle_double(const char *label, const char *desc, oricle_double_
         if (value > max_value) value = max_value;
     }
     if (!o->kalman_filter.is_initialized) {
-        if (o->kalman_calibration_samples == NULL) {
-            o->kalman_calibration_samples = (double *)malloc(KALMAN_CALIBRATION_SAMPLES * sizeof(double));
-            if (!o->kalman_calibration_samples) {
-                LOG_ERROR("%s[%s]Failed to allocate calibration samples. Fallback to raw measurement.", label, desc);
-                o->value_prediction = value;
-                return;
-            }
+        if (o->kalman_initialized_count == 0) {
             o->temp_ewma_value = value;
         }
         if (o->kalman_initialized_count < KALMAN_CALIBRATION_SAMPLES) {
@@ -72,8 +55,6 @@ void calculate_oricle_double(const char *label, const char *desc, oricle_double_
             if (o->kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
                 double avg_value = calculate_double_average(o->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
                 double var_value = calculate_double_variance(o->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_value);
-                free(o->kalman_calibration_samples);
-                o->kalman_calibration_samples = NULL;
                 if (var_value < (double)0.1) var_value = (double)0.1;
                 double kalman_q_avg_task = (double)1;
                 double kalman_r_avg_task = var_value;
@@ -81,14 +62,14 @@ void calculate_oricle_double(const char *label, const char *desc, oricle_double_
                 kalman_double_init(&o->kalman_filter, kalman_q_avg_task, kalman_r_avg_task, kalman_p0_avg_task, avg_value);
                 o->kalman_filter.is_initialized = true;                                
                 o->value_prediction = (double)o->kalman_filter.state_estimate;
-                LOG_DEBUG("%s[%s]Kalman Filter fully initialized. Avg: %.2f, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
+                LOG_DEVEL_DEBUG("%s[%s]Kalman Filter fully initialized. Avg: %.2f, Var: %.2f (Q:%.2f, R:%.2f, P0:%.2f)",
                                 label, desc, avg_value, var_value, kalman_q_avg_task, kalman_r_avg_task, kalman_p0_avg_task);
             } else {
                 o->value_prediction = o->temp_ewma_value;
-                LOG_DEBUG("%s[%s]Calibrating... (%d/%d) -> Meas: %.2f -> EWMA: %.2f", label, desc, o->kalman_initialized_count, KALMAN_CALIBRATION_SAMPLES, value, o->temp_ewma_value);
+                LOG_DEVEL_DEBUG("%s[%s]Calibrating... (%d/%d) -> Meas: %.2f -> EWMA: %.2f", label, desc, o->kalman_initialized_count, KALMAN_CALIBRATION_SAMPLES, value, o->temp_ewma_value);
             }
         }
-        LOG_DEBUG("%s[%s]Meas: %.2f -> Est: %.2f", label, desc, value, o->value_prediction);
+        LOG_DEVEL_DEBUG("%s[%s]Meas: %.2f -> Est: %.2f", label, desc, value, o->value_prediction);
         return;
     }
     o->value_prediction = kalman_double_filter(&o->kalman_filter, (double)value);
@@ -96,7 +77,7 @@ void calculate_oricle_double(const char *label, const char *desc, oricle_double_
     if (max_value != (double)0) {
         if (o->value_prediction > max_value) o->value_prediction = max_value;
     }
-    LOG_DEBUG("%s[%s]Meas: %.2f -> Est: %.2f", label, desc, value, o->value_prediction);
+    LOG_DEVEL_DEBUG("%s[%s]Meas: %.2f -> Est: %.2f", label, desc, value, o->value_prediction);
 }
 
 void calculate_oricle_long_double(const char *label, const char *desc, oricle_long_double_t *o, long double value, long double max_value) {
@@ -106,10 +87,6 @@ void calculate_oricle_long_double(const char *label, const char *desc, oricle_lo
         o->value_prediction = o->initial_value;
         o->kalman_filter.is_initialized = false;
         o->kalman_initialized_count = 0;
-        if (o->kalman_calibration_samples != NULL) {
-            free(o->kalman_calibration_samples);
-            o->kalman_calibration_samples = NULL;
-        }
         LOG_DEBUG("%s[%s]First-time setup.", label, desc);
         if (o->initial_value != (long double)0) value = o->initial_value;
     }
@@ -118,13 +95,7 @@ void calculate_oricle_long_double(const char *label, const char *desc, oricle_lo
         if (value > max_value) value = max_value;
     }
     if (!o->kalman_filter.is_initialized) {
-        if (o->kalman_calibration_samples == NULL) {
-            o->kalman_calibration_samples = (long double *)malloc(KALMAN_CALIBRATION_SAMPLES * sizeof(long double));
-            if (!o->kalman_calibration_samples) {
-                LOG_ERROR("%s[%s]Failed to allocate calibration samples. Fallback to raw measurement.", label, desc);
-                o->value_prediction = value;
-                return;
-            }
+        if (o->kalman_initialized_count == 0) {
             o->temp_ewma_value = value;
         }
         if (o->kalman_initialized_count < KALMAN_CALIBRATION_SAMPLES) {
@@ -136,8 +107,6 @@ void calculate_oricle_long_double(const char *label, const char *desc, oricle_lo
             if (o->kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
                 long double avg_value = calculate_long_double_average(o->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
                 long double var_value = calculate_long_double_variance(o->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_value);
-                free(o->kalman_calibration_samples);
-                o->kalman_calibration_samples = NULL;
                 if (var_value < (long double)0.1) var_value = (long double)0.1;
                 long double kalman_q_avg_task = (long double)1;
                 long double kalman_r_avg_task = var_value;

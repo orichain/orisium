@@ -77,6 +77,18 @@ typedef struct {
     bool isready;
     uint16_t task_count;
     uds_pair_pid_t upp;
+    worker_metrics_t metrics;
+    oricle_double_t healthy;
+    oricle_long_double_t avgtt;
+    worker_security_t security;
+} master_cow_session_t;
+
+typedef struct {
+    bool isactive;
+    bool ishealthy;
+    bool isready;
+    uint16_t task_count;
+    uds_pair_pid_t upp;
 	worker_metrics_t metrics;
     oricle_double_t healthy;
     oricle_long_double_t avgtt;
@@ -100,18 +112,6 @@ typedef struct {
     oricle_long_double_t avgtt;
     worker_security_t security;
 } master_dbw_session_t;
-
-typedef struct {
-    bool isactive;
-    bool ishealthy;
-    bool isready;
-    uint16_t task_count;
-    uds_pair_pid_t upp;
-    worker_metrics_t metrics;
-    oricle_double_t healthy;
-    oricle_long_double_t avgtt;
-    worker_security_t security;
-} master_cow_session_t;
 
 typedef struct {
     bool rcvd;

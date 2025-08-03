@@ -80,6 +80,6 @@ exit:
 	printf("[Orisium]: ==========================================================\n");
     printf("[Orisium]: Orisium selesai dijalankan.\n");
     printf("[Orisium]: ==========================================================\n");
-    
+    //CLOSE_PID(&master_ctx.master_pid);
     return 0;
 }

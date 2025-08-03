@@ -25,7 +25,13 @@
 #define HEARTBEAT_JITTER_PERCENTAGE 0.2
 #define RAND_MAX_DOUBLE ((double)RAND_MAX)
 #define INITIAL_MILISECONDS_PER_UNIT 5
-#define REKEYING_HB_TIMES 10000
+//----------------------------------------------------------------------
+// rekeying tiap 24 jam
+// berdasarkan hb timer (9 detik) * 9600 = 86400 detik = 24 jam
+//----------------------------------------------------------------------
+#define REKEYING_HB_TIMES 9600
+//----------------------------------------------------------------------
+#define WORKER_RECREATE_SEC 1
 
 #define IPV6_ADDRESS_LEN 16
 #define IPV4_ADDRESS_LEN 4
