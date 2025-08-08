@@ -1,0 +1,433 @@
+#include <stdint.h>
+#include <string.h>
+#include <stdbool.h>
+#include <endian.h>
+
+#include "log.h"
+#include "ipc/protocol.h"
+#include "async.h"
+#include "utilities.h"
+#include "types.h"
+#include "constants.h"
+#include "workers/workers.h"
+#include "workers/ipc.h"
+#include "workers/master_ipc_cmds.h"
+#include "pqc.h"
+#include "poly1305-donna.h"
+#include "aes.h"
+
+void handle_workers_ipc_closed_event(worker_context_t *worker_ctx) {
+    LOG_INFO("%sMaster disconnected. Initiating graceful shutdown...", worker_ctx->label);
+    worker_ctx->shutdown_requested = 1;
+}
+
+status_t handle_workers_ipc_event(worker_context_t *worker_ctx, double *initial_delay_ms) {
+    ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(worker_ctx->label, worker_ctx->master_uds_fd);
+    if (ircvdi.status != SUCCESS) {
+        LOG_ERROR("%sError receiving or deserializing IPC message from Master: %d", worker_ctx->label, ircvdi.status);
+        return ircvdi.status;
+    }
+    if (check_mac_ctr(
+            worker_ctx->label, 
+            worker_ctx->aes_key, 
+            worker_ctx->mac_key, 
+            &worker_ctx->remote_ctr, 
+            ircvdi.r_ipc_raw_protocol_t
+        ) != SUCCESS
+    )
+    {
+        CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+        return FAILURE;
+    }
+    switch (ircvdi.r_ipc_raw_protocol_t->type) {
+        case IPC_MASTER_WORKER_INFO: {
+            ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label,
+                worker_ctx->aes_key, worker_ctx->remote_nonce, &worker_ctx->remote_ctr,
+                (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+            );
+            if (deserialized_ircvdi.status != SUCCESS) {
+                LOG_ERROR("%sipc_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_ircvdi.status);
+                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                return FAILURE;
+            } else {
+                LOG_DEBUG("%sipc_deserialize BERHASIL.", worker_ctx->label);
+                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+            }           
+            ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
+            ipc_master_worker_info_t *iinfoi = received_protocol->payload.ipc_master_worker_info;
+            switch (iinfoi->flag) {
+                case IT_SHUTDOWN: {
+                    LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", worker_ctx->label);
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    worker_ctx->shutdown_requested = 1;
+                    break;
+                }
+                case IT_READY: {
+                    LOG_INFO("%sMaster Ready ...", worker_ctx->label);
+//----------------------------------------------------------------------
+                    if (*initial_delay_ms > 0) {
+                        LOG_DEBUG("%sApplying initial delay of %ld ms...", worker_ctx->label, *initial_delay_ms);
+                        sleep_ms(*initial_delay_ms);
+                    }
+//----------------------------------------------------------------------
+                    if (KEM_GENERATE_KEYPAIR(worker_ctx->kem_publickey, worker_ctx->kem_privatekey) != 0) {
+                        LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", worker_ctx->label);
+                        worker_ctx->shutdown_requested = 1;
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        return FAILURE;
+                    }
+                    if (worker_master_hello1(worker_ctx) != SUCCESS) {
+                        LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
+                        worker_ctx->shutdown_requested = 1;
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        return FAILURE;
+                    }
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    break;
+                }
+                case IT_REKEYING: {
+                    LOG_INFO("%sMaster Rekeying ...", worker_ctx->label);
+//----------------------------------------------------------------------
+                    if (*initial_delay_ms > 0) {
+                        LOG_DEBUG("%sApplying initial delay of %ld ms...", worker_ctx->label, *initial_delay_ms);
+                        sleep_ms(*initial_delay_ms);
+                    }
+//----------------------------------------------------------------------
+                    if (KEM_GENERATE_KEYPAIR(worker_ctx->kem_publickey, worker_ctx->kem_privatekey) != 0) {
+                        LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", worker_ctx->label);
+                        worker_ctx->shutdown_requested = 1;
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        return FAILURE;
+                    }
+                    if (async_delete_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->heartbeat_timer_fd) != SUCCESS) {		
+                        LOG_INFO("%sGagal async_delete_event hb timer, Untuk Rekeying", worker_ctx->label);
+                        worker_ctx->shutdown_requested = 1;
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        return FAILURE;
+                    }
+                    CLOSE_FD(&worker_ctx->heartbeat_timer_fd);
+                    worker_ctx->hello1_sent = false;
+                    worker_ctx->hello1_ack_rcvd = false;
+                    worker_ctx->hello2_sent = false;
+                    worker_ctx->hello2_ack_rcvd = false;
+                    if (worker_master_hello1(worker_ctx) != SUCCESS) {
+                        LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
+                        worker_ctx->shutdown_requested = 1;
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        return FAILURE;
+                    }
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    break;
+                }
+                default:
+                    LOG_ERROR("%sUnknown Info Flag %d from Master. Ignoring.", worker_ctx->label, iinfoi->flag);
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+            }
+            break;
+        }
+        case IPC_MASTER_WORKER_HELLO1_ACK: {
+            if (!worker_ctx->hello1_sent) {
+                LOG_ERROR("%sBelum pernah mengirim HELLO1", worker_ctx->label);
+                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                return FAILURE;
+            }
+            if (worker_ctx->hello1_ack_rcvd) {
+                LOG_ERROR("%sSudah ada HELLO1_ACK", worker_ctx->label);
+                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                return FAILURE;
+            }
+            ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label,
+                worker_ctx->aes_key, worker_ctx->remote_nonce, &worker_ctx->remote_ctr,
+                (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+            );
+            if (deserialized_ircvdi.status != SUCCESS) {
+                LOG_ERROR("%sipc_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_ircvdi.status);
+                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                return FAILURE;
+            } else {
+                LOG_DEBUG("%sipc_deserialize BERHASIL.", worker_ctx->label);
+                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+            }           
+            ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
+            ipc_master_worker_hello1_ack_t *ihello1_acki = received_protocol->payload.ipc_master_worker_hello1_ack;
+            memcpy(worker_ctx->kem_ciphertext, ihello1_acki->kem_ciphertext, KEM_CIPHERTEXT_BYTES);
+            if (KEM_DECODE_SHAREDSECRET(worker_ctx->kem_sharedsecret, worker_ctx->kem_ciphertext, worker_ctx->kem_privatekey) != 0) {
+                LOG_ERROR("%sFailed to KEM_DECODE_SHAREDSECRET. Worker error. Initiating graceful shutdown...", worker_ctx->label);
+                worker_ctx->shutdown_requested = 1;
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            if (worker_master_hello2(worker_ctx) != SUCCESS) {
+                LOG_ERROR("%sFailed to worker_master_hello2. Worker error. Initiating graceful shutdown...", worker_ctx->label);
+                worker_ctx->shutdown_requested = 1;
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            memcpy(worker_ctx->remote_nonce, ihello1_acki->nonce, AES_NONCE_BYTES);
+            worker_ctx->hello1_ack_rcvd = true;
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            break;
+        }
+        case IPC_MASTER_WORKER_HELLO2_ACK: {
+            if (!worker_ctx->hello2_sent) {
+                LOG_ERROR("%sBelum pernah mengirim HELLO2", worker_ctx->label);
+                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                return FAILURE;
+            }
+            if (worker_ctx->hello2_ack_rcvd) {
+                LOG_ERROR("%sSudah ada HELLO2_ACK", worker_ctx->label);
+                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                return FAILURE;
+            }
+            ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label,
+                worker_ctx->aes_key, worker_ctx->remote_nonce, &worker_ctx->remote_ctr,
+                (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+            );
+            if (deserialized_ircvdi.status != SUCCESS) {
+                LOG_ERROR("%sipc_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_ircvdi.status);
+                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                return FAILURE;
+            } else {
+                LOG_DEBUG("%sipc_deserialize BERHASIL.", worker_ctx->label);
+                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+            }           
+            ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
+            ipc_master_worker_hello2_ack_t *ihello2_acki = received_protocol->payload.ipc_master_worker_hello2_ack;
+//======================================================================
+// Ambil remote_nonce
+// Set remote_ctr = 0
+// Ambil encrypter wot+index
+// Ambil Mac
+// Cocokkan MAc
+// Decrypt wot dan index
+//======================================================================
+            uint8_t encrypted_wot_index[sizeof(uint8_t) + sizeof(uint8_t)];   
+            memcpy(encrypted_wot_index, ihello2_acki->encrypted_wot_index, sizeof(uint8_t) + sizeof(uint8_t));
+            uint8_t data_mac[AES_TAG_BYTES];
+            memcpy(data_mac, ihello2_acki->encrypted_wot_index + sizeof(uint8_t) + sizeof(uint8_t), AES_TAG_BYTES);
+//----------------------------------------------------------------------
+// Tmp aes_key
+//----------------------------------------------------------------------
+            uint8_t tmp_aes_key[HASHES_BYTES];
+            kdf1(worker_ctx->kem_sharedsecret, tmp_aes_key);
+//----------------------------------------------------------------------
+// cek Mac
+//----------------------------------------------------------------------  
+            uint8_t mac[AES_TAG_BYTES];
+            poly1305_context mac_ctx;
+            poly1305_init(&mac_ctx, worker_ctx->mac_key);
+            poly1305_update(&mac_ctx, encrypted_wot_index, sizeof(uint8_t) + sizeof(uint8_t));
+            poly1305_finish(&mac_ctx, mac);
+            if (!poly1305_verify(mac, data_mac)) {
+                LOG_ERROR("%sFailed to Mac Tidak Sesuai. Worker error...", worker_ctx->label);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }            
+//----------------------------------------------------------------------
+// Decrypt
+//---------------------------------------------------------------------- 
+            uint8_t decrypted_wot_index[sizeof(uint8_t) + sizeof(uint8_t)];
+            aes256ctx aes_ctx;
+            aes256_ctr_keyexp(&aes_ctx, tmp_aes_key);
+//=========================================IV===========================    
+            uint8_t keystream_buffer[sizeof(uint8_t) + sizeof(uint8_t)];
+            uint8_t iv[AES_IV_BYTES];
+            memcpy(iv, worker_ctx->remote_nonce, AES_NONCE_BYTES);
+            uint32_t remote_ctr_be = htobe32(worker_ctx->remote_ctr);
+            memcpy(iv + AES_NONCE_BYTES, &remote_ctr_be, sizeof(uint32_t));
+//=========================================IV===========================    
+            aes256_ctr(keystream_buffer, sizeof(uint8_t) + sizeof(uint8_t), iv, &aes_ctx);
+            for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t); i++) {
+                decrypted_wot_index[i] = encrypted_wot_index[i] ^ keystream_buffer[i];
+            }
+            aes256_ctx_release(&aes_ctx);
+//----------------------------------------------------------------------
+// Mencocokkan wot index
+//----------------------------------------------------------------------
+            worker_type_t data_wot;
+            memcpy((uint8_t *)&data_wot, decrypted_wot_index, sizeof(uint8_t));
+            if (*(uint8_t *)worker_ctx->wot != *(uint8_t *)&data_wot) {
+                LOG_ERROR("%sberbeda wot. Worker error...", worker_ctx->label);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            uint8_t data_index;
+            memcpy(&data_index, decrypted_wot_index + sizeof(uint8_t), sizeof(uint8_t));
+            if (*worker_ctx->index != data_index) {
+                LOG_ERROR("%sberbeda index. Worker error...", worker_ctx->label);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+//----------------------------------------------------------------------
+// Aktifkan Heartbeat Karna security/Enkripsi Sudah Ready
+//---------------------------------------------------------------------- 
+            if (async_create_timerfd(worker_ctx->label, &worker_ctx->heartbeat_timer_fd) != SUCCESS) {
+                LOG_ERROR("%sWorker error async_create_timerfd...", worker_ctx->label);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            if (async_set_timerfd_time(worker_ctx->label, &worker_ctx->heartbeat_timer_fd,
+                WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT, 0,
+                WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT, 0) != SUCCESS)
+            {
+                LOG_ERROR("%sWorker error async_set_timerfd_time...", worker_ctx->label);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->heartbeat_timer_fd) != SUCCESS) {
+                LOG_ERROR("%sWorker error async_create_incoming_event...", worker_ctx->label);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+//----------------------------------------------------------------------
+// Menganggap data valid dengan integritas
+//---------------------------------------------------------------------- 
+            memcpy(worker_ctx->aes_key, tmp_aes_key, HASHES_BYTES);
+            memset (tmp_aes_key, 0, HASHES_BYTES);
+            worker_ctx->remote_ctr = (uint32_t)0;
+            worker_ctx->hello2_ack_rcvd = true;
+//---------------------------------------------------------------------- 
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            break;
+        }
+        /*
+        case IPC_MASTER_COW_CONNECT: {
+            ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label,
+                worker_ctx->aes_key, worker_ctx->remote_nonce, &worker_ctx->remote_ctr,
+                (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+            );
+            if (deserialized_ircvdi.status != SUCCESS) {
+                LOG_ERROR("%sipc_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_ircvdi.status);
+                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                return FAILURE;
+            } else {
+                LOG_DEBUG("%sipc_deserialize BERHASIL.", worker_ctx->label);
+                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+            }           
+            ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
+            ipc_master_cow_connect_t *cc = received_protocol->payload.ipc_master_cow_connect;
+            int slot_found = -1;
+            for (int i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
+                if (!sessions[i].in_use) {
+                    sessions[i].in_use = true;
+                    memcpy(&sessions[i].identity.remote_addr, &cc->server_addr, sizeof(struct sockaddr_in6));
+                    slot_found = i;
+                    break;
+                }
+            }
+            if (slot_found == -1) {
+                LOG_INFO("%sNO SLOT. master_cow_session_t <> cow_c_session_t. Tidak singkron. Worker error. Initiating graceful shutdown...", worker_ctx->label);
+                worker_ctx->shutdown_requested = 1;
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            cow_c_session_t *single_session;
+            single_session = &sessions[slot_found];
+    //======================================================================
+    // Setup sock_fd and connect to server
+    //======================================================================
+            struct addrinfo hints, *res, *rp;
+            memset(&hints, 0, sizeof(hints));
+            hints.ai_family = AF_UNSPEC;
+            hints.ai_socktype = SOCK_DGRAM;
+            hints.ai_protocol = IPPROTO_UDP;
+            char host_str[NI_MAXHOST];
+            char port_str[NI_MAXSERV];
+            int getname_res = getnameinfo((struct sockaddr *)&single_session->identity.remote_addr, sizeof(struct sockaddr_in6),
+                                host_str, NI_MAXHOST,
+                                port_str, NI_MAXSERV,
+                                NI_NUMERICHOST | NI_NUMERICSERV
+                              );
+            if (getname_res != 0) {
+                LOG_ERROR("%sgetnameinfo failed. %s", worker_ctx->label, strerror(errno));
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            int gai_err = getaddrinfo(host_str, port_str, &hints, &res);
+            if (gai_err != 0) {
+                LOG_ERROR("%sgetaddrinfo error for UDP %s:%s: %s", worker_ctx->label, host_str, port_str, gai_strerror(gai_err));
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            for (rp = res; rp != NULL; rp = rp->ai_next) {
+                single_session->sock_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+                if (single_session->sock_fd == -1) {
+                    LOG_ERROR("%sUDP Socket creation failed: %s", worker_ctx->label, strerror(errno));
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    return FAILURE;
+                }
+                LOG_DEBUG("%sUDP Socket FD %d created.", worker_ctx->label, single_session->sock_fd);
+                status_t r_snbkg = set_nonblocking(worker_ctx->label, single_session->sock_fd);
+                if (r_snbkg != SUCCESS) {
+                    LOG_ERROR("%sset_nonblocking failed.", worker_ctx->label);
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    return FAILURE;
+                }
+                LOG_DEBUG("%sUDP Socket FD %d set to non-blocking.", worker_ctx->label, single_session->sock_fd);
+                int conn_res = connect(single_session->sock_fd, rp->ai_addr, rp->ai_addrlen);
+                if (conn_res == 0) {
+                    LOG_INFO("%sUDP socket 'connected' to %s:%s (FD %d).", worker_ctx->label, host_str, port_str, single_session->sock_fd);
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    break;
+                } else {
+                    LOG_ERROR("%sUDP 'connect' failed for %s:%s (FD %d): %s", worker_ctx->label, host_str, port_str, single_session->sock_fd, strerror(errno));
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    CLOSE_FD(&single_session->sock_fd);
+                    return FAILURE;
+                }
+            }
+            freeaddrinfo(res);
+            if (single_session->sock_fd == -1) {
+                LOG_ERROR("%sFailed to set up any UDP socket for %s:%s.", worker_ctx->label, host_str, port_str);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &single_session->sock_fd) != SUCCESS) {
+                LOG_ERROR("%sFailed to async_create_incoming_event for %s:%s.", worker_ctx->label, host_str, port_str);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+//======================================================================
+// Generate Identity                    
+//======================================================================
+            if (generate_connection_id(worker_ctx->label, &single_session->identity.client_id) != SUCCESS) {
+                LOG_ERROR("%sFailed to generate_connection_id for %s:%s.", worker_ctx->label, host_str, port_str);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            if (KEM_GENERATE_KEYPAIR(single_session->identity.kem_publickey, single_session->identity.kem_privatekey) != 0) {
+                LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR for %s:%s.", worker_ctx->label, host_str, port_str);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+//======================================================================
+// Send HELLO1                    
+//======================================================================           
+            if (async_create_timerfd(worker_ctx->label, &single_session->hello1.timer_fd) != SUCCESS) {
+                LOG_ERROR("%sFailed to async_create_timerfd for %s:%s.", worker_ctx->label, host_str, port_str);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+//----------------------------------------------------------------------
+            if (send_hello1(worker_ctx, single_session) != SUCCESS) {
+                LOG_ERROR("%sFailed to send_hello1 for %s:%s.", worker_ctx->label, host_str, port_str);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+//----------------------------------------------------------------------
+            if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &single_session->hello1.timer_fd) != SUCCESS) {
+                LOG_ERROR("%sFailed to async_create_incoming_event for %s:%s.", worker_ctx->label, host_str, port_str);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }        
+//======================================================================    
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            break;
+        }
+        */
+        default:
+            LOG_ERROR("%sUnknown protocol type %d from Master. Ignoring.", worker_ctx->label, ircvdi.r_ipc_raw_protocol_t->type);
+            CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+    }
+    return SUCCESS;
+}

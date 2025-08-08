@@ -374,7 +374,7 @@ void run_master(const char *label, master_context_t *master_ctx) {
                         async_event_is_EPOLLERR(current_events) ||
                         async_event_is_EPOLLRDHUP(current_events))
                     {
-                        worker_type_t_status_t worker_closed = handle_ipc_closed_event(label, master_ctx, &current_fd);
+                        worker_type_t_status_t worker_closed = handle_master_ipc_closed_event(label, master_ctx, &current_fd);
                         if (worker_closed.status != SUCCESS) {
                             continue;
                         }
@@ -396,7 +396,7 @@ void run_master(const char *label, master_context_t *master_ctx) {
 //----------------------------------------------------------------------
                         continue;
                     } else {
-                        status_t hie_rslt = handle_ipc_event(label, master_ctx, &current_fd);
+                        status_t hie_rslt = handle_master_ipc_event(label, master_ctx, &current_fd);
 //----------------------------------------------------------------------
 // All Worker Ready To Comunication In Secure Encription
 //----------------------------------------------------------------------
