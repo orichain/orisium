@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+
 #include "constants.h"
 
 typedef struct {
@@ -33,7 +34,7 @@ typedef struct {
     uint8_t first_check;
     kalman_t kalman_filter;
     uint8_t kalman_initialized_count;
-    float kalman_calibration_samples[KALMAN_CALIBRATION_SAMPLES]; 
+    float *kalman_calibration_samples; 
     float initial_value;
     float temp_ewma_value;
     float value_prediction;
@@ -43,7 +44,7 @@ typedef struct {
     uint8_t first_check;
     kalman_double_t kalman_filter;
     uint8_t kalman_initialized_count;
-    double kalman_calibration_samples[KALMAN_CALIBRATION_SAMPLES]; 
+    double *kalman_calibration_samples; 
     double initial_value;
     double temp_ewma_value;
     double value_prediction;
@@ -53,7 +54,7 @@ typedef struct {
     uint8_t first_check;
     kalman_long_double_t kalman_filter;
     uint8_t kalman_initialized_count;
-    long double kalman_calibration_samples[KALMAN_CALIBRATION_SAMPLES]; 
+    long double *kalman_calibration_samples; 
     long double initial_value;
     long double temp_ewma_value;
     long double value_prediction;
