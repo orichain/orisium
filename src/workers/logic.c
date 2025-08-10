@@ -3,6 +3,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <signal.h>
+#include <bits/types/sig_atomic_t.h>
 
 #include "log.h"
 #include "async.h"
@@ -85,7 +86,7 @@ void run_logic_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_
                     handle_workers_ipc_closed_event(worker_ctx);
                     continue;
                 } else {
-                    handle_workers_ipc_event(worker_ctx, initial_delay_ms);
+                    handle_workers_ipc_event(worker_ctx, NULL, initial_delay_ms);
                     continue;
                 }
             } else {

@@ -13,12 +13,34 @@
 #include "orilink/protocol.h"
 
 typedef struct {
+    bool rcvd;
+    uint64_t rcvd_time;
+    bool ack_sent;
+    int ack_sent_try_count;
+    uint64_t ack_sent_time;
+    int ack_timer_fd;
+    double interval_ack_timer_fd;
+} hello_ack_t;
+
+typedef struct {
     bool in_use;
-    int sock_fd;
 //======================================================================
-// IDENTITY
+// IDENTITY & SECURITY
 //======================================================================    
 	orilink_identity_t identity;
+	orilink_security_t security;
+//======================================================================
+// HELLO SOCK
+//======================================================================
+    hello_ack_t hello1_ack;
+    hello_ack_t hello2_ack;
+    hello_ack_t hello3_ack;
+    hello_ack_t sock_ready;	
+//======================================================================
+// ORICLE
+//======================================================================
+	oricle_double_t rtt;
+    oricle_double_t retry;
 } sio_c_session_t; //Server
 
 typedef struct {
@@ -33,14 +55,12 @@ typedef struct {
 
 typedef struct {
     bool in_use;
-    int sock_fd;
 //======================================================================
-// IDENTITY
+// IDENTITY & SECURITY
 //======================================================================    
 	orilink_identity_t identity;
-    uint8_t encrypted_server_id_port[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES];
-    uint8_t temp_kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
-    uint64_t new_client_id;
+	uint8_t *kem_privatekey;
+	orilink_security_t security;
 //======================================================================
 // HELLO SOCK
 //======================================================================
@@ -48,6 +68,11 @@ typedef struct {
     hello_t hello2;
     hello_t hello3;
     hello_t hello_end;
+//======================================================================
+// ORICLE
+//======================================================================
+	oricle_double_t rtt;
+    oricle_double_t retry;
 } cow_c_session_t; //Client
 
 typedef struct {
@@ -77,6 +102,10 @@ typedef struct {
 
 status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *wot, uint8_t *index, int *master_uds_fd);
 void cleanup_worker(worker_context_t *ctx);
+//----------------------------------------------------------------------
+void setup_cow_session(cow_c_session_t *single_session);
+void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session);
+//----------------------------------------------------------------------
 void run_sio_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
 void run_logic_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
 void run_cow_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);

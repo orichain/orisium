@@ -22,13 +22,6 @@
 
 status_t close_worker(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
 	if (wot == SIO) {
-        for (int i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
-            master_sio_c_session_t *c_session;
-            c_session = &master_ctx->sio_c_session[i];
-            if (c_session->in_use && (c_session->sio_index == index)) {
-                cleanup_master_sio_session(label, &master_ctx->master_async, c_session);
-            }
-        }
         master_sio_session_t *session = &master_ctx->sio_session[index];
         uds_pair_pid_t *upp = &session->upp;
         worker_security_t *security = &session->security;
@@ -95,13 +88,6 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
 		CLOSE_UDS(&upp->uds[1]);
         CLOSE_PID(&upp->pid);
 	} else if (wot == COW) {
-        for (int i = 0; i < MAX_MASTER_COW_SESSIONS; ++i) {
-            master_cow_c_session_t *c_session;
-            c_session = &master_ctx->cow_c_session[i];
-            if (c_session->in_use && (c_session->cow_index == index)) {
-                cleanup_master_cow_session(c_session);
-            }
-        }
         master_cow_session_t *session = &master_ctx->cow_session[index];
         uds_pair_pid_t *upp = &session->upp;
         worker_security_t *security = &session->security;
@@ -435,10 +421,6 @@ void close_master_resource(master_context_t *master_ctx, worker_type_t wot, uint
     free(security->mac_key);
     free(security->local_nonce);
     free(security->remote_nonce);
-    memset(master_ctx->kem_privatekey, 0, KEM_PRIVATEKEY_BYTES);
-    free(master_ctx->kem_privatekey);
-    memset(master_ctx->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
-    free(master_ctx->kem_publickey);
 }
 
 status_t setup_fork_worker(const char* label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {

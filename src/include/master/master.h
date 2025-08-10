@@ -114,39 +114,15 @@ typedef struct {
 } master_dbw_session_t;
 
 typedef struct {
-    bool rcvd;
-    uint64_t rcvd_time;
-    bool ack_sent;
-    int ack_sent_try_count;
-    uint64_t ack_sent_time;
-    int ack_timer_fd;
-    double interval_ack_timer_fd;
-} hello_ack_t;
-
-typedef struct {
 	int sio_index;
     bool in_use;
-    int sock_fd;
-//======================================================================
-// IDENTITY
-//======================================================================    
-	orilink_identity_t identity;
-    uint8_t client_kem_publickey[KEM_PUBLICKEY_BYTES];
-    uint8_t encrypted_server_id_port[AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES];
-    uint8_t temp_kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
-//======================================================================
-// HELLO SOCK
-//======================================================================
-    hello_ack_t hello1_ack;
-    hello_ack_t hello2_ack;
-    hello_ack_t hello3_ack;
-    hello_ack_t sock_ready;
+    orilink_identity_t identity;
 } master_sio_c_session_t;
 
 typedef struct {
 	int cow_index;
     bool in_use;
-    struct sockaddr_in6 server_addr;
+    orilink_identity_t identity;
 } master_cow_c_session_t;
 
 typedef struct {
@@ -167,9 +143,6 @@ typedef struct {
 //----------------------------------------------------------------------
     bool all_workers_is_ready;
     bool is_rekeying;
-//----------------------------------------------------------------------
-    uint8_t *kem_privatekey;
-    uint8_t *kem_publickey;
 //----------------------------------------------------------------------    
     master_sio_session_t *sio_session;
     master_logic_session_t *logic_session;
@@ -188,12 +161,6 @@ void sigint_handler(int signum);
 status_t setup_master(const char *label, master_context_t *master_ctx);
 void cleanup_master(const char *label, master_context_t *master_ctx);
 void run_master(const char *label, master_context_t *master_ctx);
-//----------------------------------------------------------------------
-void cleanup_master_sio_session(const char *label, async_type_t *master_async, master_sio_c_session_t *session);
-void cleanup_master_cow_session(master_cow_c_session_t *session);
-//----------------------------------------------------------------------
-void cleanup_hello_ack(const char *label, async_type_t *async, hello_ack_t *h);
-void setup_hello_ack(hello_ack_t *h);
 //----------------------------------------------------------------------
 
 #endif

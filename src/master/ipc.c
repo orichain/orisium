@@ -1,7 +1,6 @@
 #include <stdbool.h>
 #include <string.h>
 #include <errno.h>
-#include <netinet/in.h>
 #include <stdint.h>
 #include <endian.h>
 #include <stdio.h>
@@ -13,7 +12,6 @@
 #include "utilities.h"
 #include "master/ipc.h"
 #include "master/master.h"
-#include "master/workers.h"
 #include "master/worker_ipc_cmds.h"
 #include "pqc.h"
 #include "poly1305-donna.h"
@@ -423,37 +421,6 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
             CLOSE_IPC_PROTOCOL(&received_protocol);
 			break;
 		}
-        case IPC_COW_MASTER_CONNECTION: {
-            ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
-                security->aes_key, security->remote_nonce, &security->remote_ctr,
-                (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
-            );
-            if (deserialized_ircvdi.status != SUCCESS) {
-                LOG_ERROR("%sipc_deserialize gagal dengan status %d.", label, deserialized_ircvdi.status);
-                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
-                return deserialized_ircvdi.status;
-            } else {
-                LOG_DEBUG("%sipc_deserialize BERHASIL.", label);
-                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
-            }           
-            ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
-            ipc_cow_master_connection_t *icowconni = received_protocol->payload.ipc_cow_master_connection;
-            for (int i = 0; i < MAX_MASTER_COW_SESSIONS; ++i) {
-                if (
-                    master_ctx->cow_c_session[i].in_use &&
-                    sockaddr_equal((const struct sockaddr *)&master_ctx->cow_c_session[i].server_addr, (const struct sockaddr *)&icowconni->server_addr)
-                   )
-                {
-                    calculate_avgtt(label, master_ctx, rcvd_wot, rcvd_index);
-                    master_ctx->cow_c_session[i].cow_index = -1;
-                    master_ctx->cow_c_session[i].in_use = false;
-                    memset(&master_ctx->cow_c_session[i].server_addr, 0, sizeof(struct sockaddr_in6));
-                    break;
-                }
-            }
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            break;
-        }
 		default:
 			LOG_ERROR("%sUnknown protocol type %d from UDS FD %d. Ignoring.", label, ircvdi.r_ipc_raw_protocol_t->type, *current_fd);
 			CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
