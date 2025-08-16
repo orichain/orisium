@@ -271,12 +271,16 @@ typedef struct {
 
 typedef struct {
     uint8_t mac[AES_TAG_BYTES];
+    uint32_t ctr;
 	uint8_t version[ORILINK_VERSION_BYTES];
+	worker_type_t wot;
+    uint8_t index;
+    uint8_t c_index;
+    uint16_t sid;
+    uint16_t sseq;
 	orilink_protocol_type_t type;
 	union {
-//======================================================================
-// Untuk pembentukan sock_fd baru
-//======================================================================        
+//======================================================================     
         orilink_hello1_t *orilink_hello1;
         orilink_hello1_ack_t *orilink_hello1_ack;
         orilink_hello2_t *orilink_hello2;
@@ -385,7 +389,13 @@ static inline void CLOSE_ORILINK_PROTOCOL(orilink_protocol_t **protocol_ptr) {
 typedef struct {
     uint8_t *recv_buffer;
     uint16_t n;
+    uint32_t ctr;
     uint8_t version[ORILINK_VERSION_BYTES];
+    worker_type_t wot;
+    uint8_t index;
+    uint8_t c_index;
+    uint16_t sid;
+    uint16_t sseq;
 	orilink_protocol_type_t type;
 } orilink_raw_protocol_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan
@@ -415,8 +425,9 @@ typedef struct {
     status_t status;
 } orilink_raw_protocol_t_status_t;
 
-ssize_t_status_t send_orilink_protocol_packet(const char *label, uint8_t* key, uint8_t* nonce, uint32_t ctr, int *sock_fd, const struct sockaddr *dest_addr, const orilink_protocol_t* p);
+ssize_t_status_t send_orilink_protocol_packet(const char *label, uint8_t *key_aes, uint8_t *key_mac, uint8_t *nonce, uint32_t *ctr, int *sock_fd, const struct sockaddr *dest_addr, const orilink_protocol_t* p);
 orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *label, int *sock_fd, struct sockaddr *source_addr);
-orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key, uint8_t* nonce, uint32_t ctr, const uint8_t* buffer, size_t len);
+status_t orilink_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint32_t* ctr, orilink_raw_protocol_t *r);
+orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t *key_aes, uint8_t *nonce, uint32_t *ctr, uint8_t* buffer, size_t len);
 
 #endif

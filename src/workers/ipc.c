@@ -27,7 +27,7 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
         LOG_ERROR("%sError receiving or deserializing IPC message from Master: %d", worker_ctx->label, ircvdi.status);
         return ircvdi.status;
     }
-    if (check_mac_ctr(
+    if (ipc_check_mac_ctr(
             worker_ctx->label, 
             worker_ctx->aes_key, 
             worker_ctx->mac_key, 

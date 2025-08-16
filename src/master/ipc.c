@@ -123,7 +123,7 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
         CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
         return FAILURE;
     }
-    if (check_mac_ctr(
+    if (ipc_check_mac_ctr(
             label, 
             security->aes_key, 
             security->mac_key, 
