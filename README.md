@@ -112,19 +112,9 @@ Protocol IPC lewat Unix Domain Socket
 ## Instalasi
 
 ```bash
-git clone https://github.com/yourusername/orisium.git
+git clone https://github.com/orichain/orisium.git
 cd orisium
-make
-./orisium_master
-```
-
------
-
-## Penggunaan
-
-```bash
-./orisium_master --config master.json
-./orisium_node --config node1.json
+gmake clean debug
 ```
 
 -----

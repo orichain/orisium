@@ -305,7 +305,9 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
             }           
             ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
             ipc_master_cow_connect_t *icow_connecti = received_protocol->payload.ipc_master_cow_connect;
-            
+//----------------------------------------------------------------------            
+// ---------------------------------------------------------------------
+//----------------------------------------------------------------------            
             char ip_str[INET6_ADDRSTRLEN];
             if (inet_ntop(AF_INET6, &(icow_connecti->server_addr.sin6_addr), ip_str, INET6_ADDRSTRLEN) == NULL) {
                 perror("inet_ntop");
@@ -314,7 +316,7 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
             }
             unsigned short port = ntohs(icow_connecti->server_addr.sin6_port);
             printf("Perintah Connect Ke: %s%hu\n", ip_str, port);
-            
+//----------------------------------------------------------------------            
             CLOSE_IPC_PROTOCOL(&received_protocol);
             break;
         }
