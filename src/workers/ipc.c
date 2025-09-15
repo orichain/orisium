@@ -290,6 +290,34 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
             CLOSE_IPC_PROTOCOL(&received_protocol);
             break;
         }
+        case IPC_MASTER_COW_CONNECT: {
+            ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label,
+                worker_ctx->aes_key, worker_ctx->remote_nonce, &worker_ctx->remote_ctr,
+                (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
+            );
+            if (deserialized_ircvdi.status != SUCCESS) {
+                LOG_ERROR("%sipc_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_ircvdi.status);
+                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                return FAILURE;
+            } else {
+                LOG_DEBUG("%sipc_deserialize BERHASIL.", worker_ctx->label);
+                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+            }           
+            ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
+            ipc_master_cow_connect_t *icow_connecti = received_protocol->payload.ipc_master_cow_connect;
+            
+            char ip_str[INET6_ADDRSTRLEN];
+            if (inet_ntop(AF_INET6, &(icow_connecti->server_addr.sin6_addr), ip_str, INET6_ADDRSTRLEN) == NULL) {
+                perror("inet_ntop");
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            unsigned short port = ntohs(icow_connecti->server_addr.sin6_port);
+            printf("Perintah Connect Ke: %s%hu\n", ip_str, port);
+            
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            break;
+        }
         default:
             LOG_ERROR("%sUnknown protocol type %d from Master. Ignoring.", worker_ctx->label, ircvdi.r_ipc_raw_protocol_t->type);
             CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
