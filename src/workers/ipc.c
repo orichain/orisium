@@ -2,6 +2,10 @@
 #include <string.h>
 #include <stdbool.h>
 #include <endian.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <sys/socket.h>
 
 #include "log.h"
 #include "ipc/protocol.h"

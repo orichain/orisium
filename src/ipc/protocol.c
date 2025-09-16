@@ -16,8 +16,6 @@
 #include "ipc/master_worker_info.h"
 #include "ipc/worker_master_heartbeat.h"
 #include "ipc/master_cow_connect.h"
-#include "ipc/master_sio_orilink_identity.h"
-#include "ipc/cow_master_connection.h"
 #include "ipc/worker_master_hello1.h"
 #include "ipc/worker_master_hello2.h"
 #include "ipc/master_worker_hello1_ack.h"
@@ -69,63 +67,6 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
             }
             payload_fixed_size = SOCKADDR_IN6_SIZE;
             payload_dynamic_size = 0;
-            break;
-        }
-        case IPC_COW_MASTER_CONNECTION: {
-            if (!checkfixheader) {
-                if (!p->payload.ipc_cow_master_connection) {
-                    LOG_ERROR("%sIPC_COW_MASTER_CONNECTION payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
-            payload_fixed_size = SOCKADDR_IN6_SIZE + sizeof(uint8_t);
-            payload_dynamic_size = 0;
-            break;
-        }
-        case IPC_MASTER_SIO_ORILINK_IDENTITY: {
-            if (!checkfixheader) {
-                if (!p->payload.ipc_cow_master_connection) {
-                    LOG_ERROR("%sIPC_COW_MASTER_CONNECTION payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
-            payload_fixed_size = SOCKADDR_IN6_SIZE +
-                                 sizeof(uint64_t) + 
-                                 sizeof(uint64_t) + 
-                                 sizeof(uint16_t) + 
-                                 KEM_PRIVATEKEY_BYTES + 
-                                 KEM_PUBLICKEY_BYTES + 
-                                 KEM_CIPHERTEXT_BYTES + 
-                                 KEM_SHAREDSECRET_BYTES + 
-                                 AES_NONCE_BYTES +
-                                 sizeof(uint32_t) +
-                                 AES_NONCE_BYTES +
-                                 sizeof(uint32_t) +
-                                 DOUBLE_ARRAY_SIZE +
-                                 DOUBLE_ARRAY_SIZE +
-                                 DOUBLE_ARRAY_SIZE +
-                                 DOUBLE_ARRAY_SIZE +
-                                 sizeof(uint8_t) +
-                                 sizeof(uint8_t) +
-                                 sizeof(uint8_t) +
-                                 DOUBLE_ARRAY_SIZE +
-                                 DOUBLE_ARRAY_SIZE +
-                                 DOUBLE_ARRAY_SIZE +
-                                 DOUBLE_ARRAY_SIZE +
-                                 DOUBLE_ARRAY_SIZE +
-                                 DOUBLE_ARRAY_SIZE +
-                                 DOUBLE_ARRAY_SIZE +
-                                 sizeof(uint8_t) +
-                                 sizeof(uint8_t) +
-                                 sizeof(uint8_t) +
-                                 DOUBLE_ARRAY_SIZE +
-                                 DOUBLE_ARRAY_SIZE +
-                                 DOUBLE_ARRAY_SIZE +
-                                 sizeof(uint8_t) +
-                                 sizeof(uint8_t);
-            payload_dynamic_size = (p->payload.ipc_master_sio_orilink_identity->rtt_kcs_len * DOUBLE_ARRAY_SIZE) + (p->payload.ipc_master_sio_orilink_identity->retry_kcs_len * DOUBLE_ARRAY_SIZE);
             break;
         }
         case IPC_WORKER_MASTER_HELLO1: {
@@ -274,12 +215,6 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes, uint8_t* key
             break;
         case IPC_MASTER_COW_CONNECT:
             result_pyld = ipc_serialize_master_cow_connect(label, p->payload.ipc_master_cow_connect, current_buffer, *buffer_size, &offset);
-            break;
-        case IPC_COW_MASTER_CONNECTION:
-            result_pyld = ipc_serialize_cow_master_connection(label, p->payload.ipc_cow_master_connection, current_buffer, *buffer_size, &offset);
-            break;
-        case IPC_MASTER_SIO_ORILINK_IDENTITY:
-            result_pyld = ipc_serialize_master_sio_orilink_identity(label, p->payload.ipc_master_sio_orilink_identity, current_buffer, *buffer_size, &offset);
             break;
         case IPC_WORKER_MASTER_HELLO1:
             result_pyld = ipc_serialize_worker_master_hello1(label, p->payload.ipc_worker_master_hello1, current_buffer, *buffer_size, &offset);
@@ -615,52 +550,6 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
             }
             p->payload.ipc_master_cow_connect = payload;
             result_pyld = ipc_deserialize_master_cow_connect(label, p, buffer, len, &current_buffer_offset);
-            break;
-		}
-        case IPC_COW_MASTER_CONNECTION: {
-            if (current_buffer_offset + fixed_header_size > len) {
-                LOG_ERROR("%sBuffer terlalu kecil untuk IPC_COW_MASTER_CONNECTION fixed header.", label);
-                CLOSE_IPC_PROTOCOL(&p);
-                free(key0);
-                result.status = FAILURE_OOBUF;
-                return result;
-            }
-            ipc_cow_master_connection_t *payload = (ipc_cow_master_connection_t*) calloc(1, sizeof(ipc_cow_master_connection_t));
-            if (!payload) {
-                LOG_ERROR("%sFailed to allocate ipc_cow_master_connection_t without FAM. %s", label, strerror(errno));
-                CLOSE_IPC_PROTOCOL(&p);
-                free(key0);
-                result.status = FAILURE_NOMEM;
-                return result;
-            }
-            p->payload.ipc_cow_master_connection = payload;
-            result_pyld = ipc_deserialize_cow_master_connection(label, p, buffer, len, &current_buffer_offset);
-            break;
-		}
-        case IPC_MASTER_SIO_ORILINK_IDENTITY: {
-            if (current_buffer_offset + fixed_header_size > len) {
-                LOG_ERROR("%sBuffer terlalu kecil untuk IPC_MASTER_SIO_ORILINK_IDENTITY fixed header.", label);
-                CLOSE_IPC_PROTOCOL(&p);
-                free(key0);
-                result.status = FAILURE_OOBUF;
-                return result;
-            }            
-            size_t fixed_header_blen1_size = fixed_header_size - sizeof(uint8_t) - sizeof(uint8_t);
-            uint8_t actual_data_len1;
-            memcpy(&actual_data_len1, buffer + current_buffer_offset + fixed_header_blen1_size, sizeof(uint8_t));
-            size_t fixed_header_blen2_size = fixed_header_size - sizeof(uint8_t);
-            uint8_t actual_data_len2;
-            memcpy(&actual_data_len2, buffer + current_buffer_offset + fixed_header_blen2_size, sizeof(uint8_t));
-            ipc_master_sio_orilink_identity_t *payload = (ipc_master_sio_orilink_identity_t*) calloc(1, sizeof(ipc_master_sio_orilink_identity_t) + actual_data_len1 + actual_data_len2);
-            if (!payload) {
-                LOG_ERROR("%sFailed to allocate ipc_master_sio_orilink_identity_t with FAM. %s", label, strerror(errno));
-                CLOSE_IPC_PROTOCOL(&p);
-                free(key0);
-                result.status = FAILURE_NOMEM;
-                return result;
-            }
-            p->payload.ipc_master_sio_orilink_identity = payload;
-            result_pyld = ipc_deserialize_master_sio_orilink_identity(label, p, buffer, len, &current_buffer_offset);
             break;
 		}
         case IPC_WORKER_MASTER_HELLO1: {

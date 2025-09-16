@@ -12,12 +12,9 @@ typedef enum {
     IPC_WORKER_MASTER_HELLO2 = (uint8_t)0x02,
     IPC_MASTER_WORKER_HELLO2_ACK = (uint8_t)0x03,
     
-    IPC_MASTER_SIO_ORILINK_IDENTITY = (uint8_t)0x12,
-    
     IPC_MASTER_COW_CONNECT = (uint8_t)0x20,
     IPC_MASTER_COW_DATA = (uint8_t)0x21,
     IPC_COW_MASTER_DATA = (uint8_t)0x22,
-    IPC_COW_MASTER_CONNECTION = (uint8_t)0x23,
     
     IPC_WORKER_MASTER_HEARTBEAT = (uint8_t)0xfe,
     IPC_MASTER_WORKER_INFO = (uint8_t)0xff
@@ -26,49 +23,6 @@ typedef enum {
 typedef struct {  
     struct sockaddr_in6 server_addr;
 } ipc_master_cow_connect_t;
-
-typedef struct {
-    struct sockaddr_in6 remote_addr;
-    uint64_t server_id;
-    uint64_t client_id;
-    uint16_t port;
-    uint8_t kem_privatekey[KEM_PRIVATEKEY_BYTES];
-    uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
-    uint8_t kem_ciphertext[KEM_CIPHERTEXT_BYTES];
-    uint8_t kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
-    uint8_t local_nonce[AES_NONCE_BYTES];
-    uint32_t local_ctr;
-    uint8_t remote_nonce[AES_NONCE_BYTES];
-    uint32_t remote_ctr;
-    double rtt_pn;
-    double rtt_mn;
-    double rtt_ee;
-    double rtt_se;
-    uint8_t rtt_ii;    
-    uint8_t rtt_fc;
-    uint8_t rtt_kic;
-    double rtt_iv;
-    double rtt_tev;
-    double rtt_vp;
-    double retry_pn;
-    double retry_mn;
-    double retry_ee;
-    double retry_se;
-    uint8_t retry_ii;    
-    uint8_t retry_fc;
-    uint8_t retry_kic;
-    double retry_iv;
-    double retry_tev;
-    double retry_vp;
-    uint8_t rtt_kcs_len;
-    uint8_t retry_kcs_len;
-    double rtt_retry_kcs[];
-} ipc_master_sio_orilink_identity_t;
-
-typedef struct {
-    struct sockaddr_in6 server_addr;
-    connection_type_t flag;
-} ipc_cow_master_connection_t;
 
 typedef struct {
     info_type_t flag;
@@ -106,8 +60,6 @@ typedef struct {
 		ipc_master_worker_info_t *ipc_master_worker_info;
 		ipc_worker_master_heartbeat_t *ipc_worker_master_heartbeat;
         ipc_master_cow_connect_t *ipc_master_cow_connect;
-        ipc_cow_master_connection_t *ipc_cow_master_connection;
-        ipc_master_sio_orilink_identity_t *ipc_master_sio_orilink_identity;
         ipc_worker_master_hello1_t *ipc_worker_master_hello1;
         ipc_master_worker_hello1_ack_t *ipc_master_worker_hello1_ack;
         ipc_worker_master_hello2_t *ipc_worker_master_hello2;
@@ -131,10 +83,6 @@ static inline void CLOSE_IPC_PROTOCOL(ipc_protocol_t **protocol_ptr) {
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_worker_info);
         } else if (x->type == IPC_MASTER_COW_CONNECT) {
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_cow_connect);
-        } else if (x->type == IPC_COW_MASTER_CONNECTION) {
-            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_cow_master_connection);
-        } else if (x->type == IPC_MASTER_SIO_ORILINK_IDENTITY) {
-            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_sio_orilink_identity);
         } else if (x->type == IPC_WORKER_MASTER_HELLO1) {
             memset(x->payload.ipc_worker_master_hello1->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_worker_master_hello1);

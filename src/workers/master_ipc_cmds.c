@@ -9,15 +9,12 @@
 #include "ipc/worker_master_heartbeat.h"
 #include "ipc/worker_master_hello1.h"
 #include "ipc/worker_master_hello2.h"
-#include "ipc/cow_master_connection.h"
 #include "workers/workers.h"
 #include "constants.h"
 #include "poly1305-donna.h"
 #include "aes.h"
 #include "stdbool.h"
 #include "utilities.h"
-
-struct sockaddr_in6;
 
 status_t worker_master_heartbeat(worker_context_t *ctx, double new_heartbeat_interval_double) {
 	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_master_heartbeat(
@@ -162,35 +159,4 @@ status_t worker_master_hello2(worker_context_t *ctx) {
     ctx->hello2_sent = true;
     CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
     return SUCCESS;
-}
-
-status_t cow_master_connection(worker_context_t *ctx, struct sockaddr_in6 *addr, connection_type_t flag) {
-	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_cow_master_connection(
-        ctx->label, 
-        *ctx->wot, 
-        *ctx->index, 
-        addr, 
-        flag
-    );
-    if (cmd_result.status != SUCCESS) {
-        return FAILURE;
-    }
-    ssize_t_status_t send_result = send_ipc_protocol_message(
-        ctx->label, 
-        ctx->aes_key,
-        ctx->mac_key,
-        ctx->local_nonce,
-        &ctx->local_ctr,
-        ctx->master_uds_fd, 
-        cmd_result.r_ipc_protocol_t
-    );
-    if (send_result.status != SUCCESS) {
-        LOG_ERROR("%sFailed to sent cow_master_connection to master.", ctx->label);
-        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
-        return send_result.status;
-    } else {
-        LOG_DEBUG("%sSent cow_master_connection to master.", ctx->label);
-    }
-    CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t); 
-	return SUCCESS;
 }
