@@ -114,6 +114,7 @@ Protocol IPC lewat Unix Domain Socket
 ```bash
 git clone https://github.com/orichain/orisium.git
 cd orisium
+git submodule update --init --recursive
 gmake clean debug
 ```
 
