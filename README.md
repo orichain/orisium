@@ -10,23 +10,22 @@ Orisium is a high-performance peer-to-peer (P2P) network designed for global sca
 
 Orisium adopts a layered network structure for extreme scalability and resilience. There is no fixed root — a root can be automatically replaced based on horizontal evaluation by other roots.
 
-  * **313 Shards = 313 Root Nodes**
+* **313 Shards = 313 Root Nodes**
+    * Each root has:
+        - **25 downstreams** (Level-1)
+        - **312 horizontal connections** to other roots (partial mesh)
 
-      * Each root has:
-          - **25 downstreams** (Level-1)
-          - **312 horizontal connections** to other roots (partial mesh)
+* **Level-1 Nodes:**
+    - Connects to **1 upstream Root**
+    - Has **24 horizontal connections** to other Level-1 nodes within the same shard
+    - Can have up to **25 downstreams** (Level-2)
 
-  * **Level-1 Nodes:**
+* **Level-2 to Level-4 Nodes:**
+    - The hierarchical structure continues with the same pattern
+    - Each node has:
+        - **1 upstream**, **24 horizontal**, and a maximum of **25 downstreams**
 
-      - Connects to **1 upstream Root**
-      - Has **24 horizontal connections** to other Level-1 nodes within the same shard
-      - Can have up to **25 downstreams** (Level-2)
-
-  * **Level-2 to Level-4 Nodes:**
-
-      - The hierarchical structure continues with the same pattern
-      - Each node has:
-          - **1 upstream**, **24 horizontal**, and a maximum of **25 downstreams**
+*Note: The numbers and details mentioned above are a representation of the initial design. These figures may change as development progresses and based on the results of rigorous performance testing, to ensure the network operates at an optimal level.*
 
 ### **Deterministic Routing & Reconnect**
 
@@ -83,6 +82,8 @@ IPC Protocol via Unix Domain Socket
 | `cow` | 5 | Outbound client for horizontal and upstream connections. The Root requires up to 317 active sessions, and one `cow` process can handle up to 65 sessions through `connection_id` multiplexing. |
 | `r-lmdb` | 5 | Local database reader (read-only) |
 | `w-lmdb` | 1 | Local database writer (write-heavy) |
+
+*Note: The counts and functions of the components listed above are a representation of the initial design. These details may change as development progresses and based on the results of performance testing.*
 
 #### 🔌 Internal Communication
 
