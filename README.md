@@ -1,7 +1,3 @@
-Tentu, berikut adalah terjemahan teks ke dalam bahasa Inggris, mempertahankan format dan struktur Markdown aslinya.
-
------
-
 # Orisium
 
 Orisium is a high-performance peer-to-peer (P2P) network designed for global scalability, attack resilience, and robust decentralization. With a dynamic hierarchical architecture and a specialized UDP-based protocol, Orisium creates a strong foundation for future decentralized applications.
