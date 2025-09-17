@@ -8,7 +8,7 @@ Orisium is a high-performance peer-to-peer (P2P) network designed for global sca
 
 ### **Dynamic Hierarchical Network Architecture with 313 Root Nodes**
 
-Orisium adopts a layered network structure for extreme scalability and resilience. There is no fixed root — a root can be automatically replaced based on horizontal evaluation by other roots.
+Orisium adopts a layered network structure for extreme scalability and resilience. There is no fixed root — a root can be automatically replaced. When a root node fails, one of its Level-1 nodes is promoted to take its place. This promotion is decided by a consensus among all the other Level-1 nodes from the old root's group, and then validated by all other root nodes, ensuring both speed and decentralization.
 
 * **313 Root Nodes**
 
