@@ -1,7 +1,3 @@
-<p align="center">
-<img src="assets/images/orisium.png" alt="Orisium Logo" width="200">
-</p>
-
 -----
 
 # Orisium
@@ -43,36 +39,16 @@ Setiap node klien:
 
 ### **3. Custom Protocol di atas UDP**
 
-Orisium tidak menggunakan TCP untuk koneksi antar-node. Seluruh komunikasi antar-node dijalankan dengan protokol ringan custom-built di atas UDP, memungkinkan:
+Untuk memastikan koneksi langsung yang efisien antar-node, Orisium tidak bergantung pada *server* relai yang dapat membebani *bandwidth*. Sebaliknya, kami menggunakan strategi berlapis, dengan **NAT *hole punching* berbasis UDP** sebagai mekanisme utamanya.
 
-* Latensi sangat rendah
-* Tidak tergantung handshake TCP
-* Implementasi kontrol jendela (*window control*), urutan pesan, dan retransmisi secara manual.
+*Hole punching* dimungkinkan karena **protokol UDP** yang tidak memiliki koneksi. Teknik ini memungkinkan dua *node* di belakang *firewall* atau NAT untuk secara efisien membuat jalur komunikasi langsung.
 
-Fungsi `find_or_create_session()` menyimpan info sesi termasuk `connection_id`, `addr`, dan status handshaking, dengan window awal default misalnya 150000 byte.
+Ini sangat penting karena dua alasan:
 
-> Karena menggunakan UDP, satu proses `cow` dapat menangani banyak sesi melalui multiplexing `connection_id`, tanpa harus membuka banyak soket fisik.
+1.  **Mengurangi Latensi & Menghemat Bandwidth**: Komunikasi langsung jauh lebih cepat daripada menggunakan *server* perantara. Ini juga menghemat sumber daya *server* pusat (seperti *root node* Anda) yang tidak perlu lagi bertindak sebagai relai untuk semua data.
+2.  **Meningkatkan Desentralisasi**: Dengan mengurangi ketergantungan pada *server* pusat, kami secara fundamental meningkatkan desentralisasi dan ketahanan jaringan.
 
-### **4. Sharding Berdasarkan Public Key (Hashing)**
-
-Pembagian *shard* dilakukan dengan **hash dari public key/address**. Ini memberikan:
-
-* Sebaran merata
-* Kemampuan distribusi tanpa bergantung pada lokasi geografis
-
-Struktur direktori:
-
-```bash
-db/hash-prefix/ab/cd/<rest-of-pubkey>/...
-```
-
-Struktur address:
-
-```
-address = prefix || pubkey || checksum
-```
-
------
+Strategi kami adalah mencoba koneksi langsung terlebih dahulu, dan beralih ke *hole punching* jika diperlukan, menjadikannya solusi konektivitas yang kuat, efisien, dan sepenuhnya terdesentralisasi.
 
 ## Arsitektur Modular
 
