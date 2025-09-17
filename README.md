@@ -61,6 +61,14 @@ To ensure efficient direct connections between nodes, Orisium does not rely on r
 
 This technique allows two nodes behind a firewall or NAT to efficiently create a direct communication path, fundamentally increasing decentralization and resilience by reducing reliance on central servers.
 
+### **Potential Applications & Use Cases**
+
+Orisium functions not just as a general P2P network, but as a foundation for building the next generation of decentralized applications. Its network architecture directly addresses the most critical scalability challenges, particularly for blockchains and consensus systems.
+
+By providing an efficient hierarchical structure and a robust recovery mechanism, Orisium effectively solves **three-quarters of the consensus problem** at the communication and node delegation level. This allows the consensus protocol built on top to focus on transaction validation and ordering, without having to worry about slow or non-decentralized peer-to-peer communication.
+
+As such, Orisium serves as a **delegated consensus framework**, paving the way for significantly faster and more efficient blockchains.
+
 -----
 
 ### **Modular Architecture**
