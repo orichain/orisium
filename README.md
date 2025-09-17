@@ -34,8 +34,8 @@ Orisium adopts a layered network structure for extreme scalability and resilienc
 
 This protocol guarantees reliable connectivity through a **deterministic** routing and connection recovery system. This approach ensures each node can efficiently find its path within the network and can automatically recover its connection if a failure occurs.
 
-  * Each new client node will initiate its first connection to a **Root Node**.
-  * The Root will evaluate the network topology and route the node to the most suitable **upstream** (e.g., a Level-1 Node) to optimize its path.
+  * Each new client node initiates its first connection by pinging a **bootstrap IP** from a pre-defined list. These bootstrap IPs serve as stable entry points and are not necessarily Root Nodes themselves.
+  * Once connected to a bootstrap IP, the new node will be routed to a suitable **Root Node**. The Root will then evaluate the network topology and route the node to the most suitable **upstream** (e.g., a Level-1 Node) to optimize its path.
   * Once connected, the node stores its latest upstream information in a local file or DB. This process ensures **session persistence** even after a restart or crash.
   * When a node fails or disconnects, it will first attempt to reconnect to the same upstream. If this attempt fails, the node will automatically **fall back to a Root Node** to get a new route assignment.
 
