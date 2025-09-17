@@ -10,20 +10,23 @@ Orisium is a high-performance peer-to-peer (P2P) network designed for global sca
 
 Orisium adopts a layered network structure for extreme scalability and resilience. There is no fixed root — a root can be automatically replaced based on horizontal evaluation by other roots.
 
-* **313 Shards = 313 Root Nodes**
-    * Each root has:
-        - **25 downstreams** (Level-1)
-        - **312 horizontal connections** to other roots (partial mesh)
+  * **313 Shards = 313 Root Nodes**
 
-* **Level-1 Nodes:**
-    - Connects to **1 upstream Root**
-    - Has **24 horizontal connections** to other Level-1 nodes within the same shard
-    - Can have up to **25 downstreams** (Level-2)
+      * Each root has:
+          - **25 downstreams** (Level-1)
+          - **312 horizontal connections** to other roots (partial mesh)
 
-* **Level-2 to Level-4 Nodes:**
-    - The hierarchical structure continues with the same pattern
-    - Each node has:
-        - **1 upstream**, **24 horizontal**, and a maximum of **25 downstreams**
+  * **Level-1 Nodes:**
+
+      - Connects to **1 upstream Root**
+      - Has **24 horizontal connections** to other Level-1 nodes within the same shard
+      - Can have up to **25 downstreams** (Level-2)
+
+  * **Level-2 to Level-4 Nodes:**
+
+      - The hierarchical structure continues with the same pattern
+      - Each node has:
+          - **1 upstream**, **24 horizontal**, and a maximum of **25 downstreams**
 
 *Note: The numbers and details mentioned above are a representation of the initial design. These figures may change as development progresses and based on the results of rigorous performance testing, to ensure the network operates at an optimal level.*
 
@@ -38,22 +41,27 @@ This protocol guarantees reliable connectivity through a **deterministic** routi
 
 ### **Automatic Recovery from Node Failure**
 
-If a node suddenly goes down or crashes, the network will not only recover at the downstream level but will also **replace the lost node**. One of the downstreams of the failed node will be promoted to take over the upstream role for the other downstreams. This mechanism ensures that every network segment always has an active upstream and prevents the creation of isolated sub-trees.
+Orisium implements a highly efficient and self-healing mechanism to handle node failures.
 
-This mechanism creates a highly resilient network, where every node has a clear strategy to ensure uninterrupted connectivity.
+  * **Fast Peer-to-Peer Recovery**: When a node fails, its horizontal peers (nodes at the same hierarchical level) will coordinate to quickly promote a replacement from the failed node's downstreams. This is done deterministically based on pre-defined criteria.
+  * **Proactive Redundancy**: The network will not only recover at the downstream level but will also **replace the lost node**. One of the downstreams of the failed node will be promoted and take over the upstream role for the other downstreams.
+  * **Decentralized Decision-Making**: This mechanism reduces the burden on the root node and ensures that every network segment always has an active upstream, preventing the creation of isolated sub-trees.
+
+This approach creates a truly resilient and decentralized network, where every node has a clear strategy to ensure uninterrupted connectivity.
 
 ### **Custom Protocol over UDP**
 
+Orisium strategically avoids TCP for inter-node connections, opting for a custom-built, lightweight protocol over UDP. This approach provides **full control** over the data transmission process, resulting in **ultra-low latency** and high performance.
+
+This protocol manually implements key functions like session management, window control, message ordering, and selective retransmission, ensuring reliability without the unnecessary overhead of a standard protocol.
+
+### **Advanced Connection Strategy**
+
 To ensure efficient direct connections between nodes, Orisium does not rely on relay servers that can burden bandwidth. Instead, we use a layered strategy, with **UDP-based NAT hole punching** as its main mechanism.
 
-Hole punching is possible due to the **UDP protocol**, which is connectionless. This technique allows two nodes behind a firewall or NAT to efficiently create a direct communication path.
+This technique allows two nodes behind a firewall or NAT to efficiently create a direct communication path, fundamentally increasing decentralization and resilience by reducing reliance on central servers.
 
-This is very important for two reasons:
-
-1.  **Reduced Latency & Bandwidth Savings**: Direct communication is much faster than using an intermediary server. It also saves the resources of central servers (like your root nodes) that would no longer need to act as a relay for all data.
-2.  **Increased Decentralization**: By reducing reliance on central servers, we fundamentally increase the decentralization and resilience of the network.
-
-Our strategy is to first attempt a direct connection and then switch to hole punching if needed, making it a robust, efficient, and fully decentralized connectivity solution.
+-----
 
 ### **Modular Architecture**
 
