@@ -10,23 +10,23 @@ Orisium is a high-performance peer-to-peer (P2P) network designed for global sca
 
 Orisium adopts a layered network structure for extreme scalability and resilience. There is no fixed root — a root can be automatically replaced. When a root node fails, one of its Level-1 nodes is promoted to take its place. This promotion is decided by a consensus among all the other Level-1 nodes from the old root's group, and then validated by all other root nodes, ensuring both speed and decentralization.
 
-* **313 Root Nodes**
+  * **313 Root Nodes**
 
-    * Each root has:
-        - **25 downstreams** (Level-1)
-        - **312 horizontal connections** to other roots (partial mesh)
+      * Each root has:
+          - **25 downstreams** (Level-1)
+          - **312 horizontal connections** to other roots (partial mesh)
 
-* **Level-1 Nodes:**
+  * **Level-1 Nodes:**
 
-    - Connects to **1 upstream Root**
-    - Has **24 horizontal connections** to other Level-1 nodes within the same **group**
-    - Can have up to **25 downstreams** (Level-2)
+      - Connects to **1 upstream Root**
+      - Has **24 horizontal connections** to other Level-1 nodes within the same **group**
+      - Can have up to **25 downstreams** (Level-2)
 
-* **Level-2 to Level-4 Nodes:**
+  * **Level-2 to Level-4 Nodes:**
 
-    - The hierarchical structure continues with the same pattern
-    - Each node has:
-        - **1 upstream**, **24 horizontal**, and a maximum of **25 downstreams**
+      - The hierarchical structure continues with the same pattern
+      - Each node has:
+          - **1 upstream**, **24 horizontal**, and a maximum of **25 downstreams**
 
 *Note: The numbers and details mentioned above are a representation of the initial design. These figures may change as development progresses and based on the results of rigorous performance testing, to ensure the network operates at an optimal level.*
 
@@ -61,6 +61,8 @@ To ensure efficient direct connections between nodes, Orisium does not rely on r
 
 This technique allows two nodes behind a firewall or NAT to efficiently create a direct communication path, fundamentally increasing decentralization and resilience by reducing reliance on central servers.
 
+-----
+
 ### **Potential Applications & Use Cases**
 
 Orisium functions not just as a general P2P network, but as a foundation for building the next generation of decentralized applications. Its network architecture directly addresses the most critical scalability challenges, particularly for blockchains and consensus systems.
@@ -68,6 +70,20 @@ Orisium functions not just as a general P2P network, but as a foundation for bui
 By providing an efficient hierarchical structure and a robust recovery mechanism, Orisium effectively solves **three-quarters of the consensus problem** at the communication and node delegation level. This allows the consensus protocol built on top to focus on transaction validation and ordering, without having to worry about slow or non-decentralized peer-to-peer communication.
 
 As such, Orisium serves as a **delegated consensus framework**, paving the way for significantly faster and more efficient blockchains.
+
+-----
+
+### **Relevance to Blockchain and Decentralized Finance (DeFi)**
+
+Orisium is designed as a foundational layer that can enhance the performance and scalability of blockchain networks. While many blockchains have a robust P2P architecture, they often use a slower TCP protocol and a flat mesh architecture that can lead to bottlenecks in block propagation.
+
+By integrating Orisium, blockchain networks can:
+
+  * **Boost Block Propagation Speed**: The hierarchical architecture allows new blocks to spread rapidly from root nodes throughout the network, reducing latency and ensuring all full nodes receive blocks almost instantly.
+  * **Enhance Network Resilience**: Orisium's self-healing mechanisms and deterministic connections can make blockchain networks far more resistant to DoS attacks and other disruptions, ensuring maximum uptime.
+  * **Reduce Network Load**: The custom UDP protocol reduces overhead on each data packet, allowing for more efficient dissemination of information and lowering the bandwidth burden on each node, which is crucial for nodes with limited resources.
+
+Orisium is the next-generation P2P layer that can be implemented to strengthen existing blockchain networks.
 
 -----
 
@@ -99,7 +115,7 @@ IPC Protocol via Unix Domain Socket
 | `r-lmdb` | 5 | Local database reader (read-only) |
 | `w-lmdb` | 1 | Local database writer (write-heavy) |
 
-*Note: The counts and functions of the components listed above are a representation of the initial design. These details may change as development progresses and based on the results of performance testing.*
+*Note: The counts and functions of the components listed above are a representation of the initial design. These details may change as development progresses and based on the results of rigorous performance testing.*
 
 #### 🔌 Internal Communication
 
