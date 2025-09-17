@@ -8,7 +8,7 @@ Orisium adalah jaringan *peer-to-peer* (P2P) berperforma tinggi yang dirancang u
 
 ## Fitur Utama
 
-### **1. Arsitektur Jaringan Hierarkis Dinamis dengan 313 Shard**
+### **Arsitektur Jaringan Hierarkis Dinamis dengan 313 Shard**
 
 Orisium mengadopsi struktur jaringan berlapis untuk skalabilitas dan ketahanan ekstrem. Tidak ada root tetap — root dapat digantikan secara otomatis berdasarkan evaluasi horizontal oleh root lain.
 
@@ -27,18 +27,22 @@ Orisium mengadopsi struktur jaringan berlapis untuk skalabilitas dan ketahanan e
   - Setiap node:
     - **1 upstream**, **24 horizontal**, dan **25 downstream** maksimum
 
-### **2. Routing & Reconnect Deterministik**
+### **Routing & Reconnect Deterministik**
+Protokol ini menjamin konektivitas yang andal melalui sistem *routing* dan pemulihan koneksi yang **deterministik**. Pendekatan ini memastikan setiap *node* dapat menemukan jalurnya di dalam jaringan secara efisien dan dapat memulihkan koneksi secara otomatis jika terjadi kegagalan.
 
-Setiap node klien:
+* Setiap *node* klien yang baru akan memulai koneksi pertamanya ke salah satu *Root Node*.
+* *Root* akan mengevaluasi topologi jaringan dan mengarahkan *node* tersebut ke *upstream* yang paling sesuai (misalnya, *Node Level-1*) untuk mengoptimalkan rute.
+* Setelah terhubung, *node* akan menyimpan informasi *upstream* terbarunya ke basis data lokal. Proses ini memastikan **persistensi sesi** bahkan setelah *restart* atau *crash*.
+* Saat *node* mengalami kegagalan atau terputus, ia akan terlebih dahulu mencoba terhubung kembali ke *upstream* yang sama. Jika upaya ini gagal, *node* akan secara otomatis **jatuh kembali (*fallback*) ke *Root Node*** untuk mendapatkan penugasan rute baru.
 
-1. Pertama kali terkoneksi ke Root.
-2. Root mengarahkan ke upstream yang sesuai (misalnya Level-1).
-3. Node menyimpan info upstream ke file/DB lokal.
-4. Saat restart atau kegagalan, node mencoba reconnect ke upstream lama, dan fallback ke Root jika gagal.
-5. Upstream dapat mengarahkan node untuk mengganti upstream.
+---
 
-### **3. Custom Protocol di atas UDP**
+### **Pemulihan Otomatis dari Kegagalan Node**
+Jika sebuah *node* tiba-tiba *down* atau tumbang, jaringan tidak hanya akan memulihkan dirinya di level *downstream* saja, tetapi juga akan **mengganti *node* yang hilang**. Salah satu *downstream* dari *node* yang tumbang akan dipromosikan dan mengambil alih peran *upstream* untuk *downstream* lainnya. Mekanisme ini memastikan bahwa setiap segmen jaringan selalu memiliki *upstream* yang aktif dan mencegah terjadinya `sub-tree` yang terisolasi.
 
+Mekanisme ini menciptakan jaringan yang sangat tangguh, di mana setiap *node* memiliki strategi yang jelas untuk memastikan konektivitas tanpa henti.
+
+### **Custom Protocol di atas UDP**
 Untuk memastikan koneksi langsung yang efisien antar-node, Orisium tidak bergantung pada *server* relai yang dapat membebani *bandwidth*. Sebaliknya, kami menggunakan strategi berlapis, dengan **NAT *hole punching* berbasis UDP** sebagai mekanisme utamanya.
 
 *Hole punching* dimungkinkan karena **protokol UDP** yang tidak memiliki koneksi. Teknik ini memungkinkan dua *node* di belakang *firewall* atau NAT untuk secara efisien membuat jalur komunikasi langsung.
