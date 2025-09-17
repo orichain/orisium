@@ -35,8 +35,6 @@ Protokol ini menjamin konektivitas yang andal melalui sistem *routing* dan pemul
 * Setelah terhubung, *node* akan menyimpan informasi *upstream* terbarunya ke basis data lokal. Proses ini memastikan **persistensi sesi** bahkan setelah *restart* atau *crash*.
 * Saat *node* mengalami kegagalan atau terputus, ia akan terlebih dahulu mencoba terhubung kembali ke *upstream* yang sama. Jika upaya ini gagal, *node* akan secara otomatis **jatuh kembali (*fallback*) ke *Root Node*** untuk mendapatkan penugasan rute baru.
 
----
-
 ### **Pemulihan Otomatis dari Kegagalan Node**
 Jika sebuah *node* tiba-tiba *down* atau tumbang, jaringan tidak hanya akan memulihkan dirinya di level *downstream* saja, tetapi juga akan **mengganti *node* yang hilang**. Salah satu *downstream* dari *node* yang tumbang akan dipromosikan dan mengambil alih peran *upstream* untuk *downstream* lainnya. Mekanisme ini memastikan bahwa setiap segmen jaringan selalu memiliki *upstream* yang aktif dan mencegah terjadinya `sub-tree` yang terisolasi.
 
