@@ -134,6 +134,8 @@ sio[2] <───>   master[1]      <───> cow[5]
 
 ## Installation
 
+The main development and testing environment currently uses **Rocky Linux 10** and **CentOS Stream 9**. We highly recommend using one of these operating systems for the best results.
+
 ```bash
 git clone https://github.com/orichain/orisium.git
 cd orisium
