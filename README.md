@@ -129,6 +129,515 @@ sio[2] <───>   master[1]      <───> cow[5]
 
   - **Unix Domain Socket (UDS)**: Used for inter-process communication (IPC), faster and more secure than local TCP/UDP.
   - This design avoids shared memory, reducing the potential for race conditions and making it easier to debug each module independently.
+  
+### Proof of Concept: Automatic Recovery from Node Failure
+
+This is the most powerful evidence of Orisium's resilience: a test where all worker nodes were manually terminated. The logs below demonstrate how the system automatically detects the failure and brings all workers back online in seconds, ensuring seamless operation.
+
+```
+./orisium
+[Orisium]: ==========================================================
+[Orisium]: Orisium dijalankan.
+[Orisium]: ==========================================================
+[2025-09-19 02:45:05] [INFO] (src/orisium.c:main:40)
+[Orisium]: SIGINT handler installed.
+[Master]: --- Node Configuration ---
+[Master]: Listen Port: 40000
+[Master]: Bootstrap Nodes (5):
+[Master]:   - Node 1: IP ::ffff:127.0.0.1, Port 40000
+[Master]:   - Node 2: IP ::ffff:127.0.0.1, Port 40001
+[Master]:   - Node 3: IP ::ffff:127.0.0.1, Port 40002
+[Master]:   - Node 4: IP ::ffff:127.0.0.1, Port 40003
+[Master]:   - Node 5: IP ::ffff:127.0.0.1, Port 40004
+[Master]: -------------------------
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[SIO 0]: Master Ready ...
+[SIO 1]: Master Ready ...
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[Logic 0]: Master Ready ...
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[Logic 1]: Master Ready ...
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[Logic 2]: Master Ready ...
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[COW 1]: Master Ready ...
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[Logic 3]: Master Ready ...
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[COW 0]: Master Ready ...
+[Logic 4]: Master Ready ...
+[COW 5]: Master Ready ...
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[COW 4]: Master Ready ...
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[DBR 5]: Master Ready ...
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[DBW 0]: Master Ready ...
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[DBR 4]: Master Ready ...
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[COW 3]: Master Ready ...
+[DBR 0]: Master Ready ...
+[DBR 1]: Master Ready ...
+[DBR 2]: Master Ready ...
+[COW 2]: Master Ready ...
+[Logic 5]: Master Ready ...
+[2025-09-19 02:45:05] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[DBR 3]: Master Ready ...
+[2025-09-19 02:45:05] [INFO] (src/master/ipc.c:handle_master_ipc_event:360)
+[Master]: ====================================================
+[2025-09-19 02:45:05] [INFO] (src/master/ipc.c:handle_master_ipc_event:361)
+[Master]: SEMUA WORKER SUDAH READY
+[2025-09-19 02:45:05] [INFO] (src/master/ipc.c:handle_master_ipc_event:362)
+[Master]: ====================================================
+Perintah Connect Ke: ::ffff:127.0.0.1:40000
+[2025-09-19 02:45:05] [INFO] (src/master/master.c:run_master:379)
+[Master]: PID 1010588 UDP Server listening on port 40000.
+Perintah Connect Ke: ::ffff:127.0.0.1:40001
+Perintah Connect Ke: ::ffff:127.0.0.1:40003
+Perintah Connect Ke: ::ffff:127.0.0.1:40004
+Perintah Connect Ke: ::ffff:127.0.0.1:40002
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY SIO-0]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY SIO-0]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY SIO-0]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY SIO-1]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY SIO-1]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY SIO-1]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY Logic-0]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY Logic-0]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY Logic-0]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY Logic-1]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY Logic-1]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY Logic-1]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY Logic-2]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY Logic-2]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY Logic-2]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY Logic-3]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY Logic-3]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY Logic-3]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY Logic-4]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY Logic-4]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY Logic-4]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY Logic-5]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY Logic-5]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY Logic-5]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY COW-0]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY COW-0]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY COW-0]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY COW-1]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY COW-1]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY COW-1]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY COW-2]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY COW-2]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY COW-2]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY COW-3]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY COW-3]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY COW-3]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY COW-4]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY COW-4]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY COW-4]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY COW-5]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY COW-5]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY COW-5]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY DBR-0]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBR-0]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBR-0]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY DBR-1]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBR-1]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBR-1]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY DBR-2]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBR-2]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBR-2]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY DBR-3]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBR-3]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBR-3]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY DBR-4]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBR-4]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBR-4]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY DBR-5]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBR-5]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBR-5]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY DBW-0]First-time setup.
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBW-0]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:14] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBW-0]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY SIO-0]Calibrating... (2/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY SIO-0]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY SIO-1]Calibrating... (2/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY SIO-1]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY Logic-0]Calibrating... (2/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY Logic-0]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY Logic-1]Calibrating... (2/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY Logic-1]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY Logic-2]Calibrating... (2/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY Logic-2]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY Logic-3]Calibrating... (2/20) -> Meas: 133.34 -> EWMA: 106.67
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY Logic-3]Meas: 133.34 -> Est: 106.67
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY Logic-4]Calibrating... (2/20) -> Meas: 66.67 -> EWMA: 93.33
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY Logic-4]Meas: 66.67 -> Est: 93.33
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY Logic-5]Calibrating... (2/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY Logic-5]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY COW-0]Calibrating... (2/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY COW-0]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY COW-1]Calibrating... (2/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY COW-1]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY COW-2]Calibrating... (2/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY COW-2]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY COW-3]Calibrating... (2/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY COW-3]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY COW-4]Calibrating... (2/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY COW-4]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY COW-5]Calibrating... (2/20) -> Meas: 133.34 -> EWMA: 106.67
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY COW-5]Meas: 133.34 -> Est: 106.67
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBR-0]Calibrating... (2/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBR-0]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBR-1]Calibrating... (2/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBR-1]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBR-2]Calibrating... (2/20) -> Meas: 100.01 -> EWMA: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBR-2]Meas: 100.01 -> Est: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBR-3]Calibrating... (2/20) -> Meas: 66.67 -> EWMA: 93.33
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBR-3]Meas: 66.67 -> Est: 93.33
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBR-4]Calibrating... (2/20) -> Meas: 100.01 -> EWMA: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBR-4]Meas: 100.01 -> Est: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBR-5]Calibrating... (2/20) -> Meas: 100.01 -> EWMA: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBR-5]Meas: 100.01 -> Est: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBW-0]Calibrating... (2/20) -> Meas: 100.01 -> EWMA: 100.00
+[2025-09-19 02:45:23] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBW-0]Meas: 100.01 -> Est: 100.00
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[DBW 0]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[DBR 2]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[DBR 3]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[DBR 4]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[DBR 5]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[DBR 1]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[DBR 0]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[COW 2]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[COW 1]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[Logic 4]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[Logic 3]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[COW 0]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[Logic 1]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[Logic 2]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[Logic 0]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[SIO 0]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[SIO 1]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[Logic 5]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[COW 3]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[COW 4]: Master Ready ...
+[2025-09-19 02:45:31] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:70)
+[COW 5]: Master Ready ...
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY SIO-0]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY SIO-0]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY SIO-0]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY SIO-1]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY SIO-1]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY SIO-1]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY Logic-0]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY Logic-0]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY Logic-0]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY Logic-1]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY Logic-1]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY Logic-1]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY Logic-2]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY Logic-2]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY Logic-2]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY Logic-3]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY Logic-3]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY Logic-3]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY Logic-4]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY Logic-4]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY Logic-4]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY Logic-5]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY Logic-5]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY Logic-5]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY COW-0]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY COW-0]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY COW-0]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY COW-1]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY COW-1]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY COW-1]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY COW-2]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY COW-2]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY COW-2]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY COW-3]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY COW-3]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY COW-3]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY COW-4]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY COW-4]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY COW-4]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY COW-5]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY COW-5]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY COW-5]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY DBR-0]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBR-0]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBR-0]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY DBR-1]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBR-1]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBR-1]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY DBR-2]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBR-2]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBR-2]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY DBR-3]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBR-3]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBR-3]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY DBR-4]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBR-4]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBR-4]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY DBR-5]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBR-5]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBR-5]Meas: 100.00 -> Est: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:46)
+[Master]: [ORICLE => HEALTHY DBW-0]First-time setup.
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:79)
+[Master]: [ORICLE => HEALTHY DBW-0]Calibrating... (1/20) -> Meas: 100.00 -> EWMA: 100.00
+[2025-09-19 02:45:32] [DEVEL-DEBUG] (src/kalman.c:calculate_oricle_double:82)
+[Master]: [ORICLE => HEALTHY DBW-0]Meas: 100.00 -> Est: 100.00
+^C[2025-09-19 02:45:38] [INFO] (src/master/master.c:run_master:190)
+[Master]: SIGINT received. Initiating graceful shutdown...
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[SIO 0]: SIGINT received. Initiating graceful shutdown...
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[SIO 1]: SIGINT received. Initiating graceful shutdown...
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[Logic 0]: SIGINT received. Initiating graceful shutdown...
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[Logic 3]: SIGINT received. Initiating graceful shutdown...
+[Logic 2]: SIGINT received. Initiating graceful shutdown...
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[Logic 1]: SIGINT received. Initiating graceful shutdown...
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[Logic 4]: SIGINT received. Initiating graceful shutdown...
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[COW 0]: SIGINT received. Initiating graceful shutdown...
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[COW 1]: SIGINT received. Initiating graceful shutdown...
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[COW 2]: SIGINT received. Initiating graceful shutdown...
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[Logic 5]: SIGINT received. Initiating graceful shutdown...
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[COW 5]: SIGINT received. Initiating graceful shutdown...
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[COW 3]: SIGINT received. Initiating graceful shutdown...
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[COW 4]: SIGINT received. Initiating graceful shutdown...
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[DBR 0]: SIGINT received. Initiating graceful shutdown...
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[DBR 3]: SIGINT received. Initiating graceful shutdown...
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[DBR 5]: SIGINT received. Initiating graceful shutdown...
+[DBR 1]: SIGINT received. Initiating graceful shutdown...
+[DBR 2]: SIGINT received. Initiating graceful shutdown...
+[DBR 4]: SIGINT received. Initiating graceful shutdown...
+[2025-09-19 02:45:38] [INFO] (src/workers/ipc.c:handle_workers_ipc_event:64)
+[DBW 0]: SIGINT received. Initiating graceful shutdown...
+[2025-09-19 02:45:38] [INFO] (src/master/workers.c:cleanup_workers:626)
+[Master]: Performing cleanup...
+[2025-09-19 02:45:38] [INFO] (src/master/workers.c:cleanup_workers:642)
+[Master]: Cleanup complete.
+[Orisium]: ==========================================================
+[Orisium]: Orisium selesai dijalankan.
+[Orisium]: ==========================================================
+[cirill@cirill orisium]$
+```
+
+This demonstrates the effectiveness of the **`Master`'s** self-healing capabilities, ensuring continuous network operation by automatically restoring all worker connections.
 
 -----
 
