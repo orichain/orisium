@@ -18,7 +18,7 @@ void cleanup_sio_worker(worker_context_t *worker_ctx) {
 }
 
 status_t setup_sio_worker(worker_context_t *worker_ctx, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
-    if (setup_worker(worker_ctx, "DBR", wot, index, master_uds_fd) != SUCCESS) return FAILURE;
+    if (setup_worker(worker_ctx, "SIO", wot, index, master_uds_fd) != SUCCESS) return FAILURE;
     return SUCCESS;
 }
 
