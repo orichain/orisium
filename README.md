@@ -130,9 +130,9 @@ sio[2] <───>   master[1]      <───> cow[5]
   - **Unix Domain Socket (UDS)**: Used for inter-process communication (IPC), faster and more secure than local TCP/UDP.
   - This design avoids shared memory, reducing the potential for race conditions and making it easier to debug each module independently.
   
-### Proof of Concept: Automatic Recovery from Node Failure
+### Proof of Concept: Automatic Recovery from Worker Failure
 
-This is the most powerful evidence of Orisium's resilience: a test where all worker nodes were manually terminated. The logs below demonstrate how the system automatically detects the failure and brings all workers back online in seconds, ensuring seamless operation.
+This is the most powerful evidence of Orisium's resilience: a test where all workers were manually terminated. The logs below demonstrate how the system automatically detects the failure and brings all workers back online in seconds, ensuring seamless operation.
 
 ```
 ./orisium
