@@ -132,9 +132,10 @@ sio[2] <───>   master[1]      <───> cow[5]
   
 ### Proof of Concept: Automatic Recovery from Worker Failure
 
-This is the most powerful evidence of Orisium's resilience: a test where all workers were manually terminated. The logs below demonstrate how the system automatically detects the failure and brings all workers back online in seconds, ensuring seamless operation.
+This is the most powerful evidence of Orisium's resilience: a test where all workers were manually terminated (kill pids). The logs below demonstrate how the system automatically detects the failure and brings all workers back online in seconds, ensuring seamless operation.
 
 ```
+
 ./orisium
 [Orisium]: ==========================================================
 [Orisium]: Orisium dijalankan.
@@ -635,6 +636,7 @@ Perintah Connect Ke: ::ffff:127.0.0.1:40002
 [Orisium]: Orisium selesai dijalankan.
 [Orisium]: ==========================================================
 [cirill@cirill orisium]$
+
 ```
 
 This demonstrates the effectiveness of the **`Master`'s** self-healing capabilities, ensuring continuous network operation by automatically restoring all worker connections.
