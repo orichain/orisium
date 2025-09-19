@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
-#include <signal.h>
-#include <bits/types/sig_atomic_t.h>
 
 #include "log.h"
 #include "async.h"
@@ -22,18 +20,11 @@ status_t setup_dbr_worker(worker_context_t *worker_ctx, worker_type_t *wot, uint
     return SUCCESS;
 }
 
-volatile sig_atomic_t dbr_sigterm_requested = 0;
-
-void dbr_sigterm_handler(int sig) {
-    dbr_sigterm_requested = 1;
-}
-
 void run_dbr_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd) {
     worker_context_t x_ctx;
     worker_context_t *worker_ctx = &x_ctx;
     if (setup_dbr_worker(worker_ctx, wot, index, master_uds_fd) != SUCCESS) goto exit;
-    signal(SIGTERM, dbr_sigterm_handler);
-    while (!worker_ctx->shutdown_requested && !dbr_sigterm_requested) {
+    while (!worker_ctx->shutdown_requested) {
         int_status_t snfds = async_wait(worker_ctx->label, &worker_ctx->async);
 		if (snfds.status != SUCCESS) {
             if (snfds.status == FAILURE_EBADF) {
@@ -42,7 +33,7 @@ void run_dbr_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
             continue;
         }
         for (int n = 0; n < snfds.r_int; ++n) {
-            if (worker_ctx->shutdown_requested || dbr_sigterm_requested) {
+            if (worker_ctx->shutdown_requested) {
 				break;
 			}
 			int_status_t fd_status = async_getfd(worker_ctx->label, &worker_ctx->async, n);
