@@ -310,8 +310,6 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
             ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
             ipc_master_cow_connect_t *icow_connecti = received_protocol->payload.ipc_master_cow_connect;            
 //----------------------------------------------------------------------            
-// ---------------------------------------------------------------------
-//----------------------------------------------------------------------            
             cow_c_session_t *cow_c_session = (cow_c_session_t *)worker_sessions;
             int slot_found = -1;
             for (uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
@@ -327,7 +325,8 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
-            
+// ---------------------------------------------------------------------
+//----------------------------------------------------------------------
             char ip_str[INET6_ADDRSTRLEN];
             if (inet_ntop(AF_INET6, &(icow_connecti->server_addr.sin6_addr), ip_str, INET6_ADDRSTRLEN) == NULL) {
                 perror("inet_ntop");

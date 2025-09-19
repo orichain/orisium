@@ -15,6 +15,7 @@
 #include "workers/ipc/master_ipc_cmds.h"
 #include "orilink/protocol.h"
 #include "stdbool.h"
+#include "utilities.h"
 
 static inline status_t setup_cow_session(const char *label, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
     single_session->in_use = false;
@@ -24,9 +25,11 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
     identity->remote_wot = UNKNOWN;
     identity->remote_index = 0xFF;
     identity->remote_session_index = 0xFF;
+    identity->remote_id = 0xFFFFFFFF;
     identity->local_wot = wot;
     identity->local_index = index;
     identity->local_session_index = session_index;
+    if (generate_connection_id(label, &identity->local_id) != SUCCESS) return FAILURE;
     single_session->kem_privatekey = (uint8_t *)calloc(1, KEM_PRIVATEKEY_BYTES);
     security->kem_publickey = (uint8_t *)calloc(1, KEM_PUBLICKEY_BYTES);
     security->kem_ciphertext = (uint8_t *)calloc(1, KEM_CIPHERTEXT_BYTES);
@@ -52,9 +55,11 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
     identity->remote_wot = UNKNOWN;
     identity->remote_index = 0xFF;
     identity->remote_session_index = 0xFF;
+    identity->remote_id = 0xFFFFFFFF;
     identity->local_wot = UNKNOWN;
     identity->local_index = 0xFF;
     identity->local_session_index = 0xFF;
+    identity->local_id = 0xFFFFFFFF;
     memset(single_session->kem_privatekey, 0, KEM_PRIVATEKEY_BYTES);
     memset(security->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
     memset(security->kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);

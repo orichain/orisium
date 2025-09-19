@@ -55,9 +55,11 @@ typedef struct {
     worker_type_t remote_wot;
     uint8_t remote_index;
     uint8_t remote_session_index;
+    uint64_t remote_id;
     worker_type_t local_wot;
     uint8_t local_index;
     uint8_t local_session_index;
+    uint64_t local_id;
 } orilink_identity_t;
 
 typedef struct {
