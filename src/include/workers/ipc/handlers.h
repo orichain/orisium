@@ -1,5 +1,5 @@
-#ifndef WORKERS_IPC_H
-#define WORKERS_IPC_H
+#ifndef WORKERS_IPC_HANDLERS_H
+#define WORKERS_IPC_HANDLERS_H
 
 #include "workers/workers.h"
 

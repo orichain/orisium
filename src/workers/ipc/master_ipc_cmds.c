@@ -2,7 +2,6 @@
 #include <inttypes.h>
 #include <endian.h>
 
-#include "workers/master_ipc_cmds.h"
 #include "log.h"
 #include "types.h"
 #include "ipc/protocol.h"
@@ -10,6 +9,7 @@
 #include "ipc/worker_master_hello1.h"
 #include "ipc/worker_master_hello2.h"
 #include "workers/workers.h"
+#include "workers/ipc/master_ipc_cmds.h"
 #include "constants.h"
 #include "poly1305-donna.h"
 #include "aes.h"

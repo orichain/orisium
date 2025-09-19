@@ -14,7 +14,7 @@
 #include "workers/workers.h"
 #include "master/workers.h"
 #include "master/worker_metrics.h"
-#include "master/worker_ipc_cmds.h"
+#include "master/ipc/worker_ipc_cmds.h"
 #include "async.h"
 #include "master/master.h"
 #include "kalman.h"

@@ -14,8 +14,8 @@
 #include "types.h"
 #include "constants.h"
 #include "workers/workers.h"
-#include "workers/ipc.h"
-#include "workers/master_ipc_cmds.h"
+#include "workers/ipc/handlers.h"
+#include "workers/ipc/master_ipc_cmds.h"
 #include "pqc.h"
 #include "poly1305-donna.h"
 #include "aes.h"
@@ -308,10 +308,26 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                 CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
             }           
             ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
-            ipc_master_cow_connect_t *icow_connecti = received_protocol->payload.ipc_master_cow_connect;
+            ipc_master_cow_connect_t *icow_connecti = received_protocol->payload.ipc_master_cow_connect;            
 //----------------------------------------------------------------------            
 // ---------------------------------------------------------------------
 //----------------------------------------------------------------------            
+            cow_c_session_t *cow_c_session = (cow_c_session_t *)worker_sessions;
+            int slot_found = -1;
+            for (uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
+                if (!cow_c_session[i].in_use) {
+                    cow_c_session[i].in_use = true;
+                    memcpy(&cow_c_session[i].identity.remote_addr, &icow_connecti->server_addr, sizeof(struct sockaddr_in6));
+                    slot_found = i;
+                    break;
+                }
+            }
+            if (slot_found == -1) {
+                LOG_ERROR("%sNO SLOT.", worker_ctx->label, deserialized_ircvdi.status);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            
             char ip_str[INET6_ADDRSTRLEN];
             if (inet_ntop(AF_INET6, &(icow_connecti->server_addr.sin6_addr), ip_str, INET6_ADDRSTRLEN) == NULL) {
                 perror("inet_ntop");

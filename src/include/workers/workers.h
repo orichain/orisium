@@ -102,10 +102,6 @@ typedef struct {
 
 status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *wot, uint8_t *index, int *master_uds_fd);
 void cleanup_worker(worker_context_t *ctx);
-//----------------------------------------------------------------------
-void setup_cow_session(cow_c_session_t *single_session);
-void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session);
-//----------------------------------------------------------------------
 void run_sio_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
 void run_logic_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
 void run_cow_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);

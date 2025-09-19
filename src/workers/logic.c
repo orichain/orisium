@@ -9,9 +9,9 @@
 #include "async.h"
 #include "types.h"
 #include "constants.h"
-#include "workers/master_ipc_cmds.h"
 #include "workers/workers.h"
-#include "workers/ipc.h"
+#include "workers/ipc/handlers.h"
+#include "workers/ipc/master_ipc_cmds.h"
 
 void cleanup_logic_worker(worker_context_t *worker_ctx) {
 	cleanup_worker(worker_ctx);

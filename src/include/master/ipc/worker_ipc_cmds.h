@@ -1,5 +1,5 @@
-#ifndef MASTER_WORKER_IPC_CMDS_H
-#define MASTER_WORKER_IPC_CMDS_H
+#ifndef MASTER_IPC_WORKER_IPC_CMDS_H
+#define MASTER_IPC_WORKER_IPC_CMDS_H
 
 #include "master/master.h"
 

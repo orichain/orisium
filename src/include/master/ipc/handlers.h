@@ -1,5 +1,5 @@
-#ifndef MASTER_IPC_H
-#define MASTER_IPC_H
+#ifndef MASTER_IPC_HANDLERS_H
+#define MASTER_IPC_HANDLERS_H
 
 #include "master/master.h"
 

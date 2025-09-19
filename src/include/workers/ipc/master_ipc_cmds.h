@@ -1,5 +1,5 @@
-#ifndef WORKERS_MASTER_IPC_CMDS_H
-#define WORKERS_MASTER_IPC_CMDS_H
+#ifndef WORKERS_IPC_MASTER_IPC_CMDS_H
+#define WORKERS_IPC_MASTER_IPC_CMDS_H
 
 #include "workers/workers.h"
 

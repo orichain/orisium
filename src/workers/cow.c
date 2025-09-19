@@ -2,25 +2,80 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+#include <netinet/in.h>
+#include <string.h>
 
+#include "pqc.h"
 #include "log.h"
 #include "async.h"
 #include "types.h"
 #include "constants.h"
 #include "workers/workers.h"
-#include "workers/ipc.h"
-#include "workers/master_ipc_cmds.h"
+#include "workers/ipc/handlers.h"
+#include "workers/ipc/master_ipc_cmds.h"
+#include "orilink/protocol.h"
+#include "stdbool.h"
 
-void setup_cow_session(cow_c_session_t *single_session) {
-    
+static inline status_t setup_cow_session(const char *label, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
+    single_session->in_use = false;
+    orilink_identity_t *identity = &single_session->identity;
+    orilink_security_t *security = &single_session->security;
+    memset(&identity->remote_addr, 0, sizeof(struct sockaddr_in6));
+    identity->remote_wot = UNKNOWN;
+    identity->remote_index = 0xFF;
+    identity->remote_session_index = 0xFF;
+    identity->local_wot = wot;
+    identity->local_index = index;
+    identity->local_session_index = session_index;
+    single_session->kem_privatekey = (uint8_t *)calloc(1, KEM_PRIVATEKEY_BYTES);
+    security->kem_publickey = (uint8_t *)calloc(1, KEM_PUBLICKEY_BYTES);
+    security->kem_ciphertext = (uint8_t *)calloc(1, KEM_CIPHERTEXT_BYTES);
+    security->kem_sharedsecret = (uint8_t *)calloc(1, KEM_SHAREDSECRET_BYTES);
+    security->aes_key = (uint8_t *)calloc(1, HASHES_BYTES);
+    security->mac_key = (uint8_t *)calloc(1, HASHES_BYTES);
+    security->local_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
+    security->remote_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
+    security->local_ctr = (uint32_t)0;
+    security->remote_ctr = (uint32_t)0;
+    if (KEM_GENERATE_KEYPAIR(security->kem_publickey, single_session->kem_privatekey) != 0) {
+        LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", label);
+        return FAILURE;
+    }
+    return SUCCESS;
 }
 
-void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session) {
-    
+static inline void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session) {
+    single_session->in_use = false;
+    orilink_identity_t *identity = &single_session->identity;
+    orilink_security_t *security = &single_session->security;
+    memset(&identity->remote_addr, 0, sizeof(struct sockaddr_in6));
+    identity->remote_wot = UNKNOWN;
+    identity->remote_index = 0xFF;
+    identity->remote_session_index = 0xFF;
+    identity->local_wot = UNKNOWN;
+    identity->local_index = 0xFF;
+    identity->local_session_index = 0xFF;
+    memset(single_session->kem_privatekey, 0, KEM_PRIVATEKEY_BYTES);
+    memset(security->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+    memset(security->kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+    memset(security->kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+    memset(security->aes_key, 0, HASHES_BYTES);
+    memset(security->mac_key, 0, HASHES_BYTES);
+    memset(security->local_nonce, 0, AES_NONCE_BYTES);
+    security->local_ctr = (uint32_t)0;
+    memset(security->remote_nonce, 0, AES_NONCE_BYTES);
+    security->remote_ctr = (uint32_t)0;
+    free(security->kem_publickey);
+    free(security->kem_ciphertext);
+    free(security->kem_sharedsecret);
+    free(security->aes_key);
+    free(security->mac_key);
+    free(security->local_nonce);
+    free(security->remote_nonce);
 }
 
-void cleanup_cow_worker(worker_context_t *worker_ctx, cow_c_session_t *sessions) {
-    for (int i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
+static inline void cleanup_cow_worker(worker_context_t *worker_ctx, cow_c_session_t *sessions) {
+    for (uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
         cow_c_session_t *single_session;
         single_session = &sessions[i];
         if (single_session->in_use) {
@@ -30,12 +85,14 @@ void cleanup_cow_worker(worker_context_t *worker_ctx, cow_c_session_t *sessions)
 	cleanup_worker(worker_ctx);
 }
 
-status_t setup_cow_worker(worker_context_t *worker_ctx, cow_c_session_t *sessions, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
+static inline status_t setup_cow_worker(worker_context_t *worker_ctx, cow_c_session_t *sessions, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
     if (setup_worker(worker_ctx, "COW", wot, index, master_uds_fd) != SUCCESS) return FAILURE;
-    for (int i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
+    for (uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
         cow_c_session_t *single_session;
         single_session = &sessions[i];
-        setup_cow_session(single_session);
+        if (setup_cow_session(worker_ctx->label, single_session, *wot, *index, i) != SUCCESS) {
+            return FAILURE;
+        }
     }
     return SUCCESS;
 }
