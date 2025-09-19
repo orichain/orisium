@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
-#include <netinet/in.h>
-#include <string.h>
 
 #include "pqc.h"
 #include "log.h"
@@ -13,8 +11,6 @@
 #include "workers/workers.h"
 #include "workers/ipc/handlers.h"
 #include "workers/ipc/master_ipc_cmds.h"
-#include "orilink/protocol.h"
-#include "stdbool.h"
 
 static inline status_t setup_cow_session(const char *label, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
     single_session->in_use = false;
@@ -65,6 +61,7 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
     security->local_ctr = (uint32_t)0;
     memset(security->remote_nonce, 0, AES_NONCE_BYTES);
     security->remote_ctr = (uint32_t)0;
+    free(single_session->kem_privatekey);
     free(security->kem_publickey);
     free(security->kem_ciphertext);
     free(security->kem_sharedsecret);
