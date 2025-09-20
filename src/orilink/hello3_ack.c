@@ -20,15 +20,15 @@ status_t orilink_serialize_hello3_ack(const char *label, const orilink_hello3_ac
     }
     size_t current_offset_local = *offset;
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint64_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    uint64_t client_id_be = htobe64(payload->client_id);
-    memcpy(current_buffer + current_offset_local, &client_id_be, sizeof(uint64_t));
-    current_offset_local += sizeof(uint64_t);    
+    uint64_t remote_id_be = htobe64(payload->remote_id);
+    memcpy(current_buffer + current_offset_local, &remote_id_be, sizeof(uint64_t));
+    current_offset_local += sizeof(uint64_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, AES_NONCE_BYTES, buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(current_buffer + current_offset_local, payload->nonce, AES_NONCE_BYTES);
+    current_offset_local += AES_NONCE_BYTES;
     if (CHECK_BUFFER_BOUNDS(current_offset_local, KEM_CIPHERTEXT_BYTES / 2, buffer_size) != SUCCESS) return FAILURE_OOBUF;
     memcpy(current_buffer + current_offset_local, payload->ciphertext2, KEM_CIPHERTEXT_BYTES / 2);
     current_offset_local += KEM_CIPHERTEXT_BYTES / 2;
-    if (CHECK_BUFFER_BOUNDS(current_offset_local, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES, buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    memcpy(current_buffer + current_offset_local, payload->encrypted_server_id_port, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
-    current_offset_local += AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES;
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
     memcpy(current_buffer + current_offset_local, (uint8_t *)&payload->trycount, sizeof(uint8_t));
     current_offset_local += sizeof(uint8_t);    
@@ -45,14 +45,21 @@ status_t orilink_deserialize_hello3_ack(const char *label, orilink_protocol_t *p
     const uint8_t *cursor = buffer + current_offset;
     orilink_hello3_ack_t *payload = p->payload.orilink_hello3_ack;
     if (current_offset + sizeof(uint64_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading client_id.", label);
+        LOG_ERROR("%sOut of bounds reading remote_id.", label);
         return FAILURE_OOBUF;
     }
-    uint64_t client_id_be;
-    memcpy(&client_id_be, cursor, sizeof(uint64_t));
-    payload->client_id = be64toh(client_id_be);
+    uint64_t remote_id_be;
+    memcpy(&remote_id_be, cursor, sizeof(uint64_t));
+    payload->remote_id = be64toh(remote_id_be);
     cursor += sizeof(uint64_t);
     current_offset += sizeof(uint64_t);
+    if (current_offset + AES_NONCE_BYTES > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading nonce.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(payload->nonce, cursor, AES_NONCE_BYTES);
+    cursor += AES_NONCE_BYTES;
+    current_offset += AES_NONCE_BYTES;
     if (current_offset + (KEM_CIPHERTEXT_BYTES / 2) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading ciphertext2.", label);
         return FAILURE_OOBUF;
@@ -60,13 +67,6 @@ status_t orilink_deserialize_hello3_ack(const char *label, orilink_protocol_t *p
     memcpy(payload->ciphertext2, cursor, KEM_CIPHERTEXT_BYTES / 2);
     cursor += KEM_CIPHERTEXT_BYTES / 2;
     current_offset += KEM_CIPHERTEXT_BYTES / 2;
-    if (current_offset + (AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading encrypted_server_id_port.", label);
-        return FAILURE_OOBUF;
-    }
-    memcpy(payload->encrypted_server_id_port, cursor, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
-    cursor += AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES;
-    current_offset += AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES;
     if (current_offset + sizeof(uint8_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading trycount.", label);
         return FAILURE_OOBUF;
@@ -78,7 +78,21 @@ status_t orilink_deserialize_hello3_ack(const char *label, orilink_protocol_t *p
     return SUCCESS;
 }
 
-orilink_protocol_t_status_t orilink_prepare_cmd_hello3_ack(const char *label, uint64_t client_id, uint8_t *ciphertext, uint8_t *encrypted_server_id_port, uint8_t trycount) {
+orilink_protocol_t_status_t orilink_prepare_cmd_hello3_ack(
+    const char *label, 
+    uint8_t inc_ctr, 
+    worker_type_t remote_wot, 
+    uint8_t remote_index, 
+    uint8_t remote_session_index, 
+    worker_type_t local_wot, 
+    uint8_t local_index, 
+    uint8_t local_session_index,
+    uint64_t remote_id, 
+    uint8_t *nonce, 
+    uint8_t *ciphertext, 
+    uint8_t trycount
+)
+{
 	orilink_protocol_t_status_t result;
 	result.r_orilink_protocol_t = (orilink_protocol_t *)malloc(sizeof(orilink_protocol_t));
 	result.status = FAILURE;
@@ -89,6 +103,13 @@ orilink_protocol_t_status_t orilink_prepare_cmd_hello3_ack(const char *label, ui
 	memset(result.r_orilink_protocol_t, 0, sizeof(orilink_protocol_t));
 	result.r_orilink_protocol_t->version[0] = ORILINK_VERSION_MAJOR;
 	result.r_orilink_protocol_t->version[1] = ORILINK_VERSION_MINOR;
+    result.r_orilink_protocol_t->inc_ctr = inc_ctr;
+    result.r_orilink_protocol_t->remote_wot = remote_wot;
+    result.r_orilink_protocol_t->remote_index = remote_index;
+    result.r_orilink_protocol_t->remote_session_index = remote_session_index;
+    result.r_orilink_protocol_t->local_wot = local_wot;
+    result.r_orilink_protocol_t->local_index = local_index;
+    result.r_orilink_protocol_t->local_session_index = local_session_index;
 	result.r_orilink_protocol_t->type = ORILINK_HELLO3_ACK;
 	orilink_hello3_ack_t *payload = (orilink_hello3_ack_t *)calloc(1, sizeof(orilink_hello3_ack_t));
 	if (!payload) {
@@ -96,9 +117,9 @@ orilink_protocol_t_status_t orilink_prepare_cmd_hello3_ack(const char *label, ui
 		CLOSE_ORILINK_PROTOCOL(&result.r_orilink_protocol_t);
 		return result;
 	}
-    payload->client_id = client_id;
+    payload->remote_id = remote_id;
+    memcpy(payload->nonce, nonce, AES_NONCE_BYTES);
     memcpy(payload->ciphertext2, ciphertext + (KEM_CIPHERTEXT_BYTES / 2), KEM_CIPHERTEXT_BYTES / 2);
-    memcpy(payload->encrypted_server_id_port, encrypted_server_id_port, AES_NONCE_BYTES + sizeof(uint64_t) + sizeof(uint16_t) + AES_TAG_BYTES);
     payload->trycount = trycount;
 	result.r_orilink_protocol_t->payload.orilink_hello3_ack = payload;
 	result.status = SUCCESS;

@@ -20,8 +20,8 @@ status_t orilink_serialize_hello1(const char *label, const orilink_hello1_t* pay
     }
     size_t current_offset_local = *offset;
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint64_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    uint64_t client_id_be = htobe64(payload->client_id);
-    memcpy(current_buffer + current_offset_local, &client_id_be, sizeof(uint64_t));
+    uint64_t local_id_be = htobe64(payload->local_id);
+    memcpy(current_buffer + current_offset_local, &local_id_be, sizeof(uint64_t));
     current_offset_local += sizeof(uint64_t);    
     if (CHECK_BUFFER_BOUNDS(current_offset_local, KEM_PUBLICKEY_BYTES / 2, buffer_size) != SUCCESS) return FAILURE_OOBUF;
     memcpy(current_buffer + current_offset_local, payload->publickey1, KEM_PUBLICKEY_BYTES / 2);
@@ -42,12 +42,12 @@ status_t orilink_deserialize_hello1(const char *label, orilink_protocol_t *p, co
     const uint8_t *cursor = buffer + current_offset;
     orilink_hello1_t *payload = p->payload.orilink_hello1;
     if (current_offset + sizeof(uint64_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading client_id.", label);
+        LOG_ERROR("%sOut of bounds reading local_id.", label);
         return FAILURE_OOBUF;
     }
-    uint64_t client_id_be;
-    memcpy(&client_id_be, cursor, sizeof(uint64_t));
-    payload->client_id = be64toh(client_id_be);
+    uint64_t local_id_be;
+    memcpy(&local_id_be, cursor, sizeof(uint64_t));
+    payload->local_id = be64toh(local_id_be);
     cursor += sizeof(uint64_t);
     current_offset += sizeof(uint64_t);
     if (current_offset + (KEM_PUBLICKEY_BYTES / 2) > total_buffer_len) {
@@ -68,7 +68,20 @@ status_t orilink_deserialize_hello1(const char *label, orilink_protocol_t *p, co
     return SUCCESS;
 }
 
-orilink_protocol_t_status_t orilink_prepare_cmd_hello1(const char *label, uint64_t client_id, uint8_t *publickey, uint8_t trycount) {
+orilink_protocol_t_status_t orilink_prepare_cmd_hello1(
+    const char *label, 
+    uint8_t inc_ctr, 
+    worker_type_t remote_wot, 
+    uint8_t remote_index, 
+    uint8_t remote_session_index, 
+    worker_type_t local_wot, 
+    uint8_t local_index, 
+    uint8_t local_session_index, 
+    uint64_t local_id, 
+    uint8_t *publickey, 
+    uint8_t trycount
+)
+{
 	orilink_protocol_t_status_t result;
 	result.r_orilink_protocol_t = (orilink_protocol_t *)malloc(sizeof(orilink_protocol_t));
 	result.status = FAILURE;
@@ -79,6 +92,13 @@ orilink_protocol_t_status_t orilink_prepare_cmd_hello1(const char *label, uint64
 	memset(result.r_orilink_protocol_t, 0, sizeof(orilink_protocol_t));
 	result.r_orilink_protocol_t->version[0] = ORILINK_VERSION_MAJOR;
 	result.r_orilink_protocol_t->version[1] = ORILINK_VERSION_MINOR;
+    result.r_orilink_protocol_t->inc_ctr = inc_ctr;
+    result.r_orilink_protocol_t->remote_wot = remote_wot;
+    result.r_orilink_protocol_t->remote_index = remote_index;
+    result.r_orilink_protocol_t->remote_session_index = remote_session_index;
+    result.r_orilink_protocol_t->local_wot = local_wot;
+    result.r_orilink_protocol_t->local_index = local_index;
+    result.r_orilink_protocol_t->local_session_index = local_session_index;
 	result.r_orilink_protocol_t->type = ORILINK_HELLO1;
 	orilink_hello1_t *payload = (orilink_hello1_t *)calloc(1, sizeof(orilink_hello1_t));
 	if (!payload) {
@@ -86,7 +106,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_hello1(const char *label, uint64
 		CLOSE_ORILINK_PROTOCOL(&result.r_orilink_protocol_t);
 		return result;
 	}
-    payload->client_id = client_id;
+    payload->local_id = local_id;
     memcpy(payload->publickey1, publickey, KEM_PUBLICKEY_BYTES / 2);
     payload->trycount = trycount;
 	result.r_orilink_protocol_t->payload.orilink_hello1 = payload;
