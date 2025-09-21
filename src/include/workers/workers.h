@@ -35,7 +35,7 @@ typedef struct {
     hello_ack_t hello1_ack;
     hello_ack_t hello2_ack;
     hello_ack_t hello3_ack;
-    hello_ack_t sock_ready;	
+    hello_ack_t hello4_ack;	
 //======================================================================
 // ORICLE
 //======================================================================
@@ -67,7 +67,7 @@ typedef struct {
     hello_t hello1;
     hello_t hello2;
     hello_t hello3;
-    hello_t hello_end;
+    hello_t hello4;
 //======================================================================
 // ORICLE
 //======================================================================
@@ -107,7 +107,5 @@ void run_logic_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_
 void run_cow_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
 void run_dbr_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
 void run_dbw_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
-void cleanup_hello(const char *label, async_type_t *async, hello_t *h);
-void setup_hello(hello_t *h);
 
 #endif

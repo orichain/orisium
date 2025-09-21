@@ -17,8 +17,29 @@
 #include "stdbool.h"
 #include "utilities.h"
 
+static inline void cleanup_hello(const char *label, async_type_t *async, hello_t *h) {
+    h->sent = false;
+    h->ack_rcvd = false;
+    h->interval_timer_fd = (double)1;
+    h->sent_try_count = 0x00;
+    async_delete_event(label, async, &h->timer_fd);
+    CLOSE_FD(&h->timer_fd);
+}
+
+static inline void setup_hello(hello_t *h) {
+    h->sent = false;
+    h->ack_rcvd = false;
+    h->interval_timer_fd = (double)1;
+    h->sent_try_count = 0x00;
+    CLOSE_FD(&h->timer_fd);
+}
+
 static inline status_t setup_cow_session(const char *label, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
     single_session->in_use = false;
+    setup_hello(&single_session->hello1);
+    setup_hello(&single_session->hello2);
+    setup_hello(&single_session->hello3);
+    setup_hello(&single_session->hello4);
     orilink_identity_t *identity = &single_session->identity;
     orilink_security_t *security = &single_session->security;
     memset(&identity->remote_addr, 0, sizeof(struct sockaddr_in6));
@@ -49,6 +70,10 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
 
 static inline void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session) {
     single_session->in_use = false;
+    cleanup_hello(label, cow_async, &single_session->hello1);
+    cleanup_hello(label, cow_async, &single_session->hello2);
+    cleanup_hello(label, cow_async, &single_session->hello3);
+    cleanup_hello(label, cow_async, &single_session->hello4);
     orilink_identity_t *identity = &single_session->identity;
     orilink_security_t *security = &single_session->security;
     memset(&identity->remote_addr, 0, sizeof(struct sockaddr_in6));
