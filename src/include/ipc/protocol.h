@@ -13,12 +13,21 @@ typedef enum {
     IPC_MASTER_WORKER_HELLO2_ACK = (uint8_t)0x03,
     
     IPC_MASTER_COW_CONNECT = (uint8_t)0x20,
-    IPC_MASTER_COW_DATA = (uint8_t)0x21,
-    IPC_COW_MASTER_DATA = (uint8_t)0x22,
+    IPC_COW_MASTER_UDP = (uint8_t)0x21,
     
     IPC_WORKER_MASTER_HEARTBEAT = (uint8_t)0xfe,
     IPC_MASTER_WORKER_INFO = (uint8_t)0xff
 } ipc_protocol_type_t;
+
+typedef struct {  
+    struct sockaddr_in6 server_addr;
+    uint16_t len;
+//----------------------------------------------------------------------
+//FAM (Flexible Array Member)    
+//----------------------------------------------------------------------
+    uint8_t data[];
+//----------------------------------------------------------------------
+} ipc_cow_master_udp_t;
 
 typedef struct {  
     struct sockaddr_in6 server_addr;
@@ -60,6 +69,7 @@ typedef struct {
 		ipc_master_worker_info_t *ipc_master_worker_info;
 		ipc_worker_master_heartbeat_t *ipc_worker_master_heartbeat;
         ipc_master_cow_connect_t *ipc_master_cow_connect;
+        ipc_cow_master_udp_t *ipc_cow_master_udp;
         ipc_worker_master_hello1_t *ipc_worker_master_hello1;
         ipc_master_worker_hello1_ack_t *ipc_master_worker_hello1_ack;
         ipc_worker_master_hello2_t *ipc_worker_master_hello2;
@@ -83,6 +93,8 @@ static inline void CLOSE_IPC_PROTOCOL(ipc_protocol_t **protocol_ptr) {
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_worker_info);
         } else if (x->type == IPC_MASTER_COW_CONNECT) {
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_cow_connect);
+        } else if (x->type == IPC_COW_MASTER_UDP) {
+            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_cow_master_udp);
         } else if (x->type == IPC_WORKER_MASTER_HELLO1) {
             memset(x->payload.ipc_worker_master_hello1->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_worker_master_hello1);
