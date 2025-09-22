@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <stdio.h>
 #include <sys/socket.h>
+#include <stdlib.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -19,6 +20,8 @@
 #include "pqc.h"
 #include "poly1305-donna.h"
 #include "aes.h"
+#include "orilink/hello1.h"
+#include "orilink/protocol.h"
 
 void handle_workers_ipc_closed_event(worker_context_t *worker_ctx) {
     LOG_INFO("%sMaster disconnected. Initiating graceful shutdown...", worker_ctx->label);
@@ -325,17 +328,66 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
-// ---------------------------------------------------------------------
+            cow_c_session_t *session = &cow_c_session[slot_found];
+            orilink_identity_t *identity = &cow_c_session[slot_found].identity;
+            orilink_security_t *security = &cow_c_session[slot_found].security;
+            orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello1(
+                worker_ctx->label,
+                0x01,
+                identity->remote_wot,
+                identity->remote_index,
+                identity->remote_session_index,
+                identity->local_wot,
+                identity->local_index,
+                identity->local_session_index,
+                identity->local_id,
+                security->kem_publickey,
+                session->hello1.sent_try_count
+            );
+            if (cmd_result.status != SUCCESS) {
+                return FAILURE;
+            }
+            puint8_t_size_t_status_t data = create_orilink_raw_protocol_packet(
+                worker_ctx->label,
+                security->aes_key,
+                security->mac_key,
+                security->local_nonce,
+                &security->local_ctr,
+                cmd_result.r_orilink_protocol_t
+            );
+            if (data.status != SUCCESS) {
+                CLOSE_ORILINK_PROTOCOL(&cmd_result.r_orilink_protocol_t);
+                return FAILURE;
+            }
+            session->hello1.len = data.r_size_t;
+            session->hello1.data = (uint8_t *)calloc(1, data.r_size_t);
+            memcpy(session->hello1.data, data.r_puint8_t, session->hello1.len);
+//------------------------------------------------------------------------------------
+// Here Below:
+// create ipc_cow_master_udp_t and send it to the master via IPC without encryption
+// encryption has already been done in orilink_prepare_cmd_hello1
+//----------------------------------------------------------------------
+
+
 //----------------------------------------------------------------------
             char ip_str[INET6_ADDRSTRLEN];
             if (inet_ntop(AF_INET6, &(icow_connecti->server_addr.sin6_addr), ip_str, INET6_ADDRSTRLEN) == NULL) {
                 perror("inet_ntop");
+                free(data.r_puint8_t);
+                data.r_puint8_t = NULL;
+                data.r_size_t = 0;
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
             unsigned short port = ntohs(icow_connecti->server_addr.sin6_port);
-            printf("Perintah Connect Ke: %s:%hu\n", ip_str, port);
+            printf("[Debug Here Helper]: Connect To: %s:%hu\n", ip_str, port);
 //----------------------------------------------------------------------            
+
+    
+//----------------------------------------------------------------------
+            free(data.r_puint8_t);
+            data.r_puint8_t = NULL;
+            data.r_size_t = 0;
             CLOSE_IPC_PROTOCOL(&received_protocol);
             break;
         }

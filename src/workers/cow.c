@@ -22,6 +22,11 @@ static inline void cleanup_hello(const char *label, async_type_t *async, hello_t
     h->ack_rcvd = false;
     h->interval_timer_fd = (double)1;
     h->sent_try_count = 0x00;
+    h->len = (uint16_t)0;
+    if (h->data) {
+        free(h->data);
+        h->data = NULL;
+    }
     async_delete_event(label, async, &h->timer_fd);
     CLOSE_FD(&h->timer_fd);
 }
@@ -31,6 +36,8 @@ static inline void setup_hello(hello_t *h) {
     h->ack_rcvd = false;
     h->interval_timer_fd = (double)1;
     h->sent_try_count = 0x00;
+    h->len = (uint16_t)0;
+    h->data = NULL;
     h->timer_fd = -1;
 }
 

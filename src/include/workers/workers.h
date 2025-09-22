@@ -20,6 +20,8 @@ typedef struct {
     uint64_t ack_sent_time;
     int ack_timer_fd;
     double interval_ack_timer_fd;
+    uint16_t len;
+    uint8_t *data;
 } hello_ack_t;
 
 typedef struct {
@@ -51,6 +53,8 @@ typedef struct {
     double interval_timer_fd;
     bool ack_rcvd;
     uint64_t ack_rcvd_time;
+    uint16_t len;
+    uint8_t *data;
 } hello_t;
 
 typedef struct {
