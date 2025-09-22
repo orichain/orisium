@@ -836,8 +836,8 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
     return result;
 }
 
-puint8_t_size_tstatus_t create_orilink_raw_protocol_packet(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, int *sock_fd, const struct sockaddr *dest_addr, const orilink_protocol_t* p) {
-	puint8_t_size_tstatus_t result;
+puint8_t_size_t_status_t create_orilink_raw_protocol_packet(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, int *sock_fd, const struct sockaddr *dest_addr, const orilink_protocol_t* p) {
+	puint8_t_size_t_status_t result;
     result.r_puint8_t = NULL;
     result.r_size_t = 0;
     result.status = FAILURE;
@@ -865,7 +865,7 @@ puint8_t_size_tstatus_t create_orilink_raw_protocol_packet(const char *label, ui
     return result;
 }
 
-ssize_t_status_t send_orilink_raw_protocol_packet(const char *label, const puint8_t_size_tstatus_t *r, int *sock_fd, const struct sockaddr *dest_addr) {
+ssize_t_status_t send_orilink_raw_protocol_packet(const char *label, const puint8_t_size_t_status_t *r, int *sock_fd, const struct sockaddr *dest_addr) {
 	ssize_t_status_t result;
     result.r_ssize_t = 0;
     result.status = FAILURE;
