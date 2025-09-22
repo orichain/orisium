@@ -90,6 +90,12 @@ typedef struct {
 } uint32_t_status_t;
 
 typedef struct {
+	uint8_t *r_puint8_t;
+    size_t r_size_t;
+	status_t status;
+} puint8_t_size_tstatus_t;
+
+typedef struct {
 	int r_int;
 	status_t status;
 } int_status_t;

@@ -836,40 +836,51 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
     return result;
 }
 
-ssize_t_status_t send_orilink_protocol_packet(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, int *sock_fd, const struct sockaddr *dest_addr, const orilink_protocol_t* p) {
+puint8_t_size_tstatus_t create_orilink_raw_protocol_packet(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, int *sock_fd, const struct sockaddr *dest_addr, const orilink_protocol_t* p) {
+	puint8_t_size_tstatus_t result;
+    result.r_puint8_t = NULL;
+    result.r_size_t = 0;
+    result.status = FAILURE;
+    ssize_t_status_t serialize_result = orilink_serialize(label, key_aes, key_mac, nonce, ctr, p, &result.r_puint8_t, &result.r_size_t);
+    if (serialize_result.status != SUCCESS) {
+        LOG_ERROR("%sError serializing ORILINK protocol: %d", label, serialize_result.status);
+        if (result.r_puint8_t) {
+            free(result.r_puint8_t);
+            result.r_puint8_t = NULL;
+            result.r_size_t = 0;
+        }
+        return result;
+    }
+    if (result.r_size_t > ORILINK_MAX_PACKET_SIZE) {
+        LOG_ERROR("%sError packet size %d ORILINK_MAX_PACKET_SIZE %d", label, result.r_size_t, ORILINK_MAX_PACKET_SIZE);
+        if (result.r_puint8_t) {
+            free(result.r_puint8_t);
+            result.r_puint8_t = NULL;
+            result.r_size_t = 0;
+        }
+        return result;
+    }
+    LOG_DEBUG("%sTotal pesan untuk dikirim: %zu byte.", label, result.r_size_t);
+    result.status = SUCCESS;
+    return result;
+}
+
+ssize_t_status_t send_orilink_raw_protocol_packet(const char *label, const puint8_t_size_tstatus_t *r, int *sock_fd, const struct sockaddr *dest_addr) {
 	ssize_t_status_t result;
     result.r_ssize_t = 0;
     result.status = FAILURE;
-    uint8_t* serialized_orilink_data_buffer = NULL;
-    size_t serialized_orilink_data_len = 0;
-    ssize_t_status_t serialize_result = orilink_serialize(label, key_aes, key_mac, nonce, ctr, p, &serialized_orilink_data_buffer, &serialized_orilink_data_len);
-    if (serialize_result.status != SUCCESS) {
-        LOG_ERROR("%sError serializing ORILINK protocol: %d", label, serialize_result.status);
-        if (serialized_orilink_data_buffer) {
-            free(serialized_orilink_data_buffer);
-        }
-        return result;
-    }
-    if (serialized_orilink_data_len > ORILINK_MAX_PACKET_SIZE) {
-        LOG_ERROR("%sError packet size %d ORILINK_MAX_PACKET_SIZE %d", label, serialized_orilink_data_len, ORILINK_MAX_PACKET_SIZE);
-        if (serialized_orilink_data_buffer) {
-            free(serialized_orilink_data_buffer);
-        }
-        return result;
-    }
-    LOG_DEBUG("%sTotal pesan untuk dikirim: %zu byte.", label, serialized_orilink_data_len);
     socklen_t dest_addr_len = sizeof(struct sockaddr_in6);
-    result.r_ssize_t = sendto(*sock_fd, serialized_orilink_data_buffer, serialized_orilink_data_len, 0, dest_addr, dest_addr_len);
-    if (result.r_ssize_t != (ssize_t)serialized_orilink_data_len) {
+    result.r_ssize_t = sendto(*sock_fd, r->r_puint8_t, r->r_size_t, 0, dest_addr, dest_addr_len);
+    if (result.r_ssize_t != (ssize_t)r->r_size_t) {
         LOG_ERROR("%ssendto failed to send_orilink_protocol_packet. %s", label, strerror(errno));
-        if (serialized_orilink_data_buffer) {
-            free(serialized_orilink_data_buffer);
+        if (r->r_puint8_t) {
+            free(r->r_puint8_t);
         }
         result.status = FAILURE;
         return result;
     }
-    if (serialized_orilink_data_buffer) {
-        free(serialized_orilink_data_buffer);
+    if (r->r_puint8_t) {
+        free(r->r_puint8_t);
     }
     result.status = SUCCESS;
     return result;
