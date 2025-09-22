@@ -321,7 +321,7 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                 }
             }
             if (slot_found == -1) {
-                LOG_ERROR("%sNO SLOT.", worker_ctx->label, deserialized_ircvdi.status);
+                LOG_ERROR("%sNO SLOT.", worker_ctx->label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
             }

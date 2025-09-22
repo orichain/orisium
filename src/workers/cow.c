@@ -31,7 +31,7 @@ static inline void setup_hello(hello_t *h) {
     h->ack_rcvd = false;
     h->interval_timer_fd = (double)1;
     h->sent_try_count = 0x00;
-    CLOSE_FD(&h->timer_fd);
+    h->timer_fd = -1;
 }
 
 static inline status_t setup_cow_session(const char *label, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
