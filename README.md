@@ -6,6 +6,13 @@ Orisium is a high-performance peer-to-peer (P2P) network designed for global sca
 
 -----
 
+## Core Architectural Principles
+
+Orisium's unique design sets it apart by embedding intelligence and resilience directly into the protocol's core.
+
+* **Hierarchical Transport Layer:** Unlike traditional protocols that build hierarchy at the application layer, Orisium's decentralized hierarchy is formed directly at the **transport layer**. This ensures a more efficient, inherently censorship-resistant network where nodes can dynamically route data around compromised or blocked connections.
+* **Intelligent Node Scoring:** The protocol uses a smart, **weighted metrics system** to evaluate the quality of a connection. It automatically measures and rates nodes based on factors like latency (RTT), reliability (retry count), and overall health. For blockchain applications, a success rate for writing blocks is given the highest weight, ensuring the network always prefers the most capable and trustworthy nodes.
+
 ## Key Features
 
 ### Dynamic Hierarchical Network Architecture with 313 Root Nodes
