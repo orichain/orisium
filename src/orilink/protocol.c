@@ -981,6 +981,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
     free(full_orilink_payload_buffer);
     r->recv_buffer = b;
     r->n = (uint32_t)bytes_read_payload;
+    memcpy(r->mac, b, AES_TAG_BYTES);
     uint32_t ctr_be;
     memcpy(&ctr_be,
         b + 

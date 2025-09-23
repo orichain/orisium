@@ -2,10 +2,8 @@
 #include <string.h>
 #include <stdbool.h>
 #include <endian.h>
-#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stdio.h>
-#include <sys/socket.h>
 #include <stdlib.h>
 
 #include "log.h"
@@ -17,6 +15,7 @@
 #include "workers/workers.h"
 #include "workers/ipc/handlers.h"
 #include "workers/ipc/master_ipc_cmds.h"
+#include "ipc/cow_master_udp.h"
 #include "pqc.h"
 #include "poly1305-donna.h"
 #include "aes.h"
@@ -331,7 +330,7 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
             cow_c_session_t *session = &cow_c_session[slot_found];
             orilink_identity_t *identity = &cow_c_session[slot_found].identity;
             orilink_security_t *security = &cow_c_session[slot_found].security;
-            orilink_protocol_t_status_t cmd_result = orilink_prepare_cmd_hello1(
+            orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello1(
                 worker_ctx->label,
                 0x01,
                 identity->remote_wot,
@@ -344,7 +343,7 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                 security->kem_publickey,
                 session->hello1.sent_try_count
             );
-            if (cmd_result.status != SUCCESS) {
+            if (orilink_cmd_result.status != SUCCESS) {
                 return FAILURE;
             }
             puint8_t_size_t_status_t data = create_orilink_raw_protocol_packet(
@@ -353,10 +352,10 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                 security->mac_key,
                 security->local_nonce,
                 &security->local_ctr,
-                cmd_result.r_orilink_protocol_t
+                orilink_cmd_result.r_orilink_protocol_t
             );
             if (data.status != SUCCESS) {
-                CLOSE_ORILINK_PROTOCOL(&cmd_result.r_orilink_protocol_t);
+                CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
                 return FAILURE;
             }
             session->hello1.len = data.r_size_t;
@@ -367,23 +366,38 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
 // create ipc_cow_master_udp_t and send it to the master via IPC without encryption
 // encryption has already been done in orilink_prepare_cmd_hello1
 //----------------------------------------------------------------------
-
-
-//----------------------------------------------------------------------
-            char ip_str[INET6_ADDRSTRLEN];
-            if (inet_ntop(AF_INET6, &(icow_connecti->server_addr.sin6_addr), ip_str, INET6_ADDRSTRLEN) == NULL) {
-                perror("inet_ntop");
-                free(data.r_puint8_t);
-                data.r_puint8_t = NULL;
-                data.r_size_t = 0;
-                CLOSE_IPC_PROTOCOL(&received_protocol);
+            ipc_protocol_t_status_t ipc_cmd_result = ipc_prepare_cmd_cow_master_udp(
+                worker_ctx->label,
+                identity->local_wot,
+                identity->local_index,
+                &identity->remote_addr,
+                session->hello1.len,
+                session->hello1.data
+            );
+            if (ipc_cmd_result.status != SUCCESS) {
                 return FAILURE;
             }
-            unsigned short port = ntohs(icow_connecti->server_addr.sin6_port);
-            printf("[Debug Here Helper]: Connect To: %s:%hu\n", ip_str, port);
-//----------------------------------------------------------------------            
-
-    
+            ssize_t_status_t send_result = send_ipc_protocol_message(
+                worker_ctx->label,
+//------------------------------------------------------------------------------------
+// Set AES KEY = NULL for IPC without encryption
+//------------------------------------------------------------------------------------
+                NULL,
+//------------------------------------------------------------------------------------
+                worker_ctx->mac_key,
+                worker_ctx->local_nonce,
+                &worker_ctx->local_ctr,
+                worker_ctx->master_uds_fd, 
+                ipc_cmd_result.r_ipc_protocol_t
+            );
+            if (send_result.status != SUCCESS) {
+                LOG_ERROR("%sFailed to sent cow_master_udp to Master.", worker_ctx->label);
+                CLOSE_IPC_PROTOCOL(&ipc_cmd_result.r_ipc_protocol_t);
+                return send_result.status;
+            } else {
+                LOG_DEBUG("%sSent cow_master_udp to Master.", worker_ctx->label);
+            }
+            CLOSE_IPC_PROTOCOL(&ipc_cmd_result.r_ipc_protocol_t);
 //----------------------------------------------------------------------
             free(data.r_puint8_t);
             data.r_puint8_t = NULL;

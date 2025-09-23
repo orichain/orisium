@@ -195,6 +195,7 @@ static inline void CLOSE_ORILINK_PROTOCOL(orilink_protocol_t **protocol_ptr) {
 typedef struct {
     uint8_t *recv_buffer;
     uint16_t n;
+    uint8_t mac[AES_TAG_BYTES];
     uint32_t ctr;
     uint8_t version[ORILINK_VERSION_BYTES];
     uint8_t inc_ctr;

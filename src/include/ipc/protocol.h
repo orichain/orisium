@@ -117,6 +117,7 @@ static inline void CLOSE_IPC_PROTOCOL(ipc_protocol_t **protocol_ptr) {
 typedef struct {
     uint8_t *recv_buffer;
     uint32_t n;
+    uint8_t mac[AES_TAG_BYTES];
     uint32_t ctr;
     uint8_t version[IPC_VERSION_BYTES];
     worker_type_t wot;

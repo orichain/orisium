@@ -88,7 +88,7 @@ ipc_protocol_t_status_t ipc_prepare_cmd_cow_master_udp(const char *label, worker
     result.r_ipc_protocol_t->wot = wot;
     result.r_ipc_protocol_t->index = index;
 	result.r_ipc_protocol_t->type = IPC_COW_MASTER_UDP;
-	ipc_cow_master_udp_t *payload = (ipc_cow_master_udp_t *)calloc(1, sizeof(ipc_cow_master_udp_t));
+	ipc_cow_master_udp_t *payload = (ipc_cow_master_udp_t *)calloc(1, sizeof(ipc_cow_master_udp_t) + len);
 	if (!payload) {
 		LOG_ERROR("%sFailed to allocate ipc_cow_master_udp_t payload. %s", label, strerror(errno));
 		CLOSE_IPC_PROTOCOL(&result.r_ipc_protocol_t);
