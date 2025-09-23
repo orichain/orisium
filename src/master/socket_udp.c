@@ -10,29 +10,29 @@
 #include "utilities.h"
 #include "orilink/protocol.h"
 #include "types.h"
-#include "master/socket_listenner.h"
+#include "master/socket_udp.h"
 #include "master/master.h"
 
-status_t setup_master_socket_listenner(const char *label, master_context_t *master_ctx) {
+status_t setup_master_socket_udp(const char *label, master_context_t *master_ctx) {
     struct sockaddr_in6 addr;
     int opt = 1;
     int v6only = 0;
     
-    master_ctx->listen_sock = socket(AF_INET6, SOCK_DGRAM, 0);
-    if (master_ctx->listen_sock == -1) {
+    master_ctx->udp_sock = socket(AF_INET6, SOCK_DGRAM, 0);
+    if (master_ctx->udp_sock == -1) {
 		LOG_ERROR("%ssocket failed. %s", label, strerror(errno));
         return FAILURE;
     }
-    status_t r_snbkg = set_nonblocking(label, master_ctx->listen_sock);
+    status_t r_snbkg = set_nonblocking(label, master_ctx->udp_sock);
     if (r_snbkg != SUCCESS) {
         LOG_ERROR("%sset_nonblocking failed.", label);
         return r_snbkg;
     }
-    if (setsockopt(master_ctx->listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
+    if (setsockopt(master_ctx->udp_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
         LOG_ERROR("%ssetsockopt failed. %s", label, strerror(errno));
         return FAILURE;
     }
-    if (setsockopt(master_ctx->listen_sock, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) == -1) {
+    if (setsockopt(master_ctx->udp_sock, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) == -1) {
 		LOG_ERROR("%ssetsockopt failed. %s", label, strerror(errno));
         return FAILURE;
     }
@@ -40,22 +40,22 @@ status_t setup_master_socket_listenner(const char *label, master_context_t *mast
     addr.sin6_family = AF_INET6;
     addr.sin6_port = htons(master_ctx->listen_port);
     addr.sin6_addr = in6addr_any;
-    if (bind(master_ctx->listen_sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+    if (bind(master_ctx->udp_sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         LOG_ERROR("%sbind failed. %s", label, strerror(errno));
         return FAILURE;
     }
     return SUCCESS;
 }
 
-status_t handle_master_listen_sock_event(const char *label, master_context_t *master_ctx) {
+status_t handle_master_udp_sock_event(const char *label, master_context_t *master_ctx) {
     struct sockaddr_in6 client_addr;
 	char host_str[NI_MAXHOST];
     char port_str[NI_MAXSERV];
     
     orilink_raw_protocol_t_status_t orcvdo = receive_orilink_raw_protocol_packet(
         label,
-        &master_ctx->listen_sock,
-        (struct sockaddr *)&client_addr
+        &master_ctx->udp_sock,
+        &client_addr
     );
     if (orcvdo.status != SUCCESS) return orcvdo.status;
     int getname_res = getnameinfo((struct sockaddr *)&client_addr, sizeof(struct sockaddr_in6),
@@ -81,10 +81,10 @@ status_t handle_master_listen_sock_event(const char *label, master_context_t *ma
         CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
         return FAILURE_IVLDPORT;
     }
-    switch (orcvdo.r_orilink_raw_protocol_t->type) {
+    switch (orcvdo.r_orilink_raw_protocol_t->type) {        
         default:
+            LOG_ERROR("%sUnknown ORILINK protocol type %d from %s:%s. Ignoring.", label, orcvdo.r_orilink_raw_protocol_t->type, host_str, port_str);
             CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
-            return FAILURE;
     }
 	return SUCCESS;
 }

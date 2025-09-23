@@ -21,9 +21,9 @@ status_t ipc_serialize_cow_master_udp(const char *label, const ipc_cow_master_ud
     }
     size_t current_offset_local = *offset;
     if (CHECK_BUFFER_BOUNDS(current_offset_local, SOCKADDR_IN6_SIZE, buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    uint8_t server_addr_be[SOCKADDR_IN6_SIZE];
-    serialize_sockaddr_in6(&payload->server_addr, server_addr_be);    
-    memcpy(current_buffer + current_offset_local, server_addr_be, SOCKADDR_IN6_SIZE);
+    uint8_t remote_addr_be[SOCKADDR_IN6_SIZE];
+    serialize_sockaddr_in6(&payload->remote_addr, remote_addr_be);    
+    memcpy(current_buffer + current_offset_local, remote_addr_be, SOCKADDR_IN6_SIZE);
     current_offset_local += SOCKADDR_IN6_SIZE;
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint16_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
     uint16_t len_be = htobe16(payload->len);
@@ -45,12 +45,12 @@ status_t ipc_deserialize_cow_master_udp(const char *label, ipc_protocol_t *p, co
     const uint8_t *cursor = buffer + current_offset;
     ipc_cow_master_udp_t *payload = p->payload.ipc_cow_master_udp;
     if (current_offset + SOCKADDR_IN6_SIZE > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading server_addr.", label);
+        LOG_ERROR("%sOut of bounds reading remote_addr.", label);
         return FAILURE_OOBUF;
     }
-    uint8_t server_addr_be[SOCKADDR_IN6_SIZE];
-    memcpy(server_addr_be, cursor, SOCKADDR_IN6_SIZE);
-    deserialize_sockaddr_in6(server_addr_be, &payload->server_addr);
+    uint8_t remote_addr_be[SOCKADDR_IN6_SIZE];
+    memcpy(remote_addr_be, cursor, SOCKADDR_IN6_SIZE);
+    deserialize_sockaddr_in6(remote_addr_be, &payload->remote_addr);
     cursor += SOCKADDR_IN6_SIZE;
     current_offset += SOCKADDR_IN6_SIZE;
     
@@ -74,7 +74,7 @@ status_t ipc_deserialize_cow_master_udp(const char *label, ipc_protocol_t *p, co
     return SUCCESS;
 }
 
-ipc_protocol_t_status_t ipc_prepare_cmd_cow_master_udp(const char *label, worker_type_t wot, uint8_t index, struct sockaddr_in6 *server_addr, uint16_t len, uint8_t *data) {
+ipc_protocol_t_status_t ipc_prepare_cmd_cow_master_udp(const char *label, worker_type_t wot, uint8_t index, struct sockaddr_in6 *remote_addr, uint16_t len, uint8_t *data) {
 	ipc_protocol_t_status_t result;
 	result.r_ipc_protocol_t = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
 	result.status = FAILURE;
@@ -94,7 +94,7 @@ ipc_protocol_t_status_t ipc_prepare_cmd_cow_master_udp(const char *label, worker
 		CLOSE_IPC_PROTOCOL(&result.r_ipc_protocol_t);
 		return result;
 	}
-    memcpy(&payload->server_addr, server_addr, SOCKADDR_IN6_SIZE);
+    memcpy(&payload->remote_addr, remote_addr, SOCKADDR_IN6_SIZE);
     payload->len = len;
     memcpy(&payload->data, data, len);
 	result.r_ipc_protocol_t->payload.ipc_cow_master_udp = payload;

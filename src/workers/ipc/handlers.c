@@ -2,8 +2,10 @@
 #include <string.h>
 #include <stdbool.h>
 #include <endian.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <sys/socket.h>
 #include <stdlib.h>
 
 #include "log.h"
@@ -317,7 +319,7 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
             for (uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
                 if (!cow_c_session[i].in_use) {
                     cow_c_session[i].in_use = true;
-                    memcpy(&cow_c_session[i].identity.remote_addr, &icow_connecti->server_addr, sizeof(struct sockaddr_in6));
+                    memcpy(&cow_c_session[i].identity.remote_addr, &icow_connecti->remote_addr, sizeof(struct sockaddr_in6));
                     slot_found = i;
                     break;
                 }
@@ -406,7 +408,7 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
             break;
         }
         default:
-            LOG_ERROR("%sUnknown protocol type %d from Master. Ignoring.", worker_ctx->label, ircvdi.r_ipc_raw_protocol_t->type);
+            LOG_ERROR("%sUnknown IPC protocol type %d from Master. Ignoring.", worker_ctx->label, ircvdi.r_ipc_raw_protocol_t->type);
             CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
     }
     return SUCCESS;

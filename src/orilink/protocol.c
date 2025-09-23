@@ -865,12 +865,12 @@ puint8_t_size_t_status_t create_orilink_raw_protocol_packet(const char *label, u
     return result;
 }
 
-ssize_t_status_t send_orilink_raw_protocol_packet(const char *label, puint8_t_size_t_status_t *r, int *sock_fd, const struct sockaddr *dest_addr) {
+ssize_t_status_t send_orilink_raw_protocol_packet(const char *label, puint8_t_size_t_status_t *r, int *sock_fd, const struct sockaddr_in6 *dest_addr) {
 	ssize_t_status_t result;
     result.r_ssize_t = 0;
     result.status = FAILURE;
     socklen_t dest_addr_len = sizeof(struct sockaddr_in6);
-    result.r_ssize_t = sendto(*sock_fd, r->r_puint8_t, r->r_size_t, 0, dest_addr, dest_addr_len);
+    result.r_ssize_t = sendto(*sock_fd, r->r_puint8_t, r->r_size_t, 0, (const struct sockaddr *)dest_addr, dest_addr_len);
     if (result.r_ssize_t != (ssize_t)r->r_size_t) {
         LOG_ERROR("%ssendto failed to send_orilink_protocol_packet. %s", label, strerror(errno));
         if (r->r_puint8_t) {
@@ -937,13 +937,13 @@ status_t orilink_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key
     }
 }
 
-orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *label, int *sock_fd, struct sockaddr *source_addr) {
+orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *label, int *sock_fd, struct sockaddr_in6 *source_addr) {
     orilink_raw_protocol_t_status_t result;
     result.status = FAILURE;
     result.r_orilink_raw_protocol_t = NULL;
     uint8_t *full_orilink_payload_buffer = (uint8_t *)calloc(1, ORILINK_MAX_PACKET_SIZE * sizeof(uint8_t));
     socklen_t source_addr_len = sizeof(struct sockaddr_in6);
-    ssize_t bytes_read_payload = recvfrom(*sock_fd, full_orilink_payload_buffer, ORILINK_MAX_PACKET_SIZE, 0, source_addr, &source_addr_len);
+    ssize_t bytes_read_payload = recvfrom(*sock_fd, full_orilink_payload_buffer, ORILINK_MAX_PACKET_SIZE, 0, (struct sockaddr * restrict)source_addr, &source_addr_len);
     if (bytes_read_payload < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
 			LOG_ERROR("%sreceive_orilink_raw_protocol_packet failed: %s", label, strerror(errno));
