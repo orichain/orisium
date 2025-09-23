@@ -63,7 +63,6 @@ status_t ipc_deserialize_udp_data(const char *label, ipc_protocol_t *p, const ui
     deserialize_sockaddr_in6(remote_addr_be, &payload->remote_addr);
     cursor += SOCKADDR_IN6_SIZE;
     current_offset += SOCKADDR_IN6_SIZE;
-    
     if (current_offset + sizeof(uint16_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading len.", label);
         return FAILURE_OOBUF;

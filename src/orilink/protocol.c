@@ -25,6 +25,7 @@
 #include "pqc.h"
 #include "poly1305-donna.h"
 #include "aes.h"
+#include "ipc/protocol.h"
 
 static inline size_t_status_t calculate_orilink_payload_size(const char *label, const orilink_protocol_t* p, bool checkfixheader) {
 	size_t_status_t result;
@@ -1082,4 +1083,107 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
     result.r_orilink_raw_protocol_t = r;
     result.status = SUCCESS;
     return result;
+}
+
+void udp_data_to_orilink_raw_protocol_packet(ipc_udp_data_t *iudp_datai, orilink_raw_protocol_t *oudp_datao) {
+    oudp_datao->recv_buffer = iudp_datai->data;
+    oudp_datao->n = iudp_datai->len;
+    memcpy(oudp_datao->mac, iudp_datai->data, AES_TAG_BYTES);
+    uint32_t ctr_be;
+    memcpy(&ctr_be,
+        iudp_datai->data + 
+        AES_TAG_BYTES,
+        sizeof(uint32_t)
+    );
+    oudp_datao->ctr = be32toh(ctr_be);
+    memcpy(oudp_datao->version,
+        iudp_datai->data + 
+        AES_TAG_BYTES + 
+        sizeof(uint32_t), 
+        ORILINK_VERSION_BYTES
+    );
+    memcpy((uint8_t *)&oudp_datao->inc_ctr,
+        iudp_datai->data +
+        AES_TAG_BYTES +
+        sizeof(uint32_t) +
+        ORILINK_VERSION_BYTES,
+        sizeof(uint8_t)
+    );
+    memcpy((uint8_t *)&oudp_datao->remote_wot,
+        iudp_datai->data +
+        AES_TAG_BYTES +
+        sizeof(uint32_t) +
+        ORILINK_VERSION_BYTES +
+        sizeof(uint8_t),
+        sizeof(uint8_t)
+    );
+    memcpy((uint8_t *)&oudp_datao->remote_index,
+        iudp_datai->data +
+        AES_TAG_BYTES +
+        sizeof(uint32_t) +
+        ORILINK_VERSION_BYTES +
+        sizeof(uint8_t) +
+        sizeof(uint8_t),
+        sizeof(uint8_t)
+    );
+    memcpy((uint8_t *)&oudp_datao->remote_session_index,
+        iudp_datai->data +
+        AES_TAG_BYTES +
+        sizeof(uint32_t) +
+        ORILINK_VERSION_BYTES +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t),
+        sizeof(uint8_t)
+    );
+    memcpy((uint8_t *)&oudp_datao->local_wot,
+        iudp_datai->data +
+        AES_TAG_BYTES +
+        sizeof(uint32_t) +
+        ORILINK_VERSION_BYTES +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t),
+        sizeof(uint8_t)
+    );
+    memcpy((uint8_t *)&oudp_datao->local_index,
+        iudp_datai->data +
+        AES_TAG_BYTES +
+        sizeof(uint32_t) +
+        ORILINK_VERSION_BYTES +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t),
+        sizeof(uint8_t)
+    );
+    memcpy((uint8_t *)&oudp_datao->local_session_index,
+        iudp_datai->data +
+        AES_TAG_BYTES +
+        sizeof(uint32_t) +
+        ORILINK_VERSION_BYTES +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t),
+        sizeof(uint8_t)
+    );
+    memcpy((uint8_t *)&oudp_datao->type,
+        iudp_datai->data +
+        AES_TAG_BYTES +
+        sizeof(uint32_t) +
+        ORILINK_VERSION_BYTES +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t),
+        sizeof(uint8_t)
+    );
 }

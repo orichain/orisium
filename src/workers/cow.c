@@ -19,6 +19,8 @@
 
 static inline void cleanup_hello(const char *label, async_type_t *async, hello_t *h) {
     h->sent = false;
+    h->sent_time = (uint64_t)0;
+    h->ack_rcvd_time = (uint64_t)0;
     h->ack_rcvd = false;
     h->interval_timer_fd = (double)1;
     h->sent_try_count = 0x00;
@@ -33,6 +35,8 @@ static inline void cleanup_hello(const char *label, async_type_t *async, hello_t
 
 static inline void setup_hello(hello_t *h) {
     h->sent = false;
+    h->sent_time = (uint64_t)0;
+    h->ack_rcvd_time = (uint64_t)0;
     h->ack_rcvd = false;
     h->interval_timer_fd = (double)1;
     h->sent_try_count = 0x00;

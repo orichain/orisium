@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+#include <netinet/in.h>
+#include <string.h>
 
 #include "log.h"
 #include "async.h"
@@ -10,20 +12,127 @@
 #include "workers/workers.h"
 #include "workers/ipc/handlers.h"
 #include "workers/ipc/master_ipc_cmds.h"
+#include "orilink/protocol.h"
+#include "stdbool.h"
+#include "utilities.h"
+#include "pqc.h"
 
-void cleanup_sio_worker(worker_context_t *worker_ctx) {
+static inline void cleanup_hello_ack(const char *label, async_type_t *async, hello_ack_t *h) {
+    h->rcvd = false;
+    h->rcvd_time = (uint64_t)0;
+    h->ack_sent_time = (uint64_t)0;
+    h->ack_sent = false;
+    h->interval_ack_timer_fd = (double)1;
+    h->ack_sent_try_count = 0x00;
+    h->len = (uint16_t)0;
+    if (h->data) {
+        free(h->data);
+        h->data = NULL;
+    }
+    async_delete_event(label, async, &h->ack_timer_fd);
+    CLOSE_FD(&h->ack_timer_fd);
+}
+
+static inline void setup_hello_ack(hello_ack_t *h) {
+    h->rcvd = false;
+    h->rcvd_time = (uint64_t)0;
+    h->ack_sent_time = (uint64_t)0;
+    h->ack_sent = false;
+    h->interval_ack_timer_fd = (double)1;
+    h->ack_sent_try_count = 0x00;
+    h->len = (uint16_t)0;
+    h->data = NULL;
+    h->ack_timer_fd = -1;
+}
+
+static inline status_t setup_sio_session(const char *label, sio_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
+    setup_hello_ack(&single_session->hello1_ack);
+    setup_hello_ack(&single_session->hello2_ack);
+    setup_hello_ack(&single_session->hello3_ack);
+    setup_hello_ack(&single_session->hello4_ack);
+    orilink_identity_t *identity = &single_session->identity;
+    orilink_security_t *security = &single_session->security;
+    memset(&identity->remote_addr, 0, sizeof(struct sockaddr_in6));
+    identity->remote_wot = UNKNOWN;
+    identity->remote_index = 0xFF;
+    identity->remote_session_index = 0xFF;
+    identity->remote_id = 0xFFFFFFFF;
+    identity->local_wot = wot;
+    identity->local_index = index;
+    identity->local_session_index = session_index;
+    if (generate_connection_id(label, &identity->local_id) != SUCCESS) return FAILURE;
+    security->kem_publickey = (uint8_t *)calloc(1, KEM_PUBLICKEY_BYTES);
+    security->kem_ciphertext = (uint8_t *)calloc(1, KEM_CIPHERTEXT_BYTES);
+    security->kem_sharedsecret = (uint8_t *)calloc(1, KEM_SHAREDSECRET_BYTES);
+    security->aes_key = (uint8_t *)calloc(1, HASHES_BYTES);
+    security->mac_key = (uint8_t *)calloc(1, HASHES_BYTES);
+    security->local_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
+    security->remote_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
+    security->local_ctr = (uint32_t)0;
+    security->remote_ctr = (uint32_t)0;
+    return SUCCESS;
+}
+
+static inline void cleanup_sio_session(const char *label, async_type_t *sio_async, sio_c_session_t *single_session) {
+    cleanup_hello_ack(label, sio_async, &single_session->hello1_ack);
+    cleanup_hello_ack(label, sio_async, &single_session->hello2_ack);
+    cleanup_hello_ack(label, sio_async, &single_session->hello3_ack);
+    cleanup_hello_ack(label, sio_async, &single_session->hello4_ack);
+    orilink_identity_t *identity = &single_session->identity;
+    orilink_security_t *security = &single_session->security;
+    memset(&identity->remote_addr, 0, sizeof(struct sockaddr_in6));
+    identity->remote_wot = UNKNOWN;
+    identity->remote_index = 0xFF;
+    identity->remote_session_index = 0xFF;
+    identity->remote_id = 0xFFFFFFFF;
+    identity->local_wot = UNKNOWN;
+    identity->local_index = 0xFF;
+    identity->local_session_index = 0xFF;
+    identity->local_id = 0xFFFFFFFF;
+    memset(security->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+    memset(security->kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+    memset(security->kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
+    memset(security->aes_key, 0, HASHES_BYTES);
+    memset(security->mac_key, 0, HASHES_BYTES);
+    memset(security->local_nonce, 0, AES_NONCE_BYTES);
+    security->local_ctr = (uint32_t)0;
+    memset(security->remote_nonce, 0, AES_NONCE_BYTES);
+    security->remote_ctr = (uint32_t)0;
+    free(security->kem_publickey);
+    free(security->kem_ciphertext);
+    free(security->kem_sharedsecret);
+    free(security->aes_key);
+    free(security->mac_key);
+    free(security->local_nonce);
+    free(security->remote_nonce);
+}
+
+void cleanup_sio_worker(worker_context_t *worker_ctx, sio_c_session_t *sessions) {
+    for (uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
+        sio_c_session_t *single_session;
+        single_session = &sessions[i];
+        cleanup_sio_session(worker_ctx->label, &worker_ctx->async, single_session);
+    }
 	cleanup_worker(worker_ctx);
 }
 
-status_t setup_sio_worker(worker_context_t *worker_ctx, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
+status_t setup_sio_worker(worker_context_t *worker_ctx, sio_c_session_t *sessions, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
     if (setup_worker(worker_ctx, "SIO", wot, index, master_uds_fd) != SUCCESS) return FAILURE;
+    for (uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
+        sio_c_session_t *single_session;
+        single_session = &sessions[i];
+        if (setup_sio_session(worker_ctx->label, single_session, *wot, *index, i) != SUCCESS) {
+            return FAILURE;
+        }
+    }
     return SUCCESS;
 }
 
 void run_sio_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd) {
     worker_context_t x_ctx;
     worker_context_t *worker_ctx = &x_ctx;
-    if (setup_sio_worker(worker_ctx, wot, index, master_uds_fd) != SUCCESS) goto exit;
+    sio_c_session_t sessions[MAX_CONNECTION_PER_SIO_WORKER];
+    if (setup_sio_worker(worker_ctx, sessions, wot, index, master_uds_fd) != SUCCESS) goto exit;
     while (!worker_ctx->shutdown_requested) {
         int_status_t snfds = async_wait(worker_ctx->label, &worker_ctx->async);
 		if (snfds.status != SUCCESS) {
@@ -77,7 +186,7 @@ void run_sio_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
                     handle_workers_ipc_closed_event(worker_ctx);
                     continue;
                 } else {
-                    handle_workers_ipc_event(worker_ctx, NULL, initial_delay_ms);
+                    handle_workers_ipc_event(worker_ctx, sessions, initial_delay_ms);
                     continue;
                 }
             } else {
@@ -91,5 +200,5 @@ void run_sio_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
     }
 
 exit:    
-    cleanup_sio_worker(worker_ctx);
+    cleanup_sio_worker(worker_ctx, sessions);
 }
