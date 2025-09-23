@@ -153,6 +153,47 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
             CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
 			break;
 		}
+        case ORILINK_HELLO1_ACK: {
+            int cow_worker_idx = orcvdo.r_orilink_raw_protocol_t->remote_index;
+            uint8_t slot_found = orcvdo.r_orilink_raw_protocol_t->remote_session_index;
+//----------------------------------------------------------------------
+// Here Below:
+// create ipc_udp_data_t and send it to the COW via IPC
+//----------------------------------------------------------------------
+            ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data(
+                label,
+                orcvdo.r_orilink_raw_protocol_t->local_wot,
+                orcvdo.r_orilink_raw_protocol_t->local_index,
+                slot_found,
+                &remote_addr,
+                orcvdo.r_orilink_raw_protocol_t->n,
+                orcvdo.r_orilink_raw_protocol_t->recv_buffer
+            );
+            if (cmd_result.status != SUCCESS) {
+                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                return FAILURE;
+            }
+            ssize_t_status_t send_result = send_ipc_protocol_message(
+                label, 
+                master_ctx->cow_session[cow_worker_idx].security.aes_key,
+                master_ctx->cow_session[cow_worker_idx].security.mac_key,
+                master_ctx->cow_session[cow_worker_idx].security.local_nonce,
+                &master_ctx->cow_session[cow_worker_idx].security.local_ctr,
+                &master_ctx->cow_session[cow_worker_idx].upp.uds[0], 
+                cmd_result.r_ipc_protocol_t
+            );
+            if (send_result.status != SUCCESS) {
+                LOG_ERROR("%sFailed to sent udp_data to COW.", label);
+                CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                return send_result.status;
+            } else {
+                LOG_DEBUG("%sSent udp_data to COW.", label);
+            }
+            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+            CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+			break;
+		}
         default:
             LOG_ERROR("%sUnknown ORILINK protocol type %d from %s:%s. Ignoring.", label, orcvdo.r_orilink_raw_protocol_t->type, host_str, port_str);
             CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);

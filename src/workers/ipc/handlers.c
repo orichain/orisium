@@ -21,6 +21,7 @@
 #include "poly1305-donna.h"
 #include "aes.h"
 #include "orilink/hello1.h"
+#include "orilink/hello1_ack.h"
 #include "orilink/protocol.h"
 
 void handle_workers_ipc_closed_event(worker_context_t *worker_ctx) {
@@ -333,6 +334,7 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                 session->hello1.sent_try_count
             );
             if (orilink_cmd_result.status != SUCCESS) {
+                CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
             puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
@@ -344,12 +346,10 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                 orilink_cmd_result.r_orilink_protocol_t
             );
             if (udp_data.status != SUCCESS) {
+                CLOSE_IPC_PROTOCOL(&received_protocol);
                 CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
                 return FAILURE;
             }
-            session->hello1.len = udp_data.r_size_t;
-            session->hello1.data = (uint8_t *)calloc(1, udp_data.r_size_t);
-            memcpy(session->hello1.data, udp_data.r_puint8_t, session->hello1.len);
 //----------------------------------------------------------------------
 // Here Below:
 // create ipc_udp_data_t and send it to the master via IPC
@@ -364,10 +364,11 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                 0xff,
 //----------------------------------------------------------------------
                 &identity->remote_addr,
-                session->hello1.len,
-                session->hello1.data
+                udp_data.r_size_t,
+                udp_data.r_puint8_t
             );
             if (ipc_cmd_result.status != SUCCESS) {
+                CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
             ssize_t_status_t send_result = send_ipc_protocol_message(
@@ -381,6 +382,7 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
             );
             if (send_result.status != SUCCESS) {
                 LOG_ERROR("%sFailed to sent udp_data to Master.", worker_ctx->label);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
                 CLOSE_IPC_PROTOCOL(&ipc_cmd_result.r_ipc_protocol_t);
                 return send_result.status;
             } else {
@@ -388,6 +390,9 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
             }
             CLOSE_IPC_PROTOCOL(&ipc_cmd_result.r_ipc_protocol_t);
 //----------------------------------------------------------------------
+            session->hello1.len = udp_data.r_size_t;
+            session->hello1.data = (uint8_t *)calloc(1, udp_data.r_size_t);
+            memcpy(session->hello1.data, udp_data.r_puint8_t, session->hello1.len);
             free(udp_data.r_puint8_t);
             udp_data.r_puint8_t = NULL;
             udp_data.r_size_t = 0;
@@ -421,7 +426,10 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                     sio_c_session_t *session = &sio_c_session[slot_found];
                     orilink_identity_t *identity = &session->identity;
                     orilink_security_t *security = &session->security;
-                    memcpy(&identity->remote_addr, &iudp_datai->remote_addr, sizeof(struct sockaddr_in6));
+//----------------------------------------------------------------------
+                    struct sockaddr_in6 remote_addr;
+                    memcpy(&remote_addr, &iudp_datai->remote_addr, sizeof(struct sockaddr_in6));
+//----------------------------------------------------------------------
                     orilink_raw_protocol_t *oudp_datao = (orilink_raw_protocol_t*)calloc(1, sizeof(orilink_raw_protocol_t));
                     if (!oudp_datao) {
                         LOG_ERROR("%sFailed to allocate orilink_raw_protocol_t. %s", worker_ctx->label, strerror(errno));
@@ -429,8 +437,8 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                         return FAILURE_NOMEM;
                     }
                     if (udp_data_to_orilink_raw_protocol_packet(worker_ctx->label, iudp_datai, oudp_datao) != SUCCESS) {
-                        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
+                        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
                         return FAILURE;
                     }
                     if (orilink_check_mac_ctr(
@@ -442,31 +450,126 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                         ) != SUCCESS
                     )
                     {
-                        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
                         CLOSE_IPC_PROTOCOL(&received_protocol);
+                        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
                         return FAILURE;
                     }
                     switch (oudp_datao->type) {
                         case ORILINK_HELLO1: {
+                            worker_type_t remote_wot;
+                            uint8_t remote_index;
+                            uint8_t remote_session_index;
                             orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
                                 security->aes_key, security->remote_nonce, &security->remote_ctr,
                                 (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n
                             );
                             if (deserialized_oudp_datao.status != SUCCESS) {
                                 LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
-                                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
                                 CLOSE_IPC_PROTOCOL(&received_protocol);
+                                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
                                 return FAILURE;
                             } else {
+                                remote_wot = oudp_datao->local_wot;
+                                remote_index = oudp_datao->local_index;
+                                remote_session_index = oudp_datao->local_session_index;
                                 LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
                                 CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
                             }
                             orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
                             orilink_hello1_t *ohello1 = received_orilink_protocol->payload.orilink_hello1;
-                            memcpy(security->kem_publickey, ohello1->publickey1, KEM_PUBLICKEY_BYTES / 2);
-                            
-                            printf("[Debug Here Helper]: OK\n");
-                            
+                            uint64_t remote_id = ohello1->local_id;
+                            uint8_t kem_publickey[KEM_PUBLICKEY_BYTES / 2];
+                            memset(kem_publickey, 0, KEM_PUBLICKEY_BYTES / 2);
+                            memcpy(kem_publickey, ohello1->publickey1, KEM_PUBLICKEY_BYTES / 2);
+                            orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello1_ack(
+                                worker_ctx->label,
+                                0x01,
+                                remote_wot,
+                                remote_index,
+                                remote_session_index,
+                                identity->local_wot,
+                                identity->local_index,
+                                identity->local_session_index,
+                                remote_id,
+                                session->hello1_ack.ack_sent_try_count
+                            );
+                            if (orilink_cmd_result.status != SUCCESS) {
+                                CLOSE_IPC_PROTOCOL(&received_protocol);
+                                CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+                                return FAILURE;
+                            }
+                            puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
+                                worker_ctx->label,
+                                security->aes_key,
+                                security->mac_key,
+                                security->local_nonce,
+                                &security->local_ctr,
+                                orilink_cmd_result.r_orilink_protocol_t
+                            );
+                            if (udp_data.status != SUCCESS) {
+                                CLOSE_IPC_PROTOCOL(&received_protocol);
+                                CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+                                CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+                                return FAILURE;
+                            }
+//----------------------------------------------------------------------
+// Here Below:
+// create ipc_udp_data_t and send it to the master via IPC
+//----------------------------------------------------------------------
+                            ipc_protocol_t_status_t ipc_cmd_result = ipc_prepare_cmd_udp_data(
+                                worker_ctx->label,
+                                identity->local_wot,
+                                identity->local_index,
+//----------------------------------------------------------------------
+// Master don't have session_index
+//----------------------------------------------------------------------
+                                0xff,
+//----------------------------------------------------------------------
+                                &remote_addr,
+                                udp_data.r_size_t,
+                                udp_data.r_puint8_t
+                            );
+                            if (ipc_cmd_result.status != SUCCESS) {
+                                CLOSE_IPC_PROTOCOL(&received_protocol);
+                                CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+                                CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+                                return FAILURE;
+                            }
+                            ssize_t_status_t send_result = send_ipc_protocol_message(
+                                worker_ctx->label,
+                                worker_ctx->aes_key,
+                                worker_ctx->mac_key,
+                                worker_ctx->local_nonce,
+                                &worker_ctx->local_ctr,
+                                worker_ctx->master_uds_fd, 
+                                ipc_cmd_result.r_ipc_protocol_t
+                            );
+                            if (send_result.status != SUCCESS) {
+                                LOG_ERROR("%sFailed to sent udp_data to Master.", worker_ctx->label);
+                                CLOSE_IPC_PROTOCOL(&received_protocol);
+                                CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+                                CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+                                CLOSE_IPC_PROTOCOL(&ipc_cmd_result.r_ipc_protocol_t);
+                                return send_result.status;
+                            } else {
+                                LOG_DEBUG("%sSent udp_data to Master.", worker_ctx->label);
+                            }
+                            CLOSE_IPC_PROTOCOL(&ipc_cmd_result.r_ipc_protocol_t);
+//----------------------------------------------------------------------
+                            session->hello1_ack.len = udp_data.r_size_t;
+                            session->hello1_ack.data = (uint8_t *)calloc(1, udp_data.r_size_t);
+                            memcpy(session->hello1_ack.data, udp_data.r_puint8_t, session->hello1_ack.len);
+                            free(udp_data.r_puint8_t);
+                            udp_data.r_puint8_t = NULL;
+                            udp_data.r_size_t = 0;
+                            CLOSE_IPC_PROTOCOL(&received_protocol);
+//----------------------------------------------------------------------                            
+                            memcpy(&identity->remote_addr, &remote_addr, sizeof(struct sockaddr_in6));
+                            identity->remote_wot = remote_wot;
+                            identity->remote_index = remote_index;
+                            identity->remote_session_index = remote_session_index;
+                            identity->remote_id = remote_id;
+                            memcpy(security->kem_publickey, kem_publickey, KEM_PUBLICKEY_BYTES / 2);
                             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
                             break;
                         }
@@ -480,6 +583,44 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
 // UDP Data From Remote SIO
 //----------------------------------------------------------------------
                 case SIO: {
+                    uint16_t slot_found = iudp_datai->session_index;
+                    cow_c_session_t *cow_c_session = (cow_c_session_t *)worker_sessions;
+                    cow_c_session_t *session = &cow_c_session[slot_found];
+                    //orilink_identity_t *identity = &session->identity;
+                    orilink_security_t *security = &session->security;
+//----------------------------------------------------------------------
+                    struct sockaddr_in6 remote_addr;
+                    memcpy(&remote_addr, &iudp_datai->remote_addr, sizeof(struct sockaddr_in6));
+//----------------------------------------------------------------------
+                    orilink_raw_protocol_t *oudp_datao = (orilink_raw_protocol_t*)calloc(1, sizeof(orilink_raw_protocol_t));
+                    if (!oudp_datao) {
+                        LOG_ERROR("%sFailed to allocate orilink_raw_protocol_t. %s", worker_ctx->label, strerror(errno));
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        return FAILURE_NOMEM;
+                    }
+                    if (udp_data_to_orilink_raw_protocol_packet(worker_ctx->label, iudp_datai, oudp_datao) != SUCCESS) {
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                        return FAILURE;
+                    }
+                    if (orilink_check_mac_ctr(
+                            worker_ctx->label, 
+                            security->aes_key, 
+                            security->mac_key, 
+                            &security->remote_ctr, 
+                            oudp_datao
+                        ) != SUCCESS
+                    )
+                    {
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                        return FAILURE;
+                    }
+                    switch (oudp_datao->type) {
+                        default:
+                            LOG_ERROR("%sUnknown ORILINK protocol type %d from Remote SIO. Ignoring.", worker_ctx->label, oudp_datao->type);
+                            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                    }
                     break;
                 }
 //----------------------------------------------------------------------
