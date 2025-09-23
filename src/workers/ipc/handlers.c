@@ -1866,6 +1866,9 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                             CLOSE_IPC_PROTOCOL(&received_protocol);
 //----------------------------------------------------------------------
                             memcpy(&identity->remote_addr, &remote_addr, sizeof(struct sockaddr_in6));
+                            memcpy(security->aes_key, aes_key, HASHES_BYTES);
+                            security->remote_ctr = remote_ctr;
+                            memset(aes_key, 0, HASHES_BYTES);
                             identity->remote_wot = remote_wot;
                             identity->remote_index = remote_index;
                             identity->remote_session_index = remote_session_index;
