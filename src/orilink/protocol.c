@@ -1085,32 +1085,37 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
     return result;
 }
 
-void udp_data_to_orilink_raw_protocol_packet(ipc_udp_data_t *iudp_datai, orilink_raw_protocol_t *oudp_datao) {
-    oudp_datao->recv_buffer = iudp_datai->data;
+status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data_t *iudp_datai, orilink_raw_protocol_t *oudp_datao) {
+    oudp_datao->recv_buffer = (uint8_t *)calloc(1, iudp_datai->len);
+    if (!oudp_datao->recv_buffer) {
+        LOG_ERROR("%sFailed to allocate orilink_raw_protocol_t buffer. %s", label, strerror(errno));
+        return FAILURE_NOMEM;
+    }
+    memcpy(oudp_datao->recv_buffer, iudp_datai->data, iudp_datai->len);
     oudp_datao->n = iudp_datai->len;
-    memcpy(oudp_datao->mac, iudp_datai->data, AES_TAG_BYTES);
+    memcpy(oudp_datao->mac, oudp_datao->recv_buffer, AES_TAG_BYTES);
     uint32_t ctr_be;
     memcpy(&ctr_be,
-        iudp_datai->data + 
+        oudp_datao->recv_buffer + 
         AES_TAG_BYTES,
         sizeof(uint32_t)
     );
     oudp_datao->ctr = be32toh(ctr_be);
     memcpy(oudp_datao->version,
-        iudp_datai->data + 
+        oudp_datao->recv_buffer + 
         AES_TAG_BYTES + 
         sizeof(uint32_t), 
         ORILINK_VERSION_BYTES
     );
     memcpy((uint8_t *)&oudp_datao->inc_ctr,
-        iudp_datai->data +
+        oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
         ORILINK_VERSION_BYTES,
         sizeof(uint8_t)
     );
     memcpy((uint8_t *)&oudp_datao->remote_wot,
-        iudp_datai->data +
+        oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
         ORILINK_VERSION_BYTES +
@@ -1118,7 +1123,7 @@ void udp_data_to_orilink_raw_protocol_packet(ipc_udp_data_t *iudp_datai, orilink
         sizeof(uint8_t)
     );
     memcpy((uint8_t *)&oudp_datao->remote_index,
-        iudp_datai->data +
+        oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
         ORILINK_VERSION_BYTES +
@@ -1127,7 +1132,7 @@ void udp_data_to_orilink_raw_protocol_packet(ipc_udp_data_t *iudp_datai, orilink
         sizeof(uint8_t)
     );
     memcpy((uint8_t *)&oudp_datao->remote_session_index,
-        iudp_datai->data +
+        oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
         ORILINK_VERSION_BYTES +
@@ -1137,7 +1142,7 @@ void udp_data_to_orilink_raw_protocol_packet(ipc_udp_data_t *iudp_datai, orilink
         sizeof(uint8_t)
     );
     memcpy((uint8_t *)&oudp_datao->local_wot,
-        iudp_datai->data +
+        oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
         ORILINK_VERSION_BYTES +
@@ -1148,7 +1153,7 @@ void udp_data_to_orilink_raw_protocol_packet(ipc_udp_data_t *iudp_datai, orilink
         sizeof(uint8_t)
     );
     memcpy((uint8_t *)&oudp_datao->local_index,
-        iudp_datai->data +
+        oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
         ORILINK_VERSION_BYTES +
@@ -1160,7 +1165,7 @@ void udp_data_to_orilink_raw_protocol_packet(ipc_udp_data_t *iudp_datai, orilink
         sizeof(uint8_t)
     );
     memcpy((uint8_t *)&oudp_datao->local_session_index,
-        iudp_datai->data +
+        oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
         ORILINK_VERSION_BYTES +
@@ -1173,7 +1178,7 @@ void udp_data_to_orilink_raw_protocol_packet(ipc_udp_data_t *iudp_datai, orilink
         sizeof(uint8_t)
     );
     memcpy((uint8_t *)&oudp_datao->type,
-        iudp_datai->data +
+        oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
         ORILINK_VERSION_BYTES +
@@ -1186,4 +1191,5 @@ void udp_data_to_orilink_raw_protocol_packet(ipc_udp_data_t *iudp_datai, orilink
         sizeof(uint8_t),
         sizeof(uint8_t)
     );
+    return SUCCESS;
 }

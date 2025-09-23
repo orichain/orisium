@@ -5,6 +5,7 @@
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -419,13 +420,60 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                     sio_c_session_t *sio_c_session = (sio_c_session_t *)worker_sessions;
                     sio_c_session_t *session = &sio_c_session[slot_found];
                     orilink_identity_t *identity = &session->identity;
-                    //orilink_security_t *security = &session->security;
+                    orilink_security_t *security = &session->security;
                     memcpy(&identity->remote_addr, &iudp_datai->remote_addr, sizeof(struct sockaddr_in6));
-                    orilink_raw_protocol_t oudp_datao;
-                    udp_data_to_orilink_raw_protocol_packet(iudp_datai, &oudp_datao);
-                    
-                    printf("[Debug Here Helper]: OK\n");
-                    
+                    orilink_raw_protocol_t *oudp_datao = (orilink_raw_protocol_t*)calloc(1, sizeof(orilink_raw_protocol_t));
+                    if (!oudp_datao) {
+                        LOG_ERROR("%sFailed to allocate orilink_raw_protocol_t. %s", worker_ctx->label, strerror(errno));
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        return FAILURE_NOMEM;
+                    }
+                    if (udp_data_to_orilink_raw_protocol_packet(worker_ctx->label, iudp_datai, oudp_datao) != SUCCESS) {
+                        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        return FAILURE;
+                    }
+                    if (orilink_check_mac_ctr(
+                            worker_ctx->label, 
+                            security->aes_key, 
+                            security->mac_key, 
+                            &security->remote_ctr, 
+                            oudp_datao
+                        ) != SUCCESS
+                    )
+                    {
+                        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                        CLOSE_IPC_PROTOCOL(&received_protocol);
+                        return FAILURE;
+                    }
+                    switch (oudp_datao->type) {
+                        case ORILINK_HELLO1: {
+                            orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
+                                security->aes_key, security->remote_nonce, &security->remote_ctr,
+                                (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n
+                            );
+                            if (deserialized_oudp_datao.status != SUCCESS) {
+                                LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
+                                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                                CLOSE_IPC_PROTOCOL(&received_protocol);
+                                return FAILURE;
+                            } else {
+                                LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
+                                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                            }
+                            orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
+                            orilink_hello1_t *ohello1 = received_orilink_protocol->payload.orilink_hello1;
+                            memcpy(security->kem_publickey, ohello1->publickey1, KEM_PUBLICKEY_BYTES / 2);
+                            
+                            printf("[Debug Here Helper]: OK\n");
+                            
+                            CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+                            break;
+                        }
+                        default:
+                            LOG_ERROR("%sUnknown ORILINK protocol type %d from Remote COW. Ignoring.", worker_ctx->label, oudp_datao->type);
+                            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                    }
                     break;
                 }
 //----------------------------------------------------------------------
