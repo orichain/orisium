@@ -116,13 +116,11 @@ typedef struct {
 typedef struct {
 	int sio_index;
     bool in_use;
-    orilink_identity_t identity;
 } master_sio_c_session_t;
 
 typedef struct {
 	int cow_index;
     bool in_use;
-    orilink_identity_t identity;
 } master_cow_c_session_t;
 
 typedef struct {

@@ -42,7 +42,6 @@ static inline void setup_hello(hello_t *h) {
 }
 
 static inline status_t setup_cow_session(const char *label, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
-    single_session->in_use = false;
     setup_hello(&single_session->hello1);
     setup_hello(&single_session->hello2);
     setup_hello(&single_session->hello3);
@@ -76,7 +75,6 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
 }
 
 static inline void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session) {
-    single_session->in_use = false;
     cleanup_hello(label, cow_async, &single_session->hello1);
     cleanup_hello(label, cow_async, &single_session->hello2);
     cleanup_hello(label, cow_async, &single_session->hello3);
@@ -116,9 +114,7 @@ static inline void cleanup_cow_worker(worker_context_t *worker_ctx, cow_c_sessio
     for (uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
         cow_c_session_t *single_session;
         single_session = &sessions[i];
-        if (single_session->in_use) {
-            cleanup_cow_session(worker_ctx->label, &worker_ctx->async, single_session);
-        }
+        cleanup_cow_session(worker_ctx->label, &worker_ctx->async, single_session);
     }
 	cleanup_worker(worker_ctx);
 }

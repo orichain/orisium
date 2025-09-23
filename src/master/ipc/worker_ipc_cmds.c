@@ -84,8 +84,8 @@ status_t master_workers_info(const char *label, master_context_t *master_ctx, in
 	return SUCCESS;
 }
 
-status_t master_cow_connect(const char *label, master_context_t *master_ctx, struct sockaddr_in6 *addr, uint8_t index) {
-	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_cow_connect(label, COW, index, addr);
+status_t master_cow_connect(const char *label, master_context_t *master_ctx, struct sockaddr_in6 *addr, uint8_t index, uint8_t session_index) {
+	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_cow_connect(label, COW, index, session_index, addr);
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }

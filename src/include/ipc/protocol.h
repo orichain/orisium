@@ -29,7 +29,8 @@ typedef struct {
 //----------------------------------------------------------------------
 } ipc_cow_master_udp_t;
 
-typedef struct {  
+typedef struct {
+    uint8_t session_index;
     struct sockaddr_in6 remote_addr;
 } ipc_master_cow_connect_t;
 

@@ -339,17 +339,16 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                         master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                         continue;
                                     }
-                                    int slot_found = -1;
-                                    for(int i = 0; i < MAX_MASTER_COW_SESSIONS; ++i) {
-                                        if(!master_ctx->cow_c_session[i].in_use) {
-                                            master_ctx->cow_c_session[i].cow_index = cow_worker_idx;
-                                            master_ctx->cow_c_session[i].in_use = true;
-                                            //memcpy(&master_ctx->cow_c_session[i].server_addr, &master_ctx->bootstrap_nodes.addr[ic], sizeof(struct sockaddr_in6));
+                                    uint8_t slot_found = 0xff;
+                                    for(uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
+                                        if(!master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].in_use) {
+                                            master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].cow_index = cow_worker_idx;
+                                            master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].in_use = true;
                                             slot_found = i;
                                             break;
                                         }
                                     }
-                                    if (slot_found == -1) {
+                                    if (slot_found == 0xff) {
                                         LOG_ERROR("%sWARNING: No free session slots in master_ctx->cow_c_session. Initiating graceful shutdown...", label);
                                         master_ctx->shutdown_requested = 1;
                                         master_workers_info(label, master_ctx, IT_SHUTDOWN);
@@ -361,7 +360,7 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                         master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                         continue;
                                     }
-                                    if (master_cow_connect(label, master_ctx, &master_ctx->bootstrap_nodes.addr[ic], cow_worker_idx) != SUCCESS) goto exit;
+                                    if (master_cow_connect(label, master_ctx, &master_ctx->bootstrap_nodes.addr[ic], cow_worker_idx, slot_found) != SUCCESS) goto exit;
                                 }
                                 if (setup_master_socket_udp(label, master_ctx) != SUCCESS) {
                                     LOG_ERROR("%sFailed to setup_master_socket_udp. Initiating graceful shutdown...", label);

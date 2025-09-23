@@ -311,25 +311,13 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
             }           
             ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
             ipc_master_cow_connect_t *icow_connecti = received_protocol->payload.ipc_master_cow_connect;            
-//----------------------------------------------------------------------            
+//----------------------------------------------------------------------
+            uint16_t slot_found = icow_connecti->session_index;
             cow_c_session_t *cow_c_session = (cow_c_session_t *)worker_sessions;
-            int slot_found = -1;
-            for (uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
-                if (!cow_c_session[i].in_use) {
-                    cow_c_session[i].in_use = true;
-                    memcpy(&cow_c_session[i].identity.remote_addr, &icow_connecti->remote_addr, sizeof(struct sockaddr_in6));
-                    slot_found = i;
-                    break;
-                }
-            }
-            if (slot_found == -1) {
-                LOG_ERROR("%sNO SLOT.", worker_ctx->label);
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                return FAILURE;
-            }
             cow_c_session_t *session = &cow_c_session[slot_found];
-            orilink_identity_t *identity = &cow_c_session[slot_found].identity;
-            orilink_security_t *security = &cow_c_session[slot_found].security;
+            orilink_identity_t *identity = &session->identity;
+            orilink_security_t *security = &session->security;
+            memcpy(&identity->remote_addr, &icow_connecti->remote_addr, sizeof(struct sockaddr_in6));
             orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello1(
                 worker_ctx->label,
                 0x01,
