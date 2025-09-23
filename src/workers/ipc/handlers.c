@@ -15,7 +15,7 @@
 #include "workers/workers.h"
 #include "workers/ipc/handlers.h"
 #include "workers/ipc/master_ipc_cmds.h"
-#include "ipc/cow_master_udp.h"
+#include "ipc/udp_data.h"
 #include "pqc.h"
 #include "poly1305-donna.h"
 #include "aes.h"
@@ -351,12 +351,17 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
             memcpy(session->hello1.data, data.r_puint8_t, session->hello1.len);
 //----------------------------------------------------------------------
 // Here Below:
-// create ipc_cow_master_udp_t and send it to the master via IPC
+// create ipc_udp_data_t and send it to the master via IPC
 //----------------------------------------------------------------------
-            ipc_protocol_t_status_t ipc_cmd_result = ipc_prepare_cmd_cow_master_udp(
+            ipc_protocol_t_status_t ipc_cmd_result = ipc_prepare_cmd_udp_data(
                 worker_ctx->label,
                 identity->local_wot,
                 identity->local_index,
+//----------------------------------------------------------------------
+// Master don't have session_index
+//----------------------------------------------------------------------
+                0xff,
+//----------------------------------------------------------------------
                 &identity->remote_addr,
                 session->hello1.len,
                 session->hello1.data
@@ -374,11 +379,11 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                 ipc_cmd_result.r_ipc_protocol_t
             );
             if (send_result.status != SUCCESS) {
-                LOG_ERROR("%sFailed to sent cow_master_udp to Master.", worker_ctx->label);
+                LOG_ERROR("%sFailed to sent udp_data to Master.", worker_ctx->label);
                 CLOSE_IPC_PROTOCOL(&ipc_cmd_result.r_ipc_protocol_t);
                 return send_result.status;
             } else {
-                LOG_DEBUG("%sSent cow_master_udp to Master.", worker_ctx->label);
+                LOG_DEBUG("%sSent udp_data to Master.", worker_ctx->label);
             }
             CLOSE_IPC_PROTOCOL(&ipc_cmd_result.r_ipc_protocol_t);
 //----------------------------------------------------------------------

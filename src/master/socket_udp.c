@@ -5,7 +5,6 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include <stdio.h>
 #include <stdint.h>
 
 #include "log.h"
@@ -18,6 +17,8 @@
 #include "master/worker_selector.h"
 #include "constants.h"
 #include "stdbool.h"
+#include "ipc/protocol.h"
+#include "ipc/udp_data.h"
 
 status_t setup_master_socket_udp(const char *label, master_context_t *master_ctx) {
     struct sockaddr_in6 addr;
@@ -54,17 +55,17 @@ status_t setup_master_socket_udp(const char *label, master_context_t *master_ctx
 }
 
 status_t handle_master_udp_sock_event(const char *label, master_context_t *master_ctx) {
-    struct sockaddr_in6 client_addr;
+    struct sockaddr_in6 remote_addr;
 	char host_str[NI_MAXHOST];
     char port_str[NI_MAXSERV];
     
     orilink_raw_protocol_t_status_t orcvdo = receive_orilink_raw_protocol_packet(
         label,
         &master_ctx->udp_sock,
-        &client_addr
+        &remote_addr
     );
     if (orcvdo.status != SUCCESS) return orcvdo.status;
-    int getname_res = getnameinfo((struct sockaddr *)&client_addr, sizeof(struct sockaddr_in6),
+    int getname_res = getnameinfo((struct sockaddr *)&remote_addr, sizeof(struct sockaddr_in6),
 						host_str, NI_MAXHOST,
 					  	port_str, NI_MAXSERV,
 					  	NI_NUMERICHOST | NI_NUMERICSERV
@@ -105,20 +106,50 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                 }
             }
             if (slot_found == 0xff) {
-                LOG_ERROR("%sWARNING: No free session slots in master_ctx->sio_c_session.", label);
+                LOG_ERROR("%sWARNING: No free session slots in sio-%d sessions.", label, sio_worker_idx);
                 CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 return FAILURE;
             }
-            if (new_task_metrics(label, master_ctx, COW, sio_worker_idx) != SUCCESS) {
+            if (new_task_metrics(label, master_ctx, SIO, sio_worker_idx) != SUCCESS) {
                 LOG_ERROR("%sFailed to input new task in COW %d metrics.", label, sio_worker_idx);
                 CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 return FAILURE;
             }
-//----------------------------------------------------------------------            
 //----------------------------------------------------------------------
-            printf("[Debug Here Helper]: SIO Index: %d, Session Index: %d.\n", sio_worker_idx, slot_found);
-            //if (master_sio_serve(label, master_ctx, &master_ctx->bootstrap_nodes.addr[ic], sio_worker_idx, slot_found) != SUCCESS) goto exit;
+// Here Below:
+// create ipc_udp_data_t and send it to the SIO via IPC
 //----------------------------------------------------------------------
+            ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data(
+                label,
+                orcvdo.r_orilink_raw_protocol_t->local_wot,
+                orcvdo.r_orilink_raw_protocol_t->local_index,
+                slot_found,
+                &remote_addr,
+                orcvdo.r_orilink_raw_protocol_t->n,
+                orcvdo.r_orilink_raw_protocol_t->recv_buffer
+            );
+            if (cmd_result.status != SUCCESS) {
+                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                return FAILURE;
+            }
+            ssize_t_status_t send_result = send_ipc_protocol_message(
+                label, 
+                master_ctx->sio_session[sio_worker_idx].security.aes_key,
+                master_ctx->sio_session[sio_worker_idx].security.mac_key,
+                master_ctx->sio_session[sio_worker_idx].security.local_nonce,
+                &master_ctx->sio_session[sio_worker_idx].security.local_ctr,
+                &master_ctx->sio_session[sio_worker_idx].upp.uds[0], 
+                cmd_result.r_ipc_protocol_t
+            );
+            if (send_result.status != SUCCESS) {
+                LOG_ERROR("%sFailed to sent udp_data to SIO.", label);
+                CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                return send_result.status;
+            } else {
+                LOG_DEBUG("%sSent udp_data to SIO.", label);
+            }
+            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
             CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
 			break;
 		}

@@ -423,7 +423,7 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
             CLOSE_IPC_PROTOCOL(&received_protocol);
 			break;
 		}
-        case IPC_COW_MASTER_UDP: {
+        case IPC_UDP_DATA: {
             ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
                 security->aes_key, security->remote_nonce, &security->remote_ctr,
                 (uint8_t*)ircvdi.r_ipc_raw_protocol_t->recv_buffer, ircvdi.r_ipc_raw_protocol_t->n
@@ -437,7 +437,7 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
                 CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
             }           
             ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
-            ipc_cow_master_udp_t *iudpi = received_protocol->payload.ipc_cow_master_udp;
+            ipc_udp_data_t *iudpi = received_protocol->payload.ipc_udp_data;
             puint8_t_size_t_status_t orpp;
             orpp.status = SUCCESS;
             orpp.r_size_t = iudpi->len;

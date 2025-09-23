@@ -349,7 +349,7 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                         }
                                     }
                                     if (slot_found == 0xff) {
-                                        LOG_ERROR("%sWARNING: No free session slots in master_ctx->cow_c_session. Initiating graceful shutdown...", label);
+                                        LOG_ERROR("%sWARNING: No free session slots in cow-%d sessions. Initiating graceful shutdown...", label, cow_worker_idx);
                                         master_ctx->shutdown_requested = 1;
                                         master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                         continue;
