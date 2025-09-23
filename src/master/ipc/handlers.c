@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <endian.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "log.h"
 #include "constants.h"
@@ -16,6 +17,7 @@
 #include "pqc.h"
 #include "poly1305-donna.h"
 #include "aes.h"
+#include "orilink/protocol.h"
 
 worker_type_t_status_t handle_master_ipc_closed_event(const char *label, master_context_t *master_ctx, int *current_fd) {
 	worker_type_t_status_t result;
@@ -436,7 +438,6 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
             }           
             ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
             ipc_cow_master_udp_t *iudpi = received_protocol->payload.ipc_cow_master_udp;
-            
             puint8_t_size_t_status_t orpp;
             orpp.status = SUCCESS;
             orpp.r_size_t = iudpi->len;

@@ -2,10 +2,8 @@
 #include <string.h>
 #include <stdbool.h>
 #include <endian.h>
-#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stdio.h>
-#include <sys/socket.h>
 #include <stdlib.h>
 
 #include "log.h"
@@ -363,10 +361,9 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
             session->hello1.len = data.r_size_t;
             session->hello1.data = (uint8_t *)calloc(1, data.r_size_t);
             memcpy(session->hello1.data, data.r_puint8_t, session->hello1.len);
-//------------------------------------------------------------------------------------
+//----------------------------------------------------------------------
 // Here Below:
-// create ipc_cow_master_udp_t and send it to the master via IPC without encryption
-// encryption has already been done in orilink_prepare_cmd_hello1
+// create ipc_cow_master_udp_t and send it to the master via IPC
 //----------------------------------------------------------------------
             ipc_protocol_t_status_t ipc_cmd_result = ipc_prepare_cmd_cow_master_udp(
                 worker_ctx->label,
@@ -381,11 +378,7 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
             }
             ssize_t_status_t send_result = send_ipc_protocol_message(
                 worker_ctx->label,
-//------------------------------------------------------------------------------------
-// Set AES KEY = NULL for IPC without encryption
-//------------------------------------------------------------------------------------
-                NULL,
-//------------------------------------------------------------------------------------
+                worker_ctx->aes_key,
                 worker_ctx->mac_key,
                 worker_ctx->local_nonce,
                 &worker_ctx->local_ctr,
