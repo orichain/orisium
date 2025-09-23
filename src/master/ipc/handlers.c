@@ -186,16 +186,16 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
 //----------------------------------------------------------------------
             memcpy(security->kem_sharedsecret, kem_sharedsecret, KEM_SHAREDSECRET_BYTES);
             memset(kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
-            uint8_t tmp_aes_key[HASHES_BYTES];
-            kdf1(security->kem_sharedsecret, tmp_aes_key);
+            uint8_t aes_key[HASHES_BYTES];
+            kdf1(security->kem_sharedsecret, aes_key);
 //----------------------------------------------------------------------
 // Di workers
 // 1. HELLO2 harus sudah pakai mac_key baru
 // 2. HELLO2 harus masih memakai aes_key lama
 //----------------------------------------------------------------------
-            kdf2(tmp_aes_key, security->mac_key);
+            kdf2(aes_key, security->mac_key);
 //----------------------------------------------------------------------
-            memset(tmp_aes_key, 0, HASHES_BYTES);
+            memset(aes_key, 0, HASHES_BYTES);
 //----------------------------------------------------------------------
             security->hello1_rcvd = true;
             CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -235,8 +235,8 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
 // Cocokkan MAc
 // Decrypt wot dan index
 //======================================================================
-            uint8_t tmp_remote_nonce[AES_NONCE_BYTES];
-            memcpy(tmp_remote_nonce, ihello2i->encrypted_wot_index, AES_NONCE_BYTES);
+            uint8_t remote_nonce[AES_NONCE_BYTES];
+            memcpy(remote_nonce, ihello2i->encrypted_wot_index, AES_NONCE_BYTES);
             uint8_t encrypted_wot_index[sizeof(uint8_t) + sizeof(uint8_t)];   
             memcpy(encrypted_wot_index, ihello2i->encrypted_wot_index + AES_NONCE_BYTES, sizeof(uint8_t) + sizeof(uint8_t));
             uint8_t data_mac[AES_TAG_BYTES];
@@ -270,7 +270,7 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
 //=========================================IV===========================    
             uint8_t keystream_buffer[sizeof(uint8_t) + sizeof(uint8_t)];
             uint8_t iv[AES_IV_BYTES];
-            memcpy(iv, tmp_remote_nonce, AES_NONCE_BYTES);
+            memcpy(iv, remote_nonce, AES_NONCE_BYTES);
             uint32_t remote_ctr_be = htobe32(security->remote_ctr);
             memcpy(iv + AES_NONCE_BYTES, &remote_ctr_be, sizeof(uint32_t));
 //=========================================IV===========================    
@@ -301,8 +301,8 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
-            memcpy(security->remote_nonce, tmp_remote_nonce, AES_NONCE_BYTES);
-            memset (tmp_remote_nonce, 0, AES_NONCE_BYTES);
+            memcpy(security->remote_nonce, remote_nonce, AES_NONCE_BYTES);
+            memset(remote_nonce, 0, AES_NONCE_BYTES);
             security->remote_ctr = (uint32_t)0;
 //----------------------------------------------------------------------
 // Menganggap data valid dengan integritas

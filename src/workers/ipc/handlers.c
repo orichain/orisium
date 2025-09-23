@@ -222,8 +222,8 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
 //----------------------------------------------------------------------
 // Tmp aes_key
 //----------------------------------------------------------------------
-            uint8_t tmp_aes_key[HASHES_BYTES];
-            kdf1(worker_ctx->kem_sharedsecret, tmp_aes_key);
+            uint8_t aes_key[HASHES_BYTES];
+            kdf1(worker_ctx->kem_sharedsecret, aes_key);
 //----------------------------------------------------------------------
 // cek Mac
 //----------------------------------------------------------------------  
@@ -242,7 +242,7 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
 //---------------------------------------------------------------------- 
             uint8_t decrypted_wot_index[sizeof(uint8_t) + sizeof(uint8_t)];
             aes256ctx aes_ctx;
-            aes256_ctr_keyexp(&aes_ctx, tmp_aes_key);
+            aes256_ctr_keyexp(&aes_ctx, aes_key);
 //=========================================IV===========================    
             uint8_t keystream_buffer[sizeof(uint8_t) + sizeof(uint8_t)];
             uint8_t iv[AES_IV_BYTES];
@@ -296,8 +296,8 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
 //----------------------------------------------------------------------
 // Menganggap data valid dengan integritas
 //---------------------------------------------------------------------- 
-            memcpy(worker_ctx->aes_key, tmp_aes_key, HASHES_BYTES);
-            memset(tmp_aes_key, 0, HASHES_BYTES);
+            memcpy(worker_ctx->aes_key, aes_key, HASHES_BYTES);
+            memset(aes_key, 0, HASHES_BYTES);
             worker_ctx->remote_ctr = (uint32_t)0;
             worker_ctx->hello2_ack_rcvd = true;
 //---------------------------------------------------------------------- 
@@ -485,7 +485,6 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                             orilink_hello1_t *ohello1 = received_orilink_protocol->payload.orilink_hello1;
                             uint64_t remote_id = ohello1->local_id;
                             uint8_t kem_publickey[KEM_PUBLICKEY_BYTES / 2];
-                            memset(kem_publickey, 0, KEM_PUBLICKEY_BYTES / 2);
                             memcpy(kem_publickey, ohello1->publickey1, KEM_PUBLICKEY_BYTES / 2);
                             orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello1_ack(
                                 worker_ctx->label,
@@ -606,9 +605,6 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                             uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
                             uint8_t kem_ciphertext[KEM_CIPHERTEXT_BYTES];
                             uint8_t kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
-                            memset(kem_publickey, 0, KEM_PUBLICKEY_BYTES);
-                            memset(kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
-                            memset(kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
                             memcpy(kem_publickey, security->kem_publickey, KEM_PUBLICKEY_BYTES / 2);
                             memcpy(kem_publickey + (KEM_PUBLICKEY_BYTES / 2), ohello2->publickey2, KEM_PUBLICKEY_BYTES / 2);
                             if (KEM_ENCODE_SHAREDSECRET(
@@ -744,7 +740,6 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                             orilink_hello3_t *ohello3 = received_orilink_protocol->payload.orilink_hello3;
                             uint64_t remote_id = ohello3->local_id;
                             uint8_t local_nonce[AES_NONCE_BYTES];
-                            memset(local_nonce, 0, AES_NONCE_BYTES);
                             if (generate_nonce(worker_ctx->label, local_nonce) != SUCCESS) {
                                 LOG_ERROR("%sFailed to generate_nonce.", worker_ctx->label);
                                 CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -900,7 +895,6 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
 // Temporary Key
 //----------------------------------------------------------------------
                             uint8_t aes_key[HASHES_BYTES];
-                            memset(aes_key, 0, HASHES_BYTES);
                             kdf1(security->kem_sharedsecret, aes_key);
 //----------------------------------------------------------------------
 // cek Mac
@@ -1360,7 +1354,6 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                             orilink_hello2_ack_t *ohello2_ack = received_orilink_protocol->payload.orilink_hello2_ack;
                             uint64_t local_id = ohello2_ack->remote_id;
                             uint8_t kem_ciphertext[KEM_CIPHERTEXT_BYTES / 2];
-                            memset(kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES / 2);
                             memcpy(kem_ciphertext, ohello2_ack->ciphertext1, KEM_CIPHERTEXT_BYTES / 2);
                             orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello3(
                                 worker_ctx->label,
@@ -1485,12 +1478,6 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                             uint8_t mac_key[HASHES_BYTES];
                             uint8_t local_nonce[AES_NONCE_BYTES];
                             uint32_t local_ctr = (uint32_t)0;
-                            memset(remote_nonce, 0, AES_NONCE_BYTES);
-                            memset(kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
-                            memset(kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
-                            memset(aes_key, 0, HASHES_BYTES);
-                            memset(mac_key, 0, HASHES_BYTES);
-                            memset(local_nonce, 0, AES_NONCE_BYTES);
                             memcpy(remote_nonce, ohello3_ack->nonce, AES_NONCE_BYTES);
                             memcpy(kem_ciphertext, security->kem_ciphertext, KEM_CIPHERTEXT_BYTES / 2);
                             memcpy(kem_ciphertext + (KEM_CIPHERTEXT_BYTES / 2), ohello3_ack->ciphertext2, KEM_CIPHERTEXT_BYTES / 2);

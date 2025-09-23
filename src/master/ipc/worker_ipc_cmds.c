@@ -143,8 +143,8 @@ status_t master_worker_hello1_ack(const char *label, master_context_t *master_ct
         return FAILURE;
     }
     if (!security || !kem_ciphertext || *worker_uds_fd == -1) return FAILURE;
-    uint8_t tmp_local_nonce[AES_NONCE_BYTES];
-    if (generate_nonce(label, tmp_local_nonce) != SUCCESS) {
+    uint8_t local_nonce[AES_NONCE_BYTES];
+    if (generate_nonce(label, local_nonce) != SUCCESS) {
         LOG_ERROR("%sFailed to generate_nonce.", label);
         return FAILURE;
     }
@@ -152,7 +152,7 @@ status_t master_worker_hello1_ack(const char *label, master_context_t *master_ct
         label, 
         wot, 
         index, 
-        tmp_local_nonce,
+        local_nonce,
         kem_ciphertext
     );
     if (cmd_result.status != SUCCESS) {
@@ -174,8 +174,8 @@ status_t master_worker_hello1_ack(const char *label, master_context_t *master_ct
     } else {
         LOG_DEBUG("%sSent master_worker_hello1_ack to %s %ld.", label, worker_name, index);
     }
-    memcpy(security->local_nonce, tmp_local_nonce, AES_NONCE_BYTES);
-    memset(tmp_local_nonce, 0, AES_NONCE_BYTES);
+    memcpy(security->local_nonce, local_nonce, AES_NONCE_BYTES);
+    memset(local_nonce, 0, AES_NONCE_BYTES);
     security->hello1_ack_sent = true;
     CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t); 
 	return SUCCESS;
@@ -217,11 +217,11 @@ status_t master_worker_hello2_ack(const char *label, master_context_t *master_ct
 //----------------------------------------------------------------------
 // Tmp aes_key
 //----------------------------------------------------------------------
-    uint8_t tmp_aes_key[HASHES_BYTES];
-    kdf1(security->kem_sharedsecret, tmp_aes_key);
+    uint8_t aes_key[HASHES_BYTES];
+    kdf1(security->kem_sharedsecret, aes_key);
 //======================================================================    
     aes256ctx aes_ctx;
-    aes256_ctr_keyexp(&aes_ctx, tmp_aes_key);
+    aes256_ctr_keyexp(&aes_ctx, aes_key);
 //=========================================IV===========================    
     uint8_t keystream_buffer[sizeof(uint8_t) + sizeof(uint8_t)];
     uint8_t iv[AES_IV_BYTES];
@@ -269,8 +269,8 @@ status_t master_worker_hello2_ack(const char *label, master_context_t *master_ct
     } else {
         LOG_DEBUG("%sSent master_worker_hello2_ack to %s %ld.", label, worker_name, index);
     }
-    memcpy(security->aes_key, tmp_aes_key, HASHES_BYTES);
-    memset (tmp_aes_key, 0, HASHES_BYTES);
+    memcpy(security->aes_key, aes_key, HASHES_BYTES);
+    memset (aes_key, 0, HASHES_BYTES);
     security->local_ctr = (uint32_t)0;
     security->hello2_ack_sent = true;
     CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t); 
