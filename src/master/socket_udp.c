@@ -97,10 +97,10 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                 return FAILURE;
             }
             uint8_t slot_found = 0xff;
-            for(uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
-                if(!master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].in_use) {
-                    master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].sio_index = sio_worker_idx;
-                    master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].in_use = true;
+            for(uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
+                if(!master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].in_use) {
+                    master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].sio_index = sio_worker_idx;
+                    master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].in_use = true;
                     slot_found = i;
                     break;
                 }
@@ -149,6 +149,7 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
             } else {
                 LOG_DEBUG("%sSent udp_data to SIO.", label);
             }
+            LOG_DEVEL_DEBUG("%sORILINK protocol type %d from %s:%s.", label, orcvdo.r_orilink_raw_protocol_t->type, host_str, port_str);
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
             CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
 			break;
@@ -220,6 +221,7 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                 default:
                     LOG_ERROR("%sUnknown Worker Type %d. Ignoring.", label, wot);
             }
+            LOG_DEVEL_DEBUG("%sORILINK protocol type %d from %s:%s.", label, orcvdo.r_orilink_raw_protocol_t->type, host_str, port_str);
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
             CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
 			break;
