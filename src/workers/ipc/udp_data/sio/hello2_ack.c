@@ -85,5 +85,6 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
     memcpy(security->kem_ciphertext, kem_ciphertext, KEM_CIPHERTEXT_BYTES / 2);
     memset(kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES / 2);
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
     return SUCCESS;
 }

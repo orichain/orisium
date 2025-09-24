@@ -81,5 +81,6 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
     identity->remote_session_index = remote_session_index;
     identity->local_id = local_id;
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
     return SUCCESS;
 }

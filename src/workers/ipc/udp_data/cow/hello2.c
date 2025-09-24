@@ -104,5 +104,6 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
     memset(kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
     memset(kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
     return SUCCESS;
 }

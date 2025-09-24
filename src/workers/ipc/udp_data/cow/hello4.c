@@ -291,5 +291,6 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     identity->remote_id = remote_id;
     CLOSE_IPC_PROTOCOL(&received_protocol);
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
     return SUCCESS;
 }
