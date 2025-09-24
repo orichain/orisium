@@ -53,7 +53,7 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
     setup_hello(&single_session->hello2);
     setup_hello(&single_session->hello3);
     setup_hello(&single_session->hello4);
-    setup_oricle_double(&single_session->retry, (double)1);
+    setup_oricle_double(&single_session->retry, (double)0);
     setup_oricle_double(&single_session->rtt, (double)0);
     orilink_identity_t *identity = &single_session->identity;
     orilink_security_t *security = &single_session->security;

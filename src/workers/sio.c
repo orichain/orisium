@@ -51,7 +51,7 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     setup_hello_ack(&single_session->hello2_ack);
     setup_hello_ack(&single_session->hello3_ack);
     setup_hello_ack(&single_session->hello4_ack);
-    setup_oricle_double(&single_session->retry, (double)1);
+    setup_oricle_double(&single_session->retry, (double)0);
     setup_oricle_double(&single_session->rtt, (double)0);
     orilink_identity_t *identity = &single_session->identity;
     orilink_security_t *security = &single_session->security;
