@@ -1,6 +1,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <netinet/in.h>
+#include <stdio.h>
+#include <time.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -11,6 +13,9 @@
 #include "pqc.h"
 #include "orilink/hello2_ack.h"
 #include "orilink/protocol.h"
+#include "async.h"
+#include "stdbool.h"
+#include "utilities.h"
 
 status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     worker_type_t remote_wot;
@@ -51,6 +56,38 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         return FAILURE;
     }
+//======================================================================
+// Initalize Or FAILURE Now
+//----------------------------------------------------------------------
+    uint64_t_status_t current_time = get_realtime_time_ns(worker_ctx->label);
+    if (current_time.status != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+    if (async_create_timerfd(worker_ctx->label, &session->hello2_ack.ack_timer_fd) != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+    session->hello2_ack.ack_sent_try_count++;
+    session->hello2_ack.ack_sent_time = current_time.r_uint64_t;
+    if (async_set_timerfd_time(worker_ctx->label, &session->hello2_ack.ack_timer_fd,
+        (time_t)session->hello2_ack.interval_ack_timer_fd,
+        (long)((session->hello2_ack.interval_ack_timer_fd - (time_t)session->hello2_ack.interval_ack_timer_fd) * 1e9),
+        (time_t)session->hello2_ack.interval_ack_timer_fd,
+        (long)((session->hello2_ack.interval_ack_timer_fd - (time_t)session->hello2_ack.interval_ack_timer_fd) * 1e9)) != SUCCESS)
+    {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->hello2_ack.ack_timer_fd) != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+//======================================================================
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello2_ack(
         worker_ctx->label,
         0x01,
@@ -103,5 +140,20 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
     memset(kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
     memset(kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+//======================================================================
+    double try_count = (double)session->hello1_ack.ack_sent_try_count-(double)1;
+    calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+    session->hello1_ack.rcvd = true;
+    session->hello1_ack.rcvd_time = current_time.r_uint64_t;
+    uint64_t interval_ull = session->hello1_ack.rcvd_time - session->hello1_ack.ack_sent_time;
+    double rtt_value = (double)interval_ull;
+    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    cleanup_hello_ack_timer(worker_ctx->label, &worker_ctx->async, &session->hello1_ack);
+    
+    printf("%sRTT Hello-1 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
+    
+//======================================================================
+    session->hello2_ack.ack_sent = true;
+//======================================================================
     return SUCCESS;
 }

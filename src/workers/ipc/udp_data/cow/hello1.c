@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <netinet/in.h>
+#include <time.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -11,6 +12,9 @@
 #include "pqc.h"
 #include "orilink/hello1_ack.h"
 #include "orilink/protocol.h"
+#include "async.h"
+#include "stdbool.h"
+#include "utilities.h"
 
 status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     worker_type_t remote_wot;
@@ -37,6 +41,38 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
     uint64_t remote_id = ohello1->local_id;
     uint8_t kem_publickey[KEM_PUBLICKEY_BYTES / 2];
     memcpy(kem_publickey, ohello1->publickey1, KEM_PUBLICKEY_BYTES / 2);
+//======================================================================
+// Initalize Or FAILURE Now
+//----------------------------------------------------------------------
+    uint64_t_status_t current_time = get_realtime_time_ns(worker_ctx->label);
+    if (current_time.status != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+    if (async_create_timerfd(worker_ctx->label, &session->hello1_ack.ack_timer_fd) != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+    session->hello1_ack.ack_sent_try_count++;
+    session->hello1_ack.ack_sent_time = current_time.r_uint64_t;
+    if (async_set_timerfd_time(worker_ctx->label, &session->hello1_ack.ack_timer_fd,
+        (time_t)session->hello1_ack.interval_ack_timer_fd,
+        (long)((session->hello1_ack.interval_ack_timer_fd - (time_t)session->hello1_ack.interval_ack_timer_fd) * 1e9),
+        (time_t)session->hello1_ack.interval_ack_timer_fd,
+        (long)((session->hello1_ack.interval_ack_timer_fd - (time_t)session->hello1_ack.interval_ack_timer_fd) * 1e9)) != SUCCESS)
+    {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->hello1_ack.ack_timer_fd) != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+//======================================================================
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello1_ack(
         worker_ctx->label,
         0x01,
@@ -84,5 +120,8 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
     memcpy(security->kem_publickey, kem_publickey, KEM_PUBLICKEY_BYTES / 2);
     memset(kem_publickey, 0, KEM_PUBLICKEY_BYTES / 2);
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+//======================================================================
+    session->hello1_ack.ack_sent = true;
+//======================================================================
     return SUCCESS;
 }

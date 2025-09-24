@@ -36,6 +36,7 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
     cow_c_session_t *session = &cow_c_session[slot_found];
     orilink_identity_t *identity = &session->identity;
     orilink_security_t *security = &session->security;
+    memcpy(&identity->remote_addr, &icow_connecti->remote_addr, sizeof(struct sockaddr_in6));
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
@@ -64,7 +65,6 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
         return FAILURE;
     }
 //======================================================================
-    memcpy(&identity->remote_addr, &icow_connecti->remote_addr, sizeof(struct sockaddr_in6));
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello1(
         worker_ctx->label,
         0x01,

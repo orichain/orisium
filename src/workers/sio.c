@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <math.h>
 
 #include "log.h"
 #include "async.h"
@@ -11,6 +12,7 @@
 #include "constants.h"
 #include "workers/workers.h"
 #include "workers/ipc/handlers.h"
+#include "workers/timer/handlers.h"
 #include "workers/ipc/master_ipc_cmds.h"
 #include "orilink/protocol.h"
 #include "stdbool.h"
@@ -195,6 +197,133 @@ void run_sio_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
                     continue;
                 }
             } else {
+                bool event_founded_in_session = false;
+                for (uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
+                    sio_c_session_t *session;
+                    session = &sessions[i];
+                    if (current_fd == session->hello1_ack.ack_timer_fd) {
+                        uint64_t u;
+                        read(session->hello1_ack.ack_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                        worker_type_t c_wot = session->identity.local_wot;
+                        uint8_t c_index = session->identity.local_index;
+                        uint8_t c_session_index = session->identity.local_session_index;
+                        if (session->hello1_ack.ack_sent_try_count > MAX_RETRY) {
+                            LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello1_ack.interval_ack_timer_fd, session->hello1_ack.ack_sent_try_count);
+//----------------------------------------------------------------------
+// Disconnected => 1. Reset Session
+//                 2. Send Info To Master
+//----------------------------------------------------------------------
+                            cleanup_sio_session(worker_ctx->label, &worker_ctx->async, session);
+                            if (setup_sio_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
+                                continue;
+                            }
+//----------------------------------------------------------------------
+                            event_founded_in_session = true;
+                            break;
+                        }
+                        LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->hello1_ack.interval_ack_timer_fd);
+                        double try_count = (double)session->hello1_ack.ack_sent_try_count;
+                        calculate_retry(worker_ctx->label, session, c_wot, try_count);
+                        session->hello1_ack.interval_ack_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                        if (retry_hello_ack(worker_ctx, session, &session->hello1_ack) != SUCCESS) {
+                            continue;
+                        }
+                        event_founded_in_session = true;
+                        break;
+                    } else if (current_fd == session->hello2_ack.ack_timer_fd) {
+                        uint64_t u;
+                        read(session->hello2_ack.ack_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                        worker_type_t c_wot = session->identity.local_wot;
+                        uint8_t c_index = session->identity.local_index;
+                        uint8_t c_session_index = session->identity.local_session_index;
+                        if (session->hello2_ack.ack_sent_try_count > MAX_RETRY) {
+                            LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello2_ack.interval_ack_timer_fd, session->hello2_ack.ack_sent_try_count);
+//----------------------------------------------------------------------
+// Disconnected => 1. Reset Session
+//                 2. Send Info To Master
+//----------------------------------------------------------------------
+                            cleanup_sio_session(worker_ctx->label, &worker_ctx->async, session);
+                            if (setup_sio_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
+                                continue;
+                            }
+//----------------------------------------------------------------------
+                            event_founded_in_session = true;
+                            break;
+                        }
+                        LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->hello2_ack.interval_ack_timer_fd);
+                        double try_count = (double)session->hello2_ack.ack_sent_try_count;
+                        calculate_retry(worker_ctx->label, session, c_wot, try_count);
+                        session->hello2_ack.interval_ack_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                        if (retry_hello_ack(worker_ctx, session, &session->hello2_ack) != SUCCESS) {
+                            continue;
+                        }
+                        event_founded_in_session = true;
+                        break;
+                    } else if (current_fd == session->hello3_ack.ack_timer_fd) {
+                        uint64_t u;
+                        read(session->hello3_ack.ack_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                        worker_type_t c_wot = session->identity.local_wot;
+                        uint8_t c_index = session->identity.local_index;
+                        uint8_t c_session_index = session->identity.local_session_index;
+                        if (session->hello3_ack.ack_sent_try_count > MAX_RETRY) {
+                            LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello3_ack.interval_ack_timer_fd, session->hello3_ack.ack_sent_try_count);
+//----------------------------------------------------------------------
+// Disconnected => 1. Reset Session
+//                 2. Send Info To Master
+//----------------------------------------------------------------------
+                            cleanup_sio_session(worker_ctx->label, &worker_ctx->async, session);
+                            if (setup_sio_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
+                                continue;
+                            }
+//----------------------------------------------------------------------
+                            event_founded_in_session = true;
+                            break;
+                        }
+                        LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->hello3_ack.interval_ack_timer_fd);
+                        double try_count = (double)session->hello3_ack.ack_sent_try_count;
+                        calculate_retry(worker_ctx->label, session, c_wot, try_count);
+                        session->hello3_ack.interval_ack_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                        if (retry_hello_ack(worker_ctx, session, &session->hello3_ack) != SUCCESS) {
+                            continue;
+                        }
+                        event_founded_in_session = true;
+                        break;
+                    } else if (current_fd == session->hello4_ack.ack_timer_fd) {
+//----------------------------------------------------------------------
+// Waiting For First Heartbeat => 1. (MAX_RETRY - 2)
+//                                2. session->hello4_ack.interval_ack_timer_fd = (double)15 * pow((double)2, (double)session->retry.value_prediction);
+//----------------------------------------------------------------------
+                        uint64_t u;
+                        read(session->hello4_ack.ack_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                        worker_type_t c_wot = session->identity.local_wot;
+                        uint8_t c_index = session->identity.local_index;
+                        uint8_t c_session_index = session->identity.local_session_index;
+                        if (session->hello4_ack.ack_sent_try_count > (MAX_RETRY - 2)) {
+                            LOG_DEVEL_DEBUG("%sWaiting For First Heartbeat. Session %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello4_ack.interval_ack_timer_fd, session->hello4_ack.ack_sent_try_count);
+//----------------------------------------------------------------------
+// Disconnected => 1. Reset Session
+//                 2. Send Info To Master
+//----------------------------------------------------------------------
+                            cleanup_sio_session(worker_ctx->label, &worker_ctx->async, session);
+                            if (setup_sio_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
+                                continue;
+                            }
+//----------------------------------------------------------------------
+                            event_founded_in_session = true;
+                            break;
+                        }
+                        LOG_DEVEL_DEBUG("%sWaiting For First Heartbeat. Session %d: interval = %lf.", worker_ctx->label, i, session->hello4_ack.interval_ack_timer_fd);
+                        double try_count = (double)session->hello4_ack.ack_sent_try_count;
+                        calculate_retry(worker_ctx->label, session, c_wot, try_count);
+                        session->hello4_ack.interval_ack_timer_fd = (double)15 * pow((double)2, (double)session->retry.value_prediction);
+                        if (retry_hello_ack(worker_ctx, session, &session->hello4_ack) != SUCCESS) {
+                            continue;
+                        }
+                        event_founded_in_session = true;
+                        break;
+                    }
+                }
+                if (event_founded_in_session) continue;
 //======================================================================
 // Event yang belum ditangkap
 //======================================================================                 

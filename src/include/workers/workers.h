@@ -123,6 +123,18 @@ static inline void cleanup_hello_timer(const char *label, async_type_t *async, h
     CLOSE_FD(&h->timer_fd);
 }
 
+static inline void cleanup_hello_ack_timer(const char *label, async_type_t *async, hello_ack_t *h) {
+    h->interval_ack_timer_fd = (double)1;
+    h->ack_sent_try_count = 0x00;
+    h->len = (uint16_t)0;
+    if (h->data) {
+        free(h->data);
+        h->data = NULL;
+    }
+    async_delete_event(label, async, &h->ack_timer_fd);
+    CLOSE_FD(&h->ack_timer_fd);
+}
+
 static inline void calculate_retry(const char *label, void *void_session, worker_type_t wot, double try_count) {
     switch (wot) {
         case COW: {

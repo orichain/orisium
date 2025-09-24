@@ -215,7 +215,7 @@ void run_cow_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
                         uint8_t c_index = session->identity.local_index;
                         uint8_t c_session_index = session->identity.local_session_index;
                         if (session->hello1.sent_try_count > MAX_RETRY) {
-                            LOG_DEVEL_DEBUG("%s session %d: disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello1.sent_try_count);
+                            LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello1.interval_timer_fd, session->hello1.sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -228,11 +228,98 @@ void run_cow_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
                             event_founded_in_session = true;
                             break;
                         }
-                        LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", worker_ctx->label, i, session->hello1.interval_timer_fd);
+                        LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->hello1.interval_timer_fd);
                         double try_count = (double)session->hello1.sent_try_count;
                         calculate_retry(worker_ctx->label, session, c_wot, try_count);
                         session->hello1.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
-                        if (retry_cow_connect(worker_ctx, session) != SUCCESS) {
+                        if (retry_hello(worker_ctx, session, &session->hello1) != SUCCESS) {
+                            continue;
+                        }
+                        event_founded_in_session = true;
+                        break;
+                    } else if (current_fd == session->hello2.timer_fd) {
+                        uint64_t u;
+                        read(session->hello2.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                        worker_type_t c_wot = session->identity.local_wot;
+                        uint8_t c_index = session->identity.local_index;
+                        uint8_t c_session_index = session->identity.local_session_index;
+                        if (session->hello2.sent_try_count > MAX_RETRY) {
+                            LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello2.interval_timer_fd, session->hello2.sent_try_count);
+//----------------------------------------------------------------------
+// Disconnected => 1. Reset Session
+//                 2. Send Info To Master
+//----------------------------------------------------------------------
+                            cleanup_cow_session(worker_ctx->label, &worker_ctx->async, session);
+                            if (setup_cow_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
+                                continue;
+                            }
+//----------------------------------------------------------------------
+                            event_founded_in_session = true;
+                            break;
+                        }
+                        LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->hello2.interval_timer_fd);
+                        double try_count = (double)session->hello2.sent_try_count;
+                        calculate_retry(worker_ctx->label, session, c_wot, try_count);
+                        session->hello2.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                        if (retry_hello(worker_ctx, session, &session->hello2) != SUCCESS) {
+                            continue;
+                        }
+                        event_founded_in_session = true;
+                        break;
+                    } else if (current_fd == session->hello3.timer_fd) {
+                        uint64_t u;
+                        read(session->hello3.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                        worker_type_t c_wot = session->identity.local_wot;
+                        uint8_t c_index = session->identity.local_index;
+                        uint8_t c_session_index = session->identity.local_session_index;
+                        if (session->hello3.sent_try_count > MAX_RETRY) {
+                            LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello3.interval_timer_fd, session->hello3.sent_try_count);
+//----------------------------------------------------------------------
+// Disconnected => 1. Reset Session
+//                 2. Send Info To Master
+//----------------------------------------------------------------------
+                            cleanup_cow_session(worker_ctx->label, &worker_ctx->async, session);
+                            if (setup_cow_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
+                                continue;
+                            }
+//----------------------------------------------------------------------
+                            event_founded_in_session = true;
+                            break;
+                        }
+                        LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->hello3.interval_timer_fd);
+                        double try_count = (double)session->hello3.sent_try_count;
+                        calculate_retry(worker_ctx->label, session, c_wot, try_count);
+                        session->hello3.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                        if (retry_hello(worker_ctx, session, &session->hello3) != SUCCESS) {
+                            continue;
+                        }
+                        event_founded_in_session = true;
+                        break;
+                    } else if (current_fd == session->hello4.timer_fd) {
+                        uint64_t u;
+                        read(session->hello4.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                        worker_type_t c_wot = session->identity.local_wot;
+                        uint8_t c_index = session->identity.local_index;
+                        uint8_t c_session_index = session->identity.local_session_index;
+                        if (session->hello4.sent_try_count > MAX_RETRY) {
+                            LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello4.interval_timer_fd, session->hello4.sent_try_count);
+//----------------------------------------------------------------------
+// Disconnected => 1. Reset Session
+//                 2. Send Info To Master
+//----------------------------------------------------------------------
+                            cleanup_cow_session(worker_ctx->label, &worker_ctx->async, session);
+                            if (setup_cow_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
+                                continue;
+                            }
+//----------------------------------------------------------------------
+                            event_founded_in_session = true;
+                            break;
+                        }
+                        LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->hello4.interval_timer_fd);
+                        double try_count = (double)session->hello4.sent_try_count;
+                        calculate_retry(worker_ctx->label, session, c_wot, try_count);
+                        session->hello4.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                        if (retry_hello(worker_ctx, session, &session->hello4) != SUCCESS) {
                             continue;
                         }
                         event_founded_in_session = true;
