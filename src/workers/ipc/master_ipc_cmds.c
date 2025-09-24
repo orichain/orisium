@@ -218,3 +218,57 @@ status_t worker_master_udp_data(
     CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
     return SUCCESS;
 }
+
+status_t worker_master_udp_data_ack(
+    const char *label, 
+    worker_context_t *worker_ctx, 
+    worker_type_t wot, 
+    uint8_t index,
+    struct sockaddr_in6 *addr,
+    puint8_t_size_t_status_t *r,
+    hello_ack_t *h
+) 
+{
+    ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data(
+        label,
+        wot,
+        index,
+        0xff,
+        addr,
+        r->r_size_t,
+        r->r_puint8_t
+    );
+    if (cmd_result.status != SUCCESS) {
+        free(r->r_puint8_t);
+        r->r_puint8_t = NULL;
+        r->r_size_t = 0;
+        return FAILURE;
+    }
+    ssize_t_status_t send_result = send_ipc_protocol_message(
+        worker_ctx->label,
+        worker_ctx->aes_key,
+        worker_ctx->mac_key,
+        worker_ctx->local_nonce,
+        &worker_ctx->local_ctr,
+        worker_ctx->master_uds_fd, 
+        cmd_result.r_ipc_protocol_t
+    );
+    if (send_result.status != SUCCESS) {
+        LOG_ERROR("%sFailed to sent udp_data to Master.", worker_ctx->label);
+        free(r->r_puint8_t);
+        r->r_puint8_t = NULL;
+        r->r_size_t = 0;
+        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        return send_result.status;
+    } else {
+        LOG_DEBUG("%sSent udp_data to Master.", worker_ctx->label);
+    }
+    h->len = r->r_size_t;
+    h->data = (uint8_t *)calloc(1, r->r_size_t);
+    memcpy(h->data, r->r_puint8_t, h->len);
+    free(r->r_puint8_t);
+    r->r_puint8_t = NULL;
+    r->r_size_t = 0;
+    CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+    return SUCCESS;
+}
