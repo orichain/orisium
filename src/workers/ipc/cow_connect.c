@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <netinet/in.h>
+#include <time.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -10,6 +11,9 @@
 #include "orilink/hello1.h"
 #include "orilink/protocol.h"
 #include "workers/ipc/master_ipc_cmds.h"
+#include "utilities.h"
+#include "async.h"
+#include "stdbool.h"
 
 status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *worker_sessions, ipc_raw_protocol_t_status_t *ircvdi) {
     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label,
@@ -32,6 +36,34 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
     cow_c_session_t *session = &cow_c_session[slot_found];
     orilink_identity_t *identity = &session->identity;
     orilink_security_t *security = &session->security;
+//======================================================================
+// Initalize Or FAILURE Now
+//----------------------------------------------------------------------
+    uint64_t_status_t current_time = get_realtime_time_ns(worker_ctx->label);
+    if (current_time.status != SUCCESS) {
+        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        return FAILURE;
+    }
+    if (async_create_timerfd(worker_ctx->label, &session->hello1.timer_fd) != SUCCESS) {
+        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        return FAILURE;
+    }
+    session->hello1.sent_try_count++;
+    session->hello1.sent_time = current_time.r_uint64_t;
+    if (async_set_timerfd_time(worker_ctx->label, &session->hello1.timer_fd,
+        (time_t)session->hello1.interval_timer_fd,
+        (long)((session->hello1.interval_timer_fd - (time_t)session->hello1.interval_timer_fd) * 1e9),
+        (time_t)session->hello1.interval_timer_fd,
+        (long)((session->hello1.interval_timer_fd - (time_t)session->hello1.interval_timer_fd) * 1e9)) != SUCCESS)
+    {
+        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        return FAILURE;
+    }
+    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->hello1.timer_fd) != SUCCESS) {
+        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        return FAILURE;
+    }
+//======================================================================
     memcpy(&identity->remote_addr, &icow_connecti->remote_addr, sizeof(struct sockaddr_in6));
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello1(
         worker_ctx->label,
@@ -68,5 +100,8 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
         return FAILURE;
     }
     CLOSE_IPC_PROTOCOL(&received_protocol);
+//======================================================================
+    session->hello1.sent = true;
+//======================================================================
     return SUCCESS;
 }

@@ -16,6 +16,7 @@
 #include "stdbool.h"
 #include "utilities.h"
 #include "pqc.h"
+#include "kalman.h"
 
 static inline void cleanup_hello_ack(const char *label, async_type_t *async, hello_ack_t *h) {
     h->rcvd = false;
@@ -50,6 +51,8 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     setup_hello_ack(&single_session->hello2_ack);
     setup_hello_ack(&single_session->hello3_ack);
     setup_hello_ack(&single_session->hello4_ack);
+    setup_oricle_double(&single_session->retry, (double)1);
+    setup_oricle_double(&single_session->rtt, (double)0);
     orilink_identity_t *identity = &single_session->identity;
     orilink_security_t *security = &single_session->security;
     memset(&identity->remote_addr, 0, sizeof(struct sockaddr_in6));
@@ -78,6 +81,8 @@ static inline void cleanup_sio_session(const char *label, async_type_t *sio_asyn
     cleanup_hello_ack(label, sio_async, &single_session->hello2_ack);
     cleanup_hello_ack(label, sio_async, &single_session->hello3_ack);
     cleanup_hello_ack(label, sio_async, &single_session->hello4_ack);
+    cleanup_oricle_double(&single_session->retry);
+    cleanup_oricle_double(&single_session->rtt);
     orilink_identity_t *identity = &single_session->identity;
     orilink_security_t *security = &single_session->security;
     memset(&identity->remote_addr, 0, sizeof(struct sockaddr_in6));

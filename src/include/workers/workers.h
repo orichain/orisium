@@ -11,6 +11,7 @@
 #include "pqc.h"
 #include "kalman.h"
 #include "orilink/protocol.h"
+#include "utilities.h"
 
 typedef struct {
     bool rcvd;
@@ -109,5 +110,71 @@ void run_logic_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_
 void run_cow_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
 void run_dbr_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
 void run_dbw_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
+
+static inline void cleanup_hello_timer(const char *label, async_type_t *async, hello_t *h) {
+    h->interval_timer_fd = (double)1;
+    h->sent_try_count = 0x00;
+    h->len = (uint16_t)0;
+    if (h->data) {
+        free(h->data);
+        h->data = NULL;
+    }
+    async_delete_event(label, async, &h->timer_fd);
+    CLOSE_FD(&h->timer_fd);
+}
+
+static inline void calculate_retry(const char *label, void *void_session, worker_type_t wot, double try_count) {
+    switch (wot) {
+        case COW: {
+            cow_c_session_t *session = (cow_c_session_t *)void_session;
+            char *desc;
+            int needed = snprintf(NULL, 0, "retry session %d", session->identity.local_session_index);
+            desc = malloc(needed + 1);
+            snprintf(desc, needed + 1, "retry session %d", session->identity.local_session_index);
+            calculate_oricle_double(label, desc, &session->retry, try_count, ((double)MAX_RETRY * (double)2));
+            free(desc);
+            break;
+        }
+        case SIO: {
+            sio_c_session_t *session = (sio_c_session_t *)void_session;
+            char *desc;
+            int needed = snprintf(NULL, 0, "retry session %d", session->identity.local_session_index);
+            desc = malloc(needed + 1);
+            snprintf(desc, needed + 1, "retry session %d", session->identity.local_session_index);
+            calculate_oricle_double(label, desc, &session->retry, try_count, ((double)MAX_RETRY * (double)2));
+            free(desc);
+            break;
+        }
+        default:
+            
+    }
+}
+
+static inline void calculate_rtt(const char *label, void *void_session, worker_type_t wot, double rtt_value) {
+    switch (wot) {
+        case COW: {
+            cow_c_session_t *session = (cow_c_session_t *)void_session;
+            char *desc;
+            int needed = snprintf(NULL, 0, "rtt session %d", session->identity.local_session_index);
+            desc = malloc(needed + 1);
+            snprintf(desc, needed + 1, "rtt session %d", session->identity.local_session_index);
+            calculate_oricle_double(label, desc, &session->rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
+            free(desc);
+            break;
+        }
+        case SIO: {
+            sio_c_session_t *session = (sio_c_session_t *)void_session;
+            char *desc;
+            int needed = snprintf(NULL, 0, "rtt session %d", session->identity.local_session_index);
+            desc = malloc(needed + 1);
+            snprintf(desc, needed + 1, "rtt session %d", session->identity.local_session_index);
+            calculate_oricle_double(label, desc, &session->rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
+            free(desc);
+            break;
+        }
+        default:
+            
+    }
+}
 
 #endif

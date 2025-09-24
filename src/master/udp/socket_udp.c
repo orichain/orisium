@@ -118,7 +118,6 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                 CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 return FAILURE;
             }
-            LOG_DEVEL_DEBUG("%sORILINK protocol type %d from %s:%s.", label, orcvdo.r_orilink_raw_protocol_t->type, host_str, port_str);
             CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
 			break;
 		}
@@ -136,7 +135,6 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                 CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 return FAILURE;
             }
-            LOG_DEVEL_DEBUG("%sORILINK protocol type %d from %s:%s.", label, orcvdo.r_orilink_raw_protocol_t->type, host_str, port_str);
             CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
 			break;
 		}

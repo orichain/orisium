@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <math.h>
 
 #include "pqc.h"
 #include "log.h"
@@ -12,10 +13,12 @@
 #include "constants.h"
 #include "workers/workers.h"
 #include "workers/ipc/handlers.h"
+#include "workers/timer/handlers.h"
 #include "workers/ipc/master_ipc_cmds.h"
 #include "orilink/protocol.h"
 #include "stdbool.h"
 #include "utilities.h"
+#include "kalman.h"
 
 static inline void cleanup_hello(const char *label, async_type_t *async, hello_t *h) {
     h->sent = false;
@@ -50,6 +53,8 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
     setup_hello(&single_session->hello2);
     setup_hello(&single_session->hello3);
     setup_hello(&single_session->hello4);
+    setup_oricle_double(&single_session->retry, (double)1);
+    setup_oricle_double(&single_session->rtt, (double)0);
     orilink_identity_t *identity = &single_session->identity;
     orilink_security_t *security = &single_session->security;
     memset(&identity->remote_addr, 0, sizeof(struct sockaddr_in6));
@@ -83,6 +88,8 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
     cleanup_hello(label, cow_async, &single_session->hello2);
     cleanup_hello(label, cow_async, &single_session->hello3);
     cleanup_hello(label, cow_async, &single_session->hello4);
+    cleanup_oricle_double(&single_session->retry);
+    cleanup_oricle_double(&single_session->rtt);
     orilink_identity_t *identity = &single_session->identity;
     orilink_security_t *security = &single_session->security;
     memset(&identity->remote_addr, 0, sizeof(struct sockaddr_in6));
@@ -196,6 +203,48 @@ void run_cow_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
                     handle_workers_ipc_event(worker_ctx, sessions, initial_delay_ms);
                     continue;
                 }
+            } else {
+                bool event_founded_in_session = false;
+                for (uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
+                    cow_c_session_t *session;
+                    session = &sessions[i];
+                    if (current_fd == session->hello1.timer_fd) {
+                        uint64_t u;
+                        read(session->hello1.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                        worker_type_t c_wot = session->identity.local_wot;
+                        uint8_t c_index = session->identity.local_index;
+                        uint8_t c_session_index = session->identity.local_session_index;
+                        if (session->hello1.sent_try_count > MAX_RETRY) {
+                            LOG_DEVEL_DEBUG("%s session %d: disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello1.sent_try_count);
+//----------------------------------------------------------------------
+// Disconnected => 1. Reset Session
+//                 2. Send Info To Master
+//----------------------------------------------------------------------
+                            cleanup_cow_session(worker_ctx->label, &worker_ctx->async, session);
+                            if (setup_cow_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
+                                continue;
+                            }
+//----------------------------------------------------------------------
+                            event_founded_in_session = true;
+                            break;
+                        }
+                        LOG_DEVEL_DEBUG("%s session %d: interval = %lf.", worker_ctx->label, i, session->hello1.interval_timer_fd);
+                        double try_count = (double)session->hello1.sent_try_count;
+                        calculate_retry(worker_ctx->label, session, c_wot, try_count);
+                        session->hello1.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                        if (retry_cow_connect(worker_ctx, session) != SUCCESS) {
+                            continue;
+                        }
+                        event_founded_in_session = true;
+                        break;
+                    }
+                }
+                if (event_founded_in_session) continue;
+//======================================================================
+// Event yang belum ditangkap
+//======================================================================                 
+                LOG_ERROR("%sUnknown FD event %d.", worker_ctx->label, current_fd);
+//======================================================================
             }
         }
     }

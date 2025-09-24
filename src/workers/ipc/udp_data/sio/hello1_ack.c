@@ -10,8 +10,20 @@
 #include "workers/ipc/master_ipc_cmds.h"
 #include "orilink/hello2.h"
 #include "orilink/protocol.h"
+#include "stdbool.h"
+#include "utilities.h"
 
 status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
+//======================================================================
+// Initalize Or FAILURE Now
+//----------------------------------------------------------------------
+    uint64_t_status_t current_time = get_realtime_time_ns(worker_ctx->label);
+    if (current_time.status != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
+//======================================================================
     worker_type_t remote_wot;
     uint8_t remote_index;
     uint8_t remote_session_index;
@@ -80,5 +92,15 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
     identity->remote_session_index = remote_session_index;
     identity->local_id = local_id;
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+//======================================================================
+    double try_count = (double)session->hello1.sent_try_count-(double)1;
+    calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+    session->hello1.ack_rcvd = true;
+    session->hello1.ack_rcvd_time = current_time.r_uint64_t;
+    uint64_t interval_ull = session->hello1.ack_rcvd_time - session->hello1.sent_time;
+    double rtt_value = (double)interval_ull;
+    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    cleanup_hello_timer(worker_ctx->label, &worker_ctx->async, &session->hello1);
+//======================================================================
     return SUCCESS;
 }
