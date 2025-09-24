@@ -299,7 +299,7 @@ void run_sio_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
                         uint8_t c_index = session->identity.local_index;
                         uint8_t c_session_index = session->identity.local_session_index;
                         if (session->hello4_ack.ack_sent_try_count > (MAX_RETRY - 2)) {
-                            LOG_DEBUG("%sWaiting For First Heartbeat. Session %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello4_ack.interval_ack_timer_fd, session->hello4_ack.ack_sent_try_count);
+                            LOG_DEVEL_DEBUG("%sWaiting For First Heartbeat. Session %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello4_ack.interval_ack_timer_fd, session->hello4_ack.ack_sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -312,13 +312,13 @@ void run_sio_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
                             event_founded_in_session = true;
                             break;
                         }
-                        LOG_DEBUG("%sWaiting For First Heartbeat. Session %d: interval = %lf.", worker_ctx->label, i, session->hello4_ack.interval_ack_timer_fd);
+                        LOG_DEVEL_DEBUG("%sWaiting For First Heartbeat. Session %d: interval = %lf.", worker_ctx->label, i, session->hello4_ack.interval_ack_timer_fd);
                         double try_count = (double)session->hello4_ack.ack_sent_try_count;
                         calculate_retry(worker_ctx->label, session, c_wot, try_count);
                         session->hello4_ack.interval_ack_timer_fd = (double)15 * pow((double)2, (double)session->retry.value_prediction);
-                        //if (retry_hello_ack(worker_ctx, session, &session->hello4_ack) != SUCCESS) {
-                        //    continue;
-                        //}
+                        if (retry_hello_ack(worker_ctx, session, &session->hello4_ack) != SUCCESS) {
+                            continue;
+                        }
                         event_founded_in_session = true;
                         break;
                     }
