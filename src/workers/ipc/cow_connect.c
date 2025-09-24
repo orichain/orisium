@@ -1,17 +1,15 @@
 #include <stdint.h>
 #include <string.h>
 #include <netinet/in.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
 #include "types.h"
 #include "workers/workers.h"
 #include "workers/ipc/handlers.h"
-#include "ipc/udp_data.h"
 #include "orilink/hello1.h"
 #include "orilink/protocol.h"
+#include "workers/ipc/master_ipc_cmds.h"
 
 status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *worker_sessions, ipc_raw_protocol_t_status_t *ircvdi) {
     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label,
@@ -60,57 +58,15 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
         &security->local_ctr,
         orilink_cmd_result.r_orilink_protocol_t
     );
+    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
     if (udp_data.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
         return FAILURE;
     }
-//----------------------------------------------------------------------
-// Here Below:
-// create ipc_udp_data_t and send it to the master via IPC
-//----------------------------------------------------------------------
-    ipc_protocol_t_status_t ipc_cmd_result = ipc_prepare_cmd_udp_data(
-        worker_ctx->label,
-        identity->local_wot,
-        identity->local_index,
-//----------------------------------------------------------------------
-// Master don't have session_index
-//----------------------------------------------------------------------
-        0xff,
-//----------------------------------------------------------------------
-        &identity->remote_addr,
-        udp_data.r_size_t,
-        udp_data.r_puint8_t
-    );
-    if (ipc_cmd_result.status != SUCCESS) {
+    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &identity->remote_addr, &udp_data, &session->hello1) != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         return FAILURE;
     }
-    ssize_t_status_t send_result = send_ipc_protocol_message(
-        worker_ctx->label,
-        worker_ctx->aes_key,
-        worker_ctx->mac_key,
-        worker_ctx->local_nonce,
-        &worker_ctx->local_ctr,
-        worker_ctx->master_uds_fd, 
-        ipc_cmd_result.r_ipc_protocol_t
-    );
-    if (send_result.status != SUCCESS) {
-        LOG_ERROR("%sFailed to sent udp_data to Master.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_IPC_PROTOCOL(&ipc_cmd_result.r_ipc_protocol_t);
-        return send_result.status;
-    } else {
-        LOG_DEBUG("%sSent udp_data to Master.", worker_ctx->label);
-    }
-    CLOSE_IPC_PROTOCOL(&ipc_cmd_result.r_ipc_protocol_t);
-//----------------------------------------------------------------------
-    session->hello1.len = udp_data.r_size_t;
-    session->hello1.data = (uint8_t *)calloc(1, udp_data.r_size_t);
-    memcpy(session->hello1.data, udp_data.r_puint8_t, session->hello1.len);
-    free(udp_data.r_puint8_t);
-    udp_data.r_puint8_t = NULL;
-    udp_data.r_size_t = 0;
     CLOSE_IPC_PROTOCOL(&received_protocol);
     return SUCCESS;
 }
