@@ -11,7 +11,7 @@
 #include "utilities.h"
 #include "orilink/protocol.h"
 #include "types.h"
-#include "master/socket_udp.h"
+#include "master/udp/socket_udp.h"
 #include "master/master.h"
 #include "master/worker_metrics.h"
 #include "master/worker_selector.h"

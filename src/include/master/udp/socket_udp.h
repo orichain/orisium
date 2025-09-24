@@ -1,5 +1,5 @@
-#ifndef MASTER_SOCKET_UDP_H
-#define MASTER_SOCKET_UDP_H
+#ifndef MASTER_UDP_SOCKET_UDP_H
+#define MASTER_UDP_SOCKET_UDP_H
 
 #include "master/master.h"
 
