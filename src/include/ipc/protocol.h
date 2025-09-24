@@ -2,6 +2,8 @@
 #define IPC_PROTOCOL_H
 
 #include <stdlib.h>
+#include <string.h>
+
 #include "types.h"
 #include "constants.h"
 #include "pqc.h"
