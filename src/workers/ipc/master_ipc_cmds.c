@@ -1,6 +1,5 @@
 #include <string.h>
 #include <inttypes.h>
-#include <endian.h>
 #include <stdlib.h>
 
 #include "log.h"
@@ -11,11 +10,7 @@
 #include "ipc/worker_master_hello2.h"
 #include "workers/workers.h"
 #include "workers/ipc/master_ipc_cmds.h"
-#include "constants.h"
-#include "poly1305-donna.h"
-#include "aes.h"
 #include "stdbool.h"
-#include "utilities.h"
 #include "ipc/udp_data.h"
 
 struct sockaddr_in6;
@@ -81,56 +76,7 @@ status_t worker_master_hello1(worker_context_t *ctx) {
     return SUCCESS;
 }
 
-status_t worker_master_hello2(worker_context_t *ctx) {
-//----------------------------------------------------------------------
-// Temporary Key
-//----------------------------------------------------------------------
-    uint8_t aes_key[HASHES_BYTES];
-    kdf1(ctx->kem_sharedsecret, aes_key);
-    uint8_t local_nonce[AES_NONCE_BYTES];
-    if (generate_nonce(ctx->label, local_nonce) != SUCCESS) {
-        LOG_ERROR("%sFailed to generate_nonce.", ctx->label);
-        return FAILURE;
-    }
-//----------------------------------------------------------------------
-// HELLO2 Memakai mac_key baru
-//----------------------------------------------------------------------
-    kdf2(aes_key, ctx->mac_key);
-//----------------------------------------------------------------------
-    uint8_t wot_index[sizeof(uint8_t) + sizeof(uint8_t)];
-    uint8_t encrypted_wot_index[sizeof(uint8_t) + sizeof(uint8_t)];   
-    uint8_t encrypted_wot_index1[AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t)];
-    uint8_t encrypted_wot_index2[AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES];
-    memcpy(encrypted_wot_index1, local_nonce, AES_NONCE_BYTES);
-    memcpy(wot_index, (uint8_t *)ctx->wot, sizeof(uint8_t));
-    memcpy(wot_index + sizeof(uint8_t), ctx->index, sizeof(uint8_t));
-//======================================================================    
-    aes256ctx aes_ctx;
-    aes256_ctr_keyexp(&aes_ctx, aes_key);
-//=========================================IV===========================    
-    uint8_t keystream_buffer[sizeof(uint8_t) + sizeof(uint8_t)];
-    uint8_t iv[AES_IV_BYTES];
-    memcpy(iv, local_nonce, AES_NONCE_BYTES);
-    uint32_t local_ctr_be = htobe32(ctx->local_ctr);
-    memcpy(iv + AES_NONCE_BYTES, &local_ctr_be, sizeof(uint32_t));
-//=========================================IV===========================    
-    aes256_ctr(keystream_buffer, sizeof(uint8_t) + sizeof(uint8_t), iv, &aes_ctx);
-    for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t); i++) {
-        encrypted_wot_index[i] = wot_index[i] ^ keystream_buffer[i];
-    }
-    aes256_ctx_release(&aes_ctx);
-//======================================================================    
-    memcpy(encrypted_wot_index1 + AES_NONCE_BYTES, encrypted_wot_index, sizeof(uint8_t) + sizeof(uint8_t));
-//======================================================================    
-    uint8_t mac[AES_TAG_BYTES];
-    poly1305_context mac_ctx;
-    poly1305_init(&mac_ctx, ctx->mac_key);
-    poly1305_update(&mac_ctx, encrypted_wot_index1, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t));
-    poly1305_finish(&mac_ctx, mac);
-//====================================================================== 
-    memcpy(encrypted_wot_index2, encrypted_wot_index1, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t));
-    memcpy(encrypted_wot_index2 + AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t), mac, AES_TAG_BYTES);
-//======================================================================
+status_t worker_master_hello2(worker_context_t *ctx, uint8_t encrypted_wot_index2[]) {
 	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_master_hello2(
         ctx->label, 
         *ctx->wot, 
@@ -156,10 +102,6 @@ status_t worker_master_hello2(worker_context_t *ctx) {
     } else {
         LOG_DEBUG("%sSent worker_master_hello2 to Master.", ctx->label);
     }
-    memset(aes_key, 0, HASHES_BYTES);
-    memcpy(ctx->local_nonce, local_nonce, AES_NONCE_BYTES);
-    memset(local_nonce, 0, AES_NONCE_BYTES);
-    ctx->local_ctr = (uint32_t)0;
     ctx->hello2_sent = true;
     CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
     return SUCCESS;
