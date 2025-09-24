@@ -1604,56 +1604,16 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                                 CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
                                 return FAILURE;
                             }
-//----------------------------------------------------------------------
-// Here Below:
-// create ipc_udp_data_t and send it to the master via IPC
-//----------------------------------------------------------------------
-                            ipc_protocol_t_status_t ipc_cmd_result = ipc_prepare_cmd_udp_data(
-                                worker_ctx->label,
-                                identity->local_wot,
-                                identity->local_index,
-//----------------------------------------------------------------------
-// Master don't have session_index
-//----------------------------------------------------------------------
-                                0xff,
-//----------------------------------------------------------------------
-                                &remote_addr,
-                                udp_data.r_size_t,
-                                udp_data.r_puint8_t
-                            );
-                            if (ipc_cmd_result.status != SUCCESS) {
+                            if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &remote_addr, &udp_data, &session->hello4) != SUCCESS) {
                                 CLOSE_IPC_PROTOCOL(&received_protocol);
                                 CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
                                 CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+                                free(udp_data.r_puint8_t);
+                                udp_data.r_puint8_t = NULL;
+                                udp_data.r_size_t = 0;
                                 return FAILURE;
                             }
-                            ssize_t_status_t send_result = send_ipc_protocol_message(
-                                worker_ctx->label,
-                                worker_ctx->aes_key,
-                                worker_ctx->mac_key,
-                                worker_ctx->local_nonce,
-                                &worker_ctx->local_ctr,
-                                worker_ctx->master_uds_fd, 
-                                ipc_cmd_result.r_ipc_protocol_t
-                            );
-                            if (send_result.status != SUCCESS) {
-                                LOG_ERROR("%sFailed to sent udp_data to Master.", worker_ctx->label);
-                                CLOSE_IPC_PROTOCOL(&received_protocol);
-                                CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-                                CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
-                                CLOSE_IPC_PROTOCOL(&ipc_cmd_result.r_ipc_protocol_t);
-                                return send_result.status;
-                            } else {
-                                LOG_DEBUG("%sSent udp_data to Master.", worker_ctx->label);
-                            }
-                            CLOSE_IPC_PROTOCOL(&ipc_cmd_result.r_ipc_protocol_t);
 //----------------------------------------------------------------------
-                            session->hello4.len = udp_data.r_size_t;
-                            session->hello4.data = (uint8_t *)calloc(1, udp_data.r_size_t);
-                            memcpy(session->hello4.data, udp_data.r_puint8_t, session->hello4.len);
-                            free(udp_data.r_puint8_t);
-                            udp_data.r_puint8_t = NULL;
-                            udp_data.r_size_t = 0;
                             CLOSE_IPC_PROTOCOL(&received_protocol);
 //----------------------------------------------------------------------                            
                             memcpy(&identity->remote_addr, &remote_addr, sizeof(struct sockaddr_in6));

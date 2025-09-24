@@ -17,8 +17,7 @@
 #include "master/worker_selector.h"
 #include "constants.h"
 #include "stdbool.h"
-#include "ipc/protocol.h"
-#include "ipc/udp_data.h"
+#include "master/ipc/worker_ipc_cmds.h"
 
 status_t setup_master_socket_udp(const char *label, master_context_t *master_ctx) {
     struct sockaddr_in6 addr;
@@ -115,42 +114,11 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                 CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 return FAILURE;
             }
-//----------------------------------------------------------------------
-// Here Below:
-// create ipc_udp_data_t and send it to the SIO via IPC
-//----------------------------------------------------------------------
-            ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data(
-                label,
-                orcvdo.r_orilink_raw_protocol_t->local_wot,
-                orcvdo.r_orilink_raw_protocol_t->local_index,
-                slot_found,
-                &remote_addr,
-                orcvdo.r_orilink_raw_protocol_t->n,
-                orcvdo.r_orilink_raw_protocol_t->recv_buffer
-            );
-            if (cmd_result.status != SUCCESS) {
+            if (master_worker_udp_data(label, master_ctx, SIO, sio_worker_idx, slot_found, &remote_addr, orcvdo.r_orilink_raw_protocol_t) != SUCCESS) {
                 CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 return FAILURE;
             }
-            ssize_t_status_t send_result = send_ipc_protocol_message(
-                label, 
-                master_ctx->sio_session[sio_worker_idx].security.aes_key,
-                master_ctx->sio_session[sio_worker_idx].security.mac_key,
-                master_ctx->sio_session[sio_worker_idx].security.local_nonce,
-                &master_ctx->sio_session[sio_worker_idx].security.local_ctr,
-                &master_ctx->sio_session[sio_worker_idx].upp.uds[0], 
-                cmd_result.r_ipc_protocol_t
-            );
-            if (send_result.status != SUCCESS) {
-                LOG_ERROR("%sFailed to sent udp_data to SIO.", label);
-                CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
-                return send_result.status;
-            } else {
-                LOG_DEBUG("%sSent udp_data to SIO.", label);
-            }
             LOG_DEVEL_DEBUG("%sORILINK protocol type %d from %s:%s.", label, orcvdo.r_orilink_raw_protocol_t->type, host_str, port_str);
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
             CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
 			break;
 		}
@@ -164,65 +132,11 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
             worker_type_t wot = orcvdo.r_orilink_raw_protocol_t->remote_wot;
             int index = orcvdo.r_orilink_raw_protocol_t->remote_index;
             uint8_t session_index = orcvdo.r_orilink_raw_protocol_t->remote_session_index;
-            ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data(
-                label,
-                orcvdo.r_orilink_raw_protocol_t->local_wot,
-                orcvdo.r_orilink_raw_protocol_t->local_index,
-                session_index,
-                &remote_addr,
-                orcvdo.r_orilink_raw_protocol_t->n,
-                orcvdo.r_orilink_raw_protocol_t->recv_buffer
-            );
-            if (cmd_result.status != SUCCESS) {
+            if (master_worker_udp_data(label, master_ctx, wot, index, session_index, &remote_addr, orcvdo.r_orilink_raw_protocol_t) != SUCCESS) {
                 CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 return FAILURE;
             }
-            switch (wot) {
-                case SIO: {
-                    ssize_t_status_t send_result = send_ipc_protocol_message(
-                        label, 
-                        master_ctx->sio_session[index].security.aes_key,
-                        master_ctx->sio_session[index].security.mac_key,
-                        master_ctx->sio_session[index].security.local_nonce,
-                        &master_ctx->sio_session[index].security.local_ctr,
-                        &master_ctx->sio_session[index].upp.uds[0], 
-                        cmd_result.r_ipc_protocol_t
-                    );
-                    if (send_result.status != SUCCESS) {
-                        LOG_ERROR("%sFailed to sent udp_data to SIO.", label);
-                        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
-                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
-                        return send_result.status;
-                    } else {
-                        LOG_DEBUG("%sSent udp_data to SIO.", label);
-                    }
-                    break;
-                }
-                case COW: {
-                    ssize_t_status_t send_result = send_ipc_protocol_message(
-                        label, 
-                        master_ctx->cow_session[index].security.aes_key,
-                        master_ctx->cow_session[index].security.mac_key,
-                        master_ctx->cow_session[index].security.local_nonce,
-                        &master_ctx->cow_session[index].security.local_ctr,
-                        &master_ctx->cow_session[index].upp.uds[0], 
-                        cmd_result.r_ipc_protocol_t
-                    );
-                    if (send_result.status != SUCCESS) {
-                        LOG_ERROR("%sFailed to sent udp_data to COW.", label);
-                        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
-                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
-                        return send_result.status;
-                    } else {
-                        LOG_DEBUG("%sSent udp_data to COW.", label);
-                    }
-                    break;
-                }
-                default:
-                    LOG_ERROR("%sUnknown Worker Type %d. Ignoring.", label, wot);
-            }
             LOG_DEVEL_DEBUG("%sORILINK protocol type %d from %s:%s.", label, orcvdo.r_orilink_raw_protocol_t->type, host_str, port_str);
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
             CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
 			break;
 		}

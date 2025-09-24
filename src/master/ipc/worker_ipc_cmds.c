@@ -16,6 +16,8 @@
 #include "poly1305-donna.h"
 #include "aes.h"
 #include "stdbool.h"
+#include "ipc/udp_data.h"
+#include "orilink/protocol.h"
 
 struct sockaddr_in6;
 
@@ -275,4 +277,74 @@ status_t master_worker_hello2_ack(const char *label, master_context_t *master_ct
     security->hello2_ack_sent = true;
     CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t); 
 	return SUCCESS;
+}
+
+status_t master_worker_udp_data(
+    const char *label, 
+    master_context_t *master_ctx, 
+    worker_type_t wot, 
+    uint8_t index,
+    uint8_t session_index,
+    struct sockaddr_in6 *addr,
+    orilink_raw_protocol_t *r
+) 
+{
+    ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data(
+        label,
+        r->local_wot,
+        r->local_index,
+        session_index,
+        addr,
+        r->n,
+        r->recv_buffer
+    );
+    if (cmd_result.status != SUCCESS) {
+        return FAILURE;
+    }
+    switch (wot) {
+        case SIO: {
+            ssize_t_status_t send_result = send_ipc_protocol_message(
+                label, 
+                master_ctx->sio_session[index].security.aes_key,
+                master_ctx->sio_session[index].security.mac_key,
+                master_ctx->sio_session[index].security.local_nonce,
+                &master_ctx->sio_session[index].security.local_ctr,
+                &master_ctx->sio_session[index].upp.uds[0], 
+                cmd_result.r_ipc_protocol_t
+            );
+            if (send_result.status != SUCCESS) {
+                LOG_ERROR("%sFailed to sent udp_data to SIO.", label);
+                CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+                return FAILURE;
+            } else {
+                LOG_DEBUG("%sSent udp_data to SIO.", label);
+            }
+            break;
+        }
+        case COW: {
+            ssize_t_status_t send_result = send_ipc_protocol_message(
+                label, 
+                master_ctx->cow_session[index].security.aes_key,
+                master_ctx->cow_session[index].security.mac_key,
+                master_ctx->cow_session[index].security.local_nonce,
+                &master_ctx->cow_session[index].security.local_ctr,
+                &master_ctx->cow_session[index].upp.uds[0], 
+                cmd_result.r_ipc_protocol_t
+            );
+            if (send_result.status != SUCCESS) {
+                LOG_ERROR("%sFailed to sent udp_data to COW.", label);
+                CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+                return FAILURE;
+            } else {
+                LOG_DEBUG("%sSent udp_data to COW.", label);
+            }
+            break;
+        }
+        default:
+            LOG_ERROR("%sFailed to sent udp_data to SIO.", label);
+            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+            return FAILURE;
+    }
+    CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+    return SUCCESS;
 }
