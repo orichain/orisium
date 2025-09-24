@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <netinet/in.h>
+#include <stdio.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -101,6 +102,9 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     cleanup_hello_timer(worker_ctx->label, &worker_ctx->async, &session->hello1);
+    
+    printf("RTT = %f\n", session->rtt.value_prediction);
+    
 //======================================================================
     return SUCCESS;
 }
