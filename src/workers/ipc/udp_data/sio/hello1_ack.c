@@ -115,7 +115,7 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
     identity->remote_wot = remote_wot;
     identity->remote_index = remote_index;
     identity->remote_session_index = remote_session_index;
-    identity->local_id = local_id;
+    //identity->local_id = local_id;
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
 //======================================================================
     double try_count = (double)session->hello1.sent_try_count-(double)1;

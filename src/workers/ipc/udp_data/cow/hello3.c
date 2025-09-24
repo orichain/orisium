@@ -133,10 +133,10 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
     kdf2(aes_key, security->mac_key);
 //----------------------------------------------------------------------
     memset(aes_key, 0, HASHES_BYTES);
-    identity->remote_wot = remote_wot;
-    identity->remote_index = remote_index;
-    identity->remote_session_index = remote_session_index;
-    identity->remote_id = remote_id;
+    //identity->remote_wot = remote_wot;
+    //identity->remote_index = remote_index;
+    //identity->remote_session_index = remote_session_index;
+    //identity->remote_id = remote_id;
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
 //======================================================================
     double try_count = (double)session->hello2_ack.ack_sent_try_count-(double)1;

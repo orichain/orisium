@@ -206,11 +206,11 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     memcpy(security->aes_key, aes_key, HASHES_BYTES);
     security->remote_ctr = remote_ctr;
     memset(aes_key, 0, HASHES_BYTES);
-    identity->remote_wot = remote_wot;
-    identity->remote_index = remote_index;
-    identity->remote_session_index = remote_session_index;
+    //identity->remote_wot = remote_wot;
+    //identity->remote_index = remote_index;
+    //identity->remote_session_index = remote_session_index;
     identity->remote_id = remote_id;
-    identity->local_id = local_id;
+    //identity->local_id = local_id;
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
 //======================================================================
     double try_count = (double)session->hello4.sent_try_count-(double)1;

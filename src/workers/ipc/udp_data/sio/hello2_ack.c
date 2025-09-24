@@ -114,10 +114,10 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
     CLOSE_IPC_PROTOCOL(&received_protocol);
 //----------------------------------------------------------------------                            
     memcpy(&identity->remote_addr, remote_addr, sizeof(struct sockaddr_in6));
-    identity->remote_wot = remote_wot;
-    identity->remote_index = remote_index;
-    identity->remote_session_index = remote_session_index;
-    identity->local_id = local_id;
+    //identity->remote_wot = remote_wot;
+    //identity->remote_index = remote_index;
+    //identity->remote_session_index = remote_session_index;
+    //identity->local_id = local_id;
     memcpy(security->kem_ciphertext, kem_ciphertext, KEM_CIPHERTEXT_BYTES / 2);
     memset(kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES / 2);
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);

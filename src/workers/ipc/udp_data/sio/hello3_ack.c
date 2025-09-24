@@ -43,7 +43,7 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello3_ack_t *ohello3_ack = received_orilink_protocol->payload.orilink_hello3_ack;
-    uint64_t local_id = ohello3_ack->remote_id;
+    //uint64_t local_id = ohello3_ack->remote_id;
     uint8_t remote_nonce[AES_NONCE_BYTES];
     uint8_t kem_ciphertext[KEM_CIPHERTEXT_BYTES];
     uint8_t kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
@@ -177,6 +177,10 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
         return FAILURE;
     }
 //======================================================================
+
+    print_hex("COW MAC = ", mac_key, HASHES_BYTES, 1);
+    print_hex("COW mac = ", mac, AES_TAG_BYTES, 1);
+    
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello4(
         worker_ctx->label,
         0x01,
@@ -217,10 +221,10 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     CLOSE_IPC_PROTOCOL(&received_protocol);
 //----------------------------------------------------------------------                            
     memcpy(&identity->remote_addr, remote_addr, sizeof(struct sockaddr_in6));
-    identity->remote_wot = remote_wot;
-    identity->remote_index = remote_index;
-    identity->remote_session_index = remote_session_index;
-    identity->local_id = local_id;
+    //identity->remote_wot = remote_wot;
+    //identity->remote_index = remote_index;
+    //identity->remote_session_index = remote_session_index;
+    //identity->local_id = local_id;
     memcpy(security->remote_nonce, remote_nonce, AES_NONCE_BYTES);
     memcpy(security->kem_ciphertext + (KEM_CIPHERTEXT_BYTES / 2), kem_ciphertext + (KEM_CIPHERTEXT_BYTES / 2), KEM_CIPHERTEXT_BYTES / 2);
     memcpy(security->kem_sharedsecret, kem_sharedsecret, KEM_SHAREDSECRET_BYTES);

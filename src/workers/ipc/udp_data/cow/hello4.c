@@ -65,6 +65,9 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
 //----------------------------------------------------------------------
     uint8_t aes_key[HASHES_BYTES];
     kdf1(security->kem_sharedsecret, aes_key);
+    
+    print_hex("SIO MAC = ", security->mac_key, HASHES_BYTES, 1);
+    
 //----------------------------------------------------------------------
 // cek Mac
 //----------------------------------------------------------------------  
@@ -78,6 +81,9 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     poly1305_init(&mac_ctx0, security->mac_key);
     poly1305_update(&mac_ctx0, encrypted_remote_identity_rcvd1, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t));
     poly1305_finish(&mac_ctx0, mac0);
+    
+    print_hex("SIO mac = ", mac0, AES_TAG_BYTES, 1);
+    
     if (!poly1305_verify(mac0, data_mac)) {
         LOG_ERROR("%sFailed to Mac Tidak Sesuai.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -323,10 +329,10 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     security->local_ctr = local_ctr;
     memset(aes_key, 0, HASHES_BYTES);
     memset(remote_nonce, 0, AES_NONCE_BYTES);
-    identity->remote_wot = remote_wot;
-    identity->remote_index = remote_index;
-    identity->remote_session_index = remote_session_index;
-    identity->remote_id = remote_id;
+    //identity->remote_wot = remote_wot;
+    //identity->remote_index = remote_index;
+    //identity->remote_session_index = remote_session_index;
+    //identity->remote_id = remote_id;
     CLOSE_IPC_PROTOCOL(&received_protocol);
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
 //======================================================================

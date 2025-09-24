@@ -1,6 +1,5 @@
 #include <stdint.h>
 #include <string.h>
-#include <netinet/in.h>
 #include <stdio.h>
 #include <time.h>
 
@@ -16,6 +15,8 @@
 #include "async.h"
 #include "stdbool.h"
 #include "utilities.h"
+
+struct sockaddr_in6;
 
 status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     worker_type_t remote_wot;
@@ -128,11 +129,11 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
 //----------------------------------------------------------------------
     CLOSE_IPC_PROTOCOL(&received_protocol);
 //----------------------------------------------------------------------                            
-    memcpy(&identity->remote_addr, remote_addr, sizeof(struct sockaddr_in6));
-    identity->remote_wot = remote_wot;
-    identity->remote_index = remote_index;
-    identity->remote_session_index = remote_session_index;
-    identity->remote_id = remote_id;
+    //memcpy(&identity->remote_addr, remote_addr, sizeof(struct sockaddr_in6));
+    //identity->remote_wot = remote_wot;
+    //identity->remote_index = remote_index;
+    //identity->remote_session_index = remote_session_index;
+    //identity->remote_id = remote_id;
     memcpy(security->kem_publickey + (KEM_PUBLICKEY_BYTES / 2), kem_publickey + (KEM_PUBLICKEY_BYTES / 2), KEM_PUBLICKEY_BYTES / 2);
     memcpy(security->kem_ciphertext, kem_ciphertext, KEM_CIPHERTEXT_BYTES);
     memcpy(security->kem_sharedsecret, kem_sharedsecret, KEM_SHAREDSECRET_BYTES);

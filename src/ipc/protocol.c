@@ -779,7 +779,7 @@ status_t ipc_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac
     )
     {
         if (r->ctr != *(uint32_t *)ctr) {
-            LOG_ERROR("%sCounter tidak cocok. data_ctr: %ul, *ctr: %ul", label, r->ctr, *(uint32_t *)ctr);
+            LOG_ERROR("%sIpc Counter tidak cocok. data_ctr: %ul, *ctr: %ul", label, r->ctr, *(uint32_t *)ctr);
             free(key0);
             return FAILURE_CTRMSMTCH;
         }
@@ -809,7 +809,7 @@ status_t ipc_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac
         free(dt);
         return SUCCESS;
     } else {
-        LOG_ERROR("%sMac mismatch!", label);
+        LOG_ERROR("%sIpc Mac mismatch!", label);
         free(data_4mac);
         free(dt);
         return FAILURE_MACMSMTCH;
