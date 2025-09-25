@@ -65,6 +65,7 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
         return FAILURE;
     }
 //======================================================================
+    identity->id_connection = icow_connecti->id_connection;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello1(
         worker_ctx->label,
         0x01,
@@ -74,6 +75,7 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
         identity->local_wot,
         identity->local_index,
         identity->local_session_index,
+        identity->id_connection,
         identity->local_id,
         security->kem_publickey,
         session->hello1.sent_try_count

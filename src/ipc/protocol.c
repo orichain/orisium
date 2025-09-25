@@ -79,7 +79,7 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
                     return result;
                 }
             }
-            payload_fixed_size = sizeof(uint8_t) + SOCKADDR_IN6_SIZE;
+            payload_fixed_size = sizeof(uint8_t) + sizeof(uint64_t) + SOCKADDR_IN6_SIZE;
             payload_dynamic_size = 0;
             break;
         }
@@ -223,7 +223,7 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes, uint8_t* key
         result.status = FAILURE_OOBUF;
         return result;
     }
-    memcpy(current_buffer + offset, (uint8_t *)&p->index, sizeof(uint8_t));
+    memcpy(current_buffer + offset, &p->index, sizeof(uint8_t));
     offset += sizeof(uint8_t);
     if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
@@ -422,7 +422,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
     current_buffer_offset += IPC_VERSION_BYTES;
     memcpy((uint8_t *)&p->wot, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
-    memcpy((uint8_t *)&p->index, buffer + current_buffer_offset, sizeof(uint8_t));
+    memcpy(&p->index, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
     memcpy((uint8_t *)&p->type, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
@@ -954,7 +954,7 @@ ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, 
     r->ctr = be32toh(ctr_be);
     memcpy(r->version, b + AES_TAG_BYTES + sizeof(uint32_t), IPC_VERSION_BYTES);
     memcpy((uint8_t *)&r->wot, b + AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES, sizeof(uint8_t));
-    memcpy((uint8_t *)&r->index, b + AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES + sizeof(uint8_t), sizeof(uint8_t));
+    memcpy(&r->index, b + AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES + sizeof(uint8_t), sizeof(uint8_t));
     memcpy((uint8_t *)&r->type, b + AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t), sizeof(uint8_t));
     result.r_ipc_raw_protocol_t = r;
     result.status = SUCCESS;

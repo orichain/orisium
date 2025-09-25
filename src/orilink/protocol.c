@@ -176,6 +176,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                           sizeof(uint8_t) + 
                           sizeof(uint8_t) + 
                           sizeof(uint8_t) + 
+                          sizeof(uint64_t) + 
                           sizeof(uint8_t) + 
                           payload_fixed_size + 
                           payload_dynamic_size;
@@ -250,7 +251,7 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
         result.status = FAILURE_OOBUF;
         return result;
     }
-    memcpy(current_buffer + offset, (uint8_t *)&p->inc_ctr, sizeof(uint8_t));
+    memcpy(current_buffer + offset, &p->inc_ctr, sizeof(uint8_t));
     offset += sizeof(uint8_t);
     if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
@@ -262,13 +263,13 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
         result.status = FAILURE_OOBUF;
         return result;
     }
-    memcpy(current_buffer + offset, (uint8_t *)&p->remote_index, sizeof(uint8_t));
+    memcpy(current_buffer + offset, &p->remote_index, sizeof(uint8_t));
     offset += sizeof(uint8_t);
     if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
     }
-    memcpy(current_buffer + offset, (uint8_t *)&p->remote_session_index, sizeof(uint8_t));
+    memcpy(current_buffer + offset, &p->remote_session_index, sizeof(uint8_t));
     offset += sizeof(uint8_t);
     if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
@@ -280,14 +281,21 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
         result.status = FAILURE_OOBUF;
         return result;
     }
-    memcpy(current_buffer + offset, (uint8_t *)&p->local_index, sizeof(uint8_t));
+    memcpy(current_buffer + offset, &p->local_index, sizeof(uint8_t));
     offset += sizeof(uint8_t);
     if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
     }
-    memcpy(current_buffer + offset, (uint8_t *)&p->local_session_index, sizeof(uint8_t));
+    memcpy(current_buffer + offset, &p->local_session_index, sizeof(uint8_t));
     offset += sizeof(uint8_t);
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint64_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    uint64_t id_connection_be = htobe64(p->id_connection);
+    memcpy(current_buffer + offset, &id_connection_be, sizeof(uint64_t));
+    offset += sizeof(uint64_t);
     if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
@@ -351,6 +359,7 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
                           sizeof(uint8_t) - 
                           sizeof(uint8_t) - 
                           sizeof(uint8_t) - 
+                          sizeof(uint64_t) - 
                           sizeof(uint8_t);
         size_t data_4mac_len = offset - AES_TAG_BYTES;
         uint8_t *data = (uint8_t *)calloc(1, data_len);
@@ -400,6 +409,7 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
                 sizeof(uint8_t) + 
                 sizeof(uint8_t) + 
                 sizeof(uint8_t) + 
+                sizeof(uint64_t) +
                 sizeof(uint8_t),
             data_len
         );
@@ -426,6 +436,7 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
                 sizeof(uint8_t) + 
                 sizeof(uint8_t) + 
                 sizeof(uint8_t) + 
+                sizeof(uint64_t) +
                 sizeof(uint8_t),
             encrypted_data,
             data_len
@@ -488,6 +499,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
             sizeof(uint8_t) + 
             sizeof(uint8_t) + 
             sizeof(uint8_t) + 
+            sizeof(uint64_t) +
             sizeof(uint8_t)
         )
     )
@@ -516,20 +528,24 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
     current_buffer_offset += sizeof(uint32_t);
     memcpy(p->version, buffer, ORILINK_VERSION_BYTES);
     current_buffer_offset += ORILINK_VERSION_BYTES;
-    memcpy((uint8_t *)&p->inc_ctr, buffer + current_buffer_offset, sizeof(uint8_t));
+    memcpy(&p->inc_ctr, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
     memcpy((uint8_t *)&p->remote_wot, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
-    memcpy((uint8_t *)&p->remote_index, buffer + current_buffer_offset, sizeof(uint8_t));
+    memcpy(&p->remote_index, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
-    memcpy((uint8_t *)&p->remote_session_index, buffer + current_buffer_offset, sizeof(uint8_t));
+    memcpy(&p->remote_session_index, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
     memcpy((uint8_t *)&p->local_wot, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
-    memcpy((uint8_t *)&p->local_index, buffer + current_buffer_offset, sizeof(uint8_t));
+    memcpy(&p->local_index, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
-    memcpy((uint8_t *)&p->local_session_index, buffer + current_buffer_offset, sizeof(uint8_t));
+    memcpy(&p->local_session_index, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
+    uint64_t id_connection_be;
+    memcpy(&id_connection_be, buffer + current_buffer_offset, sizeof(uint64_t));
+    p->id_connection = be64toh(id_connection_be);
+    current_buffer_offset += sizeof(uint64_t);
     memcpy((uint8_t *)&p->type, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
     uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
@@ -559,6 +575,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
                           sizeof(uint8_t) - 
                           sizeof(uint8_t) - 
                           sizeof(uint8_t) - 
+                          sizeof(uint64_t) -
                           sizeof(uint8_t);
         uint8_t *data = (uint8_t *)calloc(1, data_len);
         if (!data) {
@@ -600,6 +617,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
                 sizeof(uint8_t) + 
                 sizeof(uint8_t) + 
                 sizeof(uint8_t) + 
+                sizeof(uint64_t) +
                 sizeof(uint8_t), 
             data_len
         );
@@ -626,6 +644,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
                 sizeof(uint8_t) + 
                 sizeof(uint8_t) + 
                 sizeof(uint8_t) + 
+                sizeof(uint64_t) +
                 sizeof(uint8_t), 
             decrypted_data, 
             data_len
@@ -996,7 +1015,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         sizeof(uint32_t), 
         ORILINK_VERSION_BYTES
     );
-    memcpy((uint8_t *)&r->inc_ctr,
+    memcpy(&r->inc_ctr,
         b +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
@@ -1011,7 +1030,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         sizeof(uint8_t),
         sizeof(uint8_t)
     );
-    memcpy((uint8_t *)&r->remote_index,
+    memcpy(&r->remote_index,
         b +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
@@ -1020,7 +1039,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         sizeof(uint8_t),
         sizeof(uint8_t)
     );
-    memcpy((uint8_t *)&r->remote_session_index,
+    memcpy(&r->remote_session_index,
         b +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
@@ -1041,7 +1060,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         sizeof(uint8_t),
         sizeof(uint8_t)
     );
-    memcpy((uint8_t *)&r->local_index,
+    memcpy(&r->local_index,
         b +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
@@ -1053,7 +1072,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         sizeof(uint8_t),
         sizeof(uint8_t)
     );
-    memcpy((uint8_t *)&r->local_session_index,
+    memcpy(&r->local_session_index,
         b +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
@@ -1066,6 +1085,22 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         sizeof(uint8_t),
         sizeof(uint8_t)
     );
+    uint64_t id_connection_be;
+    memcpy(&id_connection_be,
+        b +
+        AES_TAG_BYTES +
+        sizeof(uint32_t) +
+        ORILINK_VERSION_BYTES +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t),
+        sizeof(uint64_t)
+    );
+    r->id_connection = be64toh(id_connection_be);
     memcpy((uint8_t *)&r->type,
         b +
         AES_TAG_BYTES +
@@ -1077,7 +1112,8 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         sizeof(uint8_t) +
         sizeof(uint8_t) +
         sizeof(uint8_t) +
-        sizeof(uint8_t),
+        sizeof(uint8_t) +
+        sizeof(uint64_t),
         sizeof(uint8_t)
     );
     result.r_orilink_raw_protocol_t = r;
@@ -1107,7 +1143,7 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
         sizeof(uint32_t), 
         ORILINK_VERSION_BYTES
     );
-    memcpy((uint8_t *)&oudp_datao->inc_ctr,
+    memcpy(&oudp_datao->inc_ctr,
         oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
@@ -1122,7 +1158,7 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
         sizeof(uint8_t),
         sizeof(uint8_t)
     );
-    memcpy((uint8_t *)&oudp_datao->remote_index,
+    memcpy(&oudp_datao->remote_index,
         oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
@@ -1131,7 +1167,7 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
         sizeof(uint8_t),
         sizeof(uint8_t)
     );
-    memcpy((uint8_t *)&oudp_datao->remote_session_index,
+    memcpy(&oudp_datao->remote_session_index,
         oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
@@ -1152,7 +1188,7 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
         sizeof(uint8_t),
         sizeof(uint8_t)
     );
-    memcpy((uint8_t *)&oudp_datao->local_index,
+    memcpy(&oudp_datao->local_index,
         oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
@@ -1164,7 +1200,7 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
         sizeof(uint8_t),
         sizeof(uint8_t)
     );
-    memcpy((uint8_t *)&oudp_datao->local_session_index,
+    memcpy(&oudp_datao->local_session_index,
         oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
@@ -1177,6 +1213,23 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
         sizeof(uint8_t),
         sizeof(uint8_t)
     );
+    
+    uint64_t id_connection_be;
+    memcpy(&id_connection_be,
+        oudp_datao->recv_buffer +
+        AES_TAG_BYTES +
+        sizeof(uint32_t) +
+        ORILINK_VERSION_BYTES +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t),
+        sizeof(uint64_t)
+    );
+    oudp_datao->id_connection = be64toh(id_connection_be);
     memcpy((uint8_t *)&oudp_datao->type,
         oudp_datao->recv_buffer +
         AES_TAG_BYTES +
@@ -1188,7 +1241,8 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
         sizeof(uint8_t) +
         sizeof(uint8_t) +
         sizeof(uint8_t) +
-        sizeof(uint8_t),
+        sizeof(uint8_t) +
+        sizeof(uint64_t),
         sizeof(uint8_t)
     );
     return SUCCESS;

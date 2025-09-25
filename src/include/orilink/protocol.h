@@ -22,6 +22,7 @@ typedef enum {
 } orilink_protocol_type_t;
 
 typedef struct {
+    uint64_t id_connection;
     struct sockaddr_in6 remote_addr;
     worker_type_t remote_wot;
     uint8_t remote_index;
@@ -121,6 +122,7 @@ typedef struct {
     worker_type_t local_wot;
     uint8_t local_index;
     uint8_t local_session_index;
+    uint64_t id_connection;
 	orilink_protocol_type_t type;
 	union {
         orilink_hello1_t *orilink_hello1;
@@ -206,6 +208,7 @@ typedef struct {
     worker_type_t local_wot;
     uint8_t local_index;
     uint8_t local_session_index;
+    uint64_t id_connection;
 	orilink_protocol_type_t type;
 } orilink_raw_protocol_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan

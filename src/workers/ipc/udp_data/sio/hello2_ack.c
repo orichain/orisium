@@ -83,6 +83,7 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
         identity->local_wot,
         identity->local_index,
         identity->local_session_index,
+        identity->id_connection,
         local_id,
         session->hello3.sent_try_count
     );

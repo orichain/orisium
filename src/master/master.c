@@ -47,12 +47,16 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
         for(uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
             master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].in_use = false;
             master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].sio_index = 0xff;
+            memset(&master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].remote_addr, 0, sizeof(struct sockaddr_in6));
+            master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].id_connection = 0xffffffffffffffff;
         }
     }
     for (uint8_t cow_worker_idx=0;cow_worker_idx<MAX_COW_WORKERS; ++cow_worker_idx) {
         for(uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
             master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].in_use = false;
             master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].cow_index = 0xff;
+            memset(&master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].remote_addr, 0, sizeof(struct sockaddr_in6));
+            master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].id_connection = 0xffffffffffffffff;
         }
     }
     master_ctx->shutdown_requested = 0;
@@ -93,12 +97,16 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
         for(uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
             master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].in_use = false;
             master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].sio_index = 0xff;
+            memset(&master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].remote_addr, 0, sizeof(struct sockaddr_in6));
+            master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].id_connection = 0xffffffffffffffff;
         }
     }
     for (uint8_t cow_worker_idx=0;cow_worker_idx<MAX_COW_WORKERS; ++cow_worker_idx) {
         for(uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
             master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].in_use = false;
             master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].cow_index = 0xff;
+            memset(&master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].remote_addr, 0, sizeof(struct sockaddr_in6));
+            master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].id_connection = 0xffffffffffffffff;
         }
     }
     free(master_ctx->sio_c_session);
@@ -336,7 +344,11 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                         master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                         continue;
                                     }
-                                    if (master_cow_connect(label, master_ctx, &master_ctx->bootstrap_nodes.addr[ic], cow_worker_idx, slot_found) != SUCCESS) goto exit;
+                                    uint64_t *id_connection = &master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + slot_found].id_connection;
+                                    struct sockaddr_in6 *remote_addr = &master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + slot_found].remote_addr;
+                                    if (generate_uint64_t_id(label, id_connection) != SUCCESS) goto exit;
+                                    memcpy(remote_addr, &master_ctx->bootstrap_nodes.addr[ic], sizeof(struct sockaddr_in6));
+                                    if (master_cow_connect(label, master_ctx, remote_addr, cow_worker_idx, slot_found, *id_connection) != SUCCESS) goto exit;
                                 }
                                 if (setup_master_socket_udp(label, master_ctx) != SUCCESS) {
                                     LOG_ERROR("%sFailed to setup_master_socket_udp. Initiating graceful shutdown...", label);

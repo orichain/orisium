@@ -20,6 +20,7 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
     worker_type_t remote_wot;
     uint8_t remote_index;
     uint8_t remote_session_index;
+    uint64_t rcvd_id_connection;
     orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
         (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n
@@ -33,6 +34,7 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
         remote_wot = oudp_datao->local_wot;
         remote_index = oudp_datao->local_index;
         remote_session_index = oudp_datao->local_session_index;
+        rcvd_id_connection = oudp_datao->id_connection;
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
     }
@@ -73,6 +75,7 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
         return FAILURE;
     }
 //======================================================================
+    identity->id_connection = rcvd_id_connection;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello1_ack(
         worker_ctx->label,
         0x01,
@@ -82,6 +85,7 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
         identity->local_wot,
         identity->local_index,
         identity->local_session_index,
+        identity->id_connection,
         remote_id,
         session->hello1_ack.ack_sent_try_count
     );

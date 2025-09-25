@@ -126,11 +126,15 @@ typedef struct {
 typedef struct {
 	uint8_t sio_index;
     bool in_use;
+    uint64_t id_connection;
+    struct sockaddr_in6 remote_addr;
 } master_sio_c_session_t;
 
 typedef struct {
 	uint8_t cow_index;
     bool in_use;
+    uint64_t id_connection;
+    struct sockaddr_in6 remote_addr;
 } master_cow_c_session_t;
 
 typedef struct {

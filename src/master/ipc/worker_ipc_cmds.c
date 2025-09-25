@@ -112,11 +112,11 @@ status_t master_workers_info(const char *label, master_context_t *master_ctx, in
 	return SUCCESS;
 }
 
-status_t master_cow_connect(const char *label, master_context_t *master_ctx, struct sockaddr_in6 *addr, uint8_t index, uint8_t session_index) {
+status_t master_cow_connect(const char *label, master_context_t *master_ctx, struct sockaddr_in6 *addr, uint8_t index, uint8_t session_index, uint64_t id_addr) {
     master_cow_session_t *session = &master_ctx->cow_session[index];
     worker_rekeying_t *rekeying = &session->rekeying;
     if (!rekeying) return FAILURE;
-	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_cow_connect(label, COW, index, session_index, addr);
+	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_cow_connect(label, COW, index, session_index, id_addr, addr);
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }

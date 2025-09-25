@@ -77,6 +77,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_hello2_ack(
     worker_type_t local_wot, 
     uint8_t local_index, 
     uint8_t local_session_index, 
+    uint64_t id_connection,
     uint64_t remote_id, 
     uint8_t *ciphertext, 
     uint8_t trycount
@@ -99,6 +100,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_hello2_ack(
     result.r_orilink_protocol_t->local_wot = local_wot;
     result.r_orilink_protocol_t->local_index = local_index;
     result.r_orilink_protocol_t->local_session_index = local_session_index;
+    result.r_orilink_protocol_t->id_connection = id_connection;
 	result.r_orilink_protocol_t->type = ORILINK_HELLO2_ACK;
 	orilink_hello2_ack_t *payload = (orilink_hello2_ack_t *)calloc(1, sizeof(orilink_hello2_ack_t));
 	if (!payload) {

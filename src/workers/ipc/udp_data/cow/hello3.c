@@ -88,6 +88,7 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
         identity->local_wot,
         identity->local_index,
         identity->local_session_index,
+        identity->id_connection,
         remote_id,
         local_nonce,
         security->kem_ciphertext,

@@ -40,6 +40,7 @@ typedef struct {
 
 typedef struct {
     uint8_t session_index;
+    uint64_t id_connection;
     struct sockaddr_in6 remote_addr;
 } ipc_master_cow_connect_t;
 

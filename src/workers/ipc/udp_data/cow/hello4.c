@@ -291,6 +291,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         identity->local_wot,
         identity->local_index,
         identity->local_session_index,
+        identity->id_connection,
         encrypted_remote_identity1,
         encrypted_local_identity1,
         session->hello4_ack.ack_sent_try_count

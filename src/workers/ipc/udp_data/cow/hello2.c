@@ -98,6 +98,7 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
         identity->local_wot,
         identity->local_index,
         identity->local_session_index,
+        identity->id_connection,
         remote_id,
         kem_ciphertext,
         session->hello2_ack.ack_sent_try_count
