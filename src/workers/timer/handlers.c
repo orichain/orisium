@@ -238,8 +238,8 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     return SUCCESS;
                 } else if (*current_fd == session->hello4_ack.ack_timer_fd) {
 //----------------------------------------------------------------------
-// Waiting For First Heartbeat => 1. (MAX_RETRY - 2)
-//                                2. session->hello4_ack.interval_ack_timer_fd = (double)15 * pow((double)2, (double)session->retry.value_prediction);
+// Waiting For First Heartbeat => 1. UDP_HEARTBEAT_MAX_RETRY
+//                                2. session->hello4_ack.interval_ack_timer_fd = (double)UDP_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
 //----------------------------------------------------------------------
                     uint64_t u;
                     read(session->hello4_ack.ack_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
@@ -265,7 +265,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     LOG_DEVEL_DEBUG("%sWaiting For First Heartbeat. Session %d: interval = %lf.", worker_ctx->label, i, session->hello4_ack.interval_ack_timer_fd);
                     double try_count = (double)session->hello4_ack.ack_sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
-                    session->hello4_ack.interval_ack_timer_fd = (double)15 * pow((double)2, (double)session->retry.value_prediction);
+                    session->hello4_ack.interval_ack_timer_fd = (double)UDP_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
                     if (retry_hello_ack(worker_ctx, session, &session->hello4_ack) != SUCCESS) {
                         continue;
                     }

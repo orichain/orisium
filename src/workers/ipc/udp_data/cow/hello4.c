@@ -263,9 +263,9 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     session->hello4_ack.ack_sent_try_count++;
     session->hello4_ack.ack_sent_time = current_time.r_uint64_t;
 //----------------------------------------------------------------------
-// Waiting For First Heartbeat => 1. session->hello4_ack.interval_ack_timer_fd = (double)15;
+// Waiting For First Heartbeat => 1. session->hello4_ack.interval_ack_timer_fd = (double)UDP_HEARTBEAT_INTERVAL;
 //----------------------------------------------------------------------
-    session->hello4_ack.interval_ack_timer_fd = (double)15;
+    session->hello4_ack.interval_ack_timer_fd = (double)UDP_HEARTBEAT_INTERVAL;
     if (async_set_timerfd_time(worker_ctx->label, &session->hello4_ack.ack_timer_fd,
         (time_t)session->hello4_ack.interval_ack_timer_fd,
         (long)((session->hello4_ack.interval_ack_timer_fd - (time_t)session->hello4_ack.interval_ack_timer_fd) * 1e9),

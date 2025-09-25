@@ -113,8 +113,13 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
         case ORILINK_HELLO4:
         case ORILINK_HELLO4_ACK: {
             worker_type_t wot = orcvdo.r_orilink_raw_protocol_t->remote_wot;
+            uint8_t index = orcvdo.r_orilink_raw_protocol_t->remote_index;
             switch (wot) {
                 case SIO: {
+                    if (index > MAX_CONNECTION_PER_SIO_WORKER) {
+                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                        return SUCCESS;
+                    }
                     bool not_exist = true;
                     for(uint16_t i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
                         master_sio_c_session_t *c_session = &master_ctx->sio_c_session[i];
@@ -137,6 +142,10 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                     break;
                 }
                 case COW: {
+                    if (index > MAX_CONNECTION_PER_COW_WORKER) {
+                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                        return SUCCESS;
+                    }
                     bool not_exist = true;
                     for(uint16_t i = 0; i < MAX_MASTER_COW_SESSIONS; ++i) {
                         master_cow_c_session_t *c_session = &master_ctx->cow_c_session[i];
@@ -162,7 +171,6 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                     CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                     return SUCCESS;
             }
-            int index = orcvdo.r_orilink_raw_protocol_t->remote_index;
             uint8_t session_index = orcvdo.r_orilink_raw_protocol_t->remote_session_index;
             if (master_worker_udp_data(label, master_ctx, wot, index, session_index, &remote_addr, orcvdo.r_orilink_raw_protocol_t) != SUCCESS) {
                 CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
