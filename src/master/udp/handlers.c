@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 #include "log.h"
 #include "orilink/protocol.h"
@@ -15,6 +16,7 @@
 #include "constants.h"
 #include "stdbool.h"
 #include "master/ipc/worker_ipc_cmds.h"
+#include "utilities.h"
 
 status_t handle_master_udp_sock_event(const char *label, master_context_t *master_ctx) {
     struct sockaddr_in6 remote_addr;
@@ -52,6 +54,23 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
     }
     switch (orcvdo.r_orilink_raw_protocol_t->type) {
         case ORILINK_HELLO1: {
+//======================================================================
+            for(uint16_t i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
+                master_sio_c_session_t *c_session = &master_ctx->sio_c_session[i];
+                if(c_session->in_use) {
+                    if (sockaddr_equal((const struct sockaddr *)&remote_addr, (const struct sockaddr *)&c_session->remote_addr)) {
+                        LOG_ERROR("%sConnection From Ip Address %s Port %s Already Exist.", label, host_str, port_str);
+                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                        return SUCCESS;
+                    }
+                    if (c_session->id_connection == orcvdo.r_orilink_raw_protocol_t->id_connection) {
+                        LOG_ERROR("%sId Connection %" PRIu64 " Already Exist.", label, c_session->id_connection);
+                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                        return SUCCESS;
+                    }
+                }
+            }
+//======================================================================
             int sio_worker_idx = select_best_worker(label, master_ctx, SIO);
             if (sio_worker_idx == -1) {
                 LOG_ERROR("%sFailed to select an SIO worker for new task.", label);
@@ -81,6 +100,8 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                 CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 return FAILURE;
             }
+            master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + slot_found].id_connection = orcvdo.r_orilink_raw_protocol_t->id_connection;
+            memcpy(&master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + slot_found].remote_addr, &remote_addr, sizeof(struct sockaddr_in6));
             CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
 			break;
 		}
@@ -92,6 +113,55 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
         case ORILINK_HELLO4:
         case ORILINK_HELLO4_ACK: {
             worker_type_t wot = orcvdo.r_orilink_raw_protocol_t->remote_wot;
+            switch (wot) {
+                case SIO: {
+                    bool not_exist = true;
+                    for(uint16_t i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
+                        master_sio_c_session_t *c_session = &master_ctx->sio_c_session[i];
+                        if(c_session->in_use) {
+                            if (
+                                sockaddr_equal((const struct sockaddr *)&remote_addr, (const struct sockaddr *)&c_session->remote_addr) &&
+                                c_session->id_connection == orcvdo.r_orilink_raw_protocol_t->id_connection
+                            )
+                            {
+                                not_exist = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (not_exist) {
+                        LOG_ERROR("%sNo Connection Exist From Ip Address %s Port %s Id Connection %" PRIu64 ".", label, host_str, port_str, orcvdo.r_orilink_raw_protocol_t->id_connection);
+                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                        return SUCCESS;
+                    }
+                    break;
+                }
+                case COW: {
+                    bool not_exist = true;
+                    for(uint16_t i = 0; i < MAX_MASTER_COW_SESSIONS; ++i) {
+                        master_cow_c_session_t *c_session = &master_ctx->cow_c_session[i];
+                        if(c_session->in_use) {
+                            if (
+                                sockaddr_equal((const struct sockaddr *)&remote_addr, (const struct sockaddr *)&c_session->remote_addr) &&
+                                c_session->id_connection == orcvdo.r_orilink_raw_protocol_t->id_connection
+                            )
+                            {
+                                not_exist = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (not_exist) {
+                        LOG_ERROR("%sNo Connection Exist From Ip Address %s Port %s Id Connection %" PRIu64 ".", label, host_str, port_str, orcvdo.r_orilink_raw_protocol_t->id_connection);
+                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                        return SUCCESS;
+                    }
+                    break;
+                }
+                default:
+                    CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                    return SUCCESS;
+            }
             int index = orcvdo.r_orilink_raw_protocol_t->remote_index;
             uint8_t session_index = orcvdo.r_orilink_raw_protocol_t->remote_session_index;
             if (master_worker_udp_data(label, master_ctx, wot, index, session_index, &remote_addr, orcvdo.r_orilink_raw_protocol_t) != SUCCESS) {
