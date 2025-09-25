@@ -12,6 +12,7 @@
 #include "workers/workers.h"
 #include "pqc.h"
 #include "stdbool.h"
+#include "ipc/protocol.h"
 
 status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
     ctx->pid = getpid();
@@ -49,6 +50,11 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
     ctx->hello1_ack_rcvd = false;
     ctx->hello2_sent = false;
     ctx->hello2_ack_rcvd = false;
+//----------------------------------------------------------------------
+// Setup IPC rekeying
+//----------------------------------------------------------------------
+    ctx->is_rekeying = false;
+    ctx->rekeying_queue = NULL;
 //----------------------------------------------------------------------	
 	if (async_create(ctx->label, &ctx->async) != SUCCESS) return FAILURE;
 	if (async_create_incoming_event_with_disconnect(ctx->label, &ctx->async, ctx->master_uds_fd) != SUCCESS) return FAILURE;
@@ -79,6 +85,8 @@ void cleanup_worker(worker_context_t *ctx) {
     ctx->hello1_ack_rcvd = false;
     ctx->hello2_sent = false;
     ctx->hello2_ack_rcvd = false;
+    ctx->is_rekeying = false;
+    ipc_cleanup_protocol_queue(ctx->rekeying_queue);
     async_delete_event(ctx->label, &ctx->async, ctx->master_uds_fd);
     CLOSE_FD(ctx->master_uds_fd);
 	async_delete_event(ctx->label, &ctx->async, &ctx->heartbeat_timer_fd);

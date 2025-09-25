@@ -101,6 +101,8 @@ typedef struct {
     bool hello1_ack_rcvd;
     bool hello2_sent;
     bool hello2_ack_rcvd;
+    bool is_rekeying;
+    ipc_protocol_queue_t *rekeying_queue;
 } worker_context_t;
 
 status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *wot, uint8_t *index, int *master_uds_fd);

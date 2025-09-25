@@ -141,6 +141,7 @@ typedef struct {
 //----------------------------------------------------------------------
     bool all_workers_is_ready;
     bool is_rekeying;
+    ipc_protocol_queue_t *rekeying_queue;
 //----------------------------------------------------------------------    
     master_sio_session_t *sio_session;
     master_logic_session_t *logic_session;

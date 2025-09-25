@@ -21,6 +21,7 @@
 #include "master/worker_metrics.h"
 #include "master/worker_selector.h"
 #include "node.h"
+#include "ipc/protocol.h"
 
 volatile sig_atomic_t shutdown_requested = 0;
 int *shutdown_event_fd = NULL;
@@ -46,6 +47,7 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
     master_ctx->shutdown_requested = 0;
     master_ctx->hb_check_times = (uint16_t)0;
     master_ctx->is_rekeying = false;
+    master_ctx->rekeying_queue = NULL;
     master_ctx->all_workers_is_ready = false;
     master_ctx->last_sio_rr_idx = 0;
     master_ctx->last_cow_rr_idx = 0;
@@ -80,6 +82,7 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     free(master_ctx->sio_c_session);
     free(master_ctx->cow_c_session);
     master_ctx->is_rekeying = false;
+    ipc_cleanup_protocol_queue(master_ctx->rekeying_queue);
     master_ctx->all_workers_is_ready = false;
     master_ctx->last_sio_rr_idx = 0;
     master_ctx->last_cow_rr_idx = 0;

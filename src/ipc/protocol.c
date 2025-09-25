@@ -924,6 +924,18 @@ ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, 
     result.status = SUCCESS;
     return result;
 }
+
+void ipc_cleanup_protocol_queue(ipc_protocol_queue_t *head) {
+    ipc_protocol_queue_t *current = head;
+    ipc_protocol_queue_t *next;
+    while (current != NULL) {
+        next = current->next;
+        CLOSE_IPC_PROTOCOL(&current->p);
+        free(current);
+        current = next;
+    }
+    head = NULL;
+}
 /*
 ssize_t_status_t send_ipc_protocol_message_wfdtopass(const char *label, int *uds_fd, const ipc_protocol_t* p, int *fd_to_pass) {
 	ssize_t_status_t result;
