@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <endian.h>
+#include <stdlib.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -104,26 +105,53 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
         CLOSE_IPC_PROTOCOL(&received_protocol);
         return FAILURE;
     }
+    if (!worker_ctx->is_rekeying) {
 //----------------------------------------------------------------------
 // Aktifkan Heartbeat Karna security/Enkripsi Sudah Ready
 //---------------------------------------------------------------------- 
-    if (async_create_timerfd(worker_ctx->label, &worker_ctx->heartbeat_timer_fd) != SUCCESS) {
-        LOG_ERROR("%sWorker error async_create_timerfd...", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        return FAILURE;
-    }
-    if (async_set_timerfd_time(worker_ctx->label, &worker_ctx->heartbeat_timer_fd,
-        WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT, 0,
-        WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT, 0) != SUCCESS)
-    {
-        LOG_ERROR("%sWorker error async_set_timerfd_time...", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        return FAILURE;
-    }
-    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->heartbeat_timer_fd) != SUCCESS) {
-        LOG_ERROR("%sWorker error async_create_incoming_event...", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        return FAILURE;
+        if (async_create_timerfd(worker_ctx->label, &worker_ctx->heartbeat_timer_fd) != SUCCESS) {
+            LOG_ERROR("%sWorker error async_create_timerfd...", worker_ctx->label);
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            return FAILURE;
+        }
+        if (async_set_timerfd_time(worker_ctx->label, &worker_ctx->heartbeat_timer_fd,
+            WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT, 0,
+            WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT, 0) != SUCCESS)
+        {
+            LOG_ERROR("%sWorker error async_set_timerfd_time...", worker_ctx->label);
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            return FAILURE;
+        }
+        if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->heartbeat_timer_fd) != SUCCESS) {
+            LOG_ERROR("%sWorker error async_create_incoming_event...", worker_ctx->label);
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            return FAILURE;
+        }
+    } else {
+        worker_ctx->is_rekeying = false;
+        ipc_protocol_queue_t *current = worker_ctx->rekeying_queue;
+        ipc_protocol_queue_t *next;
+        while (current != NULL) {
+            next = current->next;
+            ssize_t_status_t send_result = send_ipc_protocol_message(
+                worker_ctx->label, 
+                worker_ctx->aes_key,
+                worker_ctx->mac_key,
+                worker_ctx->local_nonce,
+                &worker_ctx->local_ctr,
+                current->uds_fd,
+                current->p
+            );
+            if (send_result.status != SUCCESS) {
+                LOG_ERROR("%sFailed to sent rekeying queue data to Master.", worker_ctx->label);
+            } else {
+                LOG_DEBUG("%sSent rekeying queue data to Master.", worker_ctx->label);
+            }
+            CLOSE_IPC_PROTOCOL(&current->p);
+            free(current);
+            current = next;
+        }
+        worker_ctx->rekeying_queue = NULL;
     }
 //----------------------------------------------------------------------
 // Menganggap data valid dengan integritas

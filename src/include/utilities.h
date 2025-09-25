@@ -75,39 +75,7 @@ static inline status_t generate_nonce(const char* label, uint8_t *out_nonce) {
     return SUCCESS;
 }
 
-static inline status_t generate_connection_id(const char* label, uint64_t *out_id) {
-    if (out_id == NULL) {
-        LOG_ERROR("%sError: out_id cannot be NULL.", label);
-        return FAILURE;
-    }
-    uint8_t output[8];
-    uint64_t output_be;
-    if (randombytes(output, 8) != 0) {
-        LOG_ERROR("%sError: randombytes.", label);
-        return FAILURE;
-    }
-    memcpy(&output_be, output, 8);
-    *out_id = be64toh(output_be);
-    return SUCCESS;
-}
-
-static inline status_t generate_heartbeat_id(const char* label, uint64_t *out_id) {
-    if (out_id == NULL) {
-        LOG_ERROR("%sError: out_id cannot be NULL.", label);
-        return FAILURE;
-    }
-    uint8_t output[8];
-    uint64_t output_be;
-    if (randombytes(output, 8) != 0) {
-        LOG_ERROR("%sError: randombytes.", label);
-        return FAILURE;
-    }
-    memcpy(&output_be, output, 8);
-    *out_id = be64toh(output_be);
-    return SUCCESS;
-}
-
-static inline status_t generate_stream_id(const char* label, uint64_t *out_id) {
+static inline status_t generate_uint64_t_id(const char* label, uint64_t *out_id) {
     if (out_id == NULL) {
         LOG_ERROR("%sError: out_id cannot be NULL.", label);
         return FAILURE;

@@ -21,7 +21,6 @@
 #include "master/worker_metrics.h"
 #include "master/worker_selector.h"
 #include "node.h"
-#include "ipc/protocol.h"
 
 volatile sig_atomic_t shutdown_requested = 0;
 int *shutdown_event_fd = NULL;
@@ -47,7 +46,6 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
     master_ctx->shutdown_requested = 0;
     master_ctx->hb_check_times = (uint16_t)0;
     master_ctx->is_rekeying = false;
-    master_ctx->rekeying_queue = NULL;
     master_ctx->all_workers_is_ready = false;
     master_ctx->last_sio_rr_idx = 0;
     master_ctx->last_cow_rr_idx = 0;
@@ -81,8 +79,9 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     free(master_ctx->dbw_session);
     free(master_ctx->sio_c_session);
     free(master_ctx->cow_c_session);
+    master_ctx->shutdown_requested = 0;
+    master_ctx->hb_check_times = (uint16_t)0;
     master_ctx->is_rekeying = false;
-    ipc_cleanup_protocol_queue(master_ctx->rekeying_queue);
     master_ctx->all_workers_is_ready = false;
     master_ctx->last_sio_rr_idx = 0;
     master_ctx->last_cow_rr_idx = 0;
@@ -132,58 +131,8 @@ void run_master(const char *label, master_context_t *master_ctx) {
                 master_ctx->hb_check_times++;
                 if (master_ctx->hb_check_times >= REKEYING_HB_TIMES) {
                     master_ctx->hb_check_times = (uint16_t)0;
-                    if (async_delete_event(label, &master_ctx->master_async, &master_ctx->heartbeat_timer_fd) != SUCCESS) {		
-                        LOG_INFO("%sGagal async_delete_event hb checker, Untuk Rekeying", label);
-                        continue;
-                    }
-                    CLOSE_FD(&master_ctx->heartbeat_timer_fd);
-                    for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-                        master_sio_session_t *session = &master_ctx->sio_session[i];
-                        worker_security_t *security = &session->security;
-                        session->isready = false;
-                        security->hello1_rcvd = false;
-                        security->hello1_ack_sent = false;
-                        security->hello2_rcvd = false;
-                        security->hello2_ack_sent = false;
-                    }
-                    for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) { 
-                        master_logic_session_t *session = &master_ctx->logic_session[i];
-                        worker_security_t *security = &session->security;
-                        session->isready = false;
-                        security->hello1_rcvd = false;
-                        security->hello1_ack_sent = false;
-                        security->hello2_rcvd = false;
-                        security->hello2_ack_sent = false;
-                    }
-                    for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
-                        master_cow_session_t *session = &master_ctx->cow_session[i];
-                        worker_security_t *security = &session->security;
-                        session->isready = false;
-                        security->hello1_rcvd = false;
-                        security->hello1_ack_sent = false;
-                        security->hello2_rcvd = false;
-                        security->hello2_ack_sent = false;
-                    }
-                    for (int i = 0; i < MAX_DBR_WORKERS; ++i) { 
-                        master_dbr_session_t *session = &master_ctx->dbr_session[i];
-                        worker_security_t *security = &session->security;
-                        session->isready = false;
-                        security->hello1_rcvd = false;
-                        security->hello1_ack_sent = false;
-                        security->hello2_rcvd = false;
-                        security->hello2_ack_sent = false;
-                    }
-                    for (int i = 0; i < MAX_DBW_WORKERS; ++i) { 
-                        master_dbw_session_t *session = &master_ctx->dbw_session[i];
-                        worker_security_t *security = &session->security;
-                        session->isready = false;
-                        security->hello1_rcvd = false;
-                        security->hello1_ack_sent = false;
-                        security->hello2_rcvd = false;
-                        security->hello2_ack_sent = false;
-                    }
-                    master_ctx->all_workers_is_ready = false;
                     master_ctx->is_rekeying = true;
+                    master_ctx->all_workers_is_ready = false;
                     master_workers_info(label, master_ctx, IT_REKEYING);
                 } else {
                     if (check_workers_healthy(label, master_ctx) != SUCCESS) continue;
@@ -275,66 +224,65 @@ void run_master(const char *label, master_context_t *master_ctx) {
 // All Worker Ready To Comunication In Secure Encription
 //----------------------------------------------------------------------
                         if (hie_rslt == SUCCESS_WRKSRDY) {
-                            uint64_t_status_t rt = get_realtime_time_ns(label);
-                            uint64_t now_ns = rt.r_uint64_t;
-                            for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-                                worker_metrics_t *metrics = &master_ctx->sio_session[i].metrics;
-                                metrics->last_checkhealthy = now_ns;
-                                metrics->count_ack = (double)0;
-                                metrics->hbtime = (double)0;
-                                metrics->sum_hbtime = metrics->hbtime;
-                            }
-                            for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) { 
-                                worker_metrics_t *metrics = &master_ctx->logic_session[i].metrics;
-                                metrics->last_checkhealthy = now_ns;
-                                metrics->count_ack = (double)0;
-                                metrics->hbtime = (double)0;
-                                metrics->sum_hbtime = metrics->hbtime;
-                            }
-                            for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
-                                worker_metrics_t *metrics = &master_ctx->cow_session[i].metrics;
-                                metrics->last_checkhealthy = now_ns;
-                                metrics->count_ack = (double)0;
-                                metrics->hbtime = (double)0;
-                                metrics->sum_hbtime = metrics->hbtime;
-                            }
-                            for (int i = 0; i < MAX_DBR_WORKERS; ++i) { 
-                                worker_metrics_t *metrics = &master_ctx->dbr_session[i].metrics;
-                                metrics->last_checkhealthy = now_ns;
-                                metrics->count_ack = (double)0;
-                                metrics->hbtime = (double)0;
-                                metrics->sum_hbtime = metrics->hbtime;
-                            }
-                            for (int i = 0; i < MAX_DBW_WORKERS; ++i) { 
-                                worker_metrics_t *metrics = &master_ctx->dbw_session[i].metrics;
-                                metrics->last_checkhealthy = now_ns;
-                                metrics->count_ack = (double)0;
-                                metrics->hbtime = (double)0;
-                                metrics->sum_hbtime = metrics->hbtime;
-                            }
-                            if (async_create_timerfd(label, &master_ctx->heartbeat_timer_fd) != SUCCESS) {
-                                LOG_INFO("%sGagal async_create_timerfd hb checker. Initiating graceful shutdown...", label);
-                                master_ctx->shutdown_requested = 1;
-                                master_workers_info(label, master_ctx, IT_SHUTDOWN);
-                                continue;
-                            }
-                            if (async_set_timerfd_time(label, &master_ctx->heartbeat_timer_fd,
-                                WORKER_HEARTBEATSEC_TIMEOUT, 0,
-                                WORKER_HEARTBEATSEC_TIMEOUT, 0) != SUCCESS)
-                            {
-                                LOG_INFO("%sGagal async_set_timerfd_time hb checker. Initiating graceful shutdown...", label);
-                                master_ctx->shutdown_requested = 1;
-                                master_workers_info(label, master_ctx, IT_SHUTDOWN);
-                                continue;
-                            }
-                            if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->heartbeat_timer_fd) != SUCCESS) {
-                                LOG_INFO("%sGagal async_create_incoming_event hb checker. Initiating graceful shutdown...", label);
-                                master_ctx->shutdown_requested = 1;
-                                master_workers_info(label, master_ctx, IT_SHUTDOWN);
-                                continue;
-                            }
                             if (!master_ctx->is_rekeying) {
-                                master_ctx->is_rekeying = false;
+                                uint64_t_status_t rt = get_realtime_time_ns(label);
+                                uint64_t now_ns = rt.r_uint64_t;
+                                for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
+                                    worker_metrics_t *metrics = &master_ctx->sio_session[i].metrics;
+                                    metrics->last_checkhealthy = now_ns;
+                                    metrics->count_ack = (double)0;
+                                    metrics->hbtime = (double)0;
+                                    metrics->sum_hbtime = metrics->hbtime;
+                                }
+                                for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) { 
+                                    worker_metrics_t *metrics = &master_ctx->logic_session[i].metrics;
+                                    metrics->last_checkhealthy = now_ns;
+                                    metrics->count_ack = (double)0;
+                                    metrics->hbtime = (double)0;
+                                    metrics->sum_hbtime = metrics->hbtime;
+                                }
+                                for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
+                                    worker_metrics_t *metrics = &master_ctx->cow_session[i].metrics;
+                                    metrics->last_checkhealthy = now_ns;
+                                    metrics->count_ack = (double)0;
+                                    metrics->hbtime = (double)0;
+                                    metrics->sum_hbtime = metrics->hbtime;
+                                }
+                                for (int i = 0; i < MAX_DBR_WORKERS; ++i) { 
+                                    worker_metrics_t *metrics = &master_ctx->dbr_session[i].metrics;
+                                    metrics->last_checkhealthy = now_ns;
+                                    metrics->count_ack = (double)0;
+                                    metrics->hbtime = (double)0;
+                                    metrics->sum_hbtime = metrics->hbtime;
+                                }
+                                for (int i = 0; i < MAX_DBW_WORKERS; ++i) { 
+                                    worker_metrics_t *metrics = &master_ctx->dbw_session[i].metrics;
+                                    metrics->last_checkhealthy = now_ns;
+                                    metrics->count_ack = (double)0;
+                                    metrics->hbtime = (double)0;
+                                    metrics->sum_hbtime = metrics->hbtime;
+                                }
+                                if (async_create_timerfd(label, &master_ctx->heartbeat_timer_fd) != SUCCESS) {
+                                    LOG_INFO("%sGagal async_create_timerfd hb checker. Initiating graceful shutdown...", label);
+                                    master_ctx->shutdown_requested = 1;
+                                    master_workers_info(label, master_ctx, IT_SHUTDOWN);
+                                    continue;
+                                }
+                                if (async_set_timerfd_time(label, &master_ctx->heartbeat_timer_fd,
+                                    WORKER_HEARTBEATSEC_TIMEOUT, 0,
+                                    WORKER_HEARTBEATSEC_TIMEOUT, 0) != SUCCESS)
+                                {
+                                    LOG_INFO("%sGagal async_set_timerfd_time hb checker. Initiating graceful shutdown...", label);
+                                    master_ctx->shutdown_requested = 1;
+                                    master_workers_info(label, master_ctx, IT_SHUTDOWN);
+                                    continue;
+                                }
+                                if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->heartbeat_timer_fd) != SUCCESS) {
+                                    LOG_INFO("%sGagal async_create_incoming_event hb checker. Initiating graceful shutdown...", label);
+                                    master_ctx->shutdown_requested = 1;
+                                    master_workers_info(label, master_ctx, IT_SHUTDOWN);
+                                    continue;
+                                }
                                 for (int ic = 0; ic < master_ctx->bootstrap_nodes.len; ic++) {
                                     int cow_worker_idx = select_best_worker(label, master_ctx, COW);
                                     if (cow_worker_idx == -1) {
@@ -378,8 +326,10 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                     master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                     continue;
                                 }
+                                LOG_INFO("%sPID %d UDP Server listening on port %d.", label, master_ctx->master_pid, master_ctx->listen_port);
+                            } else {
+                                master_ctx->is_rekeying = false;
                             }
-                            LOG_INFO("%sPID %d UDP Server listening on port %d.", label, master_ctx->master_pid, master_ctx->listen_port);
                             continue;
                         } else {
                             continue;

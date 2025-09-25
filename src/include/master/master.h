@@ -48,6 +48,11 @@ typedef struct {
 } worker_security_t;
 
 typedef struct {
+    bool is_rekeying;
+    ipc_protocol_queue_t *rekeying_queue;
+} worker_rekeying_t;
+
+typedef struct {
     bool isactive;
     bool ishealthy;
     bool isready;
@@ -57,6 +62,7 @@ typedef struct {
     oricle_double_t healthy;
     oricle_long_double_t avgtt;
     worker_security_t security;
+    worker_rekeying_t rekeying;
 } master_sio_session_t;
 
 typedef struct {
@@ -69,6 +75,7 @@ typedef struct {
     oricle_double_t healthy;
     oricle_long_double_t avgtt;
     worker_security_t security;
+    worker_rekeying_t rekeying;
 } master_logic_session_t;
 
 typedef struct {
@@ -81,6 +88,7 @@ typedef struct {
     oricle_double_t healthy;
     oricle_long_double_t avgtt;
     worker_security_t security;
+    worker_rekeying_t rekeying;
 } master_cow_session_t;
 
 typedef struct {
@@ -93,6 +101,7 @@ typedef struct {
     oricle_double_t healthy;
     oricle_long_double_t avgtt;
     worker_security_t security;
+    worker_rekeying_t rekeying;
 } master_dbr_session_t;
 //======================================================================
 // hanya ada 1 writer
@@ -111,6 +120,7 @@ typedef struct {
     oricle_double_t healthy;
     oricle_long_double_t avgtt;
     worker_security_t security;
+    worker_rekeying_t rekeying;
 } master_dbw_session_t;
 
 typedef struct {
@@ -141,7 +151,6 @@ typedef struct {
 //----------------------------------------------------------------------
     bool all_workers_is_ready;
     bool is_rekeying;
-    ipc_protocol_queue_t *rekeying_queue;
 //----------------------------------------------------------------------    
     master_sio_session_t *sio_session;
     master_logic_session_t *logic_session;

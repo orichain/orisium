@@ -16,7 +16,7 @@ worker_type_t_status_t handle_master_ipc_closed_event(const char *label, master_
 	result.r_worker_type_t = UNKNOWN;
 	result.status = FAILURE;
 	result.index = (uint8_t)0xff;
-    const char* worker_name = "Unknown";
+    const char* worker_name = "UNKNOWN";
     bool is_worker_uds_closing = false;
 
     for (uint8_t i = 0; i < MAX_SIO_WORKERS; ++i) {
@@ -97,35 +97,41 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
 		return ircvdi.status;
 	}
     worker_security_t *security = NULL;
+    worker_rekeying_t *rekeying = NULL;
     const char *worker_name = "Unknown";
     int *worker_uds_fd = NULL;
     worker_type_t rcvd_wot = ircvdi.r_ipc_raw_protocol_t->wot;
     uint8_t rcvd_index = ircvdi.r_ipc_raw_protocol_t->index;
     if (rcvd_wot == SIO) {
         security = &master_ctx->sio_session[rcvd_index].security;
+        rekeying = &master_ctx->sio_session[rcvd_index].rekeying;
         worker_uds_fd = &master_ctx->sio_session[rcvd_index].upp.uds[0];
         worker_name = "SIO";
     } else if (rcvd_wot == LOGIC) {
         security = &master_ctx->logic_session[rcvd_index].security;
+        rekeying = &master_ctx->logic_session[rcvd_index].rekeying;
         worker_uds_fd = &master_ctx->logic_session[rcvd_index].upp.uds[0];
         worker_name = "Logic";
     } else if (rcvd_wot == COW) {
         security = &master_ctx->cow_session[rcvd_index].security;
+        rekeying = &master_ctx->cow_session[rcvd_index].rekeying;
         worker_uds_fd = &master_ctx->cow_session[rcvd_index].upp.uds[0];
         worker_name = "COW";
     } else if (rcvd_wot == DBR) {
         security = &master_ctx->dbr_session[rcvd_index].security;
+        rekeying = &master_ctx->dbr_session[rcvd_index].rekeying;
         worker_uds_fd = &master_ctx->dbr_session[rcvd_index].upp.uds[0];
         worker_name = "DBR";
     } else if (rcvd_wot == DBW) {
         security = &master_ctx->dbw_session[rcvd_index].security;
+        rekeying = &master_ctx->dbw_session[rcvd_index].rekeying;
         worker_uds_fd = &master_ctx->dbw_session[rcvd_index].upp.uds[0];
         worker_name = "DBW";
     } else {
         CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
         return FAILURE;
     }
-    if (!security || *worker_uds_fd == -1) {
+    if (!security || !rekeying || *worker_uds_fd == -1) {
         CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
         return FAILURE;
     }
@@ -149,7 +155,7 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
 			break;
 		}
         case IPC_WORKER_MASTER_HELLO2: {
-            status_t rhello2 = handle_master_ipc_hello2(label, master_ctx, rcvd_wot, rcvd_index, security, worker_name, worker_uds_fd, &ircvdi);
+            status_t rhello2 = handle_master_ipc_hello2(label, master_ctx, rcvd_wot, rcvd_index, security, rekeying, worker_name, worker_uds_fd, &ircvdi);
             if (rhello2 == SUCCESS_WRKSRDY) {
                 return SUCCESS_WRKSRDY;
             }

@@ -53,7 +53,9 @@ typedef enum {
 typedef enum {
 	IT_READY = (uint8_t)0x00,
     IT_SHUTDOWN = (uint8_t)0x01,
-    IT_REKEYING = (uint8_t)0x02
+    IT_REKEYING = (uint8_t)0x02,
+    
+    IT_WAKEUP = (uint8_t)0xff
 } info_type_t;
 
 typedef enum {

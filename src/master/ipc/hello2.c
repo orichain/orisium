@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <endian.h>
+#include <stdlib.h>
 
 #include "log.h"
 #include "constants.h"
@@ -14,7 +15,7 @@
 #include "poly1305-donna.h"
 #include "aes.h"
 
-status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ctx, worker_type_t rcvd_wot, int rcvd_index, worker_security_t *security, const char *worker_name, int *worker_uds_fd, ipc_raw_protocol_t_status_t *ircvdi) {
+status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ctx, worker_type_t rcvd_wot, int rcvd_index, worker_security_t *security, worker_rekeying_t *rekeying, const char *worker_name, int *worker_uds_fd, ipc_raw_protocol_t_status_t *ircvdi) {
     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
         (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
@@ -155,16 +156,57 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
 // Menganggap data valid dengan integritas
 //----------------------------------------------------------------------
     if (rcvd_wot == SIO) {
-        master_ctx->sio_session[rcvd_index].isready = true;
+        master_sio_session_t *session = &master_ctx->sio_session[rcvd_index];
+        session->isready = true;
     } else if (rcvd_wot == LOGIC) {
-        master_ctx->logic_session[rcvd_index].isready = true;
+        master_logic_session_t *session = &master_ctx->logic_session[rcvd_index];
+        session->isready = true;
     } else if (rcvd_wot == COW) {
-        master_ctx->cow_session[rcvd_index].isready = true;
+        master_cow_session_t *session = &master_ctx->cow_session[rcvd_index];
+        session->isready = true;
     } else if (rcvd_wot == DBR) {
-        master_ctx->dbr_session[rcvd_index].isready = true;
+        master_dbr_session_t *session = &master_ctx->dbr_session[rcvd_index];
+        session->isready = true;
     } else if (rcvd_wot == DBW) {
-        master_ctx->dbw_session[rcvd_index].isready = true;
+        master_dbw_session_t *session = &master_ctx->dbw_session[rcvd_index];
+        session->isready = true;
+    } else {
+        LOG_ERROR("%sFailed to master_worker_hello2_ack.", label);
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        return FAILURE;
     }
+    if (!rekeying || !security) {
+        LOG_ERROR("%sFailed to master_worker_hello2_ack.", label);
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        return FAILURE;
+    }
+//----------------------------------------------------------------------
+//----------------------------------------------------------------------
+    rekeying->is_rekeying = false;
+    ipc_protocol_queue_t *current = rekeying->rekeying_queue;
+    ipc_protocol_queue_t *next;
+    while (current != NULL) {
+        next = current->next;
+        ssize_t_status_t send_result = send_ipc_protocol_message(
+            label, 
+            security->aes_key,
+            security->mac_key,
+            security->local_nonce,
+            &security->local_ctr,
+            current->uds_fd,
+            current->p
+        );
+        if (send_result.status != SUCCESS) {
+            LOG_DEBUG("%sFailed to sent rekeying queue data to Worker.", label);
+        } else {
+            LOG_DEBUG("%sSent rekeying queue data to Worker.", label);
+        }
+        CLOSE_IPC_PROTOCOL(&current->p);
+        free(current);
+        current = next;
+    }
+    rekeying->rekeying_queue = NULL;
+//----------------------------------------------------------------------
     if (!master_ctx->all_workers_is_ready) {
         master_ctx->all_workers_is_ready = true;
         for (uint8_t indexrdy = 0; indexrdy < MAX_SIO_WORKERS; ++indexrdy) {
@@ -207,7 +249,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
         }
         if (master_ctx->all_workers_is_ready) {
             LOG_INFO("%s====================================================", label);
-            LOG_INFO("%sSEMUA WORKER SUDAH READY", label);
+            LOG_INFO("%sAll Workers Is READY [Secure]", label);
             LOG_INFO("%s====================================================", label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
             return SUCCESS_WRKSRDY;

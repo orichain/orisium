@@ -925,8 +925,42 @@ ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, 
     return result;
 }
 
-void ipc_cleanup_protocol_queue(ipc_protocol_queue_t *head) {
-    ipc_protocol_queue_t *current = head;
+status_t ipc_add_protocol_queue(const char *label, uint64_t queue_id, worker_type_t wot, uint8_t index, int *uds_fd, ipc_protocol_t *p, ipc_protocol_queue_t **head) {
+    ipc_protocol_queue_t *new_queue = (ipc_protocol_queue_t *)calloc(1, sizeof(ipc_protocol_queue_t));
+    if (!new_queue) {
+        LOG_ERROR("%sFailed to allocate ipc_protocol_queue_t buffer. %s", label, strerror(errno));
+        return FAILURE;
+    }    
+    new_queue->queue_id = queue_id;
+    new_queue->wot = wot;
+    new_queue->index = index;
+    new_queue->uds_fd = uds_fd;
+    new_queue->p = p;
+    new_queue->next = *head;
+    *head = new_queue;
+    return SUCCESS;
+}
+
+void ipc_remove_protocol_queue(uint64_t queue_id, ipc_protocol_queue_t **head) {
+    ipc_protocol_queue_t *current = *head;
+    ipc_protocol_queue_t *previous = NULL;
+    while (current != NULL && current->queue_id != queue_id) {
+        previous = current;
+        current = current->next;
+    }
+    if (current != NULL) {
+        if (previous == NULL) {
+            *head = current->next;
+        } else {
+            previous->next = current->next;
+        }
+        CLOSE_IPC_PROTOCOL(&current->p);
+        free(current);
+    }
+}
+
+void ipc_cleanup_protocol_queue(ipc_protocol_queue_t **head) {
+    ipc_protocol_queue_t *current = *head;
     ipc_protocol_queue_t *next;
     while (current != NULL) {
         next = current->next;
@@ -934,8 +968,9 @@ void ipc_cleanup_protocol_queue(ipc_protocol_queue_t *head) {
         free(current);
         current = next;
     }
-    head = NULL;
+    *head = NULL;
 }
+
 /*
 ssize_t_status_t send_ipc_protocol_message_wfdtopass(const char *label, int *uds_fd, const ipc_protocol_t* p, int *fd_to_pass) {
 	ssize_t_status_t result;

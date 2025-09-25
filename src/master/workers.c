@@ -19,6 +19,7 @@
 #include "master/master.h"
 #include "kalman.h"
 #include "pqc.h"
+#include "ipc/protocol.h"
 
 static inline void close_security(worker_security_t *security) {
     memset(security->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
@@ -48,12 +49,15 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         master_sio_session_t *session = &master_ctx->sio_session[index];
         uds_pair_pid_t *upp = &session->upp;
         worker_security_t *security = &session->security;
+        worker_rekeying_t *rekeying = &session->rekeying;
         cleanup_oricle_long_double(&session->avgtt);
         cleanup_oricle_double(&session->healthy);
         session->isactive = false;
         session->ishealthy = false;
         session->isready = false;
         close_security(security);
+        rekeying->is_rekeying = false;
+        ipc_cleanup_protocol_queue(&rekeying->rekeying_queue);
         async_delete_event(label, &master_ctx->master_async, &upp->uds[0]);
         CLOSE_UDS(&upp->uds[0]);
 		CLOSE_UDS(&upp->uds[1]);
@@ -62,12 +66,15 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         master_logic_session_t *session = &master_ctx->logic_session[index];
         uds_pair_pid_t *upp = &session->upp;
         worker_security_t *security = &session->security;
+        worker_rekeying_t *rekeying = &session->rekeying;
         cleanup_oricle_long_double(&session->avgtt);
         cleanup_oricle_double(&session->healthy);
         session->isactive = false;
         session->ishealthy = false;
         session->isready = false;
         close_security(security);
+        rekeying->is_rekeying = false;
+        ipc_cleanup_protocol_queue(&rekeying->rekeying_queue);
         async_delete_event(label, &master_ctx->master_async, &upp->uds[0]);
         CLOSE_UDS(&upp->uds[0]);
 		CLOSE_UDS(&upp->uds[1]);
@@ -76,12 +83,15 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         master_cow_session_t *session = &master_ctx->cow_session[index];
         uds_pair_pid_t *upp = &session->upp;
         worker_security_t *security = &session->security;
+        worker_rekeying_t *rekeying = &session->rekeying;
         cleanup_oricle_long_double(&session->avgtt);
         cleanup_oricle_double(&session->healthy);
         session->isactive = false;
         session->ishealthy = false;
         session->isready = false;
         close_security(security);
+        rekeying->is_rekeying = false;
+        ipc_cleanup_protocol_queue(&rekeying->rekeying_queue);
         async_delete_event(label, &master_ctx->master_async, &upp->uds[0]);
         CLOSE_UDS(&upp->uds[0]);
 		CLOSE_UDS(&upp->uds[1]);
@@ -90,12 +100,15 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         master_dbr_session_t *session = &master_ctx->dbr_session[index];
         uds_pair_pid_t *upp = &session->upp;
         worker_security_t *security = &session->security;
+        worker_rekeying_t *rekeying = &session->rekeying;
         cleanup_oricle_long_double(&session->avgtt);
         cleanup_oricle_double(&session->healthy);
         session->isactive = false;
         session->ishealthy = false;
         session->isready = false;
         close_security(security);
+        rekeying->is_rekeying = false;
+        ipc_cleanup_protocol_queue(&rekeying->rekeying_queue);
         async_delete_event(label, &master_ctx->master_async, &upp->uds[0]);
         CLOSE_UDS(&upp->uds[0]);
 		CLOSE_UDS(&upp->uds[1]);
@@ -104,12 +117,15 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
         master_dbw_session_t *session = &master_ctx->dbw_session[index];
         uds_pair_pid_t *upp = &session->upp;
         worker_security_t *security = &session->security;
+        worker_rekeying_t *rekeying = &session->rekeying;
         cleanup_oricle_long_double(&session->avgtt);
         cleanup_oricle_double(&session->healthy);
         session->isactive = false;
         session->ishealthy = false;
         session->isready = false;
         close_security(security);
+        rekeying->is_rekeying = false;
+        ipc_cleanup_protocol_queue(&rekeying->rekeying_queue);
         async_delete_event(label, &master_ctx->master_async, &upp->uds[0]);
         CLOSE_UDS(&upp->uds[0]);
 		CLOSE_UDS(&upp->uds[1]);
@@ -126,6 +142,7 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
         master_sio_session_t *session = &master_ctx->sio_session[index];
         uds_pair_pid_t *upp = &session->upp;
         worker_security_t *security = &session->security;
+        worker_rekeying_t *rekeying = &session->rekeying;
         upp->uds[0] = 0; 
 		upp->uds[1] = 0; 
         setup_oricle_long_double(&session->avgtt, (long double)0);
@@ -146,6 +163,8 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
         security->hello1_ack_sent = false;
         security->hello2_rcvd = false;
         security->hello2_ack_sent = false;
+        rekeying->is_rekeying = false;
+        rekeying->rekeying_queue = NULL;
 		if (socketpair(AF_UNIX, SOCK_STREAM, 0, upp->uds) == -1) {
 			LOG_ERROR("%ssocketpair (%s) creation failed: %s", label, worker_name, strerror(errno));
 			return FAILURE;
@@ -162,6 +181,7 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
         master_logic_session_t *session = &master_ctx->logic_session[index];
         uds_pair_pid_t *upp = &session->upp;
         worker_security_t *security = &session->security;
+        worker_rekeying_t *rekeying = &session->rekeying;
         upp->uds[0] = 0; 
 		upp->uds[1] = 0; 
         setup_oricle_long_double(&session->avgtt, (long double)0);
@@ -182,6 +202,8 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
         security->hello1_ack_sent = false;
         security->hello2_rcvd = false;
         security->hello2_ack_sent = false;
+        rekeying->is_rekeying = false;
+        rekeying->rekeying_queue = NULL;
 		if (socketpair(AF_UNIX, SOCK_STREAM, 0, upp->uds) == -1) {
 			LOG_ERROR("%ssocketpair (%s) creation failed: %s", label, worker_name, strerror(errno));
 			return FAILURE;
@@ -198,6 +220,7 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
         master_cow_session_t *session = &master_ctx->cow_session[index];
         uds_pair_pid_t *upp = &session->upp;
         worker_security_t *security = &session->security;
+        worker_rekeying_t *rekeying = &session->rekeying;
         upp->uds[0] = 0; 
 		upp->uds[1] = 0; 
         setup_oricle_long_double(&session->avgtt, (long double)0);
@@ -218,6 +241,8 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
         security->hello1_ack_sent = false;
         security->hello2_rcvd = false;
         security->hello2_ack_sent = false;
+        rekeying->is_rekeying = false;
+        rekeying->rekeying_queue = NULL;
 		if (socketpair(AF_UNIX, SOCK_STREAM, 0, upp->uds) == -1) {
 			LOG_ERROR("%ssocketpair (%s) creation failed: %s", label, worker_name, strerror(errno));
 			return FAILURE;
@@ -234,6 +259,7 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
         master_dbr_session_t *session = &master_ctx->dbr_session[index];
         uds_pair_pid_t *upp = &session->upp;
         worker_security_t *security = &session->security;
+        worker_rekeying_t *rekeying = &session->rekeying;
         upp->uds[0] = 0; 
 		upp->uds[1] = 0; 
         setup_oricle_long_double(&session->avgtt, (long double)0);
@@ -254,6 +280,8 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
         security->hello1_ack_sent = false;
         security->hello2_rcvd = false;
         security->hello2_ack_sent = false;
+        rekeying->is_rekeying = false;
+        rekeying->rekeying_queue = NULL;
 		if (socketpair(AF_UNIX, SOCK_STREAM, 0, upp->uds) == -1) {
 			LOG_ERROR("%ssocketpair (%s) creation failed: %s", label, worker_name, strerror(errno));
 			return FAILURE;
@@ -270,6 +298,7 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
         master_dbw_session_t *session = &master_ctx->dbw_session[index];
         uds_pair_pid_t *upp = &session->upp;
         worker_security_t *security = &session->security;
+        worker_rekeying_t *rekeying = &session->rekeying;
         upp->uds[0] = 0; 
 		upp->uds[1] = 0; 
         setup_oricle_long_double(&session->avgtt, (long double)0);
@@ -290,6 +319,8 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
         security->hello1_ack_sent = false;
         security->hello2_rcvd = false;
         security->hello2_ack_sent = false;
+        rekeying->is_rekeying = false;
+        rekeying->rekeying_queue = NULL;
 		if (socketpair(AF_UNIX, SOCK_STREAM, 0, upp->uds) == -1) {
 			LOG_ERROR("%ssocketpair (%s) creation failed: %s", label, worker_name, strerror(errno));
 			return FAILURE;

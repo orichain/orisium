@@ -236,7 +236,7 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
     identity->local_wot = wot;
     identity->local_index = index;
     identity->local_session_index = session_index;
-    if (generate_connection_id(label, &identity->local_id) != SUCCESS) return FAILURE;
+    if (generate_uint64_t_id(label, &identity->local_id) != SUCCESS) return FAILURE;
     single_session->kem_privatekey = (uint8_t *)calloc(1, KEM_PRIVATEKEY_BYTES);
     security->kem_publickey = (uint8_t *)calloc(1, KEM_PUBLICKEY_BYTES);
     security->kem_ciphertext = (uint8_t *)calloc(1, KEM_CIPHERTEXT_BYTES);
@@ -337,7 +337,7 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     identity->local_wot = wot;
     identity->local_index = index;
     identity->local_session_index = session_index;
-    if (generate_connection_id(label, &identity->local_id) != SUCCESS) return FAILURE;
+    if (generate_uint64_t_id(label, &identity->local_id) != SUCCESS) return FAILURE;
     security->kem_publickey = (uint8_t *)calloc(1, KEM_PUBLICKEY_BYTES);
     security->kem_ciphertext = (uint8_t *)calloc(1, KEM_CIPHERTEXT_BYTES);
     security->kem_sharedsecret = (uint8_t *)calloc(1, KEM_SHAREDSECRET_BYTES);

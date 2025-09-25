@@ -82,6 +82,9 @@ typedef struct {
 } ipc_protocol_t;
 
 typedef struct ipc_protocol_queue_t {
+    uint64_t queue_id;
+    worker_type_t wot;
+    uint8_t index;
     int *uds_fd;
     ipc_protocol_t *p;
     struct ipc_protocol_queue_t *next;
@@ -165,6 +168,8 @@ ssize_t_status_t send_ipc_protocol_message(const char *label, uint8_t* key_aes, 
 ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, int *uds_fd);
 status_t ipc_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint32_t* ctr, ipc_raw_protocol_t *r);
 ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t *key_aes, uint8_t *nonce, uint32_t *ctr, uint8_t *buffer, size_t len);
-void ipc_cleanup_protocol_queue(ipc_protocol_queue_t *head);
+status_t ipc_add_protocol_queue(const char *label, uint64_t queue_id, worker_type_t wot, uint8_t index, int *uds_fd, ipc_protocol_t *p, ipc_protocol_queue_t **head);
+void ipc_remove_protocol_queue(uint64_t queue_id, ipc_protocol_queue_t **head);
+void ipc_cleanup_protocol_queue(ipc_protocol_queue_t **head);
 
 #endif

@@ -86,7 +86,7 @@ void cleanup_worker(worker_context_t *ctx) {
     ctx->hello2_sent = false;
     ctx->hello2_ack_rcvd = false;
     ctx->is_rekeying = false;
-    ipc_cleanup_protocol_queue(ctx->rekeying_queue);
+    ipc_cleanup_protocol_queue(&ctx->rekeying_queue);
     async_delete_event(ctx->label, &ctx->async, ctx->master_uds_fd);
     CLOSE_FD(ctx->master_uds_fd);
 	async_delete_event(ctx->label, &ctx->async, &ctx->heartbeat_timer_fd);

@@ -3,7 +3,6 @@
 
 #include "log.h"
 #include "ipc/protocol.h"
-#include "async.h"
 #include "utilities.h"
 #include "types.h"
 #include "workers/workers.h"
@@ -33,6 +32,11 @@ status_t handle_workers_ipc_info(worker_context_t *worker_ctx, double *initial_d
             worker_ctx->shutdown_requested = 1;
             break;
         }
+        case IT_WAKEUP: {
+            LOG_INFO("%sIT_WAKEUP received...", worker_ctx->label);
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            break;
+        }
         case IT_READY: {
             LOG_INFO("%sMaster Ready ...", worker_ctx->label);
 //----------------------------------------------------------------------
@@ -57,6 +61,7 @@ status_t handle_workers_ipc_info(worker_context_t *worker_ctx, double *initial_d
             break;
         }
         case IT_REKEYING: {
+            worker_ctx->is_rekeying = true;
             LOG_INFO("%sMaster Rekeying ...", worker_ctx->label);
 //----------------------------------------------------------------------
             if (*initial_delay_ms > 0) {
@@ -70,13 +75,6 @@ status_t handle_workers_ipc_info(worker_context_t *worker_ctx, double *initial_d
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
             }
-            if (async_delete_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->heartbeat_timer_fd) != SUCCESS) {		
-                LOG_INFO("%sGagal async_delete_event hb timer, Untuk Rekeying", worker_ctx->label);
-                worker_ctx->shutdown_requested = 1;
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                return FAILURE;
-            }
-            CLOSE_FD(&worker_ctx->heartbeat_timer_fd);
             worker_ctx->hello1_sent = false;
             worker_ctx->hello1_ack_rcvd = false;
             worker_ctx->hello2_sent = false;
