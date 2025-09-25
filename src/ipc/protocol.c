@@ -14,6 +14,7 @@
 #include "types.h"
 #include "log.h"
 #include "ipc/master_worker_info.h"
+#include "ipc/worker_master_task_info.h"
 #include "ipc/worker_master_heartbeat.h"
 #include "ipc/master_cow_connect.h"
 #include "ipc/udp_data.h"
@@ -43,6 +44,18 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
                 }
             }
             payload_fixed_size = sizeof(uint8_t);
+            payload_dynamic_size = 0;
+            break;
+        }
+        case IPC_WORKER_MASTER_TASK_INFO: {
+            if (!checkfixheader) {
+                if (!p->payload.ipc_worker_master_task_info) {
+                    LOG_ERROR("%sIPC_WORKER_MASTER_TASK_INFO payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
+            }
+            payload_fixed_size = sizeof(uint8_t) + sizeof(uint8_t);
             payload_dynamic_size = 0;
             break;
         }
@@ -222,6 +235,9 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes, uint8_t* key
     switch (p->type) {
         case IPC_MASTER_WORKER_INFO:
             result_pyld = ipc_serialize_master_worker_info(label, p->payload.ipc_master_worker_info, current_buffer, *buffer_size, &offset);
+            break;
+        case IPC_WORKER_MASTER_TASK_INFO:
+            result_pyld = ipc_serialize_worker_master_task_info(label, p->payload.ipc_worker_master_task_info, current_buffer, *buffer_size, &offset);
             break;
         case IPC_WORKER_MASTER_HEARTBEAT:
             result_pyld = ipc_serialize_worker_master_heartbeat(label, p->payload.ipc_worker_master_heartbeat, current_buffer, *buffer_size, &offset);
@@ -527,6 +543,26 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
             }
             p->payload.ipc_master_worker_info = payload;
             result_pyld = ipc_deserialize_master_worker_info(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case IPC_WORKER_MASTER_TASK_INFO: {
+            if (current_buffer_offset + fixed_header_size > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk IPC_WORKER_MASTER_TASK_INFO fixed header.", label);
+                CLOSE_IPC_PROTOCOL(&p);
+                free(key0);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            ipc_worker_master_task_info_t *payload = (ipc_worker_master_task_info_t*) calloc(1, sizeof(ipc_worker_master_task_info_t));
+            if (!payload) {
+                LOG_ERROR("%sFailed to allocate ipc_worker_master_task_info_t without FAM. %s", label, strerror(errno));
+                CLOSE_IPC_PROTOCOL(&p);
+                free(key0);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.ipc_worker_master_task_info = payload;
+            result_pyld = ipc_deserialize_worker_master_task_info(label, p, buffer, len, &current_buffer_offset);
             break;
 		}
         case IPC_WORKER_MASTER_HEARTBEAT: {

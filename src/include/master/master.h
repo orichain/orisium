@@ -124,12 +124,12 @@ typedef struct {
 } master_dbw_session_t;
 
 typedef struct {
-	int sio_index;
+	uint8_t sio_index;
     bool in_use;
 } master_sio_c_session_t;
 
 typedef struct {
-	int cow_index;
+	uint8_t cow_index;
     bool in_use;
 } master_cow_c_session_t;
 

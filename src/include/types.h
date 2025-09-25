@@ -59,6 +59,10 @@ typedef enum {
 } info_type_t;
 
 typedef enum {
+	TIT_TIMEOUT = (uint8_t)0xff
+} task_info_type_t;
+
+typedef enum {
 	CONNECTED = (uint8_t)0x00,
     CANNOTCONNECT = (uint8_t)0x01,
     DISCONNECTED = (uint8_t)0x02

@@ -176,6 +176,12 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
             }
 			break;
 		}
+        case IPC_WORKER_MASTER_TASK_INFO: {
+            if (handle_master_ipc_task_info(label, master_ctx, rcvd_wot, rcvd_index, security, &ircvdi) != SUCCESS) {
+                return FAILURE;
+            }
+			break;
+		}
 		default:
 			LOG_ERROR("%sUnknown IPC protocol type %d from UDS FD %d. Ignoring.", label, ircvdi.r_ipc_raw_protocol_t->type, *current_fd);
 			CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);

@@ -25,5 +25,6 @@ status_t worker_master_udp_data_ack(
     puint8_t_size_t_status_t *r,
     hello_ack_t *h
 );
+status_t worker_master_task_info(worker_context_t *ctx, uint8_t session_index, task_info_type_t flag);
 
 #endif

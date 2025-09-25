@@ -44,7 +44,7 @@ status_t orilink_serialize_hello4(const char *label, const orilink_hello4_t* pay
         sizeof(uint64_t) +
         AES_TAG_BYTES;
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    memcpy(current_buffer + current_offset_local, (uint8_t *)&payload->trycount, sizeof(uint8_t));
+    memcpy(current_buffer + current_offset_local, &payload->trycount, sizeof(uint8_t));
     current_offset_local += sizeof(uint8_t);    
     *offset = current_offset_local;
     return SUCCESS;
@@ -98,7 +98,7 @@ status_t orilink_deserialize_hello4(const char *label, orilink_protocol_t *p, co
         LOG_ERROR("%sOut of bounds reading trycount.", label);
         return FAILURE_OOBUF;
     }
-    memcpy((uint8_t *)&payload->trycount, cursor, sizeof(uint8_t));
+    memcpy(&payload->trycount, cursor, sizeof(uint8_t));
     cursor += sizeof(uint8_t);
     current_offset += sizeof(uint8_t);
     *offset_ptr = current_offset;

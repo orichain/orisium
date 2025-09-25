@@ -16,10 +16,16 @@ typedef enum {
     
     IPC_MASTER_COW_CONNECT = (uint8_t)0x10,
     
+    IPC_WORKER_MASTER_TASK_INFO = (uint8_t)0xfc,
     IPC_UDP_DATA = (uint8_t)0xfd,
     IPC_WORKER_MASTER_HEARTBEAT = (uint8_t)0xfe,
     IPC_MASTER_WORKER_INFO = (uint8_t)0xff
 } ipc_protocol_type_t;
+
+typedef struct {
+    uint8_t session_index;
+    task_info_type_t flag;
+} ipc_worker_master_task_info_t;
 
 typedef struct {
     uint8_t session_index;
@@ -70,6 +76,7 @@ typedef struct {
     uint8_t index;
 	ipc_protocol_type_t type;
 	union {
+        ipc_worker_master_task_info_t *ipc_worker_master_task_info;
 		ipc_master_worker_info_t *ipc_master_worker_info;
 		ipc_worker_master_heartbeat_t *ipc_worker_master_heartbeat;
         ipc_master_cow_connect_t *ipc_master_cow_connect;
@@ -104,6 +111,8 @@ static inline void CLOSE_IPC_PROTOCOL(ipc_protocol_t **protocol_ptr) {
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_worker_master_heartbeat);
         } else if (x->type == IPC_MASTER_WORKER_INFO) {
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_worker_info);
+        } else if (x->type == IPC_WORKER_MASTER_TASK_INFO) {
+            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_worker_master_task_info);
         } else if (x->type == IPC_MASTER_COW_CONNECT) {
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_cow_connect);
         } else if (x->type == IPC_UDP_DATA) {

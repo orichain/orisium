@@ -5,6 +5,7 @@
 #include "types.h"
 #include "workers/workers.h"
 #include "workers/timer/handlers.h"
+#include "workers/ipc/master_ipc_cmds.h"
 #include "constants.h"
 #include "log.h"
 
@@ -30,6 +31,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //----------------------------------------------------------------------
                         cleanup_cow_session(worker_ctx->label, &worker_ctx->async, session);
                         if (setup_cow_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
+                            continue;
+                        }
+                        if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
                             continue;
                         }
 //----------------------------------------------------------------------
@@ -59,6 +63,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         if (setup_cow_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
                             continue;
                         }
+                        if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
+                            continue;
+                        }
 //----------------------------------------------------------------------
                         return SUCCESS;
                     }
@@ -86,6 +93,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         if (setup_cow_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
                             continue;
                         }
+                        if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
+                            continue;
+                        }
 //----------------------------------------------------------------------
                         return SUCCESS;
                     }
@@ -111,6 +121,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //----------------------------------------------------------------------
                         cleanup_cow_session(worker_ctx->label, &worker_ctx->async, session);
                         if (setup_cow_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
+                            continue;
+                        }
+                        if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
                             continue;
                         }
 //----------------------------------------------------------------------
@@ -149,6 +162,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         if (setup_sio_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
                             continue;
                         }
+                        if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
+                            continue;
+                        }
 //----------------------------------------------------------------------
                         return SUCCESS;
                     }
@@ -176,6 +192,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         if (setup_sio_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
                             continue;
                         }
+                        if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
+                            continue;
+                        }
 //----------------------------------------------------------------------
                         return SUCCESS;
                     }
@@ -201,6 +220,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //----------------------------------------------------------------------
                         cleanup_sio_session(worker_ctx->label, &worker_ctx->async, session);
                         if (setup_sio_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
+                            continue;
+                        }
+                        if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
                             continue;
                         }
 //----------------------------------------------------------------------
@@ -232,6 +254,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //----------------------------------------------------------------------
                         cleanup_sio_session(worker_ctx->label, &worker_ctx->async, session);
                         if (setup_sio_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
+                            continue;
+                        }
+                        if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
                             continue;
                         }
 //----------------------------------------------------------------------

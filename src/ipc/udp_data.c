@@ -21,7 +21,7 @@ status_t ipc_serialize_udp_data(const char *label, const ipc_udp_data_t* payload
     }
     size_t current_offset_local = *offset;
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    memcpy(current_buffer + current_offset_local, (uint8_t *)&payload->session_index, sizeof(uint8_t));
+    memcpy(current_buffer + current_offset_local, &payload->session_index, sizeof(uint8_t));
     current_offset_local += sizeof(uint8_t);
     if (CHECK_BUFFER_BOUNDS(current_offset_local, SOCKADDR_IN6_SIZE, buffer_size) != SUCCESS) return FAILURE_OOBUF;
     uint8_t remote_addr_be[SOCKADDR_IN6_SIZE];
@@ -51,7 +51,7 @@ status_t ipc_deserialize_udp_data(const char *label, ipc_protocol_t *p, const ui
         LOG_ERROR("%sOut of bounds reading session_index.", label);
         return FAILURE_OOBUF;
     }
-    memcpy((uint8_t *)&payload->session_index, cursor, sizeof(uint8_t));
+    memcpy(&payload->session_index, cursor, sizeof(uint8_t));
     cursor += sizeof(uint8_t);
     current_offset += sizeof(uint8_t);
     if (current_offset + SOCKADDR_IN6_SIZE > total_buffer_len) {

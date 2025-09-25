@@ -43,6 +43,18 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
     master_ctx->sio_c_session = (master_sio_c_session_t *)calloc(1, MAX_MASTER_SIO_SESSIONS * sizeof(master_sio_c_session_t));
     master_ctx->cow_c_session = (master_cow_c_session_t *)calloc(1, MAX_MASTER_COW_SESSIONS * sizeof(master_cow_c_session_t));
 //----------------------------------------------------------------------
+    for (uint8_t sio_worker_idx=0;sio_worker_idx<MAX_SIO_WORKERS; ++sio_worker_idx) {
+        for(uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
+            master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].in_use = false;
+            master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].sio_index = 0xff;
+        }
+    }
+    for (uint8_t cow_worker_idx=0;cow_worker_idx<MAX_COW_WORKERS; ++cow_worker_idx) {
+        for(uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
+            master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].in_use = false;
+            master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].cow_index = 0xff;
+        }
+    }
     master_ctx->shutdown_requested = 0;
     master_ctx->hb_check_times = (uint16_t)0;
     master_ctx->is_rekeying = false;
@@ -77,6 +89,18 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     free(master_ctx->cow_session);
     free(master_ctx->dbr_session);
     free(master_ctx->dbw_session);
+    for (uint8_t sio_worker_idx=0;sio_worker_idx<MAX_SIO_WORKERS; ++sio_worker_idx) {
+        for(uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
+            master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].in_use = false;
+            master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].sio_index = 0xff;
+        }
+    }
+    for (uint8_t cow_worker_idx=0;cow_worker_idx<MAX_COW_WORKERS; ++cow_worker_idx) {
+        for(uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
+            master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].in_use = false;
+            master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].cow_index = 0xff;
+        }
+    }
     free(master_ctx->sio_c_session);
     free(master_ctx->cow_c_session);
     master_ctx->shutdown_requested = 0;
