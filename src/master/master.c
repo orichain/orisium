@@ -13,6 +13,7 @@
 #include "utilities.h"
 #include "types.h"
 #include "master/udp/socket_udp.h"
+#include "master/udp/handlers.h"
 #include "master/ipc/handlers.h"
 #include "master/workers.h"
 #include "master/master.h"
