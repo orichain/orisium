@@ -255,9 +255,7 @@ $(IWYU_BIN_PATH):
 		CLANG_MAJOR_VER=$$(clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \
 		IWYU_VER=$$(expr $$CLANG_MAJOR_VER + 4); \
 		echo "📌 Deteksi Clang versi $$CLANG_MAJOR_VER"; \
-		rm -rf iwyu && \
-        mkdir iwyu && \
-		wget -O iwyu.tar.gz https://github.com/include-what-you-use/include-what-you-use/archive/refs/tags/0.$$IWYU_VER.tar.gz && \
+		wget -q -O iwyu.tar.gz https://github.com/include-what-you-use/include-what-you-use/archive/refs/tags/0.$$IWYU_VER.tar.gz && \
 		tar -xzf iwyu.tar.gz -C iwyu --strip-components=1 && \
 		rm -f iwyu.tar.gz && \
 		cd $(IWYU_DIR) && \
