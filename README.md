@@ -4,14 +4,44 @@
 
 Orisium is a high-performance peer-to-peer (P2P) network designed for global scalability, attack resilience, and robust decentralization. With a dynamic hierarchical architecture and a specialized UDP-based protocol, Orisium creates a strong foundation for future decentralized applications.
 
------
+## Secure & Hyper-Efficient P2P Transport Layer
 
-## Core Architectural Principles
+Orisium is a **custom, low-latency P2P transport protocol** designed for real-time, decentralized applications and networks requiring strict security, speed, and state management. Built on UDP and implemented in C, Orisium combines **Post-Quantum Cryptography (PQC)** with an **Adaptive Dual-State Architecture** and intelligent flow control.
 
-Orisium's unique design sets it apart by embedding intelligence and resilience directly into the protocol's core.
+## 🚀 Key Architectural Innovations
 
-* **Hierarchical Transport Layer:** Unlike traditional protocols that build hierarchy at the application layer, Orisium's decentralized hierarchy is formed directly at the **transport layer**. This ensures a more efficient, inherently censorship-resistant network where nodes can dynamically route data around compromised or blocked connections.
-* **Intelligent Node Scoring:** The protocol uses a smart, **weighted metrics system** to evaluate the quality of a connection. It automatically measures and rates nodes based on factors like latency (RTT), reliability (retry count), and overall health. For blockchain applications, a success rate for writing blocks is given the highest weight, ensuring the network always prefers the most capable and trustworthy nodes.
+### 1. Post-Quantum Cryptography (PQC) Foundation
+* **Strict Serial Handshake:** Utilizes a rigid serial state machine (`HELLO` to `FINISH`) to ensure every cryptographic handshake step and **PQC Key Exchange** is verified and authenticated.
+* **Absolute Anti-Replay:** The protocol strictly rejects re-received packets (including retries of old handshake packets) to maintain state integrity and prevent replay attacks.
+
+### 2. Adaptive Dual-State Architecture
+Orisium separates traffic into two functionally distinct streams to optimize reliability without sacrificing speed, eliminating the classic Speed vs. Reliability trade-off.
+
+| Stream | Flow Nature | Purpose & Key Innovation |
+| :--- | :--- | :--- |
+| **Control Stream** | **Serial & Reliable** (Requires ACK) | Establishes the PQC session, performs **Network Orchestration**, and manages **Node Hierarchy**. Failure here triggers a controlled session disconnect. |
+| **Data Stream** | **Parallel & Reliable** (Selective Repeat/Per-Packet Timer) | High-speed *payload* transmission. **Eliminates Head-of-Line Blocking (HOLB)**, ensuring minimal *worst-case latency* for data. Failure only triggers packet retransmission. |
+
+### 3. Intelligent Network Control
+The protocol achieves resilience and efficiency through advanced adaptive logic:
+* **Adaptive Heartbeat:** Employs a **Kalman Filter** to predict network conditions (RTT, jitter) and dynamically adjusts the heartbeat interval ($4 \text{ seconds} \times 2^{\text{prediction}}$). This provides both rapid *liveness* detection and responsible bandwidth use.
+* **Mobile Efficiency:** The heartbeat interval is deliberately extended for mobile clients (e.g., $20-30 \text{ seconds}$) to prevent **cellular radio wake-up** and subsequent **battery drain**.
+
+### 4. High-Throughput Data Optimization
+* **Selective Repeat (SR):** Each data packet operates with its own timer and is retransmitted independently. This guarantees **maximum throughput** by ensuring only lost packets are resent.
+* **Responsible Flow Control:** Transmission is governed by the **Receive Window Buffer** (set at **256 packets** or $\approx 300 \text{ KB}$), preventing receiver overload and maintaining network stability.
+* **Safe Fragmentation:** Data is segmented into $\approx 1200 \text{ byte}$ fragments, mitigating the risks of IP fragmentation and optimizing UDP payload size.
+
+## 🛠️ Core State Management & Security
+
+Orisium's state is protected by multiple cryptographic layers to ensure integrity:
+
+1.  **MAC Validation (Poly1305):** Used for rapid data authentication and integrity checking.
+2.  **Encryption (AES-CTR):** Used for payload confidentiality and encrypted identity exchange during the handshake.
+3.  **Dual Connection ID:** Sessions are validated not just by IP/Port, but also by a unique, secure **Connection ID** to prevent session hijacking.
+
+**Current Status: Finalizing Heartbeat**
+The protocol is currently in the stage of finalizing the Heartbeat state machine. To resolve the *state lock* encountered after the initial `HELLO4_ACK` exchange, the Master will send a new, dedicated **`ORILINK_HEARTBEAT`** packet (with an incremented Control Counter) as the official next step in the serial control flow.
 
 ## Key Features
 
