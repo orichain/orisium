@@ -63,7 +63,7 @@ void run_sio_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
 // Heartbeat dengan jitter
 //----------------------------------------------------------------------
 				double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * HEARTBEAT_JITTER_PERCENTAGE * 2) - HEARTBEAT_JITTER_PERCENTAGE;
-                double new_heartbeat_interval_double = WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT * (1.0 + jitter_amount);
+                double new_heartbeat_interval_double = WORKER_HEARTBEATSEC_TIMEOUT * (1.0 + jitter_amount);
                 if (new_heartbeat_interval_double < 0.1) {
                     new_heartbeat_interval_double = 0.1;
                 }

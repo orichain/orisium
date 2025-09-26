@@ -115,8 +115,8 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
             return FAILURE;
         }
         if (async_set_timerfd_time(worker_ctx->label, &worker_ctx->heartbeat_timer_fd,
-            WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT, 0,
-            WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT, 0) != SUCCESS)
+            WORKER_HEARTBEATSEC_TIMEOUT, 0,
+            WORKER_HEARTBEATSEC_TIMEOUT, 0) != SUCCESS)
         {
             LOG_ERROR("%sWorker error async_set_timerfd_time...", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);

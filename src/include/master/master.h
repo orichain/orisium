@@ -141,7 +141,7 @@ typedef struct {
 //----------------------------------------------------------------------
 	int master_pid;
     int udp_sock;
-    int heartbeat_timer_fd;
+    int check_healthy_timer_fd;
     int shutdown_event_fd;
     async_type_t master_async;
 //----------------------------------------------------------------------

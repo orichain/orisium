@@ -827,9 +827,9 @@ status_t calculate_healthy(const char* label, master_context_t *master_ctx, work
     if (!metrics || !oricle || !ishealthy) return FAILURE;
     uint64_t now_ns = rt.r_uint64_t;
     double actual_elapsed_sec = (double)(now_ns - metrics->last_checkhealthy) / 1e9;
-    double ttl_delay_jitter = (metrics->sum_hbtime - metrics->hbtime) - ((double)WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT * metrics->count_ack);
+    double ttl_delay_jitter = (metrics->sum_hbtime - metrics->hbtime) - ((double)WORKER_HEARTBEATSEC_TIMEOUT * metrics->count_ack);
     double setup_elapsed_sec = (double)WORKER_HEARTBEATSEC_TIMEOUT + ttl_delay_jitter;
-    double setup_count_ack = setup_elapsed_sec / (double)WORKER_HEARTBEATSEC_NODE_HEARTBEATSEC_TIMEOUT;
+    double setup_count_ack = setup_elapsed_sec / (double)WORKER_HEARTBEATSEC_TIMEOUT;
     double comp_elapsed_sec = actual_elapsed_sec / setup_elapsed_sec;
     double expected_count_ack = setup_count_ack * comp_elapsed_sec;
     double current_health_measurement;

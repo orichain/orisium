@@ -68,7 +68,7 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
 	master_ctx->master_pid = 0;
 	master_ctx->shutdown_event_fd = -1;
     master_ctx->udp_sock = -1;
-    master_ctx->heartbeat_timer_fd = -1;
+    master_ctx->check_healthy_timer_fd = -1;
     master_ctx->master_async.async_fd = -1;
     master_ctx->master_pid = getpid();
 //======================================================================
@@ -118,8 +118,8 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     master_ctx->last_sio_rr_idx = 0;
     master_ctx->last_cow_rr_idx = 0;
     CLOSE_FD(&master_ctx->udp_sock);
-    async_delete_event(label, &master_ctx->master_async, &master_ctx->heartbeat_timer_fd);
-    CLOSE_FD(&master_ctx->heartbeat_timer_fd);
+    async_delete_event(label, &master_ctx->master_async, &master_ctx->check_healthy_timer_fd);
+    CLOSE_FD(&master_ctx->check_healthy_timer_fd);
     CLOSE_FD(&master_ctx->master_async.async_fd);
     master_ctx->listen_port = (uint16_t)0;
     memset(&master_ctx->bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
@@ -146,13 +146,13 @@ void run_master(const char *label, master_context_t *master_ctx) {
 			uint32_t_status_t events_status = async_getevents(label, &master_ctx->master_async, n);
 			if (events_status.status != SUCCESS) continue;
 			uint32_t current_events = events_status.r_uint32_t;	
-			if (current_fd == master_ctx->heartbeat_timer_fd) {
+			if (current_fd == master_ctx->check_healthy_timer_fd) {
 				uint64_t u;
-				read(master_ctx->heartbeat_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                if (async_set_timerfd_time(label, &master_ctx->heartbeat_timer_fd,
-                    WORKER_HEARTBEATSEC_TIMEOUT,
+				read(master_ctx->check_healthy_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                if (async_set_timerfd_time(label, &master_ctx->check_healthy_timer_fd,
+                    WORKER_CHECK_HEALTHY,
                     0,
-                    WORKER_HEARTBEATSEC_TIMEOUT,
+                    WORKER_CHECK_HEALTHY,
                     0) != SUCCESS)
                 {
                     LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
@@ -294,22 +294,22 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                     metrics->hbtime = (double)0;
                                     metrics->sum_hbtime = metrics->hbtime;
                                 }
-                                if (async_create_timerfd(label, &master_ctx->heartbeat_timer_fd) != SUCCESS) {
+                                if (async_create_timerfd(label, &master_ctx->check_healthy_timer_fd) != SUCCESS) {
                                     LOG_INFO("%sGagal async_create_timerfd hb checker. Initiating graceful shutdown...", label);
                                     master_ctx->shutdown_requested = 1;
                                     master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                     continue;
                                 }
-                                if (async_set_timerfd_time(label, &master_ctx->heartbeat_timer_fd,
-                                    WORKER_HEARTBEATSEC_TIMEOUT, 0,
-                                    WORKER_HEARTBEATSEC_TIMEOUT, 0) != SUCCESS)
+                                if (async_set_timerfd_time(label, &master_ctx->check_healthy_timer_fd,
+                                    WORKER_CHECK_HEALTHY, 0,
+                                    WORKER_CHECK_HEALTHY, 0) != SUCCESS)
                                 {
                                     LOG_INFO("%sGagal async_set_timerfd_time hb checker. Initiating graceful shutdown...", label);
                                     master_ctx->shutdown_requested = 1;
                                     master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                     continue;
                                 }
-                                if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->heartbeat_timer_fd) != SUCCESS) {
+                                if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->check_healthy_timer_fd) != SUCCESS) {
                                     LOG_INFO("%sGagal async_create_incoming_event hb checker. Initiating graceful shutdown...", label);
                                     master_ctx->shutdown_requested = 1;
                                     master_workers_info(label, master_ctx, IT_SHUTDOWN);
