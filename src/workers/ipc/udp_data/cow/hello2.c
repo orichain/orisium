@@ -19,6 +19,20 @@
 struct sockaddr_in6;
 
 status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
+//======================================================================
+// + Security
+//======================================================================
+    if (!session->hello1_ack.ack_sent) {
+        LOG_ERROR("%sReceive Hello2 But This Worker Session Is Never Sending Hello1_Ack.", worker_ctx->label);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
+    if (session->hello1_ack.rcvd) {
+        LOG_ERROR("%sHello2 Received Already.", worker_ctx->label);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
+//======================================================================
     worker_type_t remote_wot;
     uint8_t remote_index;
     uint8_t remote_session_index;
@@ -41,6 +55,16 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello2_t *ohello2 = received_orilink_protocol->payload.orilink_hello2;
     uint64_t remote_id = ohello2->local_id;
+//======================================================================
+// + Security
+//======================================================================
+    if (remote_id != identity->remote_id) {
+        LOG_ERROR("%sReceive Different Id Between Hello2 And Hello1_Ack.", worker_ctx->label);
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+//======================================================================
     uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
     uint8_t kem_ciphertext[KEM_CIPHERTEXT_BYTES];
     uint8_t kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
@@ -99,7 +123,7 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
         identity->local_index,
         identity->local_session_index,
         identity->id_connection,
-        remote_id,
+        identity->remote_id,
         kem_ciphertext,
         session->hello2_ack.ack_sent_try_count
     );

@@ -21,6 +21,20 @@
 #include "stdbool.h"
 
 status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
+//======================================================================
+// + Security
+//======================================================================
+    if (!session->hello3_ack.ack_sent) {
+        LOG_ERROR("%sReceive Hello4 But This Worker Session Is Never Sending Hello3_Ack.", worker_ctx->label);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
+    if (session->hello3_ack.rcvd) {
+        LOG_ERROR("%sHello4 Received Already.", worker_ctx->label);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
+//======================================================================
     worker_type_t remote_wot;
     uint8_t remote_index;
     uint8_t remote_session_index;
@@ -112,9 +126,9 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         decrypted_remote_identity_rcvd[i] = encrypted_remote_identity_rcvd[i] ^ keystream_buffer0[i];
     }
     aes256_ctx_release(&aes_ctx0);
-//----------------------------------------------------------------------
-// Mencocokkan wot index
-//----------------------------------------------------------------------
+//======================================================================
+// + Security
+//======================================================================
     worker_type_t data_wot;
     memcpy((uint8_t *)&data_wot, decrypted_remote_identity_rcvd, sizeof(uint8_t));
     if (*(uint8_t *)&remote_wot != *(uint8_t *)&data_wot) {

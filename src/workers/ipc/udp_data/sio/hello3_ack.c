@@ -22,6 +22,20 @@
 #include "stdbool.h"
 
 status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
+//======================================================================
+// + Security
+//======================================================================
+    if (!session->hello3.sent) {
+        LOG_ERROR("%sReceive Hello3_Ack But This Worker Session Is Never Sending Hello3.", worker_ctx->label);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
+    if (session->hello3.ack_rcvd) {
+        LOG_ERROR("%sHello3_Ack Received Already.", worker_ctx->label);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
+//======================================================================
     worker_type_t remote_wot;
     uint8_t remote_index;
     uint8_t remote_session_index;
@@ -43,7 +57,17 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello3_ack_t *ohello3_ack = received_orilink_protocol->payload.orilink_hello3_ack;
-    //uint64_t local_id = ohello3_ack->remote_id;
+    uint64_t local_id = ohello3_ack->remote_id;
+//======================================================================
+// + Security
+//======================================================================
+    if (local_id != identity->local_id) {
+        LOG_ERROR("%sReceive Different Id Between Hello3_Ack And Hello3.", worker_ctx->label);
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+//======================================================================
     uint8_t remote_nonce[AES_NONCE_BYTES];
     uint8_t kem_ciphertext[KEM_CIPHERTEXT_BYTES];
     uint8_t kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
