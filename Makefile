@@ -239,36 +239,38 @@ $(IWYU_BIN_PATH):
 	@if [ ! -f "$(IWYU_BIN_PATH)" ]; then \
 		echo "📥 Membangun dari sumber..."; \
 		echo "📥 Memeriksa dan menginstall dependensi IWYU untuk distro $(DISTRO_ID) menggunakan $(PKG_MANAGER)..."; \
-		PKGS="cmake clang llvm clang-devel llvm-devel"; \
-		for pkg in $$PKGS; do \
-			if [ "$(PKG_MANAGER)" = "unsupported" ]; then \
-				echo "❌ Tidak bisa install $$pkg. Distribusi tidak didukung."; \
-				exit 1; \
-			elif [ "$(PKG_MANAGER)" = "apt" ]; then \
-				$(USE_SUDO) apt update && $(USE_SUDO) apt install -y cmake clang llvm || true; \
-				break; \
-			elif [ "$(PKG_MANAGER)" = "dnf" ] || [ "$(PKG_MANAGER)" = "yum" ]; then \
-				$(USE_SUDO) $(PKG_MANAGER) install -y cmake clang llvm clang-devel llvm-devel || true; \
-				break; \
-			elif [ "$(PKG_MANAGER)" = "pacman" ]; then \
-				$(USE_SUDO) pacman -Syu --noconfirm cmake clang llvm || true; \
-				break; \
-			elif [ "$(PKG_MANAGER)" = "zypper" ]; then \
-				$(USE_SUDO) zypper install -y cmake clang llvm || true; \
-				break; \
-			fi; \
-		done; \
+		if [ "$(PKG_MANAGER)" = "unsupported" ]; then \
+			echo "❌ Tidak bisa install dependensi. Distribusi tidak didukung."; \
+			exit 1; \
+		elif [ "$(PKG_MANAGER)" = "apt" ]; then \
+			$(USE_SUDO) apt update && $(USE_SUDO) apt install -y wget cmake clang llvm || true; \
+		elif [ "$(PKG_MANAGER)" = "dnf" ] || [ "$(PKG_MANAGER)" = "yum" ]; then \
+			$(USE_SUDO) $(PKG_MANAGER) install -y wget cmake clang llvm clang-devel llvm-devel || true; \
+		elif [ "$(PKG_MANAGER)" = "pacman" ]; then \
+			$(USE_SUDO) pacman -Syu --noconfirm wget cmake clang llvm || true; \
+		elif [ "$(PKG_MANAGER)" = "zypper" ]; then \
+			$(USE_SUDO) zypper install -y wget cmake clang llvm || true; \
+		fi; \
+		\
 		CLANG_MAJOR_VER=$$(clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \
+		IWYU_VER=$$(expr $$CLANG_MAJOR_VER + 4); \
 		echo "📌 Deteksi Clang versi $$CLANG_MAJOR_VER"; \
+		rm -rf iwyu && \
+        mkdir iwyu && \
+		wget -O iwyu.tar.gz https://github.com/include-what-you-use/include-what-you-use/archive/refs/tags/0.$$IWYU_VER.tar.gz && \
+		tar -xzf iwyu.tar.gz -C iwyu --strip-components=1 && \
+		rm -f iwyu.tar.gz && \
 		cd $(IWYU_DIR) && \
-		if [ "$$CLANG_MAJOR_VER" -ge 10 ] && [ "$$CLANG_MAJOR_VER" -le 20 ]; then \
-			git checkout clang_$$CLANG_MAJOR_VER || echo "⚠️ Branch clang_$$CLANG_MAJOR_VER tidak ditemukan"; \
-		else \
-			echo "⚠️ Versi clang tidak dikenali. Lewati checkout branch."; \
-		fi && \
 		mkdir -p $(IWYU_BUILD) && \
 		cd $(IWYU_BUILD) && \
-		cmake .. -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DLLVM_DIR=/usr/lib64/cmake/llvm && \
+		cmake \
+		-G "Unix Makefiles" \
+		-DCMAKE_C_COMPILER=clang \
+        -DCMAKE_CXX_COMPILER=clang++ \
+        -DCMAKE_BUILD_TYPE="Release" \
+		-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+		-DLLVM_DIR=/usr/lib64/cmake/llvm \
+		.. && \
 		$(MAKE) -j4; \
 	else \
 		echo "✅ IWYU sudah tersedia."; \

@@ -1,3 +1,5 @@
+iwyu/*
+!iwyu/.gitkeep
 obj/
 logs/
 test/
