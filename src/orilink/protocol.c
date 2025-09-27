@@ -19,6 +19,8 @@
 #include "orilink/hello3_ack.h"
 #include "orilink/hello4.h"
 #include "orilink/hello4_ack.h"
+#include "orilink/heartbeat.h"
+#include "orilink/heartbeat_ack.h"
 #include "types.h"
 #include "log.h"
 #include "constants.h"
@@ -155,6 +157,30 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                                  sizeof(uint64_t) +
                                  AES_TAG_BYTES +
                                  sizeof(uint8_t);
+            payload_dynamic_size = 0;
+            break;
+        }
+        case ORILINK_HEARTBEAT: {
+            if (!checkfixheader) {
+                if (!p->payload.orilink_heartbeat) {
+                    LOG_ERROR("%sORILINK_HEARTBEAT payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
+            }
+            payload_fixed_size = DOUBLE_ARRAY_SIZE;
+            payload_dynamic_size = 0;
+            break;
+        }
+        case ORILINK_HEARTBEAT_ACK: {
+            if (!checkfixheader) {
+                if (!p->payload.orilink_heartbeat_ack) {
+                    LOG_ERROR("%sORILINK_HEARTBEAT_ACK payload is NULL.", label);
+                    result.status = FAILURE;
+                    return result;
+                }
+            }
+            payload_fixed_size = DOUBLE_ARRAY_SIZE;
             payload_dynamic_size = 0;
             break;
         }
@@ -327,6 +353,12 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
             break;
         case ORILINK_HELLO4_ACK:
             result_pyld = orilink_serialize_hello4_ack(label, p->payload.orilink_hello4_ack, current_buffer, *buffer_size, &offset);
+            break;
+        case ORILINK_HEARTBEAT:
+            result_pyld = orilink_serialize_heartbeat(label, p->payload.orilink_heartbeat, current_buffer, *buffer_size, &offset);
+            break;
+        case ORILINK_HEARTBEAT_ACK:
+            result_pyld = orilink_serialize_heartbeat_ack(label, p->payload.orilink_heartbeat, current_buffer, *buffer_size, &offset);
             break;
         default:
             LOG_ERROR("%sUnknown protocol type for serialization: 0x%02x", label, p->type);
@@ -822,6 +854,46 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
             }
             p->payload.orilink_hello4_ack = payload;
             result_pyld = orilink_deserialize_hello4_ack(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case ORILINK_HEARTBEAT: {
+			if (current_buffer_offset + fixed_header_size > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HEARTBEAT fixed header.", label);
+                CLOSE_ORILINK_PROTOCOL(&p);
+                free(key0);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            orilink_heartbeat_t *payload = (orilink_heartbeat_t*) calloc(1, sizeof(orilink_heartbeat_t));
+            if (!payload) {
+                LOG_ERROR("%sFailed to allocate orilink_heartbeat_t without FAM. %s", label, strerror(errno));
+                CLOSE_ORILINK_PROTOCOL(&p);
+                free(key0);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.orilink_heartbeat = payload;
+            result_pyld = orilink_deserialize_heartbeat(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+        case ORILINK_HEARTBEAT_ACK: {
+			if (current_buffer_offset + fixed_header_size > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HEARTBEAT_ACK fixed header.", label);
+                CLOSE_ORILINK_PROTOCOL(&p);
+                free(key0);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            orilink_heartbeat_t *payload = (orilink_heartbeat_t*) calloc(1, sizeof(orilink_heartbeat_t));
+            if (!payload) {
+                LOG_ERROR("%sFailed to allocate orilink_heartbeat_t without FAM. %s", label, strerror(errno));
+                CLOSE_ORILINK_PROTOCOL(&p);
+                free(key0);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.orilink_heartbeat_ack = payload;
+            result_pyld = orilink_deserialize_heartbeat_ack(label, p, buffer, len, &current_buffer_offset);
             break;
 		}
         default:
