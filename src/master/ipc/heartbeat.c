@@ -27,32 +27,32 @@ status_t handle_master_ipc_heartbeat(const char *label, master_context_t *master
         LOG_DEBUG("%sSIO %d set last_ack to %llu.", label, rcvd_index, rt.r_uint64_t);
         master_ctx->sio_session[rcvd_index].metrics.last_ack = rt.r_uint64_t;
         master_ctx->sio_session[rcvd_index].metrics.count_ack += (double)1;
-        master_ctx->sio_session[rcvd_index].metrics.sum_hbtime += iheartbeati->hbtime;
-        master_ctx->sio_session[rcvd_index].metrics.hbtime = iheartbeati->hbtime;
+        master_ctx->sio_session[rcvd_index].metrics.sum_hb_interval += iheartbeati->hb_interval;
+        master_ctx->sio_session[rcvd_index].metrics.hb_interval = iheartbeati->hb_interval;
     } else if (rcvd_wot == LOGIC) {
         LOG_DEBUG("%sLogic %d set last_ack to %llu.", label, rcvd_index, rt.r_uint64_t);
         master_ctx->logic_session[rcvd_index].metrics.last_ack = rt.r_uint64_t;
         master_ctx->logic_session[rcvd_index].metrics.count_ack += (double)1;
-        master_ctx->logic_session[rcvd_index].metrics.sum_hbtime += iheartbeati->hbtime;
-        master_ctx->logic_session[rcvd_index].metrics.hbtime = iheartbeati->hbtime;
+        master_ctx->logic_session[rcvd_index].metrics.sum_hb_interval += iheartbeati->hb_interval;
+        master_ctx->logic_session[rcvd_index].metrics.hb_interval = iheartbeati->hb_interval;
     } else if (rcvd_wot == COW) {
         LOG_DEBUG("%sCOW %d set last_ack to %llu.", label, rcvd_index, rt.r_uint64_t);
         master_ctx->cow_session[rcvd_index].metrics.last_ack = rt.r_uint64_t;
         master_ctx->cow_session[rcvd_index].metrics.count_ack += (double)1;
-        master_ctx->cow_session[rcvd_index].metrics.sum_hbtime += iheartbeati->hbtime;
-        master_ctx->cow_session[rcvd_index].metrics.hbtime = iheartbeati->hbtime;
+        master_ctx->cow_session[rcvd_index].metrics.sum_hb_interval += iheartbeati->hb_interval;
+        master_ctx->cow_session[rcvd_index].metrics.hb_interval = iheartbeati->hb_interval;
     } else if (rcvd_wot == DBR) {
         LOG_DEBUG("%sDBR %d set last_ack to %llu.", label, rcvd_index, rt.r_uint64_t);
         master_ctx->dbr_session[rcvd_index].metrics.last_ack = rt.r_uint64_t;
         master_ctx->dbr_session[rcvd_index].metrics.count_ack += (double)1;
-        master_ctx->dbr_session[rcvd_index].metrics.sum_hbtime += iheartbeati->hbtime;
-        master_ctx->dbr_session[rcvd_index].metrics.hbtime = iheartbeati->hbtime;
+        master_ctx->dbr_session[rcvd_index].metrics.sum_hb_interval += iheartbeati->hb_interval;
+        master_ctx->dbr_session[rcvd_index].metrics.hb_interval = iheartbeati->hb_interval;
     } else if (rcvd_wot == DBW) {
         LOG_DEBUG("%sDBW %d set last_ack to %llu.", label, rcvd_index, rt.r_uint64_t);
         master_ctx->dbw_session[rcvd_index].metrics.last_ack = rt.r_uint64_t;
         master_ctx->dbw_session[rcvd_index].metrics.count_ack += (double)1;
-        master_ctx->dbw_session[rcvd_index].metrics.sum_hbtime += iheartbeati->hbtime;
-        master_ctx->dbw_session[rcvd_index].metrics.hbtime = iheartbeati->hbtime;
+        master_ctx->dbw_session[rcvd_index].metrics.sum_hb_interval += iheartbeati->hb_interval;
+        master_ctx->dbw_session[rcvd_index].metrics.hb_interval = iheartbeati->hb_interval;
     } else {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         return FAILURE;

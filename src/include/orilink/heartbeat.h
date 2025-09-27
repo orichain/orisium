@@ -13,7 +13,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat(
     uint8_t local_index, 
     uint8_t local_session_index, 
     uint64_t id_connection,
-    double hbtime
+    double hb_interval
 );
 
 #endif

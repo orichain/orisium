@@ -49,7 +49,7 @@ typedef struct {
 } ipc_master_worker_info_t;
 
 typedef struct {
-    double hbtime;
+    double hb_interval;
 } ipc_worker_master_heartbeat_t;
 
 typedef struct {

@@ -50,7 +50,7 @@ typedef struct {
 } orilink_security_t;
 
 typedef struct {
-    double hbtime;
+    double hb_interval;
 } orilink_heartbeat_t;
 
 typedef struct {

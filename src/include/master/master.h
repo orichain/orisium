@@ -14,8 +14,8 @@
 #include "pqc.h"
 
 typedef struct {
-    double hbtime;
-    double sum_hbtime;
+    double hb_interval;
+    double sum_hb_interval;
     double count_ack;
     uint64_t last_ack;
     uint64_t last_checkhealthy;

@@ -18,9 +18,9 @@ status_t orilink_serialize_heartbeat_ack(const char *label, const orilink_heartb
     }
     size_t current_offset_local = *offset;
     if (CHECK_BUFFER_BOUNDS(current_offset_local, DOUBLE_ARRAY_SIZE, buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    uint8_t hbtime_be[8];
-    double_to_uint8_be(payload->hbtime, hbtime_be);
-    memcpy(current_buffer + current_offset_local, hbtime_be, DOUBLE_ARRAY_SIZE);
+    uint8_t hb_interval_be[8];
+    double_to_uint8_be(payload->hb_interval, hb_interval_be);
+    memcpy(current_buffer + current_offset_local, hb_interval_be, DOUBLE_ARRAY_SIZE);
     current_offset_local += DOUBLE_ARRAY_SIZE; 
     *offset = current_offset_local;
     return SUCCESS;
@@ -35,12 +35,12 @@ status_t orilink_deserialize_heartbeat_ack(const char *label, orilink_protocol_t
     const uint8_t *cursor = buffer + current_offset;
     orilink_heartbeat_t *payload = p->payload.orilink_heartbeat_ack;
     if (current_offset + DOUBLE_ARRAY_SIZE > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading hbtime.", label);
+        LOG_ERROR("%sOut of bounds reading hb_interval.", label);
         return FAILURE_OOBUF;
     }
-    uint8_t hbtime_be[8];
-    memcpy(hbtime_be, cursor, DOUBLE_ARRAY_SIZE);
-    payload->hbtime = uint8_be_to_double(hbtime_be);
+    uint8_t hb_interval_be[8];
+    memcpy(hb_interval_be, cursor, DOUBLE_ARRAY_SIZE);
+    payload->hb_interval = uint8_be_to_double(hb_interval_be);
     cursor += DOUBLE_ARRAY_SIZE;
     current_offset += DOUBLE_ARRAY_SIZE;
     *offset_ptr = current_offset;
@@ -57,7 +57,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_ack(
     uint8_t local_index, 
     uint8_t local_session_index, 
     uint64_t id_connection, 
-    double hbtime
+    double hb_interval
 )
 {
 	orilink_protocol_t_status_t result;
@@ -85,7 +85,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_ack(
 		CLOSE_ORILINK_PROTOCOL(&result.r_orilink_protocol_t);
 		return result;
 	}
-    payload->hbtime = hbtime;
+    payload->hb_interval = hb_interval;
 	result.r_orilink_protocol_t->payload.orilink_heartbeat_ack = payload;
 	result.status = SUCCESS;
 	return result;

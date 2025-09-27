@@ -827,7 +827,7 @@ status_t calculate_healthy(const char* label, master_context_t *master_ctx, work
     if (!metrics || !oricle || !ishealthy) return FAILURE;
     uint64_t now_ns = rt.r_uint64_t;
     double actual_elapsed_sec = (double)(now_ns - metrics->last_checkhealthy) / 1e9;
-    double ttl_delay_jitter = (metrics->sum_hbtime - metrics->hbtime) - ((double)WORKER_HEARTBEATSEC_TIMEOUT * metrics->count_ack);
+    double ttl_delay_jitter = (metrics->sum_hb_interval - metrics->hb_interval) - ((double)WORKER_HEARTBEATSEC_TIMEOUT * metrics->count_ack);
     double setup_elapsed_sec = (double)WORKER_HEARTBEATSEC_TIMEOUT + ttl_delay_jitter;
     double setup_count_ack = setup_elapsed_sec / (double)WORKER_HEARTBEATSEC_TIMEOUT;
     double comp_elapsed_sec = actual_elapsed_sec / setup_elapsed_sec;
@@ -848,7 +848,7 @@ status_t calculate_healthy(const char* label, master_context_t *master_ctx, work
     *ishealthy = (oricle->value_prediction >= HEALTHY_THRESHOLD);
     metrics->last_checkhealthy = now_ns;
     metrics->count_ack = (double)0;
-    metrics->sum_hbtime = metrics->hbtime;
+    metrics->sum_hb_interval = metrics->hb_interval;
     return SUCCESS;
 }
 

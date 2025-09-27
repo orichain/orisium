@@ -14,8 +14,8 @@ double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_t
         initial_delay_ms = MAX_INITIAL_DELAY_MS;
     }
     uint64_t_status_t rt = get_realtime_time_ns(label);
-    metrics->sum_hbtime = (double)0;
-    metrics->hbtime = (double)0;
+    metrics->sum_hb_interval = (double)0;
+    metrics->hb_interval = (double)0;
     metrics->count_ack = (double)0;
     metrics->last_ack = rt.r_uint64_t;
     metrics->last_checkhealthy = rt.r_uint64_t;
@@ -24,8 +24,8 @@ double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_t
     metrics->longest_task_time = 0ULL;
 //======================================================================            
     if (initial_delay_ms > 0) {
-        metrics->hbtime = (double)WORKER_HEARTBEATSEC_TIMEOUT + ((double)initial_delay_ms/1000.0);
-        metrics->sum_hbtime = metrics->hbtime;
+        metrics->hb_interval = (double)WORKER_HEARTBEATSEC_TIMEOUT + ((double)initial_delay_ms/1000.0);
+        metrics->sum_hb_interval = metrics->hb_interval;
         metrics->count_ack = (double)0;
     }
     return initial_delay_ms;

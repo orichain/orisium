@@ -263,36 +263,36 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                     worker_metrics_t *metrics = &master_ctx->sio_session[i].metrics;
                                     metrics->last_checkhealthy = now_ns;
                                     metrics->count_ack = (double)0;
-                                    metrics->hbtime = (double)0;
-                                    metrics->sum_hbtime = metrics->hbtime;
+                                    metrics->hb_interval = (double)0;
+                                    metrics->sum_hb_interval = metrics->hb_interval;
                                 }
                                 for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) { 
                                     worker_metrics_t *metrics = &master_ctx->logic_session[i].metrics;
                                     metrics->last_checkhealthy = now_ns;
                                     metrics->count_ack = (double)0;
-                                    metrics->hbtime = (double)0;
-                                    metrics->sum_hbtime = metrics->hbtime;
+                                    metrics->hb_interval = (double)0;
+                                    metrics->sum_hb_interval = metrics->hb_interval;
                                 }
                                 for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
                                     worker_metrics_t *metrics = &master_ctx->cow_session[i].metrics;
                                     metrics->last_checkhealthy = now_ns;
                                     metrics->count_ack = (double)0;
-                                    metrics->hbtime = (double)0;
-                                    metrics->sum_hbtime = metrics->hbtime;
+                                    metrics->hb_interval = (double)0;
+                                    metrics->sum_hb_interval = metrics->hb_interval;
                                 }
                                 for (int i = 0; i < MAX_DBR_WORKERS; ++i) { 
                                     worker_metrics_t *metrics = &master_ctx->dbr_session[i].metrics;
                                     metrics->last_checkhealthy = now_ns;
                                     metrics->count_ack = (double)0;
-                                    metrics->hbtime = (double)0;
-                                    metrics->sum_hbtime = metrics->hbtime;
+                                    metrics->hb_interval = (double)0;
+                                    metrics->sum_hb_interval = metrics->hb_interval;
                                 }
                                 for (int i = 0; i < MAX_DBW_WORKERS; ++i) { 
                                     worker_metrics_t *metrics = &master_ctx->dbw_session[i].metrics;
                                     metrics->last_checkhealthy = now_ns;
                                     metrics->count_ack = (double)0;
-                                    metrics->hbtime = (double)0;
-                                    metrics->sum_hbtime = metrics->hbtime;
+                                    metrics->hb_interval = (double)0;
+                                    metrics->sum_hb_interval = metrics->hb_interval;
                                 }
                                 if (async_create_timerfd(label, &master_ctx->check_healthy_timer_fd) != SUCCESS) {
                                     LOG_INFO("%sGagal async_create_timerfd hb checker. Initiating graceful shutdown...", label);
