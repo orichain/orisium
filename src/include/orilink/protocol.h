@@ -50,6 +50,8 @@ typedef struct {
 } orilink_security_t;
 
 typedef struct {
+    uint64_t local_id;
+    uint64_t remote_id;
     double hb_interval;
 } orilink_heartbeat_t;
 

@@ -8,7 +8,7 @@
 
 double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_type_t wot, int index) {
     int worker_type_id = (int)wot;
-    const double MAX_INITIAL_DELAY_MS = (double)WORKER_HEARTBEATSEC_TIMEOUT * 1000.0;
+    const double MAX_INITIAL_DELAY_MS = (double)WORKER_HEARTBEAT_INTERVAL * 1000.0;
     double initial_delay_ms = (double)worker_type_id * index * INITIAL_MILISECONDS_PER_UNIT;
     if (initial_delay_ms > MAX_INITIAL_DELAY_MS) {
         initial_delay_ms = MAX_INITIAL_DELAY_MS;
@@ -24,7 +24,7 @@ double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_t
     metrics->longest_task_time = 0ULL;
 //======================================================================            
     if (initial_delay_ms > 0) {
-        metrics->hb_interval = (double)WORKER_HEARTBEATSEC_TIMEOUT + ((double)initial_delay_ms/1000.0);
+        metrics->hb_interval = (double)WORKER_HEARTBEAT_INTERVAL + ((double)initial_delay_ms/1000.0);
         metrics->sum_hb_interval = metrics->hb_interval;
         metrics->count_ack = (double)0;
     }

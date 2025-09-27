@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <endian.h>
 
 #include "utilities.h"
 #include "orilink/protocol.h"
@@ -17,6 +18,14 @@ status_t orilink_serialize_heartbeat(const char *label, const orilink_heartbeat_
         return FAILURE;
     }
     size_t current_offset_local = *offset;
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint64_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    uint64_t local_id_be = htobe64(payload->local_id);
+    memcpy(current_buffer + current_offset_local, &local_id_be, sizeof(uint64_t));
+    current_offset_local += sizeof(uint64_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint64_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    uint64_t remote_id_be = htobe64(payload->remote_id);
+    memcpy(current_buffer + current_offset_local, &remote_id_be, sizeof(uint64_t));
+    current_offset_local += sizeof(uint64_t);
     if (CHECK_BUFFER_BOUNDS(current_offset_local, DOUBLE_ARRAY_SIZE, buffer_size) != SUCCESS) return FAILURE_OOBUF;
     uint8_t hb_interval_be[8];
     double_to_uint8_be(payload->hb_interval, hb_interval_be);
@@ -34,6 +43,24 @@ status_t orilink_deserialize_heartbeat(const char *label, orilink_protocol_t *p,
     size_t current_offset = *offset_ptr;
     const uint8_t *cursor = buffer + current_offset;
     orilink_heartbeat_t *payload = p->payload.orilink_heartbeat;
+    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading local_id.", label);
+        return FAILURE_OOBUF;
+    }
+    uint64_t local_id_be;
+    memcpy(&local_id_be, cursor, sizeof(uint64_t));
+    payload->local_id = be64toh(local_id_be);
+    cursor += sizeof(uint64_t);
+    current_offset += sizeof(uint64_t);
+    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading remote_id.", label);
+        return FAILURE_OOBUF;
+    }
+    uint64_t remote_id_be;
+    memcpy(&remote_id_be, cursor, sizeof(uint64_t));
+    payload->remote_id = be64toh(remote_id_be);
+    cursor += sizeof(uint64_t);
+    current_offset += sizeof(uint64_t);
     if (current_offset + DOUBLE_ARRAY_SIZE > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading hb_interval.", label);
         return FAILURE_OOBUF;
@@ -56,7 +83,9 @@ orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat(
     worker_type_t local_wot, 
     uint8_t local_index, 
     uint8_t local_session_index, 
-    uint64_t id_connection, 
+    uint64_t id_connection,
+    uint64_t local_id,
+    uint64_t remote_id,
     double hb_interval
 )
 {
@@ -85,6 +114,8 @@ orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat(
 		CLOSE_ORILINK_PROTOCOL(&result.r_orilink_protocol_t);
 		return result;
 	}
+    payload->local_id = local_id;
+    payload->remote_id = remote_id;
     payload->hb_interval = hb_interval;
 	result.r_orilink_protocol_t->payload.orilink_heartbeat = payload;
 	result.status = SUCCESS;

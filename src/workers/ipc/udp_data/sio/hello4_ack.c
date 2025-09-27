@@ -3,6 +3,8 @@
 #include <endian.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <time.h>
+#include <math.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -15,6 +17,9 @@
 #include "aes.h"
 #include "orilink/protocol.h"
 #include "stdbool.h"
+#include "async.h"
+#include "orilink/heartbeat.h"
+#include "workers/ipc/master_ipc_cmds.h"
 
 status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
 //======================================================================
@@ -31,9 +36,6 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         return FAILURE;
     }
 //======================================================================
-    worker_type_t remote_wot;
-    uint8_t remote_index;
-    uint8_t remote_session_index;
     orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
         (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n
@@ -44,9 +46,6 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     } else {
-        remote_wot = oudp_datao->local_wot;
-        remote_index = oudp_datao->local_index;
-        remote_session_index = oudp_datao->local_session_index;
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
     }
@@ -173,22 +172,12 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         decrypted_remote_identity[i] = encrypted_remote_identity[i] ^ keystream_buffer1[i];
     }
     aes256_ctx_release(&aes_ctx1);
-//======================================================================
-// Initalize Or FAILURE Now
-//----------------------------------------------------------------------
-    uint64_t_status_t current_time = get_realtime_time_ns(worker_ctx->label);
-    if (current_time.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        return FAILURE;
-    }
-//======================================================================
 //----------------------------------------------------------------------
 // Mencocokkan wot index
 //----------------------------------------------------------------------
     worker_type_t data_wot1;
     memcpy((uint8_t *)&data_wot1, decrypted_remote_identity, sizeof(uint8_t));
-    if (*(uint8_t *)&remote_wot != *(uint8_t *)&data_wot1) {
+    if (*(uint8_t *)&identity->remote_wot != *(uint8_t *)&data_wot1) {
         LOG_ERROR("%sberbeda wot %d <=> %d. Worker error...", worker_ctx->label, data_wot1, identity->local_wot);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
@@ -196,7 +185,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     }
     uint8_t data_index1;
     memcpy(&data_index1, decrypted_remote_identity + sizeof(uint8_t), sizeof(uint8_t));
-    if (remote_index != data_index1) {
+    if (identity->remote_index != data_index1) {
         LOG_ERROR("%sberbeda index. Worker error...", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
@@ -204,7 +193,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     }
     uint8_t data_session_index1;
     memcpy(&data_session_index1, decrypted_remote_identity + sizeof(uint8_t) + sizeof(uint8_t), sizeof(uint8_t));
-    if (remote_session_index != data_session_index1) {
+    if (identity->remote_session_index != data_session_index1) {
         LOG_ERROR("%sberbeda session_index.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
@@ -214,6 +203,76 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     memcpy(&remote_id_be, decrypted_local_identity + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t), sizeof(uint64_t));
     uint64_t remote_id = be64toh(remote_id_be);
 //======================================================================
+// Initalize Or FAILURE Now
+//----------------------------------------------------------------------
+    uint64_t_status_t current_time = get_realtime_time_ns(worker_ctx->label);
+    if (current_time.status != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+    if (async_create_timerfd(worker_ctx->label, &session->heartbeat.timer_fd) != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+    session->heartbeat.sent_try_count++;
+    session->heartbeat.sent_time = current_time.r_uint64_t;
+    if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat.timer_fd,
+        (time_t)session->heartbeat.interval_timer_fd,
+        (long)((session->heartbeat.interval_timer_fd - (time_t)session->heartbeat.interval_timer_fd) * 1e9),
+        (time_t)session->heartbeat.interval_timer_fd,
+        (long)((session->heartbeat.interval_timer_fd - (time_t)session->heartbeat.interval_timer_fd) * 1e9)) != SUCCESS)
+    {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat.timer_fd) != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+//======================================================================
+    orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_heartbeat(
+        worker_ctx->label,
+        0x01,
+        identity->remote_wot,
+        identity->remote_index,
+        identity->remote_session_index,
+        identity->local_wot,
+        identity->local_index,
+        identity->local_session_index,
+        identity->id_connection,
+        identity->local_id,
+        remote_id,
+        (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction)
+    );
+    if (orilink_cmd_result.status != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+    puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
+        worker_ctx->label,
+        security->aes_key,
+        security->mac_key,
+        security->local_nonce,
+        &security->local_ctr,
+        orilink_cmd_result.r_orilink_protocol_t
+    );
+    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+    if (udp_data.status != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, remote_addr, &udp_data, &session->heartbeat) != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+//----------------------------------------------------------------------
     CLOSE_IPC_PROTOCOL(&received_protocol);
 //----------------------------------------------------------------------
     memcpy(&identity->remote_addr, remote_addr, sizeof(struct sockaddr_in6));
@@ -234,10 +293,12 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     uint64_t interval_ull = session->hello4.ack_rcvd_time - session->hello4.sent_time;
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-    cleanup_hello_timer(worker_ctx->label, &worker_ctx->async, &session->hello4);
+    cleanup_packet_timer(worker_ctx->label, &worker_ctx->async, &session->hello4);
     
     printf("%sRTT Hello-4 = %f\n", worker_ctx->label, session->rtt.value_prediction);
     
+//======================================================================
+    session->heartbeat.sent = true;
 //======================================================================
     return SUCCESS;
 }

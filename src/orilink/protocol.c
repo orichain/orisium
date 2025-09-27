@@ -168,7 +168,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                     return result;
                 }
             }
-            payload_fixed_size = DOUBLE_ARRAY_SIZE;
+            payload_fixed_size = sizeof(uint64_t) + sizeof(uint64_t) + DOUBLE_ARRAY_SIZE;
             payload_dynamic_size = 0;
             break;
         }
@@ -180,7 +180,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                     return result;
                 }
             }
-            payload_fixed_size = DOUBLE_ARRAY_SIZE;
+            payload_fixed_size = sizeof(uint64_t) + sizeof(uint64_t) + DOUBLE_ARRAY_SIZE;
             payload_dynamic_size = 0;
             break;
         }

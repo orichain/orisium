@@ -32,9 +32,6 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
         return FAILURE;
     }
 //======================================================================
-    worker_type_t remote_wot;
-    uint8_t remote_index;
-    uint8_t remote_session_index;
     orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
         (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n
@@ -45,9 +42,6 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     } else {
-        remote_wot = oudp_datao->local_wot;
-        remote_index = oudp_datao->local_index;
-        remote_session_index = oudp_datao->local_session_index;
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
     }
@@ -101,9 +95,9 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello3(
         worker_ctx->label,
         0x01,
-        remote_wot,
-        remote_index,
-        remote_session_index,
+        identity->remote_wot,
+        identity->remote_index,
+        identity->remote_session_index,
         identity->local_wot,
         identity->local_index,
         identity->local_session_index,
@@ -154,7 +148,7 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
     uint64_t interval_ull = session->hello2.ack_rcvd_time - session->hello2.sent_time;
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-    cleanup_hello_timer(worker_ctx->label, &worker_ctx->async, &session->hello2);
+    cleanup_packet_timer(worker_ctx->label, &worker_ctx->async, &session->hello2);
     
     printf("%sRTT Hello-2 = %f\n", worker_ctx->label, session->rtt.value_prediction);
     

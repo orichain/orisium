@@ -23,7 +23,7 @@ typedef struct {
     double interval_ack_timer_fd;
     uint16_t len;
     uint8_t *data;
-} hello_ack_t;
+} packet_ack_t;
 
 typedef struct {
 //======================================================================
@@ -32,12 +32,16 @@ typedef struct {
 	orilink_identity_t identity;
 	orilink_security_t security;
 //======================================================================
-// HELLO SOCK
+// HELLO
 //======================================================================
-    hello_ack_t hello1_ack;
-    hello_ack_t hello2_ack;
-    hello_ack_t hello3_ack;
-    hello_ack_t hello4_ack;	
+    packet_ack_t hello1_ack;
+    packet_ack_t hello2_ack;
+    packet_ack_t hello3_ack;
+    packet_ack_t hello4_ack;
+//======================================================================
+// HEARTBEAT
+//======================================================================
+    packet_ack_t heartbeat_ack;
 //======================================================================
 // ORICLE
 //======================================================================
@@ -55,7 +59,7 @@ typedef struct {
     uint64_t ack_rcvd_time;
     uint16_t len;
     uint8_t *data;
-} hello_t;
+} packet_t;
 
 typedef struct {
 //======================================================================
@@ -65,12 +69,16 @@ typedef struct {
 	uint8_t *kem_privatekey;
 	orilink_security_t security;
 //======================================================================
-// HELLO SOCK
+// HELLO
 //======================================================================
-    hello_t hello1;
-    hello_t hello2;
-    hello_t hello3;
-    hello_t hello4;
+    packet_t hello1;
+    packet_t hello2;
+    packet_t hello3;
+    packet_t hello4;
+//======================================================================
+// HEARTBEAT
+//======================================================================
+    packet_t heartbeat;
 //======================================================================
 // ORICLE
 //======================================================================
@@ -113,7 +121,7 @@ void run_cow_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
 void run_dbr_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
 void run_dbw_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
 
-static inline void cleanup_hello_timer(const char *label, async_type_t *async, hello_t *h) {
+static inline void cleanup_packet_timer(const char *label, async_type_t *async, packet_t *h) {
     h->interval_timer_fd = (double)1;
     h->sent_try_count = 0x00;
     h->len = (uint16_t)0;
@@ -125,7 +133,7 @@ static inline void cleanup_hello_timer(const char *label, async_type_t *async, h
     CLOSE_FD(&h->timer_fd);
 }
 
-static inline void cleanup_hello_ack_timer(const char *label, async_type_t *async, hello_ack_t *h) {
+static inline void cleanup_packet_ack_timer(const char *label, async_type_t *async, packet_ack_t *h) {
     h->interval_ack_timer_fd = (double)1;
     h->ack_sent_try_count = 0x00;
     h->len = (uint16_t)0;
@@ -191,7 +199,7 @@ static inline void calculate_rtt(const char *label, void *void_session, worker_t
     }
 }
 
-static inline void cleanup_hello(const char *label, async_type_t *async, hello_t *h) {
+static inline void cleanup_packet(const char *label, async_type_t *async, packet_t *h) {
     h->sent = false;
     h->sent_time = (uint64_t)0;
     h->ack_rcvd_time = (uint64_t)0;
@@ -207,12 +215,12 @@ static inline void cleanup_hello(const char *label, async_type_t *async, hello_t
     CLOSE_FD(&h->timer_fd);
 }
 
-static inline void setup_hello(hello_t *h) {
+static inline void setup_packet(packet_t *h, double interval_timer) {
     h->sent = false;
     h->sent_time = (uint64_t)0;
     h->ack_rcvd_time = (uint64_t)0;
     h->ack_rcvd = false;
-    h->interval_timer_fd = (double)1;
+    h->interval_timer_fd = interval_timer;
     h->sent_try_count = 0x00;
     h->len = (uint16_t)0;
     h->data = NULL;
@@ -220,10 +228,11 @@ static inline void setup_hello(hello_t *h) {
 }
 
 static inline status_t setup_cow_session(const char *label, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
-    setup_hello(&single_session->hello1);
-    setup_hello(&single_session->hello2);
-    setup_hello(&single_session->hello3);
-    setup_hello(&single_session->hello4);
+    setup_packet(&single_session->hello1, (double)1);
+    setup_packet(&single_session->hello2, (double)1);
+    setup_packet(&single_session->hello3, (double)1);
+    setup_packet(&single_session->hello4, (double)1);
+    setup_packet(&single_session->heartbeat, (double)NODE_HEARTBEAT_INTERVAL);
     setup_oricle_double(&single_session->retry, (double)0);
     setup_oricle_double(&single_session->rtt, (double)0);
     orilink_identity_t *identity = &single_session->identity;
@@ -256,10 +265,11 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
 }
 
 static inline void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session) {
-    cleanup_hello(label, cow_async, &single_session->hello1);
-    cleanup_hello(label, cow_async, &single_session->hello2);
-    cleanup_hello(label, cow_async, &single_session->hello3);
-    cleanup_hello(label, cow_async, &single_session->hello4);
+    cleanup_packet(label, cow_async, &single_session->hello1);
+    cleanup_packet(label, cow_async, &single_session->hello2);
+    cleanup_packet(label, cow_async, &single_session->hello3);
+    cleanup_packet(label, cow_async, &single_session->hello4);
+    cleanup_packet(label, cow_async, &single_session->heartbeat);
     cleanup_oricle_double(&single_session->retry);
     cleanup_oricle_double(&single_session->rtt);
     orilink_identity_t *identity = &single_session->identity;
@@ -294,7 +304,7 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
     free(security->remote_nonce);
 }
 
-static inline void cleanup_hello_ack(const char *label, async_type_t *async, hello_ack_t *h) {
+static inline void cleanup_packet_ack(const char *label, async_type_t *async, packet_ack_t *h) {
     h->rcvd = false;
     h->rcvd_time = (uint64_t)0;
     h->ack_sent_time = (uint64_t)0;
@@ -310,12 +320,12 @@ static inline void cleanup_hello_ack(const char *label, async_type_t *async, hel
     CLOSE_FD(&h->ack_timer_fd);
 }
 
-static inline void setup_hello_ack(hello_ack_t *h) {
+static inline void setup_packet_ack(packet_ack_t *h, double interval_timer) {
     h->rcvd = false;
     h->rcvd_time = (uint64_t)0;
     h->ack_sent_time = (uint64_t)0;
     h->ack_sent = false;
-    h->interval_ack_timer_fd = (double)1;
+    h->interval_ack_timer_fd = interval_timer;
     h->ack_sent_try_count = 0x00;
     h->len = (uint16_t)0;
     h->data = NULL;
@@ -323,10 +333,11 @@ static inline void setup_hello_ack(hello_ack_t *h) {
 }
 
 static inline status_t setup_sio_session(const char *label, sio_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
-    setup_hello_ack(&single_session->hello1_ack);
-    setup_hello_ack(&single_session->hello2_ack);
-    setup_hello_ack(&single_session->hello3_ack);
-    setup_hello_ack(&single_session->hello4_ack);
+    setup_packet_ack(&single_session->hello1_ack, (double)1);
+    setup_packet_ack(&single_session->hello2_ack, (double)1);
+    setup_packet_ack(&single_session->hello3_ack, (double)1);
+    setup_packet_ack(&single_session->hello4_ack, (double)1);
+    setup_packet_ack(&single_session->heartbeat_ack, (double)NODE_HEARTBEAT_INTERVAL);
     setup_oricle_double(&single_session->retry, (double)0);
     setup_oricle_double(&single_session->rtt, (double)0);
     orilink_identity_t *identity = &single_session->identity;
@@ -354,10 +365,11 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
 }
 
 static inline void cleanup_sio_session(const char *label, async_type_t *sio_async, sio_c_session_t *single_session) {
-    cleanup_hello_ack(label, sio_async, &single_session->hello1_ack);
-    cleanup_hello_ack(label, sio_async, &single_session->hello2_ack);
-    cleanup_hello_ack(label, sio_async, &single_session->hello3_ack);
-    cleanup_hello_ack(label, sio_async, &single_session->hello4_ack);
+    cleanup_packet_ack(label, sio_async, &single_session->hello1_ack);
+    cleanup_packet_ack(label, sio_async, &single_session->hello2_ack);
+    cleanup_packet_ack(label, sio_async, &single_session->hello3_ack);
+    cleanup_packet_ack(label, sio_async, &single_session->hello4_ack);
+    cleanup_packet_ack(label, sio_async, &single_session->heartbeat_ack);
     cleanup_oricle_double(&single_session->retry);
     cleanup_oricle_double(&single_session->rtt);
     orilink_identity_t *identity = &single_session->identity;

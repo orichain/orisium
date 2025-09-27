@@ -128,7 +128,7 @@ status_t worker_master_udp_data(
     uint8_t index,
     struct sockaddr_in6 *addr,
     puint8_t_size_t_status_t *r,
-    hello_t *h
+    packet_t *h
 ) 
 {
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data(
@@ -206,7 +206,7 @@ status_t worker_master_udp_data_ack(
     uint8_t index,
     struct sockaddr_in6 *addr,
     puint8_t_size_t_status_t *r,
-    hello_ack_t *h
+    packet_ack_t *h
 ) 
 {
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data(

@@ -35,9 +35,6 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         return FAILURE;
     }
 //======================================================================
-    worker_type_t remote_wot;
-    uint8_t remote_index;
-    uint8_t remote_session_index;
     orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
         (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n
@@ -48,9 +45,6 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     } else {
-        remote_wot = oudp_datao->local_wot;
-        remote_index = oudp_datao->local_index;
-        remote_session_index = oudp_datao->local_session_index;
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
     }
@@ -131,7 +125,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
 //======================================================================
     worker_type_t data_wot;
     memcpy((uint8_t *)&data_wot, decrypted_remote_identity_rcvd, sizeof(uint8_t));
-    if (*(uint8_t *)&remote_wot != *(uint8_t *)&data_wot) {
+    if (*(uint8_t *)&identity->remote_wot != *(uint8_t *)&data_wot) {
         LOG_ERROR("%sberbeda wot.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
@@ -139,7 +133,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     }
     uint8_t data_index;
     memcpy(&data_index, decrypted_remote_identity_rcvd + sizeof(uint8_t), sizeof(uint8_t));
-    if (remote_index != data_index) {
+    if (identity->remote_index != data_index) {
         LOG_ERROR("%sberbeda index.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
@@ -147,7 +141,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     }
     uint8_t data_session_index;
     memcpy(&data_session_index, decrypted_remote_identity_rcvd + sizeof(uint8_t) + sizeof(uint8_t), sizeof(uint8_t));
-    if (remote_session_index != data_session_index) {
+    if (identity->remote_session_index != data_session_index) {
         LOG_ERROR("%sberbeda session_index.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
@@ -168,17 +162,17 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     uint8_t encrypted_remote_identity1[sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t) + AES_TAG_BYTES];
     memcpy(
         remote_identity, 
-        (uint8_t *)&remote_wot, 
+        (uint8_t *)&identity->remote_wot, 
         sizeof(uint8_t)
     );
     memcpy(
         remote_identity + sizeof(uint8_t), 
-        (uint8_t *)&remote_index, 
+        (uint8_t *)&identity->remote_index, 
         sizeof(uint8_t)
     );
     memcpy(
         remote_identity + sizeof(uint8_t) + sizeof(uint8_t), 
-        (uint8_t *)&remote_session_index, 
+        (uint8_t *)&identity->remote_session_index, 
         sizeof(uint8_t)
     );
     uint64_t remote_id_be1 = htobe64(remote_id);
@@ -295,9 +289,9 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello4_ack(
         worker_ctx->label,
         0x01,
-        remote_wot,
-        remote_index,
-        remote_session_index,
+        identity->remote_wot,
+        identity->remote_index,
+        identity->remote_session_index,
         identity->local_wot,
         identity->local_index,
         identity->local_session_index,
@@ -354,7 +348,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     uint64_t interval_ull = session->hello3_ack.rcvd_time - session->hello3_ack.ack_sent_time;
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-    cleanup_hello_ack_timer(worker_ctx->label, &worker_ctx->async, &session->hello3_ack);
+    cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->hello3_ack);
     
     printf("%sRTT Hello-3 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
     
