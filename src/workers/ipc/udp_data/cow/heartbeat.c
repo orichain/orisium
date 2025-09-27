@@ -166,7 +166,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         double rtt_value = (double)interval_ull;
         calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
         
-        printf("%sRTT Heartbeat Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
+        LOG_DEVEL_DEBUG("%sRTT Heartbeat Ack = %f", worker_ctx->label, session->rtt.value_prediction);
     }
 //======================================================================
     session->heartbeat_ack.ack_sent = true;

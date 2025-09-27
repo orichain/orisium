@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <inttypes.h>
 #include <time.h>
 
@@ -78,7 +77,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     cleanup_packet_timer(worker_ctx->label, &worker_ctx->async, &session->heartbeat);
 
-    printf("%sRTT Heartbeat = %f\n", worker_ctx->label, session->rtt.value_prediction);
+    LOG_DEVEL_DEBUG("%sRTT Heartbeat = %f", worker_ctx->label, session->rtt.value_prediction);
 //======================================================================
     if (async_create_timerfd(worker_ctx->label, &session->heartbeat_timer_fd) != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
