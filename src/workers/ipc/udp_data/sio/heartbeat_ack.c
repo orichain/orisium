@@ -78,7 +78,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
         identity->id_connection,
         identity->local_id,
         identity->remote_id,
-        hb_interval
+        session->heartbeat.interval_timer_fd
     );
     if (orilink_cmd_result.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
