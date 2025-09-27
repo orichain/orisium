@@ -42,6 +42,8 @@ typedef struct {
 // HEARTBEAT
 //======================================================================
     packet_ack_t heartbeat_ack;
+    bool heartbeat_closed;
+    int heartbeat_openner_fd;
 //======================================================================
 // ORICLE
 //======================================================================
@@ -79,6 +81,7 @@ typedef struct {
 // HEARTBEAT
 //======================================================================
     packet_t heartbeat;
+    int heartbeat_timer_fd;
 //======================================================================
 // ORICLE
 //======================================================================
@@ -233,6 +236,7 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
     setup_packet(&single_session->hello3, (double)1);
     setup_packet(&single_session->hello4, (double)1);
     setup_packet(&single_session->heartbeat, (double)NODE_HEARTBEAT_INTERVAL);
+    single_session->heartbeat_timer_fd = -1;
     setup_oricle_double(&single_session->retry, (double)0);
     setup_oricle_double(&single_session->rtt, (double)0);
     orilink_identity_t *identity = &single_session->identity;
@@ -270,6 +274,8 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
     cleanup_packet(label, cow_async, &single_session->hello3);
     cleanup_packet(label, cow_async, &single_session->hello4);
     cleanup_packet(label, cow_async, &single_session->heartbeat);
+    async_delete_event(label, cow_async, &single_session->heartbeat_timer_fd);
+    CLOSE_FD(&single_session->heartbeat_timer_fd);
     cleanup_oricle_double(&single_session->retry);
     cleanup_oricle_double(&single_session->rtt);
     orilink_identity_t *identity = &single_session->identity;
@@ -338,6 +344,8 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     setup_packet_ack(&single_session->hello3_ack, (double)1);
     setup_packet_ack(&single_session->hello4_ack, (double)1);
     setup_packet_ack(&single_session->heartbeat_ack, (double)NODE_HEARTBEAT_INTERVAL);
+    single_session->heartbeat_closed = false;
+    single_session->heartbeat_openner_fd = -1;
     setup_oricle_double(&single_session->retry, (double)0);
     setup_oricle_double(&single_session->rtt, (double)0);
     orilink_identity_t *identity = &single_session->identity;
@@ -370,6 +378,9 @@ static inline void cleanup_sio_session(const char *label, async_type_t *sio_asyn
     cleanup_packet_ack(label, sio_async, &single_session->hello3_ack);
     cleanup_packet_ack(label, sio_async, &single_session->hello4_ack);
     cleanup_packet_ack(label, sio_async, &single_session->heartbeat_ack);
+    single_session->heartbeat_closed = false;
+    async_delete_event(label, sio_async, &single_session->heartbeat_openner_fd);
+    CLOSE_FD(&single_session->heartbeat_openner_fd);
     cleanup_oricle_double(&single_session->retry);
     cleanup_oricle_double(&single_session->rtt);
     orilink_identity_t *identity = &single_session->identity;

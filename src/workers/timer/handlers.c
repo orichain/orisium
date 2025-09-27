@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "types.h"
 #include "workers/workers.h"
@@ -8,6 +9,11 @@
 #include "workers/ipc/master_ipc_cmds.h"
 #include "constants.h"
 #include "log.h"
+#include "async.h"
+#include "stdbool.h"
+#include "utilities.h"
+#include "orilink/heartbeat.h"
+#include "orilink/protocol.h"
 
 status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions, int *current_fd) {
     worker_type_t wot = *worker_ctx->wot;
@@ -167,6 +173,75 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         continue;
                     }
                     return SUCCESS;
+                } else if (*current_fd == session->heartbeat_timer_fd) {
+                    uint64_t u;
+                    read(session->heartbeat_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+//======================================================================
+// Initalize Or FAILURE Now
+//----------------------------------------------------------------------
+                    uint64_t_status_t current_time = get_realtime_time_ns(worker_ctx->label);
+                    if (current_time.status != SUCCESS) {
+                        return FAILURE;
+                    }
+                    if (async_create_timerfd(worker_ctx->label, &session->heartbeat.timer_fd) != SUCCESS) {
+                        return FAILURE;
+                    }
+                    session->heartbeat.sent_try_count++;
+                    session->heartbeat.sent_time = current_time.r_uint64_t;
+                    session->heartbeat.interval_timer_fd = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
+                    if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat.timer_fd,
+                        (time_t)session->heartbeat.interval_timer_fd,
+                        (long)((session->heartbeat.interval_timer_fd - (time_t)session->heartbeat.interval_timer_fd) * 1e9),
+                        (time_t)session->heartbeat.interval_timer_fd,
+                        (long)((session->heartbeat.interval_timer_fd - (time_t)session->heartbeat.interval_timer_fd) * 1e9)) != SUCCESS)
+                    {
+                        return FAILURE;
+                    }
+                    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat.timer_fd) != SUCCESS) {
+                        return FAILURE;
+                    }
+//======================================================================
+                    orilink_identity_t *identity = &session->identity;
+                    orilink_security_t *security = &session->security;
+                    orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_heartbeat(
+                        worker_ctx->label,
+                        0x01,
+                        identity->remote_wot,
+                        identity->remote_index,
+                        identity->remote_session_index,
+                        identity->local_wot,
+                        identity->local_index,
+                        identity->local_session_index,
+                        identity->id_connection,
+                        identity->local_id,
+                        identity->remote_id,
+                        session->heartbeat.interval_timer_fd
+                    );
+                    if (orilink_cmd_result.status != SUCCESS) {
+                        return FAILURE;
+                    }
+                    puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
+                        worker_ctx->label,
+                        security->aes_key,
+                        security->mac_key,
+                        security->local_nonce,
+                        &security->local_ctr,
+                        orilink_cmd_result.r_orilink_protocol_t
+                    );
+                    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+                    if (udp_data.status != SUCCESS) {
+                        return FAILURE;
+                    }
+                    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &session->identity.remote_addr, &udp_data, &session->heartbeat) != SUCCESS) {
+                        return FAILURE;
+                    }
+//======================================================================
+                    session->heartbeat.sent = true;
+                    session->heartbeat.ack_rcvd = false;
+//======================================================================
+                    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_timer_fd);
+                    CLOSE_FD(&session->heartbeat_timer_fd);
+                    return SUCCESS;
                 }
             }
             break;
@@ -325,6 +400,13 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     if (retry_packet_ack(worker_ctx, session, &session->heartbeat_ack) != SUCCESS) {
                         continue;
                     }
+                    return SUCCESS;
+                } else if (*current_fd == session->heartbeat_openner_fd) {
+                    uint64_t u;
+                    read(session->heartbeat_openner_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    session->heartbeat_closed = false;
+                    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_fd);
+                    CLOSE_FD(&session->heartbeat_openner_fd);
                     return SUCCESS;
                 }
             }
