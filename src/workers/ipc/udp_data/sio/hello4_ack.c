@@ -3,7 +3,6 @@
 #include <netinet/in.h>
 #include <stdio.h>
 #include <time.h>
-#include <math.h>
 #include <inttypes.h>
 
 #include "log.h"
@@ -246,7 +245,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         identity->id_connection,
         identity->local_id,
         remote_id,
-        (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction)
+        session->heartbeat.interval_timer_fd
     );
     if (orilink_cmd_result.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
