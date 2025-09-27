@@ -148,11 +148,6 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
 //----------------------------------------------------------------------
     CLOSE_IPC_PROTOCOL(&received_protocol);
 //----------------------------------------------------------------------                            
-    //memcpy(&identity->remote_addr, remote_addr, sizeof(struct sockaddr_in6));
-    //identity->remote_wot = remote_wot;
-    //identity->remote_index = remote_index;
-    //identity->remote_session_index = remote_session_index;
-    //identity->remote_id = remote_id;
     memcpy(security->kem_publickey + (KEM_PUBLICKEY_BYTES / 2), kem_publickey + (KEM_PUBLICKEY_BYTES / 2), KEM_PUBLICKEY_BYTES / 2);
     memcpy(security->kem_ciphertext, kem_ciphertext, KEM_CIPHERTEXT_BYTES);
     memcpy(security->kem_sharedsecret, kem_sharedsecret, KEM_SHAREDSECRET_BYTES);

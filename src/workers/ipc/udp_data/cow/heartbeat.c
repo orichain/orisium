@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <inttypes.h>
+#include <time.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -8,6 +9,9 @@
 #include "workers/workers.h"
 #include "orilink/protocol.h"
 #include "stdbool.h"
+#include "orilink/heartbeat_ack.h"
+#include "async.h"
+#include "workers/ipc/master_ipc_cmds.h"
 
 struct sockaddr_in6;
 
@@ -50,8 +54,6 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         return FAILURE;
     }
-//======================================================================    
-    
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
@@ -61,10 +63,70 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         return FAILURE;
     }
+    if (async_create_timerfd(worker_ctx->label, &session->heartbeat_ack.ack_timer_fd) != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+    session->heartbeat_ack.ack_sent_try_count++;
+    session->heartbeat_ack.ack_sent_time = current_time.r_uint64_t;
+    if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_ack.ack_timer_fd,
+        (time_t)session->heartbeat_ack.interval_ack_timer_fd,
+        (long)((session->heartbeat_ack.interval_ack_timer_fd - (time_t)session->heartbeat_ack.interval_ack_timer_fd) * 1e9),
+        (time_t)session->heartbeat_ack.interval_ack_timer_fd,
+        (long)((session->heartbeat_ack.interval_ack_timer_fd - (time_t)session->heartbeat_ack.interval_ack_timer_fd) * 1e9)) != SUCCESS)
+    {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_ack.ack_timer_fd) != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+//======================================================================
+    orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_heartbeat_ack(
+        worker_ctx->label,
+        0x01,
+        identity->remote_wot,
+        identity->remote_index,
+        identity->remote_session_index,
+        identity->local_wot,
+        identity->local_index,
+        identity->local_session_index,
+        identity->id_connection,
+        identity->local_id,
+        identity->remote_id,
+        session->heartbeat_ack.interval_ack_timer_fd
+    );
+    if (orilink_cmd_result.status != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+    puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
+        worker_ctx->label,
+        security->aes_key,
+        security->mac_key,
+        security->local_nonce,
+        &security->local_ctr,
+        orilink_cmd_result.r_orilink_protocol_t
+    );
+    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+    if (udp_data.status != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+    if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, remote_addr, &udp_data, &session->heartbeat_ack) != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
 //----------------------------------------------------------------------
     CLOSE_IPC_PROTOCOL(&received_protocol);
 //----------------------------------------------------------------------                            
-    CLOSE_IPC_PROTOCOL(&received_protocol);
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
 //======================================================================
     double try_count = (double)session->hello4_ack.ack_sent_try_count-(double)1;
@@ -77,6 +139,8 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->hello4_ack);
     
     printf("%sRTT Hello-4 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
+//======================================================================
+    session->heartbeat_ack.ack_sent = true;
 //======================================================================
     return SUCCESS;
 }

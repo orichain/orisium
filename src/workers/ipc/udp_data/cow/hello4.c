@@ -334,11 +334,6 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     security->local_ctr = local_ctr;
     memset(aes_key, 0, HASHES_BYTES);
     memset(remote_nonce, 0, AES_NONCE_BYTES);
-    //identity->remote_wot = remote_wot;
-    //identity->remote_index = remote_index;
-    //identity->remote_session_index = remote_session_index;
-    //identity->remote_id = remote_id;
-    CLOSE_IPC_PROTOCOL(&received_protocol);
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
 //======================================================================
     double try_count = (double)session->hello3_ack.ack_sent_try_count-(double)1;

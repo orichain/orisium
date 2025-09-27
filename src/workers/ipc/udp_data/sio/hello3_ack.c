@@ -240,10 +240,6 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     CLOSE_IPC_PROTOCOL(&received_protocol);
 //----------------------------------------------------------------------                            
     memcpy(&identity->remote_addr, remote_addr, sizeof(struct sockaddr_in6));
-    //identity->remote_wot = remote_wot;
-    //identity->remote_index = remote_index;
-    //identity->remote_session_index = remote_session_index;
-    //identity->local_id = local_id;
     memcpy(security->remote_nonce, remote_nonce, AES_NONCE_BYTES);
     memcpy(security->kem_ciphertext + (KEM_CIPHERTEXT_BYTES / 2), kem_ciphertext + (KEM_CIPHERTEXT_BYTES / 2), KEM_CIPHERTEXT_BYTES / 2);
     memcpy(security->kem_sharedsecret, kem_sharedsecret, KEM_SHAREDSECRET_BYTES);
