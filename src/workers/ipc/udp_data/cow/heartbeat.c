@@ -31,10 +31,12 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         return FAILURE;
     }
     bool is_first_heartbeat;
+    //uint64_t old_hback_send_time;
     if (session->heartbeat_ack.ack_timer_fd == -1) {
         is_first_heartbeat = true;
     } else {
         is_first_heartbeat = false;
+        //old_hback_send_time = session->heartbeat_ack.ack_sent_time;
         cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->heartbeat_ack);
     }
 //======================================================================
@@ -162,11 +164,15 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
         session->heartbeat_ack.rcvd = true;
         session->heartbeat_ack.rcvd_time = current_time.r_uint64_t;
-        uint64_t interval_ull = session->heartbeat_ack.rcvd_time - session->heartbeat_ack.ack_sent_time;
+        /*
+         * Can Not Calculate Rtt On Heartbeat Ack Because Of Delay Interval To The Next Heartbeat
+         * 
+        uint64_t interval_ull = session->heartbeat_ack.rcvd_time - old_hback_send_time;
         double rtt_value = (double)interval_ull;
         calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
         
         LOG_DEVEL_DEBUG("%sRTT Heartbeat Ack = %f", worker_ctx->label, session->rtt.value_prediction);
+        */
     }
 //======================================================================
     session->heartbeat_ack.ack_sent = true;
