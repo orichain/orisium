@@ -61,6 +61,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_fin(worker_context_t *worker_
     if (hb_interval > (double)NODE_CHECK_HEALTHY) {
         hb_interval = (double)NODE_CHECK_HEALTHY;
     }
+    double hb_openner_interval = hb_interval-(double)1;
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
@@ -92,10 +93,10 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_fin(worker_context_t *worker_
         return FAILURE;
     }
     if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_openner_fd,
-        (time_t)hb_interval,
-        (long)((hb_interval - (time_t)hb_interval) * 1e9),
-        (time_t)hb_interval,
-        (long)((hb_interval - (time_t)hb_interval) * 1e9)) != SUCCESS)
+        (time_t)hb_openner_interval,
+        (long)((hb_openner_interval - (time_t)hb_openner_interval) * 1e9),
+        (time_t)hb_openner_interval,
+        (long)((hb_openner_interval - (time_t)hb_openner_interval) * 1e9)) != SUCCESS)
     {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
