@@ -146,18 +146,26 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
 //----------------------------------------------------------------------                            
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
 //======================================================================
-    double try_count = (double)session->hello4_ack.ack_sent_try_count-(double)1;
-    calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
-    session->hello4_ack.rcvd = true;
-    session->hello4_ack.rcvd_time = current_time.r_uint64_t;
-    uint64_t interval_ull = session->hello4_ack.rcvd_time - session->hello4_ack.ack_sent_time;
-    double rtt_value = (double)interval_ull;
-    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-    cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->hello4_ack);
-    
     if (is_first_heartbeat) {
+        double try_count = (double)session->hello4_ack.ack_sent_try_count-(double)1;
+        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+        session->hello4_ack.rcvd = true;
+        session->hello4_ack.rcvd_time = current_time.r_uint64_t;
+        uint64_t interval_ull = session->hello4_ack.rcvd_time - session->hello4_ack.ack_sent_time;
+        double rtt_value = (double)interval_ull;
+        calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+        cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->hello4_ack);
+        
         printf("%sRTT Hello-4 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
     } else {
+        double try_count = (double)session->heartbeat_ack.ack_sent_try_count-(double)1;
+        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+        session->heartbeat_ack.rcvd = true;
+        session->heartbeat_ack.rcvd_time = current_time.r_uint64_t;
+        uint64_t interval_ull = session->heartbeat_ack.rcvd_time - session->heartbeat_ack.ack_sent_time;
+        double rtt_value = (double)interval_ull;
+        calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+        
         printf("%sRTT Heartbeat Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
     }
 //======================================================================
