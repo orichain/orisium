@@ -18,7 +18,10 @@ typedef enum {
     ORILINK_HELLO3 = (uint8_t)0x04,
     ORILINK_HELLO3_ACK = (uint8_t)0x05,
     ORILINK_HELLO4 = (uint8_t)0x06,
-    ORILINK_HELLO4_ACK = (uint8_t)0x07
+    ORILINK_HELLO4_ACK = (uint8_t)0x07,
+    
+    ORILINK_HEARTBEAT = (uint8_t)0x10,
+    ORILINK_HEARTBEAT_ACK = (uint8_t)0x11
 } orilink_protocol_type_t;
 
 typedef struct {
@@ -45,6 +48,10 @@ typedef struct {
     uint8_t *remote_nonce;
     uint32_t remote_ctr;
 } orilink_security_t;
+
+typedef struct {
+    double hbtime;
+} orilink_heartbeat_t;
 
 typedef struct {
     uint64_t local_id;
@@ -133,6 +140,8 @@ typedef struct {
         orilink_hello3_ack_t *orilink_hello3_ack;
         orilink_hello4_t *orilink_hello4;
         orilink_hello4_ack_t *orilink_hello4_ack;
+        orilink_heartbeat_t *orilink_heartbeat;
+        orilink_heartbeat_t *orilink_heartbeat_ack;
 	} payload;
 } orilink_protocol_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan
@@ -189,6 +198,10 @@ static inline void CLOSE_ORILINK_PROTOCOL(orilink_protocol_t **protocol_ptr) {
                 AES_TAG_BYTES
             );
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_hello4_ack);
+        } else if (x->type == ORILINK_HEARTBEAT) {
+            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat);
+        } else if (x->type == ORILINK_HEARTBEAT_ACK) {
+            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat_ack);
         }
         free(x);
         *protocol_ptr = NULL;
