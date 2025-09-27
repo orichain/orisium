@@ -1,10 +1,10 @@
-#include <stdint.h>
 #include <string.h>
 #include <endian.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
+#include <inttypes.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -200,7 +200,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         return FAILURE;
     }
     uint64_t remote_id_be;
-    memcpy(&remote_id_be, decrypted_local_identity + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t), sizeof(uint64_t));
+    memcpy(&remote_id_be, decrypted_remote_identity + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t), sizeof(uint64_t));
     uint64_t remote_id = be64toh(remote_id_be);
 //======================================================================
 // Initalize Or FAILURE Now
@@ -255,7 +255,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     }
     puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
         worker_ctx->label,
-        security->aes_key,
+        aes_key,
         security->mac_key,
         security->local_nonce,
         &security->local_ctr,
@@ -294,6 +294,9 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     cleanup_packet_timer(worker_ctx->label, &worker_ctx->async, &session->hello4);
+    
+    printf("COW Local Id %" PRIu64 ".\n", identity->local_id);
+    printf("COW Remote Id %" PRIu64 ".\n", identity->remote_id);
     
     printf("%sRTT Hello-4 = %f\n", worker_ctx->label, session->rtt.value_prediction);
     

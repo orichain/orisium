@@ -1,5 +1,5 @@
-#include <stdint.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -40,20 +40,16 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
-    //orilink_heartbeat_t *oheartbeat = received_orilink_protocol->payload.orilink_heartbeat;
+    orilink_heartbeat_t *oheartbeat = received_orilink_protocol->payload.orilink_heartbeat;
 //======================================================================
 // + Security
 //======================================================================
-/*
-    printf("Current Local Id %" PRIu64 ". Received Local Id %" PRIu64 ".\n", identity->local_id, oheartbeat->remote_id);
-    printf("Current Remote Id %" PRIu64 ". Received Remote Id %" PRIu64 ".\n", identity->remote_id, oheartbeat->local_id);
     if (identity->local_id != oheartbeat->remote_id || identity->remote_id != oheartbeat->local_id) {
         LOG_ERROR("%sLocal Id And Or Remote Id Mismatch.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         return FAILURE;
     }
-*/
 //======================================================================    
     
 //======================================================================

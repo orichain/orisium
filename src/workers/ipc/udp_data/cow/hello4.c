@@ -1,9 +1,9 @@
-#include <stdint.h>
 #include <string.h>
 #include <endian.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <time.h>
+#include <inttypes.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -351,6 +351,8 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->hello3_ack);
     
     printf("%sRTT Hello-3 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
+    printf("SIO Local Id %" PRIu64 ".\n", identity->local_id);
+    printf("SIO Remote Id %" PRIu64 ".\n", identity->remote_id);
     
 //======================================================================
     session->hello4_ack.ack_sent = true;
