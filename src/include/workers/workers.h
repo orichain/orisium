@@ -42,6 +42,7 @@ typedef struct {
 // HEARTBEAT
 //======================================================================
     packet_ack_t heartbeat_ack;
+    bool is_first_heartbeat;
     bool heartbeat_closed;
     int heartbeat_openner_fd;
 //======================================================================
@@ -344,6 +345,7 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     setup_packet_ack(&single_session->hello3_ack, (double)1);
     setup_packet_ack(&single_session->hello4_ack, (double)1);
     setup_packet_ack(&single_session->heartbeat_ack, (double)NODE_HEARTBEAT_INTERVAL);
+    single_session->is_first_heartbeat = false;
     single_session->heartbeat_closed = false;
     single_session->heartbeat_openner_fd = -1;
     setup_oricle_double(&single_session->retry, (double)0);
@@ -378,6 +380,7 @@ static inline void cleanup_sio_session(const char *label, async_type_t *sio_asyn
     cleanup_packet_ack(label, sio_async, &single_session->hello3_ack);
     cleanup_packet_ack(label, sio_async, &single_session->hello4_ack);
     cleanup_packet_ack(label, sio_async, &single_session->heartbeat_ack);
+    single_session->is_first_heartbeat = false;
     single_session->heartbeat_closed = false;
     async_delete_event(label, sio_async, &single_session->heartbeat_openner_fd);
     CLOSE_FD(&single_session->heartbeat_openner_fd);

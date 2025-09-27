@@ -30,15 +30,6 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
-    bool is_first_heartbeat;
-    //uint64_t old_hback_send_time;
-    if (session->heartbeat_ack.ack_timer_fd == -1) {
-        is_first_heartbeat = true;
-    } else {
-        is_first_heartbeat = false;
-        //old_hback_send_time = session->heartbeat_ack.ack_sent_time;
-        cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->heartbeat_ack);
-    }
 //======================================================================
     orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
@@ -88,7 +79,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     }
     session->heartbeat_ack.ack_sent_try_count++;
     session->heartbeat_ack.ack_sent_time = current_time.r_uint64_t;
-    session->heartbeat_ack.interval_ack_timer_fd = hb_interval + (double)1;
+    session->heartbeat_ack.interval_ack_timer_fd = hb_interval;
     if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_ack.ack_timer_fd,
         (time_t)session->heartbeat_ack.interval_ack_timer_fd,
         (long)((session->heartbeat_ack.interval_ack_timer_fd - (time_t)session->heartbeat_ack.interval_ack_timer_fd) * 1e9),
@@ -148,7 +139,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
 //----------------------------------------------------------------------                            
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
 //======================================================================
-    if (is_first_heartbeat) {
+    if (session->is_first_heartbeat) {
         double try_count = (double)session->hello4_ack.ack_sent_try_count-(double)1;
         calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
         session->hello4_ack.rcvd = true;
@@ -159,45 +150,10 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->hello4_ack);
         
         printf("%sRTT Hello-4 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
-    } else {
-        double try_count = (double)session->heartbeat_ack.ack_sent_try_count-(double)1;
-        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
-        session->heartbeat_ack.rcvd = true;
-        session->heartbeat_ack.rcvd_time = current_time.r_uint64_t;
-        /*
-         * Can Not Calculate Rtt On Heartbeat Ack Because Of Delay Interval To The Next Heartbeat
-         * 
-        uint64_t interval_ull = session->heartbeat_ack.rcvd_time - old_hback_send_time;
-        double rtt_value = (double)interval_ull;
-        calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-        
-        LOG_DEVEL_DEBUG("%sRTT Heartbeat Ack = %f", worker_ctx->label, session->rtt.value_prediction);
-        */
     }
 //======================================================================
     session->heartbeat_ack.ack_sent = true;
-    session->heartbeat_closed = true;
-//======================================================================
-    if (async_create_timerfd(worker_ctx->label, &session->heartbeat_openner_fd) != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        return FAILURE;
-    }
-    if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_openner_fd,
-        (time_t)hb_interval,
-        (long)((hb_interval - (time_t)hb_interval) * 1e9),
-        (time_t)hb_interval,
-        (long)((hb_interval - (time_t)hb_interval) * 1e9)) != SUCCESS)
-    {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        return FAILURE;
-    }
-    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_fd) != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        return FAILURE;
-    }
+    session->is_first_heartbeat = false;
 //======================================================================
     return SUCCESS;
 }

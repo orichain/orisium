@@ -351,6 +351,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     
 //======================================================================
     session->hello4_ack.ack_sent = true;
+    session->is_first_heartbeat = true;
 //======================================================================
     return SUCCESS;
 }
