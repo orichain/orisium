@@ -77,6 +77,12 @@ status_t handle_workers_ipc_udp_data_sio(worker_context_t *worker_ctx, void *wor
             }
             break;
         }
+        case ORILINK_HEARTBEAT_FIN_ACK: {
+            if (handle_workers_ipc_udp_data_sio_heartbeat_fin_ack(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {
+                return FAILURE;
+            }
+            break;
+        }
         default:
             LOG_ERROR("%sUnknown ORILINK protocol type %d from Remote SIO-%d[%d]. Ignoring.", worker_ctx->label, oudp_datao->type, oudp_datao->local_index, oudp_datao->local_session_index);
             CLOSE_IPC_PROTOCOL(&received_protocol);

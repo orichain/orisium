@@ -22,7 +22,8 @@ typedef enum {
     
     ORILINK_HEARTBEAT = (uint8_t)0x10,
     ORILINK_HEARTBEAT_ACK = (uint8_t)0x11,
-    ORILINK_HEARTBEAT_FIN = (uint8_t)0x12
+    ORILINK_HEARTBEAT_FIN = (uint8_t)0x12,
+    ORILINK_HEARTBEAT_FIN_ACK = (uint8_t)0x13
 } orilink_protocol_type_t;
 
 typedef struct {
@@ -55,6 +56,11 @@ typedef struct {
     uint64_t remote_id;
     double hb_interval;
 } orilink_heartbeat_t;
+
+typedef struct {
+    uint64_t local_id;
+    uint64_t remote_id;
+} orilink_heartbeat_fin_t;
 
 typedef struct {
     uint64_t local_id;
@@ -145,7 +151,8 @@ typedef struct {
         orilink_hello4_ack_t *orilink_hello4_ack;
         orilink_heartbeat_t *orilink_heartbeat;
         orilink_heartbeat_t *orilink_heartbeat_ack;
-        orilink_heartbeat_t *orilink_heartbeat_fin;
+        orilink_heartbeat_fin_t *orilink_heartbeat_fin;
+        orilink_heartbeat_fin_t *orilink_heartbeat_fin_ack;
 	} payload;
 } orilink_protocol_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan
@@ -208,6 +215,8 @@ static inline void CLOSE_ORILINK_PROTOCOL(orilink_protocol_t **protocol_ptr) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat_ack);
         } else if (x->type == ORILINK_HEARTBEAT_FIN) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat_fin);
+        } else if (x->type == ORILINK_HEARTBEAT_FIN_ACK) {
+            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat_fin_ack);
         }
         free(x);
         *protocol_ptr = NULL;

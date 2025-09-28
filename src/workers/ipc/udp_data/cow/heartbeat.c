@@ -79,6 +79,9 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     }
     session->heartbeat_ack.ack_sent_try_count++;
     session->heartbeat_ack.ack_sent_time = current_time.r_uint64_t;
+    
+    printf("Ack Sent Time %" PRIu64 "\n", session->heartbeat_ack.ack_sent_time);
+    
     session->heartbeat_ack.interval_ack_timer_fd = hb_interval;
     if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_ack.ack_timer_fd,
         (time_t)session->heartbeat_ack.interval_ack_timer_fd,

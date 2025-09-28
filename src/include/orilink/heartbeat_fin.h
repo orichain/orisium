@@ -1,7 +1,7 @@
 #ifndef ORILINK_HEARTBEAT_FIN_H
 #define ORILINK_HEARTBEAT_FIN_H
 
-status_t orilink_serialize_heartbeat_fin(const char *label, const orilink_heartbeat_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset);
+status_t orilink_serialize_heartbeat_fin(const char *label, const orilink_heartbeat_fin_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset);
 status_t orilink_deserialize_heartbeat_fin(const char *label, orilink_protocol_t *p, const uint8_t *buffer, size_t total_buffer_len, size_t *offset_ptr);
 orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_fin(
     const char *label, 
@@ -14,8 +14,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_fin(
     uint8_t local_session_index, 
     uint64_t id_connection,
     uint64_t local_id,
-    uint64_t remote_id,
-    double hb_interval
+    uint64_t remote_id
 );
 
 #endif
