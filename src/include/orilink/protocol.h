@@ -65,36 +65,30 @@ typedef struct {
 typedef struct {
     uint64_t local_id;
     uint8_t publickey1[KEM_PUBLICKEY_BYTES / 2];
-    uint8_t trycount;
 } orilink_hello1_t;
 
 typedef struct {
     uint64_t remote_id;
-    uint8_t trycount;
 } orilink_hello1_ack_t;
 
 typedef struct {
     uint64_t local_id;
     uint8_t publickey2[KEM_PUBLICKEY_BYTES / 2];
-    uint8_t trycount;
 } orilink_hello2_t;
 
 typedef struct {
     uint64_t remote_id;
     uint8_t ciphertext1[KEM_CIPHERTEXT_BYTES / 2];
-    uint8_t trycount;
 } orilink_hello2_ack_t;
 
 typedef struct {
     uint64_t local_id;
-    uint8_t trycount;
 } orilink_hello3_t;
 
 typedef struct {
     uint64_t remote_id;
     uint8_t nonce[AES_NONCE_BYTES];
     uint8_t ciphertext2[KEM_CIPHERTEXT_BYTES / 2];
-    uint8_t trycount;
 } orilink_hello3_ack_t;
 
 typedef struct {
@@ -106,7 +100,6 @@ typedef struct {
         sizeof(uint64_t) +
         AES_TAG_BYTES
     ];
-    uint8_t trycount;
 } orilink_hello4_t;
 
 typedef struct {
@@ -124,12 +117,12 @@ typedef struct {
         sizeof(uint64_t) +
         AES_TAG_BYTES
     ];
-    uint8_t trycount;
 } orilink_hello4_ack_t;
 
 typedef struct {
     uint8_t mac[AES_TAG_BYTES];
     uint32_t ctr;
+    uint8_t trycount;
 	uint8_t version[ORILINK_VERSION_BYTES];
     uint8_t inc_ctr;
     worker_type_t remote_wot;
@@ -228,6 +221,7 @@ typedef struct {
     uint16_t n;
     uint8_t mac[AES_TAG_BYTES];
     uint32_t ctr;
+    uint8_t trycount;
     uint8_t version[ORILINK_VERSION_BYTES];
     uint8_t inc_ctr;
     worker_type_t remote_wot;
@@ -267,10 +261,11 @@ typedef struct {
 } orilink_raw_protocol_t_status_t;
 
 puint8_t_size_t_status_t create_orilink_raw_protocol_packet(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, const orilink_protocol_t* p);
+puint8_t_size_t_status_t retry_orilink_raw_protocol_packet(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, uint8_t *data, size_t len, uint8_t new_trycount);
 ssize_t_status_t send_orilink_raw_protocol_packet(const char *label, puint8_t_size_t_status_t *r, int *sock_fd, const struct sockaddr_in6 *dest_addr);
 orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *label, int *sock_fd, struct sockaddr_in6 *source_addr);
 status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data_t *iudp_datai, orilink_raw_protocol_t *oudp_datao);
-status_t orilink_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint32_t* ctr, orilink_raw_protocol_t *r);
+status_t orilink_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t* ctr, orilink_raw_protocol_t *r);
 orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t *key_aes, uint8_t *nonce, uint32_t *ctr, uint8_t* buffer, size_t len);
 
 #endif

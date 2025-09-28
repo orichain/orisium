@@ -86,7 +86,8 @@ orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_ack(
     uint64_t id_connection, 
     uint64_t local_id,
     uint64_t remote_id,
-    double hb_interval
+    double hb_interval,
+    uint8_t trycount
 )
 {
 	orilink_protocol_t_status_t result;
@@ -107,6 +108,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_ack(
     result.r_orilink_protocol_t->local_index = local_index;
     result.r_orilink_protocol_t->local_session_index = local_session_index;
     result.r_orilink_protocol_t->id_connection = id_connection;
+    result.r_orilink_protocol_t->trycount = trycount;
 	result.r_orilink_protocol_t->type = ORILINK_HEARTBEAT_ACK;
 	orilink_heartbeat_t *payload = (orilink_heartbeat_t *)calloc(1, sizeof(orilink_heartbeat_t));
 	if (!payload) {

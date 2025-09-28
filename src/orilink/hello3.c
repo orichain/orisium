@@ -22,9 +22,6 @@ status_t orilink_serialize_hello3(const char *label, const orilink_hello3_t* pay
     uint64_t local_id_be = htobe64(payload->local_id);
     memcpy(current_buffer + current_offset_local, &local_id_be, sizeof(uint64_t));
     current_offset_local += sizeof(uint64_t);
-    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    memcpy(current_buffer + current_offset_local, &payload->trycount, sizeof(uint8_t));
-    current_offset_local += sizeof(uint8_t);    
     *offset = current_offset_local;
     return SUCCESS;
 }
@@ -46,13 +43,6 @@ status_t orilink_deserialize_hello3(const char *label, orilink_protocol_t *p, co
     payload->local_id = be64toh(local_id_be);
     cursor += sizeof(uint64_t);
     current_offset += sizeof(uint64_t);
-    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading trycount.", label);
-        return FAILURE_OOBUF;
-    }
-    memcpy(&payload->trycount, cursor, sizeof(uint8_t));
-    cursor += sizeof(uint8_t);
-    current_offset += sizeof(uint8_t);
     *offset_ptr = current_offset;
     return SUCCESS;
 }
@@ -89,6 +79,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_hello3(
     result.r_orilink_protocol_t->local_index = local_index;
     result.r_orilink_protocol_t->local_session_index = local_session_index;
     result.r_orilink_protocol_t->id_connection = id_connection;
+    result.r_orilink_protocol_t->trycount = trycount;
 	result.r_orilink_protocol_t->type = ORILINK_HELLO3;
 	orilink_hello3_t *payload = (orilink_hello3_t *)calloc(1, sizeof(orilink_hello3_t));
 	if (!payload) {
@@ -97,7 +88,6 @@ orilink_protocol_t_status_t orilink_prepare_cmd_hello3(
 		return result;
 	}
     payload->local_id = local_id;
-    payload->trycount = trycount;
 	result.r_orilink_protocol_t->payload.orilink_hello3 = payload;
 	result.status = SUCCESS;
 	return result;

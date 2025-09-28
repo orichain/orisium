@@ -14,7 +14,8 @@ orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_fin_ack(
     uint8_t local_session_index, 
     uint64_t id_connection,
     uint64_t local_id,
-    uint64_t remote_id
+    uint64_t remote_id,
+    uint8_t trycount
 );
 
 #endif

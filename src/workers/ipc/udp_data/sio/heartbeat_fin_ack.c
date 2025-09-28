@@ -1,4 +1,5 @@
 #include <inttypes.h>
+#include <time.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -8,6 +9,7 @@
 #include "workers/ipc/handlers.h"
 #include "orilink/protocol.h"
 #include "stdbool.h"
+#include "async.h"
 
 struct sockaddr_in6;
 
@@ -69,6 +71,29 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_fin_ack(worker_context_t *wor
     cleanup_packet_timer(worker_ctx->label, &worker_ctx->async, &session->heartbeat_fin);
 
     LOG_DEVEL_DEBUG("%sRTT Heartbeat Fin = %f", worker_ctx->label, session->rtt.value_prediction);
+//======================================================================
+    if (async_create_timerfd(worker_ctx->label, &session->heartbeat_timer_fd) != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+    if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_timer_fd,
+        (time_t)session->heartbeat_interval,
+        (long)((session->heartbeat_interval - (time_t)session->heartbeat_interval) * 1e9),
+        (time_t)session->heartbeat_interval,
+        (long)((session->heartbeat_interval - (time_t)session->heartbeat_interval) * 1e9)) != SUCCESS)
+    {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_timer_fd) != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
+//======================================================================
+    session->heartbeat.ack_rcvd = false;
 //======================================================================
     return SUCCESS;
 }

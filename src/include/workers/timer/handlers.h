@@ -3,8 +3,56 @@
 
 #include "workers/workers.h"
 #include "workers/ipc/master_ipc_cmds.h"
+#include "orilink/heartbeat_fin.h"
 
 status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions, int *current_fd);
+
+static inline status_t retry_packet_with_trycount(worker_context_t *worker_ctx, cow_c_session_t *session, packet_t *packet) {
+    orilink_identity_t *identity = &session->identity;
+    orilink_security_t *security = &session->security;
+//======================================================================
+// Initalize Or FAILURE Now
+//----------------------------------------------------------------------
+    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
+    if (current_time.status != SUCCESS) {
+        return FAILURE;
+    }
+    packet->sent_try_count++;
+    packet->sent_time = current_time.r_uint64_t;
+    if (async_set_timerfd_time(worker_ctx->label, &packet->timer_fd,
+        (time_t)packet->interval_timer_fd,
+        (long)((packet->interval_timer_fd - (time_t)packet->interval_timer_fd) * 1e9),
+        (time_t)packet->interval_timer_fd,
+        (long)((packet->interval_timer_fd - (time_t)packet->interval_timer_fd) * 1e9)) != SUCCESS)
+    {
+        return FAILURE;
+    }
+//======================================================================
+    puint8_t_size_t_status_t udp_data = retry_orilink_raw_protocol_packet(
+        worker_ctx->label, 
+        security->aes_key,
+        security->mac_key,
+        security->local_nonce,
+        &security->local_ctr,
+        packet->data, 
+        packet->len, 
+        packet->sent_try_count
+    );
+    if (udp_data.status != SUCCESS) {
+        free(packet->data);
+        packet->data = NULL;
+        packet->len = 0;
+        return FAILURE;
+    }
+    free(packet->data);
+    packet->data = NULL;
+    packet->len = 0;
+    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &identity->remote_addr, &udp_data, packet) != SUCCESS) {
+        return FAILURE;
+    }
+//======================================================================
+    return SUCCESS;
+}
 
 static inline status_t retry_packet(worker_context_t *worker_ctx, cow_c_session_t *session, packet_t *packet) {
     orilink_identity_t *identity = &session->identity;

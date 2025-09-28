@@ -48,8 +48,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                 }
             }
             payload_fixed_size = sizeof(uint64_t) + 
-                                 (KEM_PUBLICKEY_BYTES / 2) + 
-                                 sizeof(uint8_t);
+                                 (KEM_PUBLICKEY_BYTES / 2);
             payload_dynamic_size = 0;
             break;
         }
@@ -61,8 +60,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                     return result;
                 }
             }
-            payload_fixed_size = sizeof(uint64_t) + 
-                                 sizeof(uint8_t);
+            payload_fixed_size = sizeof(uint64_t);
             payload_dynamic_size = 0;
             break;
         }
@@ -75,8 +73,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                 }
             }
             payload_fixed_size = sizeof(uint64_t) + 
-                                 (KEM_PUBLICKEY_BYTES / 2) + 
-                                 sizeof(uint8_t);
+                                 (KEM_PUBLICKEY_BYTES / 2);
             payload_dynamic_size = 0;
             break;
         }
@@ -89,8 +86,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                 }
             }
             payload_fixed_size = sizeof(uint64_t) + 
-                                 (KEM_CIPHERTEXT_BYTES / 2) + 
-                                 sizeof(uint8_t);
+                                 (KEM_CIPHERTEXT_BYTES / 2);
             payload_dynamic_size = 0;
             break;
         }
@@ -102,8 +98,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                     return result;
                 }
             }
-            payload_fixed_size = sizeof(uint64_t) + 
-                                 sizeof(uint8_t);
+            payload_fixed_size = sizeof(uint64_t);
             payload_dynamic_size = 0;
             break;
         }
@@ -117,8 +112,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
             }
             payload_fixed_size = sizeof(uint64_t) + 
                                  AES_NONCE_BYTES + 
-                                 (KEM_CIPHERTEXT_BYTES / 2) + 
-                                 sizeof(uint8_t);
+                                 (KEM_CIPHERTEXT_BYTES / 2);
             payload_dynamic_size = 0;
             break;
         }
@@ -135,8 +129,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                                  sizeof(uint8_t) +
                                  sizeof(uint8_t) +
                                  sizeof(uint64_t) +
-                                 AES_TAG_BYTES +
-                                 sizeof(uint8_t);
+                                 AES_TAG_BYTES;
             payload_dynamic_size = 0;
             break;
         }
@@ -157,8 +150,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                                  sizeof(uint8_t) +
                                  sizeof(uint8_t) +
                                  sizeof(uint64_t) +
-                                 AES_TAG_BYTES +
-                                 sizeof(uint8_t);
+                                 AES_TAG_BYTES;
             payload_dynamic_size = 0;
             break;
         }
@@ -220,6 +212,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
     } else {
         result.r_size_t = AES_TAG_BYTES + 
                           sizeof(uint32_t) + 
+                          sizeof(uint8_t) + 
                           ORILINK_VERSION_BYTES + 
                           sizeof(uint8_t) + 
                           sizeof(uint8_t) + 
@@ -292,6 +285,15 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
     }
     memset(current_buffer + offset, 0, sizeof(uint32_t));
     offset += sizeof(uint32_t);
+//----------------------------------------------------------------------    
+// Try Count
+//----------------------------------------------------------------------    
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, &p->trycount, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
 //----------------------------------------------------------------------    
     if (CHECK_BUFFER_BOUNDS(offset, ORILINK_VERSION_BYTES, *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
@@ -415,6 +417,7 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
         size_t data_len = offset - 
                           AES_TAG_BYTES -
                           sizeof(uint32_t) -
+                          sizeof(uint8_t) -
                           ORILINK_VERSION_BYTES -
                           sizeof(uint8_t) -
                           sizeof(uint8_t) - 
@@ -465,6 +468,7 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
             current_buffer +
                 AES_TAG_BYTES + 
                 sizeof(uint32_t) + 
+                sizeof(uint8_t) + 
                 ORILINK_VERSION_BYTES + 
                 sizeof(uint8_t) + 
                 sizeof(uint8_t) + 
@@ -492,6 +496,7 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
             current_buffer +
                 AES_TAG_BYTES + 
                 sizeof(uint32_t) + 
+                sizeof(uint8_t) + 
                 ORILINK_VERSION_BYTES + 
                 sizeof(uint8_t) + 
                 sizeof(uint8_t) + 
@@ -555,6 +560,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
     if (!buffer || len < (
             AES_TAG_BYTES + 
             sizeof(uint32_t) + 
+            sizeof(uint8_t) + 
             ORILINK_VERSION_BYTES + 
             sizeof(uint8_t) + 
             sizeof(uint8_t) + 
@@ -590,6 +596,8 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
     uint32_t data_ctr_be;
     memcpy(&data_ctr_be, buffer + current_buffer_offset, sizeof(uint32_t));
     current_buffer_offset += sizeof(uint32_t);
+    memcpy(&p->trycount, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
     memcpy(p->version, buffer, ORILINK_VERSION_BYTES);
     current_buffer_offset += ORILINK_VERSION_BYTES;
     memcpy(&p->inc_ctr, buffer + current_buffer_offset, sizeof(uint8_t));
@@ -631,6 +639,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
         size_t data_len = len -
                           AES_TAG_BYTES -
                           sizeof(uint32_t) -
+                          sizeof(uint8_t) -
                           ORILINK_VERSION_BYTES -
                           sizeof(uint8_t) -
                           sizeof(uint8_t) - 
@@ -673,6 +682,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
             buffer +
                 AES_TAG_BYTES + 
                 sizeof(uint32_t) + 
+                sizeof(uint8_t) + 
                 ORILINK_VERSION_BYTES + 
                 sizeof(uint8_t) + 
                 sizeof(uint8_t) + 
@@ -700,6 +710,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
             buffer + 
                 AES_TAG_BYTES + 
                 sizeof(uint32_t) + 
+                sizeof(uint8_t) + 
                 ORILINK_VERSION_BYTES + 
                 sizeof(uint8_t) + 
                 sizeof(uint8_t) + 
@@ -1029,6 +1040,45 @@ puint8_t_size_t_status_t create_orilink_raw_protocol_packet(const char *label, u
     return result;
 }
 
+puint8_t_size_t_status_t retry_orilink_raw_protocol_packet(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, uint8_t *data, size_t len, uint8_t new_trycount) {
+	puint8_t_size_t_status_t result;
+    result.r_puint8_t = NULL;
+    result.r_size_t = 0;
+    result.status = FAILURE;
+    uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
+    orilink_protocol_t_status_t deserialized = orilink_deserialize(label, key0, NULL, NULL, data, len);
+    if (deserialized.status != SUCCESS) {
+        free(key0);
+        return result;
+    }
+    free(key0);
+    deserialized.r_orilink_protocol_t->trycount = new_trycount;
+    ssize_t_status_t serialize_result = orilink_serialize(label, key_aes, key_mac, nonce, ctr, deserialized.r_orilink_protocol_t, &result.r_puint8_t, &result.r_size_t);
+    if (serialize_result.status != SUCCESS) {
+        LOG_ERROR("%sError serializing ORILINK protocol: %d", label, serialize_result.status);
+        if (result.r_puint8_t) {
+            free(result.r_puint8_t);
+            result.r_puint8_t = NULL;
+            result.r_size_t = 0;
+        }
+        CLOSE_ORILINK_PROTOCOL(&deserialized.r_orilink_protocol_t);
+        return result;
+    }
+    CLOSE_ORILINK_PROTOCOL(&deserialized.r_orilink_protocol_t);
+    if (result.r_size_t > ORILINK_MAX_PACKET_SIZE) {
+        LOG_ERROR("%sError packet size %d ORILINK_MAX_PACKET_SIZE %d", label, result.r_size_t, ORILINK_MAX_PACKET_SIZE);
+        if (result.r_puint8_t) {
+            free(result.r_puint8_t);
+            result.r_puint8_t = NULL;
+            result.r_size_t = 0;
+        }
+        return result;
+    }
+    LOG_DEBUG("%sTotal pesan untuk dikirim: %zu byte.", label, result.r_size_t);
+    result.status = SUCCESS;
+    return result;
+}
+
 ssize_t_status_t send_orilink_raw_protocol_packet(const char *label, puint8_t_size_t_status_t *r, int *sock_fd, const struct sockaddr_in6 *dest_addr) {
 	ssize_t_status_t result;
     result.r_ssize_t = 0;
@@ -1054,7 +1104,7 @@ ssize_t_status_t send_orilink_raw_protocol_packet(const char *label, puint8_t_si
     return result;
 }
 
-status_t orilink_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint32_t* ctr, orilink_raw_protocol_t *r) {
+status_t orilink_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t* ctr, orilink_raw_protocol_t *r) {
 	uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
     if (memcmp(
             key_aes, 
@@ -1063,8 +1113,17 @@ status_t orilink_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key
         ) != 0
     )
     {
+//======================================================================
+// + Security
+//======================================================================
+        if (r->trycount > (uint8_t)MAX_RETRY) {
+            LOG_ERROR("%sMax Try Count Reached", label);
+            free(key0);
+            return FAILURE;
+        }
+//======================================================================
         if (r->ctr != *(uint32_t *)ctr) {
-            LOG_ERROR("%sOrilink Counter tidak cocok. data_ctr: %ul, *ctr: %ul", label, r->ctr, *(uint32_t *)ctr);
+            LOG_ERROR("%sOrilink Counter tidak cocok. Protocol %d, data_ctr: %ul, *ctr: %ul", label, r->type, r->ctr, *(uint32_t *)ctr);
             free(key0);
             return FAILURE_CTRMSMTCH;
         }
@@ -1153,16 +1212,24 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         sizeof(uint32_t)
     );
     r->ctr = be32toh(ctr_be);
+    memcpy(&r->trycount,
+        b +
+        AES_TAG_BYTES +
+        sizeof(uint32_t),
+        sizeof(uint8_t)
+    );
     memcpy(r->version,
         b + 
         AES_TAG_BYTES + 
-        sizeof(uint32_t), 
+        sizeof(uint32_t) +
+        sizeof(uint8_t), 
         ORILINK_VERSION_BYTES
     );
     memcpy(&r->inc_ctr,
         b +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
+        sizeof(uint8_t) +
         ORILINK_VERSION_BYTES,
         sizeof(uint8_t)
     );
@@ -1170,6 +1237,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         b +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
+        sizeof(uint8_t) +
         ORILINK_VERSION_BYTES +
         sizeof(uint8_t),
         sizeof(uint8_t)
@@ -1178,6 +1246,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         b +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
+        sizeof(uint8_t) +
         ORILINK_VERSION_BYTES +
         sizeof(uint8_t) +
         sizeof(uint8_t),
@@ -1187,6 +1256,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         b +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
+        sizeof(uint8_t) +
         ORILINK_VERSION_BYTES +
         sizeof(uint8_t) +
         sizeof(uint8_t) +
@@ -1197,6 +1267,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         b +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
+        sizeof(uint8_t) +
         ORILINK_VERSION_BYTES +
         sizeof(uint8_t) +
         sizeof(uint8_t) +
@@ -1208,6 +1279,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         b +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
+        sizeof(uint8_t) +
         ORILINK_VERSION_BYTES +
         sizeof(uint8_t) +
         sizeof(uint8_t) +
@@ -1220,6 +1292,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         b +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
+        sizeof(uint8_t) +
         ORILINK_VERSION_BYTES +
         sizeof(uint8_t) +
         sizeof(uint8_t) +
@@ -1234,6 +1307,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         b +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
+        sizeof(uint8_t) +
         ORILINK_VERSION_BYTES +
         sizeof(uint8_t) +
         sizeof(uint8_t) +
@@ -1249,6 +1323,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         b +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
+        sizeof(uint8_t) +
         ORILINK_VERSION_BYTES +
         sizeof(uint8_t) +
         sizeof(uint8_t) +
@@ -1281,16 +1356,24 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
         sizeof(uint32_t)
     );
     oudp_datao->ctr = be32toh(ctr_be);
+    memcpy(&oudp_datao->trycount,
+        oudp_datao->recv_buffer + 
+        AES_TAG_BYTES +
+        sizeof(uint32_t),
+        sizeof(uint8_t)
+    );
     memcpy(oudp_datao->version,
         oudp_datao->recv_buffer + 
         AES_TAG_BYTES + 
-        sizeof(uint32_t), 
+        sizeof(uint32_t) +
+        sizeof(uint8_t), 
         ORILINK_VERSION_BYTES
     );
     memcpy(&oudp_datao->inc_ctr,
         oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
+        sizeof(uint8_t) +
         ORILINK_VERSION_BYTES,
         sizeof(uint8_t)
     );
@@ -1298,6 +1381,7 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
         oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
+        sizeof(uint8_t) +
         ORILINK_VERSION_BYTES +
         sizeof(uint8_t),
         sizeof(uint8_t)
@@ -1306,6 +1390,7 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
         oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
+        sizeof(uint8_t) +
         ORILINK_VERSION_BYTES +
         sizeof(uint8_t) +
         sizeof(uint8_t),
@@ -1315,6 +1400,7 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
         oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
+        sizeof(uint8_t) +
         ORILINK_VERSION_BYTES +
         sizeof(uint8_t) +
         sizeof(uint8_t) +
@@ -1325,6 +1411,7 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
         oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
+        sizeof(uint8_t) +
         ORILINK_VERSION_BYTES +
         sizeof(uint8_t) +
         sizeof(uint8_t) +
@@ -1336,6 +1423,7 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
         oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
+        sizeof(uint8_t) +
         ORILINK_VERSION_BYTES +
         sizeof(uint8_t) +
         sizeof(uint8_t) +
@@ -1348,6 +1436,7 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
         oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
+        sizeof(uint8_t) +
         ORILINK_VERSION_BYTES +
         sizeof(uint8_t) +
         sizeof(uint8_t) +
@@ -1363,6 +1452,7 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
         oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
+        sizeof(uint8_t) +
         ORILINK_VERSION_BYTES +
         sizeof(uint8_t) +
         sizeof(uint8_t) +
@@ -1378,6 +1468,7 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
         oudp_datao->recv_buffer +
         AES_TAG_BYTES +
         sizeof(uint32_t) +
+        sizeof(uint8_t) +
         ORILINK_VERSION_BYTES +
         sizeof(uint8_t) +
         sizeof(uint8_t) +

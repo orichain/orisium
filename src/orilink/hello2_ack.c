@@ -26,9 +26,6 @@ status_t orilink_serialize_hello2_ack(const char *label, const orilink_hello2_ac
     if (CHECK_BUFFER_BOUNDS(current_offset_local, KEM_CIPHERTEXT_BYTES / 2, buffer_size) != SUCCESS) return FAILURE_OOBUF;
     memcpy(current_buffer + current_offset_local, payload->ciphertext1, KEM_CIPHERTEXT_BYTES / 2);
     current_offset_local += KEM_CIPHERTEXT_BYTES / 2;
-    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    memcpy(current_buffer + current_offset_local, &payload->trycount, sizeof(uint8_t));
-    current_offset_local += sizeof(uint8_t);    
     *offset = current_offset_local;
     return SUCCESS;
 }
@@ -57,13 +54,6 @@ status_t orilink_deserialize_hello2_ack(const char *label, orilink_protocol_t *p
     memcpy(payload->ciphertext1, cursor, KEM_CIPHERTEXT_BYTES / 2);
     cursor += KEM_CIPHERTEXT_BYTES / 2;
     current_offset += KEM_CIPHERTEXT_BYTES / 2;
-    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading trycount.", label);
-        return FAILURE_OOBUF;
-    }
-    memcpy(&payload->trycount, cursor, sizeof(uint8_t));
-    cursor += sizeof(uint8_t);
-    current_offset += sizeof(uint8_t);
     *offset_ptr = current_offset;
     return SUCCESS;
 }
@@ -101,6 +91,7 @@ orilink_protocol_t_status_t orilink_prepare_cmd_hello2_ack(
     result.r_orilink_protocol_t->local_index = local_index;
     result.r_orilink_protocol_t->local_session_index = local_session_index;
     result.r_orilink_protocol_t->id_connection = id_connection;
+    result.r_orilink_protocol_t->trycount = trycount;
 	result.r_orilink_protocol_t->type = ORILINK_HELLO2_ACK;
 	orilink_hello2_ack_t *payload = (orilink_hello2_ack_t *)calloc(1, sizeof(orilink_hello2_ack_t));
 	if (!payload) {
@@ -110,7 +101,6 @@ orilink_protocol_t_status_t orilink_prepare_cmd_hello2_ack(
 	}
     payload->remote_id = remote_id;
     memcpy(payload->ciphertext1, ciphertext, KEM_CIPHERTEXT_BYTES / 2);
-    payload->trycount = trycount;
 	result.r_orilink_protocol_t->payload.orilink_hello2_ack = payload;
 	result.status = SUCCESS;
 	return result;

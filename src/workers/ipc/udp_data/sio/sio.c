@@ -37,6 +37,7 @@ status_t handle_workers_ipc_udp_data_sio(worker_context_t *worker_ctx, void *wor
             worker_ctx->label, 
             security->aes_key, 
             security->mac_key, 
+            security->remote_nonce,
             &security->remote_ctr, 
             oudp_datao
         ) != SUCCESS

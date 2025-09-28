@@ -2,6 +2,9 @@
 #include <unistd.h>
 #include <time.h>
 #include <inttypes.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "types.h"
 #include "workers/workers.h"
@@ -30,7 +33,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
                     if (session->hello1.sent_try_count > MAX_RETRY) {
-                        LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello1.interval_timer_fd, session->hello1.sent_try_count);
+                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello1.interval_timer_fd, session->hello1.sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -60,7 +63,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
                     if (session->hello2.sent_try_count > MAX_RETRY) {
-                        LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello2.interval_timer_fd, session->hello2.sent_try_count);
+                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello2.interval_timer_fd, session->hello2.sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -90,7 +93,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
                     if (session->hello3.sent_try_count > MAX_RETRY) {
-                        LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello3.interval_timer_fd, session->hello3.sent_try_count);
+                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello3.interval_timer_fd, session->hello3.sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -120,7 +123,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
                     if (session->hello4.sent_try_count > MAX_RETRY) {
-                        LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello4.interval_timer_fd, session->hello4.sent_try_count);
+                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello4.interval_timer_fd, session->hello4.sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -149,8 +152,8 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     worker_type_t c_wot = session->identity.local_wot;
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
-                    if (session->heartbeat.sent_try_count > NODE_HEARTBEAT_MAX_RETRY) {
-                        LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->heartbeat.interval_timer_fd, session->heartbeat.sent_try_count);
+                    if (session->heartbeat.sent_try_count > MAX_RETRY) {
+                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->heartbeat.interval_timer_fd, session->heartbeat.sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -168,7 +171,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->heartbeat.interval_timer_fd);
                     double try_count = (double)session->heartbeat.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
-                    session->heartbeat.interval_timer_fd = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
+                    session->heartbeat.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
                     if (retry_packet(worker_ctx, session, &session->heartbeat) != SUCCESS) {
                         continue;
                     }
@@ -188,7 +191,6 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     }
                     session->heartbeat.sent_try_count++;
                     session->heartbeat.sent_time = current_time.r_uint64_t;
-                    session->heartbeat.interval_timer_fd = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
                     if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat.timer_fd,
                         (time_t)session->heartbeat.interval_timer_fd,
                         (long)((session->heartbeat.interval_timer_fd - (time_t)session->heartbeat.interval_timer_fd) * 1e9),
@@ -200,6 +202,8 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat.timer_fd) != SUCCESS) {
                         return FAILURE;
                     }
+//======================================================================
+                    double hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
 //======================================================================
                     orilink_identity_t *identity = &session->identity;
                     orilink_security_t *security = &session->security;
@@ -215,7 +219,8 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         identity->id_connection,
                         identity->local_id,
                         identity->remote_id,
-                        session->heartbeat.interval_timer_fd
+                        hb_interval,
+                        session->heartbeat.sent_try_count
                     );
                     if (orilink_cmd_result.status != SUCCESS) {
                         return FAILURE;
@@ -232,15 +237,31 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     if (udp_data.status != SUCCESS) {
                         return FAILURE;
                     }
-                    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &session->identity.remote_addr, &udp_data, &session->heartbeat) != SUCCESS) {
-                        return FAILURE;
+//======================================================================
+// Test Packet Dropped
+//======================================================================
+                    session->test_drop_heartbeat++;
+                    if (session->test_drop_heartbeat == 5) {
+                        printf("[Debug Here Helper]: Heartbeat Packet Number %d. Sending To Fake Addr To Force Retry\n", session->test_drop_heartbeat);
+                        struct sockaddr_in6 fake_addr;
+                        memset(&fake_addr, 0, sizeof(struct sockaddr_in6));
+                        if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &fake_addr, &udp_data, &session->heartbeat) != SUCCESS) {
+                            return FAILURE;
+                        }
+                    } else {
+                        printf("[Debug Here Helper]: Heartbeat Packet Number %d\n", session->test_drop_heartbeat);
+                        if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &session->identity.remote_addr, &udp_data, &session->heartbeat) != SUCCESS) {
+                            return FAILURE;
+                        }
+                        if (session->test_drop_heartbeat >= 25) {
+                            session->test_drop_heartbeat = 0;
+                        }
                     }
-//======================================================================
-                    session->heartbeat.sent = true;
-                    session->heartbeat.ack_rcvd = false;
-//======================================================================
                     async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_timer_fd);
                     CLOSE_FD(&session->heartbeat_timer_fd);
+//======================================================================
+                    session->heartbeat.sent = true;
+//======================================================================
                     return SUCCESS;
                 } else if (*current_fd == session->heartbeat_fin.timer_fd) {
                     uint64_t u;
@@ -249,7 +270,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
                     if (session->heartbeat_fin.sent_try_count > MAX_RETRY) {
-                        LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->heartbeat_fin.interval_timer_fd, session->heartbeat_fin.sent_try_count);
+                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->heartbeat_fin.interval_timer_fd, session->heartbeat_fin.sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -268,7 +289,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     double try_count = (double)session->heartbeat_fin.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     session->heartbeat_fin.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
-                    if (retry_packet(worker_ctx, session, &session->heartbeat_fin) != SUCCESS) {
+                    if (retry_packet_with_trycount(worker_ctx, session, &session->heartbeat_fin) != SUCCESS) {
                         continue;
                     }
                     return SUCCESS;
@@ -288,7 +309,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
                     if (session->hello1_ack.ack_sent_try_count > MAX_RETRY) {
-                        LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello1_ack.interval_ack_timer_fd, session->hello1_ack.ack_sent_try_count);
+                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello1_ack.interval_ack_timer_fd, session->hello1_ack.ack_sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -318,7 +339,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
                     if (session->hello2_ack.ack_sent_try_count > MAX_RETRY) {
-                        LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello2_ack.interval_ack_timer_fd, session->hello2_ack.ack_sent_try_count);
+                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello2_ack.interval_ack_timer_fd, session->hello2_ack.ack_sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -348,7 +369,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
                     if (session->hello3_ack.ack_sent_try_count > MAX_RETRY) {
-                        LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello3_ack.interval_ack_timer_fd, session->hello3_ack.ack_sent_try_count);
+                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello3_ack.interval_ack_timer_fd, session->hello3_ack.ack_sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -378,7 +399,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
                     if (session->hello4_ack.ack_sent_try_count > MAX_RETRY) {
-                        LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello4_ack.interval_ack_timer_fd, session->hello4_ack.ack_sent_try_count);
+                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello4_ack.interval_ack_timer_fd, session->hello4_ack.ack_sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -407,8 +428,8 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     worker_type_t c_wot = session->identity.local_wot;
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
-                    if (session->heartbeat_ack.ack_sent_try_count > NODE_HEARTBEAT_MAX_RETRY) {
-                        LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->heartbeat_ack.interval_ack_timer_fd, session->heartbeat_ack.ack_sent_try_count);
+                    if (session->heartbeat_ack.ack_sent_try_count > MAX_RETRY) {
+                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->heartbeat_ack.interval_ack_timer_fd, session->heartbeat_ack.ack_sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -426,7 +447,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->heartbeat_ack.interval_ack_timer_fd);
                     double try_count = (double)session->heartbeat_ack.ack_sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
-                    session->heartbeat_ack.interval_ack_timer_fd = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
+                    session->heartbeat_ack.interval_ack_timer_fd = pow((double)2, (double)session->retry.value_prediction);
                     if (retry_packet_ack(worker_ctx, session, &session->heartbeat_ack) != SUCCESS) {
                         continue;
                     }
@@ -434,7 +455,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 } else if (*current_fd == session->heartbeat_openner_fd) {
                     uint64_t u;
                     read(session->heartbeat_openner_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                    session->heartbeat_closed = false;
+                    if (!session->remote_heartbeat_fin_ack_not_reveived) {
+                        session->heartbeat_ack.rcvd = false;
+                    }
                     async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_fd);
                     CLOSE_FD(&session->heartbeat_openner_fd);
                     return SUCCESS;
