@@ -13,7 +13,7 @@ double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_t
     if (initial_delay_ms > MAX_INITIAL_DELAY_MS) {
         initial_delay_ms = MAX_INITIAL_DELAY_MS;
     }
-    uint64_t_status_t rt = get_realtime_time_ns(label);
+    uint64_t_status_t rt = get_monotonic_time_ns(label);
     metrics->sum_hb_interval = (double)0;
     metrics->hb_interval = (double)0;
     metrics->count_ack = (double)0;
@@ -32,7 +32,7 @@ double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_t
 }
 
 status_t new_task_metrics(const char *label, master_context_t *master_ctx, worker_type_t wot, int index) {
-    uint64_t_status_t rt = get_realtime_time_ns(label);
+    uint64_t_status_t rt = get_monotonic_time_ns(label);
     if (rt.status != SUCCESS) return rt.status;
     worker_metrics_t *metrics = NULL;
     uint16_t *task_count = NULL;

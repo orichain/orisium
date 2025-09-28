@@ -40,7 +40,7 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
-    uint64_t_status_t current_time = get_realtime_time_ns(worker_ctx->label);
+    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
         CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
         return FAILURE;

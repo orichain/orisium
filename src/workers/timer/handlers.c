@@ -179,7 +179,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
-                    uint64_t_status_t current_time = get_realtime_time_ns(worker_ctx->label);
+                    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
                     if (current_time.status != SUCCESS) {
                         return FAILURE;
                     }

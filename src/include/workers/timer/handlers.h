@@ -11,7 +11,7 @@ static inline status_t retry_packet(worker_context_t *worker_ctx, cow_c_session_
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
-    uint64_t_status_t current_time = get_realtime_time_ns(worker_ctx->label);
+    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
         return FAILURE;
     }
@@ -49,7 +49,7 @@ static inline status_t retry_packet_ack(worker_context_t *worker_ctx, sio_c_sess
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
-    uint64_t_status_t current_time = get_realtime_time_ns(worker_ctx->label);
+    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
         return FAILURE;
     }

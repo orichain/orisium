@@ -277,13 +277,27 @@ static inline status_t sleep_s(double seconds) {
     long ns = (long)(fmin(seconds, 60 * 60 * 24) * 1e9);
     return sleep_ns(ns);
 }
-
+/*
 static inline uint64_t_status_t get_realtime_time_ns(const char *label) {
 	uint64_t_status_t result;
 	result.status = FAILURE;
 	result.r_uint64_t = 0;
     struct timespec ts;
     if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+        LOG_ERROR("%s%s", label, strerror(errno));
+        return result;
+    }
+    result.r_uint64_t = (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+    result.status = SUCCESS;
+    return result;
+}
+*/
+static inline uint64_t_status_t get_monotonic_time_ns(const char *label) {
+	uint64_t_status_t result;
+	result.status = FAILURE;
+	result.r_uint64_t = 0;
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
         LOG_ERROR("%s%s", label, strerror(errno));
         return result;
     }

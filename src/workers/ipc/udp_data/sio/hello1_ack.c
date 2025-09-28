@@ -65,7 +65,7 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
-    uint64_t_status_t current_time = get_realtime_time_ns(worker_ctx->label);
+    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);

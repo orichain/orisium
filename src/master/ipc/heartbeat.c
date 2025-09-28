@@ -22,7 +22,7 @@ status_t handle_master_ipc_heartbeat(const char *label, master_context_t *master
     }           
     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
     ipc_worker_master_heartbeat_t *iheartbeati = received_protocol->payload.ipc_worker_master_heartbeat;
-    uint64_t_status_t rt = get_realtime_time_ns(label);
+    uint64_t_status_t rt = get_monotonic_time_ns(label);
     if (rcvd_wot == SIO) {
         LOG_DEBUG("%sSIO %d set last_ack to %llu.", label, rcvd_index, rt.r_uint64_t);
         master_ctx->sio_session[rcvd_index].metrics.last_ack = rt.r_uint64_t;

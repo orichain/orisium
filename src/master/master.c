@@ -257,7 +257,7 @@ void run_master(const char *label, master_context_t *master_ctx) {
 //----------------------------------------------------------------------
                         if (hie_rslt == SUCCESS_WRKSRDY) {
                             if (!master_ctx->is_rekeying) {
-                                uint64_t_status_t rt = get_realtime_time_ns(label);
+                                uint64_t_status_t rt = get_monotonic_time_ns(label);
                                 uint64_t now_ns = rt.r_uint64_t;
                                 for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
                                     worker_metrics_t *metrics = &master_ctx->sio_session[i].metrics;

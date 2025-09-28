@@ -13,7 +13,7 @@
     #include <sys/stat.h>   // for stat, mkdir
 
     #include "globals.h"    // for shutdown_requested
-    #include "utilities.h"  // for get_realtime_time_ns, sleep_s
+    #include "utilities.h"  // for get_monotonic_time_ns, sleep_s
     #include "types.h"
 
     static FILE *log_fp = NULL;
@@ -107,7 +107,7 @@
     }
 
     void *log_cleaner_thread(void *arg) {
-		uint64_t_status_t grtns_result = get_realtime_time_ns("[LOG]: ");
+		uint64_t_status_t grtns_result = get_monotonic_time_ns("[LOG]: ");
 		if (grtns_result.status == SUCCESS) {
 			uint64_t current_time = grtns_result.r_uint64_t;
 			uint64_t start_time = current_time;
@@ -115,7 +115,7 @@
 
 			cleanup_old_logs(7);
 			while (!shutdown_requested) {
-				grtns_result = get_realtime_time_ns("[LOG]: ");
+				grtns_result = get_monotonic_time_ns("[LOG]: ");
 				if (grtns_result.status == SUCCESS) {
 					current_time = grtns_result.r_uint64_t;
 					if ((current_time - start_time) > clean_every) {

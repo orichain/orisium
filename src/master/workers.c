@@ -727,7 +727,7 @@ status_t calculate_avgtt(const char *label, master_context_t *master_ctx, worker
         case DBW: { worker_name = "DBW"; break; }
         default: { worker_name = "Unknown"; break; }
     }
-    uint64_t_status_t rt = get_realtime_time_ns(label);
+    uint64_t_status_t rt = get_monotonic_time_ns(label);
     if (rt.status != SUCCESS) return rt.status;
     worker_metrics_t *metrics = NULL;
     uint16_t *task_count = NULL;
@@ -796,7 +796,7 @@ status_t calculate_healthy(const char* label, master_context_t *master_ctx, work
         case DBW: { worker_name = "DBW"; break; }
         default: { worker_name = "Unknown"; break; }
     }
-    uint64_t_status_t rt = get_realtime_time_ns(label);
+    uint64_t_status_t rt = get_monotonic_time_ns(label);
     if (rt.status != SUCCESS) return rt.status;
     worker_metrics_t *metrics = NULL;
     oricle_double_t *oricle;
