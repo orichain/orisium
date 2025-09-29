@@ -153,7 +153,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
             return FAILURE;
         }
-        if (session->test_drop_heartbeat_ack >= 25) {
+        if (session->test_drop_heartbeat_ack >= 1000000) {
             session->test_drop_heartbeat_ack = 0;
         }
     }

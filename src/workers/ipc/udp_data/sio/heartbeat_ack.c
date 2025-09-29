@@ -103,7 +103,6 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
         identity->remote_id,
         session->heartbeat_fin.sent_try_count
     );
-    printf("Send Fin Try Count %d\n", session->heartbeat_fin.sent_try_count);
     if (orilink_cmd_result.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
@@ -143,7 +142,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
             return FAILURE;
         }
-        if (session->test_drop_heartbeat_fin >= 25) {
+        if (session->test_drop_heartbeat_fin >= 1000000) {
             session->test_drop_heartbeat_fin = 0;
         }
     }

@@ -253,7 +253,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &session->identity.remote_addr, &udp_data, &session->heartbeat) != SUCCESS) {
                             return FAILURE;
                         }
-                        if (session->test_drop_heartbeat >= 25) {
+                        if (session->test_drop_heartbeat >= 1000000) {
                             session->test_drop_heartbeat = 0;
                         }
                     }

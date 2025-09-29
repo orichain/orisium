@@ -25,9 +25,6 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_fin(worker_context_t *worker_
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
-    
-    printf("Rcv Fin Try Count %d\n", oudp_datao->trycount);
-    
     if (session->heartbeat_ack.rcvd) {
         if (oudp_datao->trycount > (uint8_t)MAX_RETRY) {
             LOG_ERROR("%sHeartbeat_Fin Received Already.", worker_ctx->label);
@@ -50,7 +47,6 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_fin(worker_context_t *worker_
     }
 //======================================================================
     session->last_heartbeat_fin_trycount = oudp_datao->trycount;
-    printf("Save Fin Try Count %d\n", session->last_heartbeat_fin_trycount);
 //======================================================================
     orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
@@ -145,7 +141,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_fin(worker_context_t *worker_
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
             return FAILURE;
         }
-        if (session->test_drop_heartbeat_fin_ack >= 25) {
+        if (session->test_drop_heartbeat_fin_ack >= 1000000) {
             session->test_drop_heartbeat_fin_ack = 0;
         }
     }
