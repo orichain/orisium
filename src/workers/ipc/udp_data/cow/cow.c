@@ -10,6 +10,7 @@
 #include "workers/workers.h"
 #include "workers/ipc/handlers.h"
 #include "orilink/protocol.h"
+#include "workers/ipc/master_ipc_cmds.h"
 
 status_t handle_workers_ipc_udp_data_cow(worker_context_t *worker_ctx, void *worker_sessions, ipc_protocol_t* received_protocol) {
     ipc_udp_data_t *iudp_datai = received_protocol->payload.ipc_udp_data;
@@ -33,19 +34,36 @@ status_t handle_workers_ipc_udp_data_cow(worker_context_t *worker_ctx, void *wor
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
-    if (orilink_check_mac_ctr(
-            worker_ctx->label, 
-            security->aes_key, 
-            security->mac_key, 
-            security->remote_nonce,
-            &security->remote_ctr, 
-            oudp_datao
-        ) != SUCCESS
-    )
-    {
+    status_t cmac = orilink_check_mac_ctr(
+        worker_ctx->label, 
+        security->aes_key, 
+        security->mac_key, 
+        security->remote_nonce,
+        &security->remote_ctr, 
+        oudp_datao
+    );
+    if (cmac != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        return FAILURE;
+//----------------------------------------------------------------------
+        if (cmac == FAILURE_MAXTRY || cmac == FAILURE_IVLDTRY) {
+            worker_type_t c_wot = session->identity.local_wot;
+            uint8_t c_index = session->identity.local_index;
+            uint8_t c_session_index = session->identity.local_session_index;
+//----------------------------------------------------------------------
+// Disconnected => 1. Reset Session
+//                 2. Send Info To Master
+//----------------------------------------------------------------------
+            cleanup_sio_session(worker_ctx->label, &worker_ctx->async, session);
+            if (setup_sio_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
+                return cmac;
+            }
+            if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
+                return cmac;
+            }
+//----------------------------------------------------------------------
+        }
+        return cmac;
     }
     switch (oudp_datao->type) {
         case ORILINK_HELLO1: {
@@ -79,8 +97,26 @@ status_t handle_workers_ipc_udp_data_cow(worker_context_t *worker_ctx, void *wor
             break;
         }
         case ORILINK_HEARTBEAT_FIN: {
-            if (handle_workers_ipc_udp_data_cow_heartbeat_fin(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {
-                return FAILURE;
+            status_t hbfin = handle_workers_ipc_udp_data_cow_heartbeat_fin(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao);
+            if (hbfin != SUCCESS) {
+                if (hbfin == FAILURE_MAXTRY || hbfin == FAILURE_IVLDTRY) {
+                    worker_type_t c_wot = session->identity.local_wot;
+                    uint8_t c_index = session->identity.local_index;
+                    uint8_t c_session_index = session->identity.local_session_index;
+//----------------------------------------------------------------------
+// Disconnected => 1. Reset Session
+//                 2. Send Info To Master
+//----------------------------------------------------------------------
+                    cleanup_sio_session(worker_ctx->label, &worker_ctx->async, session);
+                    if (setup_sio_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
+                        return hbfin;
+                    }
+                    if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
+                        return hbfin;
+                    }
+//----------------------------------------------------------------------
+                }
+                return hbfin;
             }
             break;
         }

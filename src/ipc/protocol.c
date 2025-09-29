@@ -417,6 +417,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
     current_buffer_offset += AES_TAG_BYTES;
     uint32_t data_ctr_be;
     memcpy(&data_ctr_be, buffer + current_buffer_offset, sizeof(uint32_t));
+    p->ctr = be32toh(data_ctr_be);
     current_buffer_offset += sizeof(uint32_t);
     memcpy(p->version, buffer + current_buffer_offset, IPC_VERSION_BYTES);
     current_buffer_offset += IPC_VERSION_BYTES;

@@ -12,6 +12,9 @@ typedef enum {
 //----------------------------------------------------------------------
     SUCCESS_WRKSRDY = (uint8_t)0x01,
 //----------------------------------------------------------------------
+    FAILURE_IVLDTRY = (uint8_t)0xe6,
+    FAILURE_MAXTRY = (uint8_t)0xe7,
+//----------------------------------------------------------------------
     FAILURE_EBADF = (uint8_t)0xe8,
     FAILURE_CTRMSMTCH = (uint8_t)0xe9,
     FAILURE_MACMSMTCH = (uint8_t)0xea,

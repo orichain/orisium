@@ -595,6 +595,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
     current_buffer_offset += AES_TAG_BYTES;
     uint32_t data_ctr_be;
     memcpy(&data_ctr_be, buffer + current_buffer_offset, sizeof(uint32_t));
+    p->ctr = be32toh(data_ctr_be);
     current_buffer_offset += sizeof(uint32_t);
     memcpy(&p->trycount, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
@@ -1040,45 +1041,6 @@ puint8_t_size_t_status_t create_orilink_raw_protocol_packet(const char *label, u
     return result;
 }
 
-puint8_t_size_t_status_t retry_orilink_raw_protocol_packet(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, uint8_t *data, size_t len, uint8_t new_trycount) {
-	puint8_t_size_t_status_t result;
-    result.r_puint8_t = NULL;
-    result.r_size_t = 0;
-    result.status = FAILURE;
-    uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
-    orilink_protocol_t_status_t deserialized = orilink_deserialize(label, key0, NULL, NULL, data, len);
-    if (deserialized.status != SUCCESS) {
-        free(key0);
-        return result;
-    }
-    free(key0);
-    deserialized.r_orilink_protocol_t->trycount = new_trycount;
-    ssize_t_status_t serialize_result = orilink_serialize(label, key_aes, key_mac, nonce, ctr, deserialized.r_orilink_protocol_t, &result.r_puint8_t, &result.r_size_t);
-    if (serialize_result.status != SUCCESS) {
-        LOG_ERROR("%sError serializing ORILINK protocol: %d", label, serialize_result.status);
-        if (result.r_puint8_t) {
-            free(result.r_puint8_t);
-            result.r_puint8_t = NULL;
-            result.r_size_t = 0;
-        }
-        CLOSE_ORILINK_PROTOCOL(&deserialized.r_orilink_protocol_t);
-        return result;
-    }
-    CLOSE_ORILINK_PROTOCOL(&deserialized.r_orilink_protocol_t);
-    if (result.r_size_t > ORILINK_MAX_PACKET_SIZE) {
-        LOG_ERROR("%sError packet size %d ORILINK_MAX_PACKET_SIZE %d", label, result.r_size_t, ORILINK_MAX_PACKET_SIZE);
-        if (result.r_puint8_t) {
-            free(result.r_puint8_t);
-            result.r_puint8_t = NULL;
-            result.r_size_t = 0;
-        }
-        return result;
-    }
-    LOG_DEBUG("%sTotal pesan untuk dikirim: %zu byte.", label, result.r_size_t);
-    result.status = SUCCESS;
-    return result;
-}
-
 ssize_t_status_t send_orilink_raw_protocol_packet(const char *label, puint8_t_size_t_status_t *r, int *sock_fd, const struct sockaddr_in6 *dest_addr) {
 	ssize_t_status_t result;
     result.r_ssize_t = 0;
@@ -1119,13 +1081,16 @@ status_t orilink_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key
         if (r->trycount > (uint8_t)MAX_RETRY) {
             LOG_ERROR("%sMax Try Count Reached", label);
             free(key0);
-            return FAILURE;
+            return FAILURE_MAXTRY;
         }
 //======================================================================
         if (r->ctr != *(uint32_t *)ctr) {
-            LOG_ERROR("%sOrilink Counter tidak cocok. Protocol %d, data_ctr: %ul, *ctr: %ul", label, r->type, r->ctr, *(uint32_t *)ctr);
+            LOG_ERROR("%sOrilink Counter tidak cocok. Protocol %d, data_ctr: %u, *ctr: %u", label, r->type, r->ctr, *(uint32_t *)ctr);
             free(key0);
             return FAILURE_CTRMSMTCH;
+        }
+        if (r->trycount > (uint8_t)1) {
+            LOG_INFO("%sTry Count %d", label, r->trycount);
         }
     }
     free(key0);
