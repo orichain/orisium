@@ -455,9 +455,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 } else if (*current_fd == session->heartbeat_openner_fd) {
                     uint64_t u;
                     read(session->heartbeat_openner_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                    if (!session->remote_heartbeat_fin_ack_not_reveived) {
-                        session->heartbeat_ack.rcvd = false;
-                    }
+                    session->heartbeat_ack.rcvd = false;
                     async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_fd);
                     CLOSE_FD(&session->heartbeat_openner_fd);
                     return SUCCESS;
