@@ -99,6 +99,9 @@ static inline status_t retry_packet(worker_context_t *worker_ctx, cow_c_session_
     uint8_t *data_4mac = (uint8_t *)calloc(1, data_4mac_len);
     if (!data_4mac) {
         LOG_ERROR("%sError calloc data_4mac for mac: %s", worker_ctx->label, strerror(errno));
+        free(packet->data);
+        packet->data = NULL;
+        packet->len = 0;
         return FAILURE_NOMEM;
     }
     memcpy(data_4mac, udp_data.r_puint8_t + AES_TAG_BYTES, data_4mac_len);
@@ -157,6 +160,9 @@ static inline status_t retry_packet_ack(worker_context_t *worker_ctx, sio_c_sess
     uint8_t *data_4mac = (uint8_t *)calloc(1, data_4mac_len);
     if (!data_4mac) {
         LOG_ERROR("%sError calloc data_4mac for mac: %s", worker_ctx->label, strerror(errno));
+        free(packet_ack->data);
+        packet_ack->data = NULL;
+        packet_ack->len = 0;
         return FAILURE_NOMEM;
     }
     memcpy(data_4mac, udp_data.r_puint8_t + AES_TAG_BYTES, data_4mac_len);
