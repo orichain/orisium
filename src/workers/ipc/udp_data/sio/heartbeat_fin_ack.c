@@ -14,6 +14,9 @@
 struct sockaddr_in6;
 
 status_t handle_workers_ipc_udp_data_sio_heartbeat_fin_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
+//----------------------------------------------------------------------
+    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_timer_fd);
+    CLOSE_FD(&session->heartbeat_timer_fd);
 //======================================================================
 // + Security
 //======================================================================
@@ -22,6 +25,13 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_fin_ack(worker_context_t *wor
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
+    if (!session->heartbeat.ack_rcvd) {
+        LOG_ERROR("%sHeartbeat_Fin_Ack Received Already.", worker_ctx->label);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE_MAXTRY;
+    }
+//----------------------------------------------------------------------
+    session->heartbeat.ack_rcvd = true;
 //======================================================================
     orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
