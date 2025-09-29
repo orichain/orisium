@@ -175,6 +175,8 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         printf("%sRTT Hello-4 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
     }
 //======================================================================
+    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_fd);
+    CLOSE_FD(&session->heartbeat_openner_fd);
     session->heartbeat_ack.ack_sent = true;
     session->is_first_heartbeat = false;
 //======================================================================

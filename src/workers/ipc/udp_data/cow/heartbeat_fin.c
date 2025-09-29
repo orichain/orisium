@@ -17,6 +17,9 @@
 #include "constants.h"
 
 status_t handle_workers_ipc_udp_data_cow_heartbeat_fin(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
+//----------------------------------------------------------------------
+    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_fd);
+    CLOSE_FD(&session->heartbeat_openner_fd);
 //======================================================================
 // + Security
 //======================================================================
@@ -37,6 +40,8 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_fin(worker_context_t *worker_
             return FAILURE_IVLDTRY;
         }
     }
+//----------------------------------------------------------------------
+    session->heartbeat_ack.rcvd = true;
 //======================================================================
     session->last_heartbeat_fin_trycount = oudp_datao->trycount;
 //======================================================================
@@ -154,9 +159,6 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_fin(worker_context_t *worker_
     printf("%sRTT Heartbeat Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
 //======================================================================
     if (hb_openner_interval != (double)0) {
-        session->heartbeat_ack.rcvd = true;
-        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_fd);
-        CLOSE_FD(&session->heartbeat_openner_fd);
         if (async_create_timerfd(worker_ctx->label, &session->heartbeat_openner_fd) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
@@ -177,6 +179,8 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_fin(worker_context_t *worker_
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
             return FAILURE;
         }
+    } else {
+        session->heartbeat_ack.rcvd = false;
     }
 //======================================================================
     return SUCCESS;
