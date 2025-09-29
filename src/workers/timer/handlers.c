@@ -289,7 +289,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     double try_count = (double)session->heartbeat_fin.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     session->heartbeat_fin.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
-                    if (retry_packet_with_trycount(worker_ctx, session, &session->heartbeat_fin) != SUCCESS) {
+                    if (retry_heartbeat_fin(worker_ctx, session) != SUCCESS) {
                         continue;
                     }
                     return SUCCESS;

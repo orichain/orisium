@@ -33,14 +33,20 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_fin(worker_context_t *worker_
             LOG_ERROR("%sHeartbeat_Fin Received Already.", worker_ctx->label);
             session->remote_heartbeat_fin_ack_not_reveived = true;
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_fd);
+            CLOSE_FD(&session->heartbeat_openner_fd);
             return FAILURE;
         }
         if (oudp_datao->trycount <= session->last_heartbeat_fin_trycount) {
             LOG_ERROR("%sHeartbeat_Fin Received Already.", worker_ctx->label);
             session->remote_heartbeat_fin_ack_not_reveived = true;
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_fd);
+            CLOSE_FD(&session->heartbeat_openner_fd);
             return FAILURE;
         }
+        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_fd);
+        CLOSE_FD(&session->heartbeat_openner_fd);
     }
 //======================================================================
     session->last_heartbeat_fin_trycount = oudp_datao->trycount;
@@ -180,7 +186,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_fin(worker_context_t *worker_
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
             return FAILURE;
         }
-//======================================================================
     }
+//======================================================================
     return SUCCESS;
 }
