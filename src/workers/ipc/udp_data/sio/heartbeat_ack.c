@@ -164,5 +164,10 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
 //======================================================================
     session->heartbeat_fin.sent = true;
 //======================================================================
+    session->metrics.last_ack = current_time.r_uint64_t;
+    session->metrics.count_ack += (double)1;
+    session->metrics.sum_hb_interval += session->heartbeat_interval;
+    session->metrics.hb_interval = session->heartbeat_interval;
+//======================================================================
     return SUCCESS;
 }

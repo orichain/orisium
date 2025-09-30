@@ -178,5 +178,10 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     session->heartbeat_ack.ack_sent = true;
     session->is_first_heartbeat = false;
 //======================================================================
+    session->metrics.last_ack = current_time.r_uint64_t;
+    session->metrics.count_ack += (double)1;
+    session->metrics.sum_hb_interval += session->heartbeat_interval;
+    session->metrics.hb_interval = session->heartbeat_interval;
+//======================================================================
     return SUCCESS;
 }

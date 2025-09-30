@@ -14,6 +14,17 @@
 #include "utilities.h"
 
 typedef struct {
+    double hb_interval;
+    double sum_hb_interval;
+    double count_ack;
+    uint64_t last_ack;
+    uint64_t last_checkhealthy;
+    uint64_t last_task_started;
+    uint64_t last_task_finished;
+    uint64_t longest_task_time;
+} node_metrics_t;
+
+typedef struct {
     bool rcvd;
     uint64_t rcvd_time;
     bool ack_sent;
@@ -50,11 +61,14 @@ typedef struct {
     
     int test_drop_heartbeat_ack;
     int test_drop_heartbeat_fin_ack;
+//----------------------------------------------------------------------
+    node_metrics_t metrics;
 //======================================================================
 // ORICLE
 //======================================================================
 	oricle_double_t rtt;
     oricle_double_t retry;
+    oricle_double_t healthy;
 } sio_c_session_t; //Server
 
 typedef struct {
@@ -93,11 +107,15 @@ typedef struct {
     
     int test_drop_heartbeat;
     int test_drop_heartbeat_fin;
+//----------------------------------------------------------------------
+    node_metrics_t metrics;
 //======================================================================
 // ORICLE
 //======================================================================
 	oricle_double_t rtt;
     oricle_double_t retry;
+    oricle_double_t healthy;
+    oricle_long_double_t avgtt;
 } cow_c_session_t; //Client
 
 typedef struct {
@@ -134,6 +152,22 @@ void run_logic_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_
 void run_cow_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
 void run_dbr_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
 void run_dbw_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
+
+static inline void initialize_node_metrics(const char *label, node_metrics_t* metrics) {
+    uint64_t_status_t rt = get_monotonic_time_ns(label);
+    metrics->sum_hb_interval = (double)0;
+    metrics->hb_interval = (double)0;
+    metrics->count_ack = (double)0;
+    metrics->last_ack = rt.r_uint64_t;
+    metrics->last_checkhealthy = rt.r_uint64_t;
+    metrics->last_task_started = rt.r_uint64_t;
+    metrics->last_task_finished = rt.r_uint64_t;
+    metrics->longest_task_time = 0ULL;
+    metrics->hb_interval = (double)NODE_HEARTBEAT_INTERVAL;
+    metrics->sum_hb_interval = metrics->hb_interval;
+    metrics->count_ack = (double)0;
+}
+
 
 static inline void cleanup_packet_timer(const char *label, async_type_t *async, packet_t *h) {
     h->interval_timer_fd = (double)1;
@@ -242,6 +276,7 @@ static inline void setup_packet(packet_t *h, double interval_timer) {
 }
 
 static inline status_t setup_cow_session(const char *label, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
+    initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
     single_session->test_drop_heartbeat = 0;
     single_session->test_drop_heartbeat_fin = 0;
@@ -256,6 +291,8 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
     single_session->heartbeat_timer_fd = -1;
     setup_oricle_double(&single_session->retry, (double)0);
     setup_oricle_double(&single_session->rtt, (double)0);
+    setup_oricle_long_double(&single_session->avgtt, (long double)0);
+    setup_oricle_double(&single_session->healthy, (double)100);
     orilink_identity_t *identity = &single_session->identity;
     orilink_security_t *security = &single_session->security;
     identity->id_connection = 0xffffffffffffffff;
@@ -297,6 +334,8 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
     CLOSE_FD(&single_session->heartbeat_timer_fd);
     cleanup_oricle_double(&single_session->retry);
     cleanup_oricle_double(&single_session->rtt);
+    cleanup_oricle_long_double(&single_session->avgtt);
+    cleanup_oricle_double(&single_session->healthy);
     orilink_identity_t *identity = &single_session->identity;
     orilink_security_t *security = &single_session->security;
     identity->id_connection = 0xffffffffffffffff;
@@ -358,6 +397,7 @@ static inline void setup_packet_ack(packet_ack_t *h, double interval_timer) {
 }
 
 static inline status_t setup_sio_session(const char *label, sio_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
+    initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
     single_session->test_drop_heartbeat_ack = 0;
     single_session->test_drop_heartbeat_fin_ack = 0;
@@ -374,6 +414,7 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     single_session->heartbeat_openner_fd = -1;
     setup_oricle_double(&single_session->retry, (double)0);
     setup_oricle_double(&single_session->rtt, (double)0);
+    setup_oricle_double(&single_session->healthy, (double)100);
     orilink_identity_t *identity = &single_session->identity;
     orilink_security_t *security = &single_session->security;
     identity->id_connection = 0xffffffffffffffff;
@@ -412,6 +453,7 @@ static inline void cleanup_sio_session(const char *label, async_type_t *sio_asyn
     CLOSE_FD(&single_session->heartbeat_openner_fd);
     cleanup_oricle_double(&single_session->retry);
     cleanup_oricle_double(&single_session->rtt);
+    cleanup_oricle_double(&single_session->healthy);
     orilink_identity_t *identity = &single_session->identity;
     orilink_security_t *security = &single_session->security;
     identity->id_connection = 0xffffffffffffffff;
