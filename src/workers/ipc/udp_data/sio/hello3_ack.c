@@ -195,10 +195,6 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
         return FAILURE;
     }
 //======================================================================
-
-    print_hex("COW MAC = ", mac_key, HASHES_BYTES, 1);
-    print_hex("COW mac = ", mac, AES_TAG_BYTES, 1);
-    
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello4(
         worker_ctx->label,
         0x01,

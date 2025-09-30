@@ -73,9 +73,6 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
 //----------------------------------------------------------------------
     uint8_t aes_key[HASHES_BYTES];
     kdf1(security->kem_sharedsecret, aes_key);
-    
-    print_hex("SIO MAC = ", security->mac_key, HASHES_BYTES, 1);
-    
 //----------------------------------------------------------------------
 // cek Mac
 //----------------------------------------------------------------------  
@@ -89,9 +86,6 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     poly1305_init(&mac_ctx0, security->mac_key);
     poly1305_update(&mac_ctx0, encrypted_remote_identity_rcvd1, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t));
     poly1305_finish(&mac_ctx0, mac0);
-    
-    print_hex("SIO mac = ", mac0, AES_TAG_BYTES, 1);
-    
     if (!poly1305_verify(mac0, data_mac)) {
         LOG_ERROR("%sFailed to Mac Tidak Sesuai.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -346,9 +340,6 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->hello3_ack);
     
     printf("%sRTT Hello-3 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
-    printf("SIO Local Id %" PRIu64 ".\n", identity->local_id);
-    printf("SIO Remote Id %" PRIu64 ".\n", identity->remote_id);
-    
 //======================================================================
     session->hello4_ack.ack_sent = true;
     session->is_first_heartbeat = true;

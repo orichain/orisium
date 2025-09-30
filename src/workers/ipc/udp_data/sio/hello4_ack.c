@@ -294,10 +294,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     cleanup_packet_timer(worker_ctx->label, &worker_ctx->async, &session->hello4);
     
-    printf("COW Local Id %" PRIu64 ".\n", identity->local_id);
-    printf("COW Remote Id %" PRIu64 ".\n", identity->remote_id);
     printf("%sRTT Hello-4 = %f\n", worker_ctx->label, session->rtt.value_prediction);
-    
 //======================================================================
     session->heartbeat.sent = true;
 //======================================================================
