@@ -70,7 +70,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_fin(worker_context_t *worker_
         return FAILURE;
     }
 //======================================================================
-    double hb_openner_interval = session->heartbeat_interval - ((double)5 * (double)(session->rtt.value_prediction / 1e9));
+    double hb_openner_interval = session->heartbeat_interval - ((double)2 * (double)(session->rtt.value_prediction / 1e9));
     if (hb_openner_interval < (double)0) {
         hb_openner_interval = (double)0;
     }
@@ -180,6 +180,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_fin(worker_context_t *worker_
             return FAILURE;
         }
     } else {
+        session->heartbeat_ack.ack_sent = false;
         session->heartbeat_ack.rcvd = false;
     }
 //======================================================================
