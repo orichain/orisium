@@ -545,7 +545,7 @@ This demonstrates the effectiveness of the **`Master`'s** self-healing capabilit
 
 **Anomaly Log:**
 
-```c
+```
 [2025-09-29 10:42:43] [DEVEL-DEBUG] (src/workers/ipc/udp_data/sio/heartbeat_fin_ack.c:handle_workers_ipc_udp_data_sio_heartbeat_fin_ack:73)
 [COW 0]: RTT Heartbeat Fin = 7871168.131424
 [Debug Here Helper]: Heartbeat Packet Number 297
@@ -577,7 +577,7 @@ Send Fin Try Count 2
 [COW 0]: RTT Heartbeat Fin = 7875029.853450
 [Debug Here Helper]: Heartbeat Packet Number 301
 [Debug Here Helper]: Heartbeat Fin Packet Number 302 
-...
+```
 
 | Time | Log Line | Analysis |
 | :--- | :--- | :--- |
@@ -589,7 +589,254 @@ Send Fin Try Count 2
 
 **Technical Conclusion:**
 
+```
+tcpdump: data link type LINUX_SLL2
+dropped privs to tcpdump
+tcpdump: listening on any, link-type LINUX_SLL2 (Linux cooked v2), snapshot length 262144 bytes
+09:36:26.616730 lo    In  IP (tos 0x0, ttl 64, id 65351, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 63
+09:36:26.616986 lo    In  IP (tos 0x0, ttl 64, id 65352, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 63
+09:36:26.617153 lo    In  IP (tos 0x0, ttl 64, id 65353, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 55
+09:36:26.617378 lo    In  IP (tos 0x0, ttl 64, id 65354, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 55
+09:36:26.778734 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 24609, offset 0, flags [DF], proto UDP (17), length 91)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 63
+09:36:26.785117 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 9433, offset 0, flags [DF], proto UDP (17), length 91)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 63
+09:36:26.785302 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 24613, offset 0, flags [DF], proto UDP (17), length 83)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 55
+09:36:26.791449 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 9438, offset 0, flags [DF], proto UDP (17), length 83)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 55
+09:36:30.617605 lo    In  IP (tos 0x0, ttl 64, id 1708, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 63
+09:36:30.617792 lo    In  IP (tos 0x0, ttl 64, id 1709, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 63
+09:36:30.618004 lo    In  IP (tos 0x0, ttl 64, id 1710, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 55
+09:36:30.618084 lo    In  IP (tos 0x0, ttl 64, id 1711, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 55
+09:36:30.791769 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 24999, offset 0, flags [DF], proto UDP (17), length 91)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 63
+09:36:30.799573 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 10308, offset 0, flags [DF], proto UDP (17), length 91)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 63
+09:36:30.799900 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 25003, offset 0, flags [DF], proto UDP (17), length 83)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 55
+09:36:30.807030 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 10312, offset 0, flags [DF], proto UDP (17), length 83)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 55
+09:36:34.618424 lo    In  IP (tos 0x0, ttl 64, id 4221, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 63
+09:36:34.618653 lo    In  IP (tos 0x0, ttl 64, id 4222, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 63
+09:36:34.618801 lo    In  IP (tos 0x0, ttl 64, id 4223, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 55
+09:36:34.618967 lo    In  IP (tos 0x0, ttl 64, id 4224, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 55
+09:36:34.807341 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 26899, offset 0, flags [DF], proto UDP (17), length 91)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 63
+09:36:34.814192 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 10521, offset 0, flags [DF], proto UDP (17), length 91)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 63
+09:36:34.814374 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 26905, offset 0, flags [DF], proto UDP (17), length 83)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 55
+09:36:34.820275 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 10525, offset 0, flags [DF], proto UDP (17), length 83)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 55
+09:36:38.619221 lo    In  IP (tos 0x0, ttl 64, id 7045, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 63
+09:36:38.619516 lo    In  IP (tos 0x0, ttl 64, id 7046, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 63
+09:36:38.619695 lo    In  IP (tos 0x0, ttl 64, id 7047, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 55
+09:36:38.619833 lo    In  IP (tos 0x0, ttl 64, id 7048, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 55
+09:36:38.820603 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 29155, offset 0, flags [DF], proto UDP (17), length 91)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 63
+09:36:38.826275 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 13884, offset 0, flags [DF], proto UDP (17), length 91)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 63
+09:36:38.826467 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 29157, offset 0, flags [DF], proto UDP (17), length 83)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 55
+09:36:38.831668 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 13889, offset 0, flags [DF], proto UDP (17), length 83)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 55
+09:36:42.620129 lo    In  IP (tos 0x0, ttl 64, id 8289, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 63
+09:36:42.620318 lo    In  IP (tos 0x0, ttl 64, id 8290, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 63
+09:36:42.620505 lo    In  IP (tos 0x0, ttl 64, id 8291, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 55
+09:36:42.620683 lo    In  IP (tos 0x0, ttl 64, id 8292, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 55
+09:36:42.831984 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 32350, offset 0, flags [DF], proto UDP (17), length 91)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 63
+09:36:42.842181 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 13896, offset 0, flags [DF], proto UDP (17), length 91)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 63
+09:36:42.842406 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 32354, offset 0, flags [DF], proto UDP (17), length 83)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 55
+09:36:42.848372 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 13897, offset 0, flags [DF], proto UDP (17), length 83)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 55
+09:36:46.620938 lo    In  IP (tos 0x0, ttl 64, id 8727, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 63
+09:36:46.621141 lo    In  IP (tos 0x0, ttl 64, id 8728, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 63
+09:36:46.621248 lo    In  IP (tos 0x0, ttl 64, id 8729, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 55
+09:36:46.621388 lo    In  IP (tos 0x0, ttl 64, id 8730, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 55
+09:36:46.848685 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 35130, offset 0, flags [DF], proto UDP (17), length 91)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 63
+09:36:46.870080 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 15357, offset 0, flags [DF], proto UDP (17), length 91)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 63
+09:36:46.870251 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 35131, offset 0, flags [DF], proto UDP (17), length 83)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 55
+09:36:46.876377 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 15372, offset 0, flags [DF], proto UDP (17), length 83)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 55
+09:36:50.621703 lo    In  IP (tos 0x0, ttl 64, id 9729, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 63
+09:36:50.621860 lo    In  IP (tos 0x0, ttl 64, id 9730, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 63
+09:36:50.622029 lo    In  IP (tos 0x0, ttl 64, id 9731, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 55
+09:36:50.622132 lo    In  IP (tos 0x0, ttl 64, id 9732, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 55
+09:36:50.876655 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 38927, offset 0, flags [DF], proto UDP (17), length 91)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 63
+09:36:50.891337 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 18754, offset 0, flags [DF], proto UDP (17), length 91)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 63
+09:36:50.891606 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 38941, offset 0, flags [DF], proto UDP (17), length 83)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 55
+09:36:50.897490 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 18766, offset 0, flags [DF], proto UDP (17), length 83)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 55
+09:36:54.622472 lo    In  IP (tos 0x0, ttl 64, id 9932, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 63
+09:36:54.622727 lo    In  IP (tos 0x0, ttl 64, id 9933, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 63
+09:36:54.622879 lo    In  IP (tos 0x0, ttl 64, id 9934, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 55
+09:36:54.623029 lo    In  IP (tos 0x0, ttl 64, id 9935, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 55
+09:36:54.897875 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 42932, offset 0, flags [DF], proto UDP (17), length 91)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 63
+09:36:54.904445 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 20430, offset 0, flags [DF], proto UDP (17), length 91)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 63
+09:36:54.904615 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 42937, offset 0, flags [DF], proto UDP (17), length 83)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 55
+09:36:54.910930 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 20436, offset 0, flags [DF], proto UDP (17), length 83)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 55
+09:36:58.623311 lo    In  IP (tos 0x0, ttl 64, id 13033, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 63
+09:36:58.623529 lo    In  IP (tos 0x0, ttl 64, id 13034, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 63
+09:36:58.623710 lo    In  IP (tos 0x0, ttl 64, id 13035, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 55
+09:36:58.623810 lo    In  IP (tos 0x0, ttl 64, id 13036, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 55
+09:36:58.911215 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 44286, offset 0, flags [DF], proto UDP (17), length 91)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 63
+09:36:58.916546 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 21259, offset 0, flags [DF], proto UDP (17), length 91)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 63
+09:36:58.916759 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 44290, offset 0, flags [DF], proto UDP (17), length 83)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 55
+09:36:58.922108 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 21265, offset 0, flags [DF], proto UDP (17), length 83)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 55
+09:37:02.624069 lo    In  IP (tos 0x0, ttl 64, id 13340, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 63
+09:37:02.624255 lo    In  IP (tos 0x0, ttl 64, id 13341, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 63
+09:37:02.624511 lo    In  IP (tos 0x0, ttl 64, id 13342, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 55
+09:37:02.624667 lo    In  IP (tos 0x0, ttl 64, id 13343, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 55
+09:37:02.922370 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 44445, offset 0, flags [DF], proto UDP (17), length 91)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 63
+09:37:02.933097 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 22707, offset 0, flags [DF], proto UDP (17), length 91)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 63
+09:37:02.933266 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 44455, offset 0, flags [DF], proto UDP (17), length 83)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 55
+09:37:02.939620 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 22710, offset 0, flags [DF], proto UDP (17), length 83)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 55
+09:37:06.624956 lo    In  IP (tos 0x0, ttl 64, id 16537, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 63
+09:37:06.625155 lo    In  IP (tos 0x0, ttl 64, id 16538, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 63
+09:37:06.625281 lo    In  IP (tos 0x0, ttl 64, id 16539, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 55
+09:37:06.625471 lo    In  IP (tos 0x0, ttl 64, id 16540, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 55
+09:37:06.939926 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 46385, offset 0, flags [DF], proto UDP (17), length 91)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 63
+09:37:06.946194 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 24522, offset 0, flags [DF], proto UDP (17), length 91)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 63
+09:37:06.946383 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 46387, offset 0, flags [DF], proto UDP (17), length 83)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 55
+09:37:06.952145 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 24523, offset 0, flags [DF], proto UDP (17), length 83)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 55
+09:37:10.625813 lo    In  IP (tos 0x0, ttl 64, id 19499, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 63
+09:37:10.626065 lo    In  IP (tos 0x0, ttl 64, id 19500, offset 0, flags [DF], proto UDP (17), length 91)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 63
+09:37:10.626258 lo    In  IP (tos 0x0, ttl 64, id 19501, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.safetynetp > 127.0.0.1.40001: UDP, length 55
+09:37:10.626441 lo    In  IP (tos 0x0, ttl 64, id 19502, offset 0, flags [DF], proto UDP (17), length 83)
+    127.0.0.1.40001 > 127.0.0.1.safetynetp: UDP, length 55
+09:37:10.952435 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 46763, offset 0, flags [DF], proto UDP (17), length 91)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 63
+09:37:10.958176 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 25197, offset 0, flags [DF], proto UDP (17), length 91)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 63
+09:37:10.958348 wlp0s20f0u1 Out IP (tos 0x0, ttl 64, id 46769, offset 0, flags [DF], proto UDP (17), length 83)
+    192.168.1.8.safetynetp > 103.175.219.56.safetynetp: UDP, length 55
+09:37:10.963792 wlp0s20f0u1 In  IP (tos 0x0, ttl 54, id 25198, offset 0, flags [DF], proto UDP (17), length 83)
+    103.175.219.56.safetynetp > 192.168.1.8.safetynetp: UDP, length 55
+```
+
 This log demonstrates two key strengths of the Orisium protocol:
 
 1.  **Security Assurance:** The **Anti-Replay mechanism** is robust and correctly identifies and discards invalid packets under live operational stress.
 2.  **Resilience:** The protocol is highly **session-resilient**. It successfully rejected a security violation packet without causing a crash, disconnection, or corrupting the critical RTT measurements. This is proof of a strong, production-ready security state design. 
+
+# Network Validation Test: Orisium Four-Way Heartbeat Protocol
+
+## Objective
+To verify the **fixed packet sizes**, **four-way handshake sequence**, and **timing stability** of the Orisium Heartbeat protocol at the network layer, confirming the efficacy of the zero-padding design for obfuscation.
+
+## Test Environment
+* **Test Node (Client):** 192.168.1.8
+* **Remote Node (Server):** 103.175.219.56
+* **Interface Observed:** `wlp0s20f0u1` (External/Wireless) and `lo` (Internal/Loopback)
+* **Tool:** `tcpdump`
+
+## Key Findings
+
+### 1. Consistent and Fixed Packet Sizes
+The traffic confirms that only **two fixed packet sizes** are used for Heartbeat exchange, validating the structural design (39-byte header + zero-padding) as calculated:
+
+| Heartbeat Phase | Observed UDP Payload Length | Design Validation | Confirmed Structure (Header + Payload) |
+| :--- | :--- | :--- | :--- |
+| **Request / Acknowledgement** | **63 bytes** | **Correct** | $39 \text{ bytes (Header)} + 24 \text{ bytes (Payload)}$ |
+| **Finalize / Finalize Ack** | **55 bytes** | **Correct** | $39 \text{ bytes (Header)} + 16 \text{ bytes (Payload)}$ |
+
+This consistency is critical for **obfuscation**, as it prevents network sensors from identifying the protocol based on packet size variation.
+
+### 2. Successful Four-Way Handshake
+The log demonstrates the expected **four-packet sequence** for every Heartbeat cycle, confirming the full verification of session state (Round Trip 1) and state finalization (Round Trip 2).
+
+**Example Cycle (Starting at 09:36:26.778734):**
+
+1.  **Request (Out):** 192.168.1.8 $\to$ 103.175.219.56, length **63**
+2.  **Ack (In):** 103.175.219.56 $\to$ 192.168.1.8, length **63**
+3.  **Finalize (Out):** 192.168.1.8 $\to$ 103.175.219.56, length **55**
+4.  **Finalize Ack (In):** 103.175.219.56 $\to$ 192.168.1.8, length **55**
+
+### 3. Heartbeat Frequency Stability
+
+The external traffic demonstrates that the Heartbeat mechanism maintains a highly stable interval, crucial for RTT measurement and link quality assessment.
+
+| Cycle Start Time (External) | Interval (Seconds) |
+| :--- | :--- |
+| 09:36:26.778 | N/A |
+| 09:36:30.791 | $\sim 4.013$ |
+| 09:36:34.807 | $\sim 4.015$ |
+| 09:36:38.820 | $\sim 4.013$ |
+
+The observed interval is consistently $\mathbf{\approx 4.0 \text{ seconds}}$, validating the application's timing scheduler.
+
+## Conclusion
+The `tcpdump` results provide **definitive network-level proof** that the Orisium Heartbeat protocol is functioning exactly as designed, exhibiting perfect **binary size control** and **timing precision**. This technical performance strongly supports the protocol's viability for low-latency, resilient communication.
