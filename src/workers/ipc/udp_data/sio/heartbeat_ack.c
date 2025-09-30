@@ -162,8 +162,6 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
 
     LOG_DEVEL_DEBUG("%sRTT Heartbeat = %f", worker_ctx->label, session->rtt.value_prediction);
 //======================================================================
-    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_timer_fd);
-    CLOSE_FD(&session->heartbeat_timer_fd);
     session->heartbeat_fin.sent = true;
 //======================================================================
     return SUCCESS;
