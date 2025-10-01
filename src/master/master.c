@@ -186,39 +186,77 @@ void run_master(const char *label, master_context_t *master_ctx) {
 				}
             } else {
                 bool event_founded_in_uds = false;
-                for (int i = 0; i < MAX_SIO_WORKERS; ++i) {
-                    if (current_fd == master_ctx->sio_session[i].upp.uds[0]) {
+                worker_type_t wot = UNKNOWN;
+                uint8_t index = 0xff;
+                int *file_descriptor;
+                for (uint8_t i = 0; i < MAX_SIO_WORKERS; ++i) {
+                    master_worker_session_t *session = get_master_worker_session(master_ctx, SIO, i);
+                    if (session == NULL) {
+                        continue;
+                    }
+                    if (current_fd == session->upp.uds[0]) {
+                        wot = SIO;
+                        index = i;
+                        file_descriptor = &session->upp.uds[0];
                         event_founded_in_uds = true;
                         break;
                     }
                 }
                 if (!event_founded_in_uds) {
-                    for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) { 
-                        if (current_fd == master_ctx->logic_session[i].upp.uds[0]) {
+                    for (uint8_t i = 0; i < MAX_LOGIC_WORKERS; ++i) { 
+                        master_worker_session_t *session = get_master_worker_session(master_ctx, LOGIC, i);
+                        if (session == NULL) {
+                            continue;
+                        }
+                        if (current_fd == session->upp.uds[0]) {
+                            wot = LOGIC;
+                            index = i;
+                            file_descriptor = &session->upp.uds[0];
                             event_founded_in_uds = true;
                             break;
                         }
                     }
                 }
                 if (!event_founded_in_uds) {
-                    for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
-                        if (current_fd == master_ctx->cow_session[i].upp.uds[0]) {
+                    for (uint8_t i = 0; i < MAX_COW_WORKERS; ++i) { 
+                        master_worker_session_t *session = get_master_worker_session(master_ctx, COW, i);
+                        if (session == NULL) {
+                            continue;
+                        }
+                        if (current_fd == session->upp.uds[0]) {
+                            wot = COW;
+                            index = i;
+                            file_descriptor = &session->upp.uds[0];
                             event_founded_in_uds = true;
                             break;
                         }
                     }
                 }
                 if (!event_founded_in_uds) {
-                    for (int i = 0; i < MAX_DBR_WORKERS; ++i) { 
-                        if (current_fd == master_ctx->dbr_session[i].upp.uds[0]) {
+                    for (uint8_t i = 0; i < MAX_DBR_WORKERS; ++i) { 
+                        master_worker_session_t *session = get_master_worker_session(master_ctx, DBR, i);
+                        if (session == NULL) {
+                            continue;
+                        }
+                        if (current_fd == session->upp.uds[0]) {
+                            wot = DBR;
+                            index = i;
+                            file_descriptor = &session->upp.uds[0];
                             event_founded_in_uds = true;
                             break;
                         }
                     }
                 }                
                 if (!event_founded_in_uds) {
-                    for (int i = 0; i < MAX_DBW_WORKERS; ++i) { 
-                        if (current_fd == master_ctx->dbw_session[i].upp.uds[0]) {
+                    for (uint8_t i = 0; i < MAX_DBW_WORKERS; ++i) { 
+                        master_worker_session_t *session = get_master_worker_session(master_ctx, DBW, i);
+                        if (session == NULL) {
+                            continue;
+                        }
+                        if (current_fd == session->upp.uds[0]) {
+                            wot = DBW;
+                            index = i;
+                            file_descriptor = &session->upp.uds[0];
                             event_founded_in_uds = true;
                             break;
                         }
@@ -229,29 +267,15 @@ void run_master(const char *label, master_context_t *master_ctx) {
                         async_event_is_EPOLLERR(current_events) ||
                         async_event_is_EPOLLRDHUP(current_events))
                     {
-                        worker_type_t_status_t worker_closed = handle_master_ipc_closed_event(label, master_ctx, &current_fd);
-                        if (worker_closed.status != SUCCESS) {
+                        if (handle_master_ipc_closed_event(label, master_ctx, wot, index, file_descriptor) != SUCCESS) {
                             continue;
                         }
-//----------------------------------------------------------------------
-// Recreate Worker                        
-//----------------------------------------------------------------------
-                        if (close_worker(label, master_ctx, worker_closed.r_worker_type_t, worker_closed.index) != SUCCESS) {
+                        if (recreate_worker(label, master_ctx, wot, index) != SUCCESS) {
                             continue;
                         }
-                        if (create_socket_pair(label, master_ctx, worker_closed.r_worker_type_t, worker_closed.index) != SUCCESS) {
-                            continue;
-                        }
-                        if (setup_fork_worker(label, master_ctx, worker_closed.r_worker_type_t, worker_closed.index) != SUCCESS) {
-                            continue;
-                        }
-                        if (master_worker_info(label, master_ctx, worker_closed.r_worker_type_t, worker_closed.index, IT_READY) != SUCCESS) {
-                            continue;
-                        }
-//----------------------------------------------------------------------
                         continue;
                     } else {
-                        status_t hie_rslt = handle_master_ipc_event(label, master_ctx, &current_fd);
+                        status_t hie_rslt = handle_master_ipc_event(label, master_ctx, file_descriptor);
 //----------------------------------------------------------------------
 // All Worker Ready To Comunication In Secure Encription
 //----------------------------------------------------------------------

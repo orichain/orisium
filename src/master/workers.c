@@ -442,7 +442,7 @@ status_t calculate_healthy(const char* label, master_context_t *master_ctx, work
     return SUCCESS;
 }
 
-static inline status_t recreatewrkr(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
+status_t recreate_worker(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
     if (close_worker(label, master_ctx, wot, index) != SUCCESS) {
         return FAILURE;
     }
@@ -469,7 +469,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
         }
         if (session->healthy.value_prediction < (double)25) {
             session->isactive = false;
-            if (recreatewrkr(label, master_ctx, SIO, i) != SUCCESS) {
+            if (recreate_worker(label, master_ctx, SIO, i) != SUCCESS) {
                 return FAILURE;
             }
         }
@@ -484,7 +484,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
         }
         if (session->healthy.value_prediction < (double)25) {
             session->isactive = false;
-            if (recreatewrkr(label, master_ctx, LOGIC, i) != SUCCESS) {
+            if (recreate_worker(label, master_ctx, LOGIC, i) != SUCCESS) {
                 return FAILURE;
             }
         }
@@ -499,7 +499,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
         }
         if (session->healthy.value_prediction < (double)25) {
             session->isactive = false;
-            if (recreatewrkr(label, master_ctx, COW, i) != SUCCESS) {
+            if (recreate_worker(label, master_ctx, COW, i) != SUCCESS) {
                 return FAILURE;
             }
         }
@@ -514,7 +514,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
         }
         if (session->healthy.value_prediction < (double)25) {
             session->isactive = false;
-            if (recreatewrkr(label, master_ctx, DBR, i) != SUCCESS) {
+            if (recreate_worker(label, master_ctx, DBR, i) != SUCCESS) {
                 return FAILURE;
             }
         }
@@ -529,7 +529,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
         }
         if (session->healthy.value_prediction < (double)25) {
             session->isactive = false;
-            if (recreatewrkr(label, master_ctx, DBW, i) != SUCCESS) {
+            if (recreate_worker(label, master_ctx, DBW, i) != SUCCESS) {
                 return FAILURE;
             }
         }

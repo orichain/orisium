@@ -78,12 +78,6 @@ typedef enum {
 } pqc_algo_type_t;
 
 typedef struct {
-	uint8_t index;
-	worker_type_t r_worker_type_t;
-	status_t status;
-} worker_type_t_status_t;
-
-typedef struct {
 	size_t r_size_t;
 	status_t status;
 } size_t_status_t;
