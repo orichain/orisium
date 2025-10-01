@@ -261,16 +261,20 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     CLOSE_FD(&session->heartbeat_timer_fd);
 //======================================================================
                     session->heartbeat.sent = true;
+                    session->heartbeat.ack_rcvd = false;
+                    session->heartbeat_end.sent = false;
+                    session->heartbeat_end.ack_rcvd = false;
+                    cleanup_packet_finalize_timer(worker_ctx->label, &worker_ctx->async, &session->heartbeat_finalize);
 //======================================================================
                     return SUCCESS;
-                } else if (*current_fd == session->heartbeat_fin.timer_fd) {
+                } else if (*current_fd == session->heartbeat_end.timer_fd) {
                     uint64_t u;
-                    read(session->heartbeat_fin.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    read(session->heartbeat_end.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
                     worker_type_t c_wot = session->identity.local_wot;
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
-                    if (session->heartbeat_fin.sent_try_count > MAX_RETRY) {
-                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->heartbeat_fin.interval_timer_fd, session->heartbeat_fin.sent_try_count);
+                    if (session->heartbeat_end.sent_try_count > MAX_RETRY) {
+                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->heartbeat_end.interval_timer_fd, session->heartbeat_end.sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -285,11 +289,12 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //----------------------------------------------------------------------
                         return SUCCESS;
                     }
-                    LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->heartbeat_fin.interval_timer_fd);
-                    double try_count = (double)session->heartbeat_fin.sent_try_count;
+                    LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->heartbeat_end.interval_timer_fd);
+                    double try_count = (double)session->heartbeat_end.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
-                    session->heartbeat_fin.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
-                    if (retry_heartbeat_fin(worker_ctx, session) != SUCCESS) {
+                    session->heartbeat_end.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                    //if (retry_heartbeat_end(worker_ctx, session) != SUCCESS) {
+                    if (retry_packet(worker_ctx, session, &session->heartbeat_end) != SUCCESS) {
                         continue;
                     }
                     return SUCCESS;
@@ -457,8 +462,40 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     read(session->heartbeat_openner_fd, &u, sizeof(u)); //Jangan lupa read event timer
                     session->heartbeat_ack.ack_sent = false;
                     session->heartbeat_ack.rcvd = false;
+                    session->heartbeat_finalize.sent = false;
+                    session->heartbeat_finalize.rcvd = false;
                     async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_fd);
                     CLOSE_FD(&session->heartbeat_openner_fd);
+                    return SUCCESS;
+                } else if (*current_fd == session->heartbeat_finalize.timer_fd) {
+                    uint64_t u;
+                    read(session->heartbeat_finalize.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    worker_type_t c_wot = session->identity.local_wot;
+                    uint8_t c_index = session->identity.local_index;
+                    uint8_t c_session_index = session->identity.local_session_index;
+                    if (session->heartbeat_finalize.sent_try_count > MAX_RETRY) {
+                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->heartbeat_finalize.interval_timer_fd, session->heartbeat_finalize.sent_try_count);
+//----------------------------------------------------------------------
+// Disconnected => 1. Reset Session
+//                 2. Send Info To Master
+//----------------------------------------------------------------------
+                        cleanup_sio_session(worker_ctx->label, &worker_ctx->async, session);
+                        if (setup_sio_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
+                            continue;
+                        }
+                        if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
+                            continue;
+                        }
+//----------------------------------------------------------------------
+                        return SUCCESS;
+                    }
+                    LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->heartbeat_finalize.interval_timer_fd);
+                    double try_count = (double)session->heartbeat_finalize.sent_try_count;
+                    calculate_retry(worker_ctx->label, session, c_wot, try_count);
+                    session->heartbeat_finalize.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                    if (retry_packet_finalize(worker_ctx, &session->identity, &session->security, &session->heartbeat_finalize) != SUCCESS) {
+                        continue;
+                    }
                     return SUCCESS;
                 }
             }

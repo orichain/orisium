@@ -21,8 +21,8 @@
 #include "orilink/hello4_ack.h"
 #include "orilink/heartbeat.h"
 #include "orilink/heartbeat_ack.h"
-#include "orilink/heartbeat_fin.h"
-#include "orilink/heartbeat_fin_ack.h"
+#include "orilink/heartbeat_end.h"
+#include "orilink/heartbeat_finalize.h"
 #include "types.h"
 #include "log.h"
 #include "constants.h"
@@ -178,10 +178,10 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
             payload_dynamic_size = 0;
             break;
         }
-        case ORILINK_HEARTBEAT_FIN: {
+        case ORILINK_HEARTBEAT_END: {
             if (!checkfixheader) {
-                if (!p->payload.orilink_heartbeat_fin) {
-                    LOG_ERROR("%sORILINK_HEARTBEAT_FIN payload is NULL.", label);
+                if (!p->payload.orilink_heartbeat_end) {
+                    LOG_ERROR("%sORILINK_HEARTBEAT_END payload is NULL.", label);
                     result.status = FAILURE;
                     return result;
                 }
@@ -190,10 +190,10 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
             payload_dynamic_size = 0;
             break;
         }
-        case ORILINK_HEARTBEAT_FIN_ACK: {
+        case ORILINK_HEARTBEAT_FINALIZE: {
             if (!checkfixheader) {
-                if (!p->payload.orilink_heartbeat_fin_ack) {
-                    LOG_ERROR("%sORILINK_HEARTBEAT_FIN_ACK payload is NULL.", label);
+                if (!p->payload.orilink_heartbeat_finalize) {
+                    LOG_ERROR("%sORILINK_HEARTBEAT_FINALIZE payload is NULL.", label);
                     result.status = FAILURE;
                     return result;
                 }
@@ -388,11 +388,11 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
         case ORILINK_HEARTBEAT_ACK:
             result_pyld = orilink_serialize_heartbeat_ack(label, p->payload.orilink_heartbeat_ack, current_buffer, *buffer_size, &offset);
             break;
-        case ORILINK_HEARTBEAT_FIN:
-            result_pyld = orilink_serialize_heartbeat_fin(label, p->payload.orilink_heartbeat_fin, current_buffer, *buffer_size, &offset);
+        case ORILINK_HEARTBEAT_END:
+            result_pyld = orilink_serialize_heartbeat_end(label, p->payload.orilink_heartbeat_end, current_buffer, *buffer_size, &offset);
             break;
-        case ORILINK_HEARTBEAT_FIN_ACK:
-            result_pyld = orilink_serialize_heartbeat_fin_ack(label, p->payload.orilink_heartbeat_fin_ack, current_buffer, *buffer_size, &offset);
+        case ORILINK_HEARTBEAT_FINALIZE:
+            result_pyld = orilink_serialize_heartbeat_finalize(label, p->payload.orilink_heartbeat_finalize, current_buffer, *buffer_size, &offset);
             break;
         default:
             LOG_ERROR("%sUnknown protocol type for serialization: 0x%02x", label, p->type);
@@ -940,44 +940,44 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
             result_pyld = orilink_deserialize_heartbeat_ack(label, p, buffer, len, &current_buffer_offset);
             break;
 		}
-        case ORILINK_HEARTBEAT_FIN: {
+        case ORILINK_HEARTBEAT_END: {
 			if (current_buffer_offset + fixed_header_size > len) {
-                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HEARTBEAT_FIN fixed header.", label);
+                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HEARTBEAT_END fixed header.", label);
                 CLOSE_ORILINK_PROTOCOL(&p);
                 free(key0);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            orilink_heartbeat_fin_t *payload = (orilink_heartbeat_fin_t*) calloc(1, sizeof(orilink_heartbeat_fin_t));
+            orilink_heartbeat_end_t *payload = (orilink_heartbeat_end_t*) calloc(1, sizeof(orilink_heartbeat_end_t));
             if (!payload) {
-                LOG_ERROR("%sFailed to allocate orilink_heartbeat_fin_t without FAM. %s", label, strerror(errno));
+                LOG_ERROR("%sFailed to allocate orilink_heartbeat_end_t without FAM. %s", label, strerror(errno));
                 CLOSE_ORILINK_PROTOCOL(&p);
                 free(key0);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
-            p->payload.orilink_heartbeat_fin = payload;
-            result_pyld = orilink_deserialize_heartbeat_fin(label, p, buffer, len, &current_buffer_offset);
+            p->payload.orilink_heartbeat_end = payload;
+            result_pyld = orilink_deserialize_heartbeat_end(label, p, buffer, len, &current_buffer_offset);
             break;
 		}
-        case ORILINK_HEARTBEAT_FIN_ACK: {
+        case ORILINK_HEARTBEAT_FINALIZE: {
 			if (current_buffer_offset + fixed_header_size > len) {
-                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HEARTBEAT_FIN_ACK fixed header.", label);
+                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HEARTBEAT_FINALIZE fixed header.", label);
                 CLOSE_ORILINK_PROTOCOL(&p);
                 free(key0);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            orilink_heartbeat_fin_t *payload = (orilink_heartbeat_fin_t*) calloc(1, sizeof(orilink_heartbeat_fin_t));
+            orilink_heartbeat_finalize_t *payload = (orilink_heartbeat_finalize_t*) calloc(1, sizeof(orilink_heartbeat_finalize_t));
             if (!payload) {
-                LOG_ERROR("%sFailed to allocate orilink_heartbeat_fin_t without FAM. %s", label, strerror(errno));
+                LOG_ERROR("%sFailed to allocate orilink_heartbeat_finalize_t without FAM. %s", label, strerror(errno));
                 CLOSE_ORILINK_PROTOCOL(&p);
                 free(key0);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
-            p->payload.orilink_heartbeat_fin_ack = payload;
-            result_pyld = orilink_deserialize_heartbeat_fin_ack(label, p, buffer, len, &current_buffer_offset);
+            p->payload.orilink_heartbeat_finalize = payload;
+            result_pyld = orilink_deserialize_heartbeat_finalize(label, p, buffer, len, &current_buffer_offset);
             break;
 		}
         default:

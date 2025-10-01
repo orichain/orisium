@@ -96,8 +96,8 @@ status_t handle_workers_ipc_udp_data_sio(worker_context_t *worker_ctx, void *wor
             }
             break;
         }
-        case ORILINK_HEARTBEAT_FIN_ACK: {
-            if (handle_workers_ipc_udp_data_sio_heartbeat_fin_ack(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {
+        case ORILINK_HEARTBEAT_FINALIZE: {
+            if (handle_workers_ipc_udp_data_sio_heartbeat_finalize(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {
                 return FAILURE;
             }
             break;

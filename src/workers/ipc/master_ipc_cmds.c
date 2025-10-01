@@ -320,7 +320,7 @@ status_t worker_master_task_info(worker_context_t *ctx, uint8_t session_index, t
     return SUCCESS;
 }
 
-status_t worker_master_udp_data_noretry(
+status_t worker_master_udp_data_finalize(
     const char *label, 
     worker_context_t *worker_ctx, 
     worker_type_t wot, 

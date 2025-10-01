@@ -9,10 +9,10 @@
 #include "orilink/protocol.h"
 #include "types.h"
 #include "log.h"
-#include "orilink/heartbeat_fin.h"
+#include "orilink/heartbeat_finalize.h"
 #include "constants.h"
 
-status_t orilink_serialize_heartbeat_fin(const char *label, const orilink_heartbeat_fin_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
+status_t orilink_serialize_heartbeat_finalize(const char *label, const orilink_heartbeat_finalize_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
     if (!payload || !current_buffer || !offset) {
         LOG_ERROR("%sInvalid input pointers.", label);
         return FAILURE;
@@ -30,14 +30,14 @@ status_t orilink_serialize_heartbeat_fin(const char *label, const orilink_heartb
     return SUCCESS;
 }
 
-status_t orilink_deserialize_heartbeat_fin(const char *label, orilink_protocol_t *p, const uint8_t *buffer, size_t total_buffer_len, size_t *offset_ptr) {
-    if (!p || !buffer || !offset_ptr || !p->payload.orilink_heartbeat_fin) {
+status_t orilink_deserialize_heartbeat_finalize(const char *label, orilink_protocol_t *p, const uint8_t *buffer, size_t total_buffer_len, size_t *offset_ptr) {
+    if (!p || !buffer || !offset_ptr || !p->payload.orilink_heartbeat_finalize) {
         LOG_ERROR("%sInvalid input pointers.", label);
         return FAILURE;
     }
     size_t current_offset = *offset_ptr;
     const uint8_t *cursor = buffer + current_offset;
-    orilink_heartbeat_fin_t *payload = p->payload.orilink_heartbeat_fin;
+    orilink_heartbeat_finalize_t *payload = p->payload.orilink_heartbeat_finalize;
     if (current_offset + sizeof(uint64_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading local_id.", label);
         return FAILURE_OOBUF;
@@ -60,7 +60,7 @@ status_t orilink_deserialize_heartbeat_fin(const char *label, orilink_protocol_t
     return SUCCESS;
 }
 
-orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_fin(
+orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_finalize(
     const char *label, 
     uint8_t inc_ctr, 
     worker_type_t remote_wot, 
@@ -94,16 +94,16 @@ orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_fin(
     result.r_orilink_protocol_t->local_session_index = local_session_index;
     result.r_orilink_protocol_t->id_connection = id_connection;
     result.r_orilink_protocol_t->trycount = trycount;
-	result.r_orilink_protocol_t->type = ORILINK_HEARTBEAT_FIN;
-	orilink_heartbeat_fin_t *payload = (orilink_heartbeat_fin_t *)calloc(1, sizeof(orilink_heartbeat_fin_t));
+	result.r_orilink_protocol_t->type = ORILINK_HEARTBEAT_FINALIZE;
+	orilink_heartbeat_finalize_t *payload = (orilink_heartbeat_finalize_t *)calloc(1, sizeof(orilink_heartbeat_finalize_t));
 	if (!payload) {
-		LOG_ERROR("%sFailed to allocate orilink_heartbeat_fin_t payload. %s", label, strerror(errno));
+		LOG_ERROR("%sFailed to allocate orilink_heartbeat_finalize_t payload. %s", label, strerror(errno));
 		CLOSE_ORILINK_PROTOCOL(&result.r_orilink_protocol_t);
 		return result;
 	}
     payload->local_id = local_id;
     payload->remote_id = remote_id;
-	result.r_orilink_protocol_t->payload.orilink_heartbeat_fin = payload;
+	result.r_orilink_protocol_t->payload.orilink_heartbeat_finalize = payload;
 	result.status = SUCCESS;
 	return result;
 }

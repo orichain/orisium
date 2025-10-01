@@ -95,10 +95,6 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         return FAILURE;
     }
 //======================================================================
-// Reinitialize session->heartbeat_fin_ack.ack_sent_try_count
-//----------------------------------------------------------------------
-    session->heartbeat_fin_ack.ack_sent_try_count = 0x00;
-//----------------------------------------------------------------------
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_heartbeat_ack(
         worker_ctx->label,
         0x01,

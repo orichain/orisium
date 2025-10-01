@@ -96,8 +96,14 @@ status_t handle_workers_ipc_udp_data_cow(worker_context_t *worker_ctx, void *wor
             }
             break;
         }
-        case ORILINK_HEARTBEAT_FIN: {
-            status_t hbfin = handle_workers_ipc_udp_data_cow_heartbeat_fin(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao);
+        case ORILINK_HEARTBEAT_END: {
+            if (handle_workers_ipc_udp_data_cow_heartbeat_end(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {
+                return FAILURE;
+            }
+            break;
+        }
+        case ORILINK_HEARTBEAT_FINALIZE: {
+            status_t hbfin = handle_workers_ipc_udp_data_cow_heartbeat_finalize(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao);
             if (hbfin != SUCCESS) {
                 if (hbfin == FAILURE_MAXTRY || hbfin == FAILURE_IVLDTRY) {
                     worker_type_t c_wot = session->identity.local_wot;

@@ -3,14 +3,12 @@
 
 #include "workers/workers.h"
 #include "workers/ipc/master_ipc_cmds.h"
-#include "orilink/heartbeat_fin.h"
+#include "orilink/heartbeat_finalize.h"
 #include "poly1305-donna.h"
 
 status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions, int *current_fd);
 
-static inline status_t retry_heartbeat_fin(worker_context_t *worker_ctx, cow_c_session_t *session) {
-    orilink_identity_t *identity = &session->identity;
-    orilink_security_t *security = &session->security;
+static inline status_t retry_packet_finalize(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, packet_finalize_t *h) {
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
@@ -18,18 +16,17 @@ static inline status_t retry_heartbeat_fin(worker_context_t *worker_ctx, cow_c_s
     if (current_time.status != SUCCESS) {
         return FAILURE;
     }
-    session->heartbeat_fin.sent_try_count++;
-    session->heartbeat_fin.sent_time = current_time.r_uint64_t;
-    if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_fin.timer_fd,
-        (time_t)session->heartbeat_fin.interval_timer_fd,
-        (long)((session->heartbeat_fin.interval_timer_fd - (time_t)session->heartbeat_fin.interval_timer_fd) * 1e9),
-        (time_t)session->heartbeat_fin.interval_timer_fd,
-        (long)((session->heartbeat_fin.interval_timer_fd - (time_t)session->heartbeat_fin.interval_timer_fd) * 1e9)) != SUCCESS)
+    h->sent_try_count++;
+    if (async_set_timerfd_time(worker_ctx->label, &h->timer_fd,
+        (time_t)h->interval_timer_fd,
+        (long)((h->interval_timer_fd - (time_t)h->interval_timer_fd) * 1e9),
+        (time_t)h->interval_timer_fd,
+        (long)((h->interval_timer_fd - (time_t)h->interval_timer_fd) * 1e9)) != SUCCESS)
     {
         return FAILURE;
     }
 //======================================================================
-    orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_heartbeat_fin(
+    orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_heartbeat_finalize(
         worker_ctx->label,
         0xFF,
         identity->remote_wot,
@@ -41,7 +38,7 @@ static inline status_t retry_heartbeat_fin(worker_context_t *worker_ctx, cow_c_s
         identity->id_connection,
         identity->local_id,
         identity->remote_id,
-        session->heartbeat_fin.sent_try_count
+        h->sent_try_count
     );
     if (orilink_cmd_result.status != SUCCESS) {
         return FAILURE;
@@ -58,7 +55,7 @@ static inline status_t retry_heartbeat_fin(worker_context_t *worker_ctx, cow_c_s
     if (udp_data.status != SUCCESS) {
         return FAILURE;
     }
-    if (worker_master_udp_data_noretry(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &identity->remote_addr, &udp_data) != SUCCESS) {
+    if (worker_master_udp_data_finalize(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &identity->remote_addr, &udp_data) != SUCCESS) {
         return FAILURE;
     }
 //======================================================================
