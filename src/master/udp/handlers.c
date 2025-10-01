@@ -80,9 +80,10 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
             }
             uint8_t slot_found = 0xff;
             for(uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
-                if(!master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].in_use) {
-                    master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].sio_index = sio_worker_idx;
-                    master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].in_use = true;
+                master_sio_c_session_t *c_session = &master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i];
+                if(!c_session->in_use) {
+                    c_session->sio_index = sio_worker_idx;
+                    c_session->in_use = true;
                     slot_found = i;
                     break;
                 }
@@ -101,8 +102,9 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                 CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 return FAILURE;
             }
-            master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + slot_found].id_connection = orcvdo.r_orilink_raw_protocol_t->id_connection;
-            memcpy(&master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + slot_found].remote_addr, &remote_addr, sizeof(struct sockaddr_in6));
+            master_sio_c_session_t *c_session = &master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + slot_found];
+            c_session->id_connection = orcvdo.r_orilink_raw_protocol_t->id_connection;
+            memcpy(&c_session->remote_addr, &remote_addr, sizeof(struct sockaddr_in6));
             CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
 			break;
 		}
