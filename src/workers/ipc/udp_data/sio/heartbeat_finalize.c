@@ -1,5 +1,8 @@
 #include <inttypes.h>
 #include <time.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -12,8 +15,7 @@
 #include "async.h"
 #include "orilink/heartbeat_finalize.h"
 #include "workers/ipc/master_ipc_cmds.h"
-
-struct sockaddr_in6;
+#include "constants.h"
 
 status_t handle_workers_ipc_udp_data_sio_heartbeat_finalize(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
 //----------------------------------------------------------------------
