@@ -130,6 +130,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
         }
         return FAILURE;
     }
+    uint8_t l_inc_ctr = orilink_cmd_result.r_orilink_protocol_t->inc_ctr;
     puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
         worker_ctx->label,
         security->aes_key,
@@ -144,6 +145,9 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
             decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
+        if (l_inc_ctr != 0xFF) {
+            decrement_ctr(&security->local_ctr, security->local_nonce);
         }
         return FAILURE;
     }
@@ -161,6 +165,9 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
             if (inc_ctr != 0xFF) {
                 decrement_ctr(&security->remote_ctr, security->remote_nonce);
             }
+            if (l_inc_ctr != 0xFF) {
+                decrement_ctr(&security->local_ctr, security->local_nonce);
+            }
             return FAILURE;
         }
     } else {
@@ -170,6 +177,9 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
             if (inc_ctr != 0xFF) {
                 decrement_ctr(&security->remote_ctr, security->remote_nonce);
+            }
+            if (l_inc_ctr != 0xFF) {
+                decrement_ctr(&security->local_ctr, security->local_nonce);
             }
             return FAILURE;
         }

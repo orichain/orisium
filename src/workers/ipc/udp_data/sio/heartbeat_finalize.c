@@ -111,6 +111,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_finalize(worker_context_t *wo
         }
         return FAILURE;
     }
+    uint8_t l_inc_ctr = orilink_cmd_result.r_orilink_protocol_t->inc_ctr;
     puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
         worker_ctx->label,
         security->aes_key,
@@ -125,6 +126,9 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_finalize(worker_context_t *wo
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
             decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
+        if (l_inc_ctr != 0xFF) {
+            decrement_ctr(&security->local_ctr, security->local_nonce);
         }
         return FAILURE;
     }
@@ -142,6 +146,9 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_finalize(worker_context_t *wo
             if (inc_ctr != 0xFF) {
                 decrement_ctr(&security->remote_ctr, security->remote_nonce);
             }
+            if (l_inc_ctr != 0xFF) {
+                decrement_ctr(&security->local_ctr, security->local_nonce);
+            }
             return FAILURE;
         }
     } else {
@@ -151,6 +158,9 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_finalize(worker_context_t *wo
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
             if (inc_ctr != 0xFF) {
                 decrement_ctr(&security->remote_ctr, security->remote_nonce);
+            }
+            if (l_inc_ctr != 0xFF) {
+                decrement_ctr(&security->local_ctr, security->local_nonce);
             }
             return FAILURE;
         }
@@ -169,6 +179,9 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_finalize(worker_context_t *wo
         if (inc_ctr != 0xFF) {
             decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
+        if (l_inc_ctr != 0xFF) {
+            decrement_ctr(&security->local_ctr, security->local_nonce);
+        }
         return FAILURE;
     }
     if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_timer_fd,
@@ -182,6 +195,9 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_finalize(worker_context_t *wo
         if (inc_ctr != 0xFF) {
             decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
+        if (l_inc_ctr != 0xFF) {
+            decrement_ctr(&security->local_ctr, security->local_nonce);
+        }
         return FAILURE;
     }
     if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_timer_fd) != SUCCESS) {
@@ -189,6 +205,9 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_finalize(worker_context_t *wo
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
             decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
+        if (l_inc_ctr != 0xFF) {
+            decrement_ctr(&security->local_ctr, security->local_nonce);
         }
         return FAILURE;
     }

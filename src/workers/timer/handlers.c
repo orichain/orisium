@@ -225,6 +225,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     if (orilink_cmd_result.status != SUCCESS) {
                         return FAILURE;
                     }
+                    uint8_t l_inc_ctr = orilink_cmd_result.r_orilink_protocol_t->inc_ctr;
                     puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
                         worker_ctx->label,
                         security->aes_key,
@@ -235,6 +236,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     );
                     CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
                     if (udp_data.status != SUCCESS) {
+                        if (l_inc_ctr != 0xFF) {
+                            decrement_ctr(&security->local_ctr, security->local_nonce);
+                        }
                         return FAILURE;
                     }
 //======================================================================
@@ -246,11 +250,17 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         struct sockaddr_in6 fake_addr;
                         memset(&fake_addr, 0, sizeof(struct sockaddr_in6));
                         if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &fake_addr, &udp_data, &session->heartbeat) != SUCCESS) {
+                            if (l_inc_ctr != 0xFF) {
+                                decrement_ctr(&security->local_ctr, security->local_nonce);
+                            }
                             return FAILURE;
                         }
                     } else {
                         printf("[Debug Here Helper]: Heartbeat Packet Number %d\n", session->test_drop_heartbeat);
                         if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &session->identity.remote_addr, &udp_data, &session->heartbeat) != SUCCESS) {
+                            if (l_inc_ctr != 0xFF) {
+                                decrement_ctr(&security->local_ctr, security->local_nonce);
+                            }
                             return FAILURE;
                         }
                         if (session->test_drop_heartbeat >= 1000000) {

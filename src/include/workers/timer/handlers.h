@@ -43,6 +43,7 @@ static inline status_t retry_packet_finalize(worker_context_t *worker_ctx, orili
     if (orilink_cmd_result.status != SUCCESS) {
         return FAILURE;
     }
+    uint8_t l_inc_ctr = orilink_cmd_result.r_orilink_protocol_t->inc_ctr;
     puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
         worker_ctx->label,
         security->aes_key,
@@ -53,9 +54,15 @@ static inline status_t retry_packet_finalize(worker_context_t *worker_ctx, orili
     );
     CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
     if (udp_data.status != SUCCESS) {
+        if (l_inc_ctr != 0xFF) {
+            decrement_ctr(&security->local_ctr, security->local_nonce);
+        }
         return FAILURE;
     }
     if (worker_master_udp_data_finalize(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &identity->remote_addr, &udp_data) != SUCCESS) {
+        if (l_inc_ctr != 0xFF) {
+            decrement_ctr(&security->local_ctr, security->local_nonce);
+        }
         return FAILURE;
     }
 //======================================================================
