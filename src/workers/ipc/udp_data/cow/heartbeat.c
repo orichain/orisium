@@ -17,6 +17,7 @@
 #include "constants.h"
 
 status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
+    uint8_t inc_ctr = oudp_datao->inc_ctr;
 //======================================================================
 // + Security
 //======================================================================
@@ -39,6 +40,9 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
@@ -53,6 +57,9 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         LOG_ERROR("%sLocal Id And Or Remote Id Mismatch.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
 //======================================================================
@@ -70,11 +77,17 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     if (current_time.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
     if (async_create_timerfd(worker_ctx->label, &session->heartbeat_ack.ack_timer_fd) != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
     session->heartbeat_ack.ack_sent_try_count++;
@@ -87,11 +100,17 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
     if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_ack.ack_timer_fd) != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
 //======================================================================
@@ -113,6 +132,9 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     if (orilink_cmd_result.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
     puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
@@ -127,6 +149,9 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     if (udp_data.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
 //======================================================================
@@ -140,6 +165,9 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &fake_addr, &udp_data, &session->heartbeat_ack) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+            if (inc_ctr != 0xFF) {
+                decrement_ctr(&security->remote_ctr, security->remote_nonce);
+            }
             return FAILURE;
         }
     } else {
@@ -147,6 +175,9 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, remote_addr, &udp_data, &session->heartbeat_ack) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+            if (inc_ctr != 0xFF) {
+                decrement_ctr(&security->remote_ctr, security->remote_nonce);
+            }
             return FAILURE;
         }
         if (session->test_drop_heartbeat_ack >= 1000000) {
@@ -174,10 +205,10 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     session->heartbeat_ack.ack_sent = true;
     session->is_first_heartbeat = false;
 //======================================================================
-    session->metrics.last_ack = current_time.r_uint64_t;
-    session->metrics.count_ack += (double)1;
-    session->metrics.sum_hb_interval += session->heartbeat_interval;
-    session->metrics.hb_interval = session->heartbeat_interval;
+    //session->metrics.last_ack = current_time.r_uint64_t;
+    //session->metrics.count_ack += (double)1;
+    //session->metrics.sum_hb_interval += session->heartbeat_interval;
+    //session->metrics.hb_interval = session->heartbeat_interval;
 //======================================================================
     return SUCCESS;
 }

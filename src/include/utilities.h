@@ -45,13 +45,27 @@ static inline void increment_ctr(uint32_t *ctr, uint8_t *nonce) {
             }
         }
     } else {
-//----------------------------------------------------------------------
-// Operator ++ memiliki prioritas lebih tinggi daripada operator dereference *.
-// Jadi, *ctr++ sebenarnya berarti: ambil nilai yang ditunjuk oleh ctr, 
-// lalu inkremen pointer ctr itu sendiri (membuatnya menunjuk ke alamat memori berikutnya)
-// yang benar adalah (*ctr)++;
-//----------------------------------------------------------------------
         (*ctr)++;
+    }
+}
+
+static inline void decrement_ctr(uint32_t *ctr, uint8_t *nonce) {
+    if (*ctr == 0) {
+        *ctr = 0xFFFFFFFFUL;
+        uint8_t borrow = 1;
+        for (int i = 11; i >= 0; i--) {
+            int16_t temp_diff = nonce[i] - borrow;
+            if (temp_diff < 0) {
+                nonce[i] = 255;
+                borrow = 1; 
+            } else {
+                nonce[i] = (uint8_t)temp_diff;
+                borrow = 0;
+                break;
+            }
+        }
+    } else {
+        (*ctr)--;
     }
 }
 

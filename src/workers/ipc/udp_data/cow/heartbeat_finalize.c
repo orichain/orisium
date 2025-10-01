@@ -12,6 +12,7 @@
 struct sockaddr_in6;
 
 status_t handle_workers_ipc_udp_data_cow_heartbeat_finalize(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
+    uint8_t inc_ctr = oudp_datao->inc_ctr;
 //======================================================================
 // + Security
 //======================================================================
@@ -34,6 +35,9 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_finalize(worker_context_t *wo
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
@@ -48,6 +52,9 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_finalize(worker_context_t *wo
         LOG_ERROR("%sLocal Id And Or Remote Id Mismatch.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
 //======================================================================
@@ -57,6 +64,9 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_finalize(worker_context_t *wo
     if (current_time.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
 //======================================================================
