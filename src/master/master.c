@@ -35,11 +35,11 @@ void sigint_handler(int signum) {
 }
 
 status_t setup_master(const char *label, master_context_t *master_ctx) {
-    master_ctx->sio_session = (master_sio_session_t *)calloc(1, MAX_SIO_WORKERS * sizeof(master_sio_session_t));
-    master_ctx->logic_session = (master_logic_session_t *)calloc(1, MAX_LOGIC_WORKERS * sizeof(master_logic_session_t));
-    master_ctx->cow_session = (master_cow_session_t *)calloc(1, MAX_COW_WORKERS * sizeof(master_cow_session_t));
-    master_ctx->dbr_session = (master_dbr_session_t *)calloc(1, MAX_DBR_WORKERS * sizeof(master_dbr_session_t));
-    master_ctx->dbw_session = (master_dbw_session_t *)calloc(1, MAX_DBW_WORKERS * sizeof(master_dbw_session_t));
+    master_ctx->sio_session = (master_worker_session_t *)calloc(1, MAX_SIO_WORKERS * sizeof(master_worker_session_t));
+    master_ctx->logic_session = (master_worker_session_t *)calloc(1, MAX_LOGIC_WORKERS * sizeof(master_worker_session_t));
+    master_ctx->cow_session = (master_worker_session_t *)calloc(1, MAX_COW_WORKERS * sizeof(master_worker_session_t));
+    master_ctx->dbr_session = (master_worker_session_t *)calloc(1, MAX_DBR_WORKERS * sizeof(master_worker_session_t));
+    master_ctx->dbw_session = (master_worker_session_t *)calloc(1, MAX_DBW_WORKERS * sizeof(master_worker_session_t));
     master_ctx->sio_c_session = (master_sio_c_session_t *)calloc(1, MAX_MASTER_SIO_SESSIONS * sizeof(master_sio_c_session_t));
     master_ctx->cow_c_session = (master_cow_c_session_t *)calloc(1, MAX_MASTER_COW_SESSIONS * sizeof(master_cow_c_session_t));
 //----------------------------------------------------------------------

@@ -20,7 +20,7 @@ worker_type_t_status_t handle_master_ipc_closed_event(const char *label, master_
     bool is_worker_uds_closing = false;
 
     for (uint8_t i = 0; i < MAX_SIO_WORKERS; ++i) {
-        master_sio_session_t *session = &master_ctx->sio_session[i];
+        master_worker_session_t *session = &master_ctx->sio_session[i];
         if (*current_fd == session->upp.uds[0]) {
             session->isactive = false;
             is_worker_uds_closing = true;
@@ -32,7 +32,7 @@ worker_type_t_status_t handle_master_ipc_closed_event(const char *label, master_
     }
     if (!is_worker_uds_closing) {
         for (uint8_t i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-            master_logic_session_t *session = &master_ctx->logic_session[i];
+            master_worker_session_t *session = &master_ctx->logic_session[i];
             if (*current_fd == session->upp.uds[0]) {
                 session->isactive = false;
                 is_worker_uds_closing = true;
@@ -45,7 +45,7 @@ worker_type_t_status_t handle_master_ipc_closed_event(const char *label, master_
     }
     if (!is_worker_uds_closing) {
         for (uint8_t i = 0; i < MAX_COW_WORKERS; ++i) {
-            master_cow_session_t *session = &master_ctx->cow_session[i];
+            master_worker_session_t *session = &master_ctx->cow_session[i];
             if (*current_fd == session->upp.uds[0]) {
                 session->isactive = false;
                 is_worker_uds_closing = true;
@@ -58,7 +58,7 @@ worker_type_t_status_t handle_master_ipc_closed_event(const char *label, master_
     }
     if (!is_worker_uds_closing) {
         for (uint8_t i = 0; i < MAX_DBR_WORKERS; ++i) {
-            master_dbr_session_t *session = &master_ctx->dbr_session[i];
+            master_worker_session_t *session = &master_ctx->dbr_session[i];
             if (*current_fd == session->upp.uds[0]) {
                 session->isactive = false;
                 is_worker_uds_closing = true;
@@ -71,7 +71,7 @@ worker_type_t_status_t handle_master_ipc_closed_event(const char *label, master_
     }
     if (!is_worker_uds_closing) {
         for (uint8_t i = 0; i < MAX_DBW_WORKERS; ++i) {
-            master_dbw_session_t *session = &master_ctx->dbw_session[i];
+            master_worker_session_t *session = &master_ctx->dbw_session[i];
             if (*current_fd == session->upp.uds[0]) {
                 session->isactive = false;
                 is_worker_uds_closing = true;

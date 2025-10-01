@@ -21,7 +21,19 @@
 #include "pqc.h"
 #include "ipc/protocol.h"
 
-static inline void close_security(worker_security_t *security) {
+status_t close_worker(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
+    master_worker_session_t *session = get_master_worker_session(master_ctx, wot, index);
+    if (session == NULL) {
+        return FAILURE;
+    }
+    uds_pair_pid_t *upp = &session->upp;
+    worker_security_t *security = &session->security;
+    worker_rekeying_t *rekeying = &session->rekeying;
+    cleanup_oricle_long_double(&session->avgtt);
+    cleanup_oricle_double(&session->healthy);
+    session->isactive = false;
+    session->ishealthy = false;
+    session->isready = false;
     memset(security->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
     memset(security->kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
     memset(security->kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
@@ -42,299 +54,57 @@ static inline void close_security(worker_security_t *security) {
     security->hello1_ack_sent = false;
     security->hello2_rcvd = false;
     security->hello2_ack_sent = false;
-}
-
-status_t close_worker(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
-	if (wot == SIO) {
-        master_sio_session_t *session = &master_ctx->sio_session[index];
-        uds_pair_pid_t *upp = &session->upp;
-        worker_security_t *security = &session->security;
-        worker_rekeying_t *rekeying = &session->rekeying;
-        cleanup_oricle_long_double(&session->avgtt);
-        cleanup_oricle_double(&session->healthy);
-        session->isactive = false;
-        session->ishealthy = false;
-        session->isready = false;
-        close_security(security);
-        rekeying->is_rekeying = false;
-        ipc_cleanup_protocol_queue(&rekeying->rekeying_queue);
-        async_delete_event(label, &master_ctx->master_async, &upp->uds[0]);
-        CLOSE_UDS(&upp->uds[0]);
-		CLOSE_UDS(&upp->uds[1]);
-        CLOSE_PID(&upp->pid);
-	} else if (wot == LOGIC) {
-        master_logic_session_t *session = &master_ctx->logic_session[index];
-        uds_pair_pid_t *upp = &session->upp;
-        worker_security_t *security = &session->security;
-        worker_rekeying_t *rekeying = &session->rekeying;
-        cleanup_oricle_long_double(&session->avgtt);
-        cleanup_oricle_double(&session->healthy);
-        session->isactive = false;
-        session->ishealthy = false;
-        session->isready = false;
-        close_security(security);
-        rekeying->is_rekeying = false;
-        ipc_cleanup_protocol_queue(&rekeying->rekeying_queue);
-        async_delete_event(label, &master_ctx->master_async, &upp->uds[0]);
-        CLOSE_UDS(&upp->uds[0]);
-		CLOSE_UDS(&upp->uds[1]);
-        CLOSE_PID(&upp->pid);
-	} else if (wot == COW) {
-        master_cow_session_t *session = &master_ctx->cow_session[index];
-        uds_pair_pid_t *upp = &session->upp;
-        worker_security_t *security = &session->security;
-        worker_rekeying_t *rekeying = &session->rekeying;
-        cleanup_oricle_long_double(&session->avgtt);
-        cleanup_oricle_double(&session->healthy);
-        session->isactive = false;
-        session->ishealthy = false;
-        session->isready = false;
-        close_security(security);
-        rekeying->is_rekeying = false;
-        ipc_cleanup_protocol_queue(&rekeying->rekeying_queue);
-        async_delete_event(label, &master_ctx->master_async, &upp->uds[0]);
-        CLOSE_UDS(&upp->uds[0]);
-		CLOSE_UDS(&upp->uds[1]);
-        CLOSE_PID(&upp->pid);
-	} else if (wot == DBR) {
-        master_dbr_session_t *session = &master_ctx->dbr_session[index];
-        uds_pair_pid_t *upp = &session->upp;
-        worker_security_t *security = &session->security;
-        worker_rekeying_t *rekeying = &session->rekeying;
-        cleanup_oricle_long_double(&session->avgtt);
-        cleanup_oricle_double(&session->healthy);
-        session->isactive = false;
-        session->ishealthy = false;
-        session->isready = false;
-        close_security(security);
-        rekeying->is_rekeying = false;
-        ipc_cleanup_protocol_queue(&rekeying->rekeying_queue);
-        async_delete_event(label, &master_ctx->master_async, &upp->uds[0]);
-        CLOSE_UDS(&upp->uds[0]);
-		CLOSE_UDS(&upp->uds[1]);
-        CLOSE_PID(&upp->pid);
-	} else if (wot == DBW) {
-        master_dbw_session_t *session = &master_ctx->dbw_session[index];
-        uds_pair_pid_t *upp = &session->upp;
-        worker_security_t *security = &session->security;
-        worker_rekeying_t *rekeying = &session->rekeying;
-        cleanup_oricle_long_double(&session->avgtt);
-        cleanup_oricle_double(&session->healthy);
-        session->isactive = false;
-        session->ishealthy = false;
-        session->isready = false;
-        close_security(security);
-        rekeying->is_rekeying = false;
-        ipc_cleanup_protocol_queue(&rekeying->rekeying_queue);
-        async_delete_event(label, &master_ctx->master_async, &upp->uds[0]);
-        CLOSE_UDS(&upp->uds[0]);
-		CLOSE_UDS(&upp->uds[1]);
-        CLOSE_PID(&upp->pid);
-	} else {
-        return FAILURE;
-    }
+    rekeying->is_rekeying = false;
+    ipc_cleanup_protocol_queue(&rekeying->rekeying_queue);
+    async_delete_event(label, &master_ctx->master_async, &upp->uds[0]);
+    CLOSE_UDS(&upp->uds[0]);
+    CLOSE_UDS(&upp->uds[1]);
+    CLOSE_PID(&upp->pid);
 	return SUCCESS;
 }
 
 status_t create_socket_pair(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
-	if (wot == SIO) {
-		const char *worker_name = "SIO";
-        master_sio_session_t *session = &master_ctx->sio_session[index];
-        uds_pair_pid_t *upp = &session->upp;
-        worker_security_t *security = &session->security;
-        worker_rekeying_t *rekeying = &session->rekeying;
-        upp->uds[0] = 0; 
-		upp->uds[1] = 0; 
-        setup_oricle_long_double(&session->avgtt, (long double)0);
-        setup_oricle_double(&session->healthy, (double)100);
-        session->isactive = true;
-        session->ishealthy = true;        
-        session->isready = false;   
-        security->kem_publickey = (uint8_t *)calloc(1, KEM_PUBLICKEY_BYTES);
-        security->kem_ciphertext = (uint8_t *)calloc(1, KEM_CIPHERTEXT_BYTES);
-        security->kem_sharedsecret = (uint8_t *)calloc(1, KEM_SHAREDSECRET_BYTES);
-        security->aes_key = (uint8_t *)calloc(1, HASHES_BYTES);
-        security->mac_key = (uint8_t *)calloc(1, HASHES_BYTES);
-        security->local_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-        security->remote_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-        security->local_ctr = (uint32_t)0;
-        security->remote_ctr = (uint32_t)0;
-        security->hello1_rcvd = false;
-        security->hello1_ack_sent = false;
-        security->hello2_rcvd = false;
-        security->hello2_ack_sent = false;
-        rekeying->is_rekeying = false;
-        rekeying->rekeying_queue = NULL;
-		if (socketpair(AF_UNIX, SOCK_STREAM, 0, upp->uds) == -1) {
-			LOG_ERROR("%ssocketpair (%s) creation failed: %s", label, worker_name, strerror(errno));
-			return FAILURE;
-		}
-		if (set_nonblocking(label, upp->uds[0]) != SUCCESS) {
-			return FAILURE;
-		}
-		if (set_nonblocking(label, upp->uds[1]) != SUCCESS) {
-			return FAILURE;
-		}
-		LOG_DEBUG("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, upp->uds[0], upp->uds[1]);
-	} else if (wot == LOGIC) {
-		const char *worker_name = "Logic";
-        master_logic_session_t *session = &master_ctx->logic_session[index];
-        uds_pair_pid_t *upp = &session->upp;
-        worker_security_t *security = &session->security;
-        worker_rekeying_t *rekeying = &session->rekeying;
-        upp->uds[0] = 0; 
-		upp->uds[1] = 0; 
-        setup_oricle_long_double(&session->avgtt, (long double)0);
-        setup_oricle_double(&session->healthy, (double)100);
-        session->isactive = true;
-        session->ishealthy = true;        
-        session->isready = false;    
-        security->kem_publickey = (uint8_t *)calloc(1, KEM_PUBLICKEY_BYTES);
-        security->kem_ciphertext = (uint8_t *)calloc(1, KEM_CIPHERTEXT_BYTES);
-        security->kem_sharedsecret = (uint8_t *)calloc(1, KEM_SHAREDSECRET_BYTES);
-        security->aes_key = (uint8_t *)calloc(1, HASHES_BYTES);
-        security->mac_key = (uint8_t *)calloc(1, HASHES_BYTES);
-        security->local_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-        security->remote_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-        security->local_ctr = (uint32_t)0;
-        security->remote_ctr = (uint32_t)0;
-        security->hello1_rcvd = false;
-        security->hello1_ack_sent = false;
-        security->hello2_rcvd = false;
-        security->hello2_ack_sent = false;
-        rekeying->is_rekeying = false;
-        rekeying->rekeying_queue = NULL;
-		if (socketpair(AF_UNIX, SOCK_STREAM, 0, upp->uds) == -1) {
-			LOG_ERROR("%ssocketpair (%s) creation failed: %s", label, worker_name, strerror(errno));
-			return FAILURE;
-		}
-		if (set_nonblocking(label, upp->uds[0]) != SUCCESS) {
-			return FAILURE;
-		}
-		if (set_nonblocking(label, upp->uds[1]) != SUCCESS) {
-			return FAILURE;
-		}
-		LOG_DEBUG("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, upp->uds[0], upp->uds[1]);
-	} else if (wot == COW) {
-		const char *worker_name = "COW";
-        master_cow_session_t *session = &master_ctx->cow_session[index];
-        uds_pair_pid_t *upp = &session->upp;
-        worker_security_t *security = &session->security;
-        worker_rekeying_t *rekeying = &session->rekeying;
-        upp->uds[0] = 0; 
-		upp->uds[1] = 0; 
-        setup_oricle_long_double(&session->avgtt, (long double)0);
-        setup_oricle_double(&session->healthy, (double)100);
-        session->isactive = true;
-        session->ishealthy = true;        
-        session->isready = false;   
-        security->kem_publickey = (uint8_t *)calloc(1, KEM_PUBLICKEY_BYTES);
-        security->kem_ciphertext = (uint8_t *)calloc(1, KEM_CIPHERTEXT_BYTES);
-        security->kem_sharedsecret = (uint8_t *)calloc(1, KEM_SHAREDSECRET_BYTES);
-        security->aes_key = (uint8_t *)calloc(1, HASHES_BYTES);
-        security->mac_key = (uint8_t *)calloc(1, HASHES_BYTES);
-        security->local_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-        security->remote_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-        security->local_ctr = (uint32_t)0;
-        security->remote_ctr = (uint32_t)0;
-        security->hello1_rcvd = false;
-        security->hello1_ack_sent = false;
-        security->hello2_rcvd = false;
-        security->hello2_ack_sent = false;
-        rekeying->is_rekeying = false;
-        rekeying->rekeying_queue = NULL;
-		if (socketpair(AF_UNIX, SOCK_STREAM, 0, upp->uds) == -1) {
-			LOG_ERROR("%ssocketpair (%s) creation failed: %s", label, worker_name, strerror(errno));
-			return FAILURE;
-		}
-		if (set_nonblocking(label, upp->uds[0]) != SUCCESS) {
-			return FAILURE;
-		}
-		if (set_nonblocking(label, upp->uds[1]) != SUCCESS) {
-			return FAILURE;
-		}
-		LOG_DEBUG("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, upp->uds[0], upp->uds[1]);
-	} else if (wot == DBR) {
-		const char *worker_name = "DBR";
-        master_dbr_session_t *session = &master_ctx->dbr_session[index];
-        uds_pair_pid_t *upp = &session->upp;
-        worker_security_t *security = &session->security;
-        worker_rekeying_t *rekeying = &session->rekeying;
-        upp->uds[0] = 0; 
-		upp->uds[1] = 0; 
-        setup_oricle_long_double(&session->avgtt, (long double)0);
-        setup_oricle_double(&session->healthy, (double)100);
-        session->isactive = true;
-        session->ishealthy = true;        
-        session->isready = false; 
-        security->kem_publickey = (uint8_t *)calloc(1, KEM_PUBLICKEY_BYTES);
-        security->kem_ciphertext = (uint8_t *)calloc(1, KEM_CIPHERTEXT_BYTES);
-        security->kem_sharedsecret = (uint8_t *)calloc(1, KEM_SHAREDSECRET_BYTES);
-        security->aes_key = (uint8_t *)calloc(1, HASHES_BYTES);
-        security->mac_key = (uint8_t *)calloc(1, HASHES_BYTES);
-        security->local_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-        security->remote_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-        security->local_ctr = (uint32_t)0;
-        security->remote_ctr = (uint32_t)0;
-        security->hello1_rcvd = false;
-        security->hello1_ack_sent = false;
-        security->hello2_rcvd = false;
-        security->hello2_ack_sent = false;
-        rekeying->is_rekeying = false;
-        rekeying->rekeying_queue = NULL;
-		if (socketpair(AF_UNIX, SOCK_STREAM, 0, upp->uds) == -1) {
-			LOG_ERROR("%ssocketpair (%s) creation failed: %s", label, worker_name, strerror(errno));
-			return FAILURE;
-		}
-		if (set_nonblocking(label, upp->uds[0]) != SUCCESS) {
-			return FAILURE;
-		}
-		if (set_nonblocking(label, upp->uds[1]) != SUCCESS) {
-			return FAILURE;
-		}
-		LOG_DEBUG("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, upp->uds[0], upp->uds[1]);
-	} else if (wot == DBW) {
-		const char *worker_name = "DBW";
-        master_dbw_session_t *session = &master_ctx->dbw_session[index];
-        uds_pair_pid_t *upp = &session->upp;
-        worker_security_t *security = &session->security;
-        worker_rekeying_t *rekeying = &session->rekeying;
-        upp->uds[0] = 0; 
-		upp->uds[1] = 0; 
-        setup_oricle_long_double(&session->avgtt, (long double)0);
-        setup_oricle_double(&session->healthy, (double)100);
-        session->isactive = true;
-        session->ishealthy = true;        
-        session->isready = false; 
-        security->kem_publickey = (uint8_t *)calloc(1, KEM_PUBLICKEY_BYTES);
-        security->kem_ciphertext = (uint8_t *)calloc(1, KEM_CIPHERTEXT_BYTES);
-        security->kem_sharedsecret = (uint8_t *)calloc(1, KEM_SHAREDSECRET_BYTES);
-        security->aes_key = (uint8_t *)calloc(1, HASHES_BYTES);
-        security->mac_key = (uint8_t *)calloc(1, HASHES_BYTES);
-        security->local_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-        security->remote_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-        security->local_ctr = (uint32_t)0;
-        security->remote_ctr = (uint32_t)0;
-        security->hello1_rcvd = false;
-        security->hello1_ack_sent = false;
-        security->hello2_rcvd = false;
-        security->hello2_ack_sent = false;
-        rekeying->is_rekeying = false;
-        rekeying->rekeying_queue = NULL;
-		if (socketpair(AF_UNIX, SOCK_STREAM, 0, upp->uds) == -1) {
-			LOG_ERROR("%ssocketpair (%s) creation failed: %s", label, worker_name, strerror(errno));
-			return FAILURE;
-		}
-		if (set_nonblocking(label, upp->uds[0]) != SUCCESS) {
-			return FAILURE;
-		}
-		if (set_nonblocking(label, upp->uds[1]) != SUCCESS) {
-			return FAILURE;
-		}
-		LOG_DEBUG("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, upp->uds[0], upp->uds[1]);
-	} else {
+    master_worker_session_t *session = get_master_worker_session(master_ctx, wot, index);
+    if (session == NULL) {
         return FAILURE;
     }
+    const char *worker_name = get_master_worker_name(wot);
+    uds_pair_pid_t *upp = &session->upp;
+    worker_security_t *security = &session->security;
+    worker_rekeying_t *rekeying = &session->rekeying;
+    upp->uds[0] = 0; 
+    upp->uds[1] = 0; 
+    setup_oricle_long_double(&session->avgtt, (long double)0);
+    setup_oricle_double(&session->healthy, (double)100);
+    session->isactive = true;
+    session->ishealthy = true;        
+    session->isready = false;   
+    security->kem_publickey = (uint8_t *)calloc(1, KEM_PUBLICKEY_BYTES);
+    security->kem_ciphertext = (uint8_t *)calloc(1, KEM_CIPHERTEXT_BYTES);
+    security->kem_sharedsecret = (uint8_t *)calloc(1, KEM_SHAREDSECRET_BYTES);
+    security->aes_key = (uint8_t *)calloc(1, HASHES_BYTES);
+    security->mac_key = (uint8_t *)calloc(1, HASHES_BYTES);
+    security->local_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
+    security->remote_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
+    security->local_ctr = (uint32_t)0;
+    security->remote_ctr = (uint32_t)0;
+    security->hello1_rcvd = false;
+    security->hello1_ack_sent = false;
+    security->hello2_rcvd = false;
+    security->hello2_ack_sent = false;
+    rekeying->is_rekeying = false;
+    rekeying->rekeying_queue = NULL;
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, upp->uds) == -1) {
+        LOG_ERROR("%ssocketpair (%s) creation failed: %s", label, worker_name, strerror(errno));
+        return FAILURE;
+    }
+    if (set_nonblocking(label, upp->uds[0]) != SUCCESS) {
+        return FAILURE;
+    }
+    if (set_nonblocking(label, upp->uds[1]) != SUCCESS) {
+        return FAILURE;
+    }
+    LOG_DEBUG("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, upp->uds[0], upp->uds[1]);
 	return SUCCESS;
 }
 
@@ -857,7 +627,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
 		if (calculate_healthy(label, master_ctx, SIO, i) != SUCCESS) {
             return FAILURE;
         }
-        master_sio_session_t *session = &master_ctx->sio_session[i];
+        master_worker_session_t *session = &master_ctx->sio_session[i];
         if (session->healthy.value_prediction < (double)25) {
             session->isactive = false;
 //----------------------------------------------------------------------
@@ -881,7 +651,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
 		if (calculate_healthy(label, master_ctx, LOGIC, i) != SUCCESS) {
             return FAILURE;
         }
-        master_logic_session_t *session = &master_ctx->logic_session[i];
+        master_worker_session_t *session = &master_ctx->logic_session[i];
         if (session->healthy.value_prediction < (double)25) {
             session->isactive = false;
 //----------------------------------------------------------------------
@@ -905,7 +675,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
 		if (calculate_healthy(label, master_ctx, COW, i) != SUCCESS) {
             return FAILURE;
         }
-        master_cow_session_t *session = &master_ctx->cow_session[i];
+        master_worker_session_t *session = &master_ctx->cow_session[i];
         if (session->healthy.value_prediction < (double)25) {
             session->isactive = false;
 //----------------------------------------------------------------------
@@ -929,7 +699,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
 		if (calculate_healthy(label, master_ctx, DBR, i) != SUCCESS) {
             return FAILURE;
         }
-        master_dbr_session_t *session = &master_ctx->dbr_session[i];
+        master_worker_session_t *session = &master_ctx->dbr_session[i];
         if (session->healthy.value_prediction < (double)25) {
             session->isactive = false;
 //----------------------------------------------------------------------
@@ -953,7 +723,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
 		if (calculate_healthy(label, master_ctx, DBW, i) != SUCCESS) {
             return FAILURE;
         }
-        master_dbw_session_t *session = &master_ctx->dbw_session[i];
+        master_worker_session_t *session = &master_ctx->dbw_session[i];
         if (session->healthy.value_prediction < (double)25) {
             session->isactive = false;
 //----------------------------------------------------------------------

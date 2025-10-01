@@ -22,27 +22,27 @@ status_t master_worker_info(const char *label, master_context_t *master_ctx, wor
     uds_pair_pid_t *upp = NULL;
     worker_rekeying_t *rekeying = NULL;
     if (wot == SIO) {
-        master_sio_session_t *session = &master_ctx->sio_session[index];
+        master_worker_session_t *session = &master_ctx->sio_session[index];
         rekeying = &session->rekeying;
         security = &session->security;
         upp = &session->upp;
     } else if (wot == LOGIC) {
-        master_logic_session_t *session = &master_ctx->logic_session[index];
+        master_worker_session_t *session = &master_ctx->logic_session[index];
         rekeying = &session->rekeying;
         security = &session->security;
         upp = &session->upp;
     } else if (wot == COW) {
-        master_cow_session_t *session = &master_ctx->cow_session[index];
+        master_worker_session_t *session = &master_ctx->cow_session[index];
         rekeying = &session->rekeying;
         security = &session->security;
         upp = &session->upp;
     } else if (wot == DBR) {
-        master_dbr_session_t *session = &master_ctx->dbr_session[index];
+        master_worker_session_t *session = &master_ctx->dbr_session[index];
         rekeying = &session->rekeying;
         security = &session->security;
         upp = &session->upp;
     } else if (wot == DBW) {
-        master_dbw_session_t *session = &master_ctx->dbw_session[index];
+        master_worker_session_t *session = &master_ctx->dbw_session[index];
         rekeying = &session->rekeying;
         security = &session->security;
         upp = &session->upp;
@@ -113,7 +113,7 @@ status_t master_workers_info(const char *label, master_context_t *master_ctx, in
 }
 
 status_t master_cow_connect(const char *label, master_context_t *master_ctx, struct sockaddr_in6 *addr, uint8_t index, uint8_t session_index, uint64_t id_addr) {
-    master_cow_session_t *session = &master_ctx->cow_session[index];
+    master_worker_session_t *session = &master_ctx->cow_session[index];
     worker_rekeying_t *rekeying = &session->rekeying;
     if (!rekeying) return FAILURE;
 	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_cow_connect(label, COW, index, session_index, id_addr, addr);
@@ -230,19 +230,19 @@ status_t master_worker_udp_data(
 {
     worker_rekeying_t *rekeying = NULL;
     if (wot == SIO) {
-        master_sio_session_t *session = &master_ctx->sio_session[index];
+        master_worker_session_t *session = &master_ctx->sio_session[index];
         rekeying = &session->rekeying;
     } else if (wot == LOGIC) {
-        master_logic_session_t *session = &master_ctx->logic_session[index];
+        master_worker_session_t *session = &master_ctx->logic_session[index];
         rekeying = &session->rekeying;
     } else if (wot == COW) {
-        master_cow_session_t *session = &master_ctx->cow_session[index];
+        master_worker_session_t *session = &master_ctx->cow_session[index];
         rekeying = &session->rekeying;
     } else if (wot == DBR) {
-        master_dbr_session_t *session = &master_ctx->dbr_session[index];
+        master_worker_session_t *session = &master_ctx->dbr_session[index];
         rekeying = &session->rekeying;
     } else if (wot == DBW) {
-        master_dbw_session_t *session = &master_ctx->dbw_session[index];
+        master_worker_session_t *session = &master_ctx->dbw_session[index];
         rekeying = &session->rekeying;
     } else {
         return FAILURE;

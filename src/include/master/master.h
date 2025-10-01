@@ -63,65 +63,7 @@ typedef struct {
     oricle_long_double_t avgtt;
     worker_security_t security;
     worker_rekeying_t rekeying;
-} master_sio_session_t;
-
-typedef struct {
-    bool isactive;
-    bool ishealthy;
-    bool isready;
-    uint16_t task_count;
-    uds_pair_pid_t upp;
-	worker_metrics_t metrics;
-    oricle_double_t healthy;
-    oricle_long_double_t avgtt;
-    worker_security_t security;
-    worker_rekeying_t rekeying;
-} master_logic_session_t;
-
-typedef struct {
-    bool isactive;
-    bool ishealthy;
-    bool isready;
-    uint16_t task_count;
-    uds_pair_pid_t upp;
-    worker_metrics_t metrics;
-    oricle_double_t healthy;
-    oricle_long_double_t avgtt;
-    worker_security_t security;
-    worker_rekeying_t rekeying;
-} master_cow_session_t;
-
-typedef struct {
-    bool isactive;
-    bool ishealthy;
-    bool isready;
-    uint16_t task_count;
-    uds_pair_pid_t upp;
-	worker_metrics_t metrics;
-    oricle_double_t healthy;
-    oricle_long_double_t avgtt;
-    worker_security_t security;
-    worker_rekeying_t rekeying;
-} master_dbr_session_t;
-//======================================================================
-// hanya ada 1 writer
-// LMDB tidak bisa multi writer
-// Master harus punya write cache dalam bentuk linked list
-// dbwriter memberi signal write complete dan akan mentrigger in_use=false dan flush cache 1 per satu sampai kosong
-// untuk memastikan penulisan ditangani
-//======================================================================
-typedef struct {
-	bool in_use;
-    bool isactive;
-    bool ishealthy;
-    bool isready;
-    uds_pair_pid_t upp;
-	worker_metrics_t metrics;
-    oricle_double_t healthy;
-    oricle_long_double_t avgtt;
-    worker_security_t security;
-    worker_rekeying_t rekeying;
-} master_dbw_session_t;
+} master_worker_session_t;
 
 typedef struct {
 	uint8_t sio_index;
@@ -156,16 +98,60 @@ typedef struct {
     bool all_workers_is_ready;
     bool is_rekeying;
 //----------------------------------------------------------------------    
-    master_sio_session_t *sio_session;
-    master_logic_session_t *logic_session;
-    master_cow_session_t *cow_session;
-    master_dbr_session_t *dbr_session;
-    master_dbw_session_t *dbw_session;    
+    master_worker_session_t *sio_session;
+    master_worker_session_t *logic_session;
+    master_worker_session_t *cow_session;
+    master_worker_session_t *dbr_session;
+    master_worker_session_t *dbw_session;    
 //----------------------------------------------------------------------
     master_sio_c_session_t *sio_c_session;
     master_cow_c_session_t *cow_c_session;
 //----------------------------------------------------------------------
 } master_context_t;
+
+static inline master_worker_session_t *get_master_worker_session(master_context_t *master_context, worker_type_t wot, uint8_t index) {
+    switch (wot) {
+        case SIO: {
+            return &master_context->sio_session[index];
+        }
+        case LOGIC: {
+            return &master_context->logic_session[index];
+        }
+        case COW: {
+            return &master_context->cow_session[index];
+        }
+        case DBR: {
+            return &master_context->dbr_session[index];
+        }
+        case DBW: {
+            return &master_context->dbw_session[index];
+        }
+        default:
+            return NULL;
+    }
+}
+
+static inline const char *get_master_worker_name(worker_type_t wot) {
+    switch (wot) {
+        case SIO: {
+            return "SIO";
+        }
+        case LOGIC: {
+            return "LOGIC";
+        }
+        case COW: {
+            return "COW";
+        }
+        case DBR: {
+            return "DBR";
+        }
+        case DBW: {
+            return "DBW";
+        }
+        default:
+            return "UNKNOWN";
+    }
+}
 
 //----------------------------------------------------------------------
 void sigint_handler(int signum);

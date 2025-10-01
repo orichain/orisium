@@ -156,19 +156,19 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
 // Menganggap data valid dengan integritas
 //----------------------------------------------------------------------
     if (rcvd_wot == SIO) {
-        master_sio_session_t *session = &master_ctx->sio_session[rcvd_index];
+        master_worker_session_t *session = &master_ctx->sio_session[rcvd_index];
         session->isready = true;
     } else if (rcvd_wot == LOGIC) {
-        master_logic_session_t *session = &master_ctx->logic_session[rcvd_index];
+        master_worker_session_t *session = &master_ctx->logic_session[rcvd_index];
         session->isready = true;
     } else if (rcvd_wot == COW) {
-        master_cow_session_t *session = &master_ctx->cow_session[rcvd_index];
+        master_worker_session_t *session = &master_ctx->cow_session[rcvd_index];
         session->isready = true;
     } else if (rcvd_wot == DBR) {
-        master_dbr_session_t *session = &master_ctx->dbr_session[rcvd_index];
+        master_worker_session_t *session = &master_ctx->dbr_session[rcvd_index];
         session->isready = true;
     } else if (rcvd_wot == DBW) {
-        master_dbw_session_t *session = &master_ctx->dbw_session[rcvd_index];
+        master_worker_session_t *session = &master_ctx->dbw_session[rcvd_index];
         session->isready = true;
     } else {
         LOG_ERROR("%sFailed to master_worker_hello2_ack.", label);
