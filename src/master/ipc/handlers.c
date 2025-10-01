@@ -1,11 +1,9 @@
-#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 
 #include "log.h"
-#include "constants.h"
 #include "ipc/protocol.h"
 #include "types.h"
 #include "master/master.h"

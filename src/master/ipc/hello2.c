@@ -153,28 +153,15 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
     memset(remote_nonce, 0, AES_NONCE_BYTES);
     security->remote_ctr = (uint32_t)0;
 //----------------------------------------------------------------------
-// Menganggap data valid dengan integritas
-//----------------------------------------------------------------------
-    if (rcvd_wot == SIO) {
-        master_worker_session_t *session = &master_ctx->sio_session[rcvd_index];
-        session->isready = true;
-    } else if (rcvd_wot == LOGIC) {
-        master_worker_session_t *session = &master_ctx->logic_session[rcvd_index];
-        session->isready = true;
-    } else if (rcvd_wot == COW) {
-        master_worker_session_t *session = &master_ctx->cow_session[rcvd_index];
-        session->isready = true;
-    } else if (rcvd_wot == DBR) {
-        master_worker_session_t *session = &master_ctx->dbr_session[rcvd_index];
-        session->isready = true;
-    } else if (rcvd_wot == DBW) {
-        master_worker_session_t *session = &master_ctx->dbw_session[rcvd_index];
-        session->isready = true;
-    } else {
-        LOG_ERROR("%sFailed to master_worker_hello2_ack.", label);
+    master_worker_session_t *session = get_master_worker_session(master_ctx, rcvd_wot, rcvd_index);
+    if (session == NULL) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         return FAILURE;
     }
+//----------------------------------------------------------------------
+// Menganggap data valid dengan integritas
+//----------------------------------------------------------------------
+    session->isready = true;
     if (!rekeying || !security) {
         LOG_ERROR("%sFailed to master_worker_hello2_ack.", label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -210,14 +197,24 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
     if (!master_ctx->all_workers_is_ready) {
         master_ctx->all_workers_is_ready = true;
         for (uint8_t indexrdy = 0; indexrdy < MAX_SIO_WORKERS; ++indexrdy) {
-            if (!master_ctx->sio_session[indexrdy].isready) {
+            master_worker_session_t *indexrdy_session = get_master_worker_session(master_ctx, SIO, indexrdy);
+            if (session == NULL) {
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+            if (!indexrdy_session->isready) {
                 master_ctx->all_workers_is_ready = false;
                 break;
             }
         }
         if (master_ctx->all_workers_is_ready) {
             for (uint8_t indexrdy = 0; indexrdy < MAX_LOGIC_WORKERS; ++indexrdy) {
-                if (!master_ctx->logic_session[indexrdy].isready) {
+                master_worker_session_t *indexrdy_session = get_master_worker_session(master_ctx, LOGIC, indexrdy);
+                if (session == NULL) {
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    return FAILURE;
+                }
+                if (!indexrdy_session->isready) {
                     master_ctx->all_workers_is_ready = false;
                     break;
                 }
@@ -225,7 +222,12 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
         }
         if (master_ctx->all_workers_is_ready) {
             for (uint8_t indexrdy = 0; indexrdy < MAX_COW_WORKERS; ++indexrdy) {
-                if (!master_ctx->cow_session[indexrdy].isready) {
+                master_worker_session_t *indexrdy_session = get_master_worker_session(master_ctx, COW, indexrdy);
+                if (session == NULL) {
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    return FAILURE;
+                }
+                if (!indexrdy_session->isready) {
                     master_ctx->all_workers_is_ready = false;
                     break;
                 }
@@ -233,7 +235,12 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
         }
         if (master_ctx->all_workers_is_ready) {
             for (uint8_t indexrdy = 0; indexrdy < MAX_DBR_WORKERS; ++indexrdy) {
-                if (!master_ctx->dbr_session[indexrdy].isready) {
+                master_worker_session_t *indexrdy_session = get_master_worker_session(master_ctx, DBR, indexrdy);
+                if (session == NULL) {
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    return FAILURE;
+                }
+                if (!indexrdy_session->isready) {
                     master_ctx->all_workers_is_ready = false;
                     break;
                 }
@@ -241,7 +248,12 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
         }
         if (master_ctx->all_workers_is_ready) {
             for (uint8_t indexrdy = 0; indexrdy < MAX_DBW_WORKERS; ++indexrdy) {
-                if (!master_ctx->dbw_session[indexrdy].isready) {
+                master_worker_session_t *indexrdy_session = get_master_worker_session(master_ctx, DBW, indexrdy);
+                if (session == NULL) {
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    return FAILURE;
+                }
+                if (!indexrdy_session->isready) {
                     master_ctx->all_workers_is_ready = false;
                     break;
                 }

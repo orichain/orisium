@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stddef.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -12,6 +13,12 @@ status_t handle_master_ipc_heartbeat(const char *label, master_context_t *master
         security->aes_key, security->remote_nonce, &security->remote_ctr,
         (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
     );
+    master_worker_session_t *session = get_master_worker_session(master_ctx, rcvd_wot, rcvd_index);
+    if (session == NULL) {
+        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        return FAILURE;
+    }
+    const char *worker_name = get_master_worker_name(rcvd_wot);
     if (deserialized_ircvdi.status != SUCCESS) {
         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", label, deserialized_ircvdi.status);
         CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
@@ -23,40 +30,11 @@ status_t handle_master_ipc_heartbeat(const char *label, master_context_t *master
     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
     ipc_worker_master_heartbeat_t *iheartbeati = received_protocol->payload.ipc_worker_master_heartbeat;
     uint64_t_status_t rt = get_monotonic_time_ns(label);
-    if (rcvd_wot == SIO) {
-        LOG_DEBUG("%sSIO %d set last_ack to %llu.", label, rcvd_index, rt.r_uint64_t);
-        master_ctx->sio_session[rcvd_index].metrics.last_ack = rt.r_uint64_t;
-        master_ctx->sio_session[rcvd_index].metrics.count_ack += (double)1;
-        master_ctx->sio_session[rcvd_index].metrics.sum_hb_interval += iheartbeati->hb_interval;
-        master_ctx->sio_session[rcvd_index].metrics.hb_interval = iheartbeati->hb_interval;
-    } else if (rcvd_wot == LOGIC) {
-        LOG_DEBUG("%sLogic %d set last_ack to %llu.", label, rcvd_index, rt.r_uint64_t);
-        master_ctx->logic_session[rcvd_index].metrics.last_ack = rt.r_uint64_t;
-        master_ctx->logic_session[rcvd_index].metrics.count_ack += (double)1;
-        master_ctx->logic_session[rcvd_index].metrics.sum_hb_interval += iheartbeati->hb_interval;
-        master_ctx->logic_session[rcvd_index].metrics.hb_interval = iheartbeati->hb_interval;
-    } else if (rcvd_wot == COW) {
-        LOG_DEBUG("%sCOW %d set last_ack to %llu.", label, rcvd_index, rt.r_uint64_t);
-        master_ctx->cow_session[rcvd_index].metrics.last_ack = rt.r_uint64_t;
-        master_ctx->cow_session[rcvd_index].metrics.count_ack += (double)1;
-        master_ctx->cow_session[rcvd_index].metrics.sum_hb_interval += iheartbeati->hb_interval;
-        master_ctx->cow_session[rcvd_index].metrics.hb_interval = iheartbeati->hb_interval;
-    } else if (rcvd_wot == DBR) {
-        LOG_DEBUG("%sDBR %d set last_ack to %llu.", label, rcvd_index, rt.r_uint64_t);
-        master_ctx->dbr_session[rcvd_index].metrics.last_ack = rt.r_uint64_t;
-        master_ctx->dbr_session[rcvd_index].metrics.count_ack += (double)1;
-        master_ctx->dbr_session[rcvd_index].metrics.sum_hb_interval += iheartbeati->hb_interval;
-        master_ctx->dbr_session[rcvd_index].metrics.hb_interval = iheartbeati->hb_interval;
-    } else if (rcvd_wot == DBW) {
-        LOG_DEBUG("%sDBW %d set last_ack to %llu.", label, rcvd_index, rt.r_uint64_t);
-        master_ctx->dbw_session[rcvd_index].metrics.last_ack = rt.r_uint64_t;
-        master_ctx->dbw_session[rcvd_index].metrics.count_ack += (double)1;
-        master_ctx->dbw_session[rcvd_index].metrics.sum_hb_interval += iheartbeati->hb_interval;
-        master_ctx->dbw_session[rcvd_index].metrics.hb_interval = iheartbeati->hb_interval;
-    } else {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        return FAILURE;
-    }
+    LOG_DEBUG("%s%s %d set last_ack to %llu.", label, worker_name, rcvd_index, rt.r_uint64_t);
+    session->metrics.last_ack = rt.r_uint64_t;
+    session->metrics.count_ack += (double)1;
+    session->metrics.sum_hb_interval += iheartbeati->hb_interval;
+    session->metrics.hb_interval = iheartbeati->hb_interval;
     CLOSE_IPC_PROTOCOL(&received_protocol);
     return SUCCESS;
 }
