@@ -343,31 +343,23 @@ status_t setup_workers(const char *label, master_context_t *master_ctx) {
 }
 
 status_t calculate_avgtt(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
-    const char *worker_name = "Unknown";
-    switch (wot) {
-        case SIO: { worker_name = "SIO"; break; }
-        case LOGIC: { worker_name = "Logic"; break; }
-        case COW: { worker_name = "COW"; break; }
-        case DBR: { worker_name = "DBR"; break; }
-        case DBW: { worker_name = "DBW"; break; }
-        default: { worker_name = "Unknown"; break; }
+    master_worker_session_t *session = get_master_worker_session(master_ctx, wot, index);
+    if (session == NULL) {
+        return FAILURE;
     }
+    const char *worker_name = get_master_worker_name(wot);
     uint64_t_status_t rt = get_monotonic_time_ns(label);
     if (rt.status != SUCCESS) return rt.status;
-    worker_metrics_t *metrics = NULL;
-    uint16_t *task_count = NULL;
-    oricle_long_double_t *oricle;
+    worker_metrics_t *metrics = &session->metrics;
+    uint16_t *task_count = &session->task_count;
+    oricle_long_double_t *oricle = &session->avgtt;
     uint64_t MAX_CONNECTION_PER_WORKER;
     if (wot == SIO) {
-        metrics = &master_ctx->sio_session[index].metrics;
-        task_count = &master_ctx->sio_session[index].task_count;
         MAX_CONNECTION_PER_WORKER = MAX_CONNECTION_PER_SIO_WORKER;
-        oricle = &master_ctx->sio_session[index].avgtt;
     } else if (wot == COW) {
-        metrics = &master_ctx->cow_session[index].metrics;
-        task_count = &master_ctx->cow_session[index].task_count;
         MAX_CONNECTION_PER_WORKER = MAX_CONNECTION_PER_COW_WORKER;
-        oricle = &master_ctx->cow_session[index].avgtt;
+    } else {
+        MAX_CONNECTION_PER_WORKER = (uint64_t)1;
     }
     if (!task_count || !metrics || !oricle) return FAILURE;
     metrics->last_ack = rt.r_uint64_t;
@@ -412,43 +404,16 @@ status_t calculate_avgtt(const char *label, master_context_t *master_ctx, worker
 }
 
 status_t calculate_healthy(const char* label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
-    const char *worker_name = "Unknown";
-    switch (wot) {
-        case SIO: { worker_name = "SIO"; break; }
-        case LOGIC: { worker_name = "Logic"; break; }
-        case COW: { worker_name = "COW"; break; }
-        case DBR: { worker_name = "DBR"; break; }
-        case DBW: { worker_name = "DBW"; break; }
-        default: { worker_name = "Unknown"; break; }
-    }
-    uint64_t_status_t rt = get_monotonic_time_ns(label);
-    if (rt.status != SUCCESS) return rt.status;
-    worker_metrics_t *metrics = NULL;
-    oricle_double_t *oricle;
-    bool *ishealthy;
-    if (wot == SIO) {
-        metrics = &master_ctx->sio_session[index].metrics;
-        oricle = &master_ctx->sio_session[index].healthy;
-        ishealthy = &master_ctx->sio_session[index].ishealthy;
-    } else if (wot == LOGIC) {
-        metrics = &master_ctx->logic_session[index].metrics;
-        oricle = &master_ctx->logic_session[index].healthy;
-        ishealthy = &master_ctx->logic_session[index].ishealthy;
-    } else if (wot == COW) {
-        metrics = &master_ctx->cow_session[index].metrics;
-        oricle = &master_ctx->cow_session[index].healthy;
-        ishealthy = &master_ctx->cow_session[index].ishealthy;
-    } else if (wot == DBR) {
-        metrics = &master_ctx->dbr_session[index].metrics;
-        oricle = &master_ctx->dbr_session[index].healthy;
-        ishealthy = &master_ctx->dbr_session[index].ishealthy;
-    } else if (wot == DBW) {
-        metrics = &master_ctx->dbw_session[index].metrics;
-        oricle = &master_ctx->dbw_session[index].healthy;
-        ishealthy = &master_ctx->dbw_session[index].ishealthy;
-    } else {
+    master_worker_session_t *session = get_master_worker_session(master_ctx, wot, index);
+    if (session == NULL) {
         return FAILURE;
     }
+    const char *worker_name = get_master_worker_name(wot);
+    uint64_t_status_t rt = get_monotonic_time_ns(label);
+    if (rt.status != SUCCESS) return rt.status;
+    worker_metrics_t *metrics = &session->metrics;
+    oricle_double_t *oricle = &session->healthy;
+    bool *ishealthy = &session->ishealthy;
     if (!metrics || !oricle || !ishealthy) return FAILURE;
     uint64_t now_ns = rt.r_uint64_t;
     double actual_elapsed_sec = (double)(now_ns - metrics->last_checkhealthy) / 1e9;
@@ -477,123 +442,94 @@ status_t calculate_healthy(const char* label, master_context_t *master_ctx, work
     return SUCCESS;
 }
 
+static inline status_t recreatewrkr(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
+    if (close_worker(label, master_ctx, wot, index) != SUCCESS) {
+        return FAILURE;
+    }
+    if (create_socket_pair(label, master_ctx, wot, index) != SUCCESS) {
+        return FAILURE;
+    }
+    if (setup_fork_worker(label, master_ctx, wot, index) != SUCCESS) {
+        return FAILURE;
+    }
+    if (master_worker_info(label, master_ctx, wot, index, IT_READY) != SUCCESS) {
+        return FAILURE;
+    }
+    return SUCCESS;
+}
+
 status_t check_workers_healthy(const char *label, master_context_t *master_ctx) {
-	for (int i = 0; i < MAX_SIO_WORKERS; ++i) { 
+	for (uint8_t i = 0; i < MAX_SIO_WORKERS; ++i) { 
 		if (calculate_healthy(label, master_ctx, SIO, i) != SUCCESS) {
             return FAILURE;
         }
-        master_worker_session_t *session = &master_ctx->sio_session[i];
+        master_worker_session_t *session = get_master_worker_session(master_ctx, SIO, i);
+        if (session == NULL) {
+            return FAILURE;
+        }
         if (session->healthy.value_prediction < (double)25) {
             session->isactive = false;
-//----------------------------------------------------------------------
-// Recreate Worker                        
-//----------------------------------------------------------------------
-            if (close_worker(label, master_ctx, SIO, i) != SUCCESS) {
-                return FAILURE;
-            }
-            if (create_socket_pair(label, master_ctx, SIO, i) != SUCCESS) {
-                return FAILURE;
-            }
-            if (setup_fork_worker(label, master_ctx, SIO, i) != SUCCESS) {
-                return FAILURE;
-            }
-            if (master_worker_info(label, master_ctx, SIO, i, IT_READY) != SUCCESS) {
+            if (recreatewrkr(label, master_ctx, SIO, i) != SUCCESS) {
                 return FAILURE;
             }
         }
 	}
-	for (int i = 0; i < MAX_LOGIC_WORKERS; ++i) {
+	for (uint8_t i = 0; i < MAX_LOGIC_WORKERS; ++i) {
 		if (calculate_healthy(label, master_ctx, LOGIC, i) != SUCCESS) {
             return FAILURE;
         }
-        master_worker_session_t *session = &master_ctx->logic_session[i];
+        master_worker_session_t *session = get_master_worker_session(master_ctx, LOGIC, i);
+        if (session == NULL) {
+            return FAILURE;
+        }
         if (session->healthy.value_prediction < (double)25) {
             session->isactive = false;
-//----------------------------------------------------------------------
-// Recreate Worker                        
-//----------------------------------------------------------------------
-            if (close_worker(label, master_ctx, LOGIC, i) != SUCCESS) {
-                return FAILURE;
-            }
-            if (create_socket_pair(label, master_ctx, LOGIC, i) != SUCCESS) {
-                return FAILURE;
-            }
-            if (setup_fork_worker(label, master_ctx, LOGIC, i) != SUCCESS) {
-                return FAILURE;
-            }
-            if (master_worker_info(label, master_ctx, LOGIC, i, IT_READY) != SUCCESS) {
+            if (recreatewrkr(label, master_ctx, LOGIC, i) != SUCCESS) {
                 return FAILURE;
             }
         }
 	}
-	for (int i = 0; i < MAX_COW_WORKERS; ++i) { 
+	for (uint8_t i = 0; i < MAX_COW_WORKERS; ++i) { 
 		if (calculate_healthy(label, master_ctx, COW, i) != SUCCESS) {
             return FAILURE;
         }
-        master_worker_session_t *session = &master_ctx->cow_session[i];
+        master_worker_session_t *session = get_master_worker_session(master_ctx, COW, i);
+        if (session == NULL) {
+            return FAILURE;
+        }
         if (session->healthy.value_prediction < (double)25) {
             session->isactive = false;
-//----------------------------------------------------------------------
-// Recreate Worker                        
-//----------------------------------------------------------------------
-            if (close_worker(label, master_ctx, COW, i) != SUCCESS) {
-                return FAILURE;
-            }
-            if (create_socket_pair(label, master_ctx, COW, i) != SUCCESS) {
-                return FAILURE;
-            }
-            if (setup_fork_worker(label, master_ctx, COW, i) != SUCCESS) {
-                return FAILURE;
-            }
-            if (master_worker_info(label, master_ctx, COW, i, IT_READY) != SUCCESS) {
+            if (recreatewrkr(label, master_ctx, COW, i) != SUCCESS) {
                 return FAILURE;
             }
         }
 	}
-    for (int i = 0; i < MAX_DBR_WORKERS; ++i) { 
+    for (uint8_t i = 0; i < MAX_DBR_WORKERS; ++i) { 
 		if (calculate_healthy(label, master_ctx, DBR, i) != SUCCESS) {
             return FAILURE;
         }
-        master_worker_session_t *session = &master_ctx->dbr_session[i];
+        master_worker_session_t *session = get_master_worker_session(master_ctx, DBR, i);
+        if (session == NULL) {
+            return FAILURE;
+        }
         if (session->healthy.value_prediction < (double)25) {
             session->isactive = false;
-//----------------------------------------------------------------------
-// Recreate Worker                        
-//----------------------------------------------------------------------
-            if (close_worker(label, master_ctx, DBR, i) != SUCCESS) {
-                return FAILURE;
-            }
-            if (create_socket_pair(label, master_ctx, DBR, i) != SUCCESS) {
-                return FAILURE;
-            }
-            if (setup_fork_worker(label, master_ctx, DBR, i) != SUCCESS) {
-                return FAILURE;
-            }
-            if (master_worker_info(label, master_ctx, DBR, i, IT_READY) != SUCCESS) {
+            if (recreatewrkr(label, master_ctx, DBR, i) != SUCCESS) {
                 return FAILURE;
             }
         }
 	}
-    for (int i = 0; i < MAX_DBW_WORKERS; ++i) { 
+    for (uint8_t i = 0; i < MAX_DBW_WORKERS; ++i) { 
 		if (calculate_healthy(label, master_ctx, DBW, i) != SUCCESS) {
             return FAILURE;
         }
-        master_worker_session_t *session = &master_ctx->dbw_session[i];
+        master_worker_session_t *session = get_master_worker_session(master_ctx, DBW, i);
+        if (session == NULL) {
+            return FAILURE;
+        }
         if (session->healthy.value_prediction < (double)25) {
             session->isactive = false;
-//----------------------------------------------------------------------
-// Recreate Worker                        
-//----------------------------------------------------------------------
-            if (close_worker(label, master_ctx, DBW, i) != SUCCESS) {
-                return FAILURE;
-            }
-            if (create_socket_pair(label, master_ctx, DBW, i) != SUCCESS) {
-                return FAILURE;
-            }
-            if (setup_fork_worker(label, master_ctx, DBW, i) != SUCCESS) {
-                return FAILURE;
-            }
-            if (master_worker_info(label, master_ctx, DBW, i, IT_READY) != SUCCESS) {
+            if (recreatewrkr(label, master_ctx, DBW, i) != SUCCESS) {
                 return FAILURE;
             }
         }
