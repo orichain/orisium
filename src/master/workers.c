@@ -109,20 +109,11 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
 }
 
 void close_master_resource(master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
-    worker_security_t *security = NULL;
-    if (wot == SIO) {
-        security = &master_ctx->sio_session[index].security;
-    } else if (wot == LOGIC) {
-        security = &master_ctx->logic_session[index].security;
-    } else if (wot == COW) {
-        security = &master_ctx->cow_session[index].security;
-    } else if (wot == DBR) {
-        security = &master_ctx->dbr_session[index].security;
-    } else if (wot == DBW) {
-        security = &master_ctx->dbw_session[index].security;
-    } else {
+    master_worker_session_t *session = get_master_worker_session(master_ctx, wot, index);
+    if (session == NULL) {
         return;
     }
+    worker_security_t *security = &session->security;
     if (!security) return;
 //----------------------------------------------------------------------
 // Jika di close, kadang terjadi EBADF saat recreate worker dengan cepat
@@ -153,272 +144,136 @@ void close_master_resource(master_context_t *master_ctx, worker_type_t wot, uint
 }
 
 status_t setup_fork_worker(const char* label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
-    if (wot == SIO) {
-        const char *worker_name = "SIO";
-        double initial_delay_ms = (double)0;
-        master_ctx->sio_session[index].upp.pid = fork();
-        if (master_ctx->sio_session[index].upp.pid == -1) {
-            LOG_ERROR("%sfork (%s): %s", label, worker_name, strerror(errno));
-            return FAILURE;
-        } else if (master_ctx->sio_session[index].upp.pid == 0) {
-            close_master_resource(master_ctx, wot, index);
-            CLOSE_UDS(&master_ctx->sio_session[index].upp.uds[0]);
-            for (int j = 0; j < MAX_SIO_WORKERS; ++j) {
+    master_worker_session_t *session = get_master_worker_session(master_ctx, wot, index);
+    if (session == NULL) {
+        return FAILURE;
+    }
+    const char *worker_name = get_master_worker_name(wot);
+    double initial_delay_ms = (double)0;
+    session->upp.pid = fork();
+    if (session->upp.pid == -1) {
+        LOG_ERROR("%sfork (%s): %s", label, worker_name, strerror(errno));
+        return FAILURE;
+    } else if (session->upp.pid == 0) {
+        close_master_resource(master_ctx, wot, index);
+        CLOSE_UDS(&session->upp.uds[0]);
+        for (uint8_t j = 0; j < MAX_SIO_WORKERS; ++j) {
+            master_worker_session_t *jsession = get_master_worker_session(master_ctx, SIO, j);
+            if (jsession == NULL) {
+                return FAILURE;
+            }
+            if (wot == SIO) {
                 if (j != index) {
-                    CLOSE_UDS(&master_ctx->sio_session[j].upp.uds[0]);
-                    CLOSE_UDS(&master_ctx->sio_session[j].upp.uds[1]);
+                    CLOSE_UDS(&jsession->upp.uds[0]);
+                    CLOSE_UDS(&jsession->upp.uds[1]);
                 }
+            } else {
+                CLOSE_UDS(&jsession->upp.uds[0]);
+                CLOSE_UDS(&jsession->upp.uds[1]);
             }
-            for (int j = 0; j < MAX_LOGIC_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->logic_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->logic_session[j].upp.uds[1]);
-            }
-            for (int j = 0; j < MAX_COW_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->cow_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->cow_session[j].upp.uds[1]);
-            }
-            for (int j = 0; j < MAX_DBR_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->dbr_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->dbr_session[j].upp.uds[1]);
-            }
-            for (int j = 0; j < MAX_DBW_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->dbw_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->dbw_session[j].upp.uds[1]);
-            }
-            worker_type_t x_wot = wot;
-            uint8_t x_index = index;
-            double x_initial_delay_ms = initial_delay_ms;
-            int *master_uds_fd = &master_ctx->sio_session[index].upp.uds[1];
-            run_sio_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
-            exit(EXIT_SUCCESS);
-        } else {
-            CLOSE_UDS(&master_ctx->sio_session[index].upp.uds[1]);
-//======================================================================
-// Hitung delay start dan inisialisasi metrics
-//======================================================================
-            master_ctx->sio_session[index].task_count = (uint16_t)0;
-            initial_delay_ms = initialize_metrics(label, &master_ctx->sio_session[index].metrics, wot, index);
-//======================================================================
-            async_create_incoming_event(
-                label,
-                &master_ctx->master_async,
-                &master_ctx->sio_session[index].upp.uds[0]
-            );
-            LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->sio_session[index].upp.pid);
         }
-    } else if (wot == LOGIC) {
-        const char *worker_name = "Logic";    
-        double initial_delay_ms = (double)0;    
-        master_ctx->logic_session[index].upp.pid = fork();
-        if (master_ctx->logic_session[index].upp.pid == -1) {
-            LOG_ERROR("%sfork (%s): %s", label, worker_name, strerror(errno));
-            return FAILURE;
-        } else if (master_ctx->logic_session[index].upp.pid == 0) {
-            close_master_resource(master_ctx, wot, index);
-            CLOSE_UDS(&master_ctx->logic_session[index].upp.uds[0]);
-            for (int j = 0; j < MAX_SIO_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->sio_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->sio_session[j].upp.uds[1]);
+        for (int j = 0; j < MAX_LOGIC_WORKERS; ++j) {
+            master_worker_session_t *jsession = get_master_worker_session(master_ctx, LOGIC, j);
+            if (jsession == NULL) {
+                return FAILURE;
             }
-            for (int j = 0; j < MAX_LOGIC_WORKERS; ++j) {
+            if (wot == LOGIC) {
                 if (j != index) {
-                    CLOSE_UDS(&master_ctx->logic_session[j].upp.uds[0]);
-                    CLOSE_UDS(&master_ctx->logic_session[j].upp.uds[1]);
+                    CLOSE_UDS(&jsession->upp.uds[0]);
+                    CLOSE_UDS(&jsession->upp.uds[1]);
                 }
+            } else {
+                CLOSE_UDS(&jsession->upp.uds[0]);
+                CLOSE_UDS(&jsession->upp.uds[1]);
             }
-            for (int j = 0; j < MAX_COW_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->cow_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->cow_session[j].upp.uds[1]);
-            }
-            for (int j = 0; j < MAX_DBR_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->dbr_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->dbr_session[j].upp.uds[1]);
-            }
-            for (int j = 0; j < MAX_DBW_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->dbw_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->dbw_session[j].upp.uds[1]);
-            }
-            worker_type_t x_wot = wot;
-            uint8_t x_index = index;
-            double x_initial_delay_ms = initial_delay_ms;
-            int *master_uds_fd = &master_ctx->logic_session[index].upp.uds[1];
-            run_logic_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
-            exit(EXIT_SUCCESS);
-        } else {
-            CLOSE_UDS(&master_ctx->logic_session[index].upp.uds[1]);
-//======================================================================
-// Hitung delay start dan inisialisasi metrics
-//======================================================================
-            master_ctx->logic_session[index].task_count = (uint16_t)0;
-            initial_delay_ms = initialize_metrics(label, &master_ctx->logic_session[index].metrics, wot, index);
-//======================================================================
-            async_create_incoming_event(
-                label,
-                &master_ctx->master_async,
-                &master_ctx->logic_session[index].upp.uds[0]
-            );
-            LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->logic_session[index].upp.pid);
         }
-    } else if (wot == COW) {
-        const char *worker_name = "COW";
-        double initial_delay_ms = (double)0;
-        master_ctx->cow_session[index].upp.pid = fork();
-        if (master_ctx->cow_session[index].upp.pid == -1) {
-            LOG_ERROR("%sfork (%s): %s", label, worker_name, strerror(errno));
-            return FAILURE;
-        } else if (master_ctx->cow_session[index].upp.pid == 0) {
-            close_master_resource(master_ctx, wot, index);
-            CLOSE_UDS(&master_ctx->cow_session[index].upp.uds[0]);
-            for (int j = 0; j < MAX_SIO_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->sio_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->sio_session[j].upp.uds[1]);
+        for (int j = 0; j < MAX_COW_WORKERS; ++j) {
+            master_worker_session_t *jsession = get_master_worker_session(master_ctx, COW, j);
+            if (jsession == NULL) {
+                return FAILURE;
             }
-            for (int j = 0; j < MAX_LOGIC_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->logic_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->logic_session[j].upp.uds[1]);
-            }
-            for (int j = 0; j < MAX_COW_WORKERS; ++j) {
+            if (wot == COW) {
                 if (j != index) {
-                    CLOSE_UDS(&master_ctx->cow_session[j].upp.uds[0]);
-                    CLOSE_UDS(&master_ctx->cow_session[j].upp.uds[1]);
+                    CLOSE_UDS(&jsession->upp.uds[0]);
+                    CLOSE_UDS(&jsession->upp.uds[1]);
                 }
+            } else {
+                CLOSE_UDS(&jsession->upp.uds[0]);
+                CLOSE_UDS(&jsession->upp.uds[1]);
             }
-            for (int j = 0; j < MAX_DBR_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->dbr_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->dbr_session[j].upp.uds[1]);
-            }
-            for (int j = 0; j < MAX_DBW_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->dbw_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->dbw_session[j].upp.uds[1]);
-            }
-            worker_type_t x_wot = wot;
-            uint8_t x_index = index;
-            double x_initial_delay_ms = initial_delay_ms;
-            int *master_uds_fd = &master_ctx->cow_session[index].upp.uds[1];
-            run_cow_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
-            exit(EXIT_SUCCESS);
-        } else {
-            CLOSE_UDS(&master_ctx->cow_session[index].upp.uds[1]);
-//======================================================================
-// Hitung delay start dan inisialisasi metrics
-//======================================================================
-            master_ctx->cow_session[index].task_count = (uint16_t)0;
-            initial_delay_ms = initialize_metrics(label, &master_ctx->cow_session[index].metrics, wot, index);
-//======================================================================
-            async_create_incoming_event(
-                label,
-                &master_ctx->master_async,
-                &master_ctx->cow_session[index].upp.uds[0]
-            );
-            LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->cow_session[index].upp.pid);
         }
-    } else if (wot == DBR) {
-        const char *worker_name = "DBR";
-        double initial_delay_ms = (double)0;
-        master_ctx->dbr_session[index].upp.pid = fork();
-        if (master_ctx->dbr_session[index].upp.pid == -1) {
-            LOG_ERROR("%sfork (%s): %s", label, worker_name, strerror(errno));
-            return FAILURE;
-        } else if (master_ctx->dbr_session[index].upp.pid == 0) {
-            close_master_resource(master_ctx, wot, index);
-            CLOSE_UDS(&master_ctx->dbr_session[index].upp.uds[0]);
-            for (int j = 0; j < MAX_SIO_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->sio_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->sio_session[j].upp.uds[1]);
+        for (int j = 0; j < MAX_DBR_WORKERS; ++j) {
+            master_worker_session_t *jsession = get_master_worker_session(master_ctx, DBR, j);
+            if (jsession == NULL) {
+                return FAILURE;
             }
-            for (int j = 0; j < MAX_LOGIC_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->logic_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->logic_session[j].upp.uds[1]);
-            }
-            for (int j = 0; j < MAX_COW_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->cow_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->cow_session[j].upp.uds[1]);
-            }
-            for (int j = 0; j < MAX_DBR_WORKERS; ++j) {
+            if (wot == DBR) {
                 if (j != index) {
-                    CLOSE_UDS(&master_ctx->dbr_session[j].upp.uds[0]);
-                    CLOSE_UDS(&master_ctx->dbr_session[j].upp.uds[1]);
+                    CLOSE_UDS(&jsession->upp.uds[0]);
+                    CLOSE_UDS(&jsession->upp.uds[1]);
                 }
+            } else {
+                CLOSE_UDS(&jsession->upp.uds[0]);
+                CLOSE_UDS(&jsession->upp.uds[1]);
             }
-            for (int j = 0; j < MAX_DBW_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->dbw_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->dbw_session[j].upp.uds[1]);
-            }
-            worker_type_t x_wot = wot;
-            uint8_t x_index = index;
-            double x_initial_delay_ms = initial_delay_ms;
-            int *master_uds_fd = &master_ctx->dbr_session[index].upp.uds[1];
-            run_dbr_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
-            exit(EXIT_SUCCESS);
-        } else {
-            CLOSE_UDS(&master_ctx->dbr_session[index].upp.uds[1]);
-//======================================================================
-// Hitung delay start dan inisialisasi metrics
-//======================================================================
-            master_ctx->dbr_session[index].task_count = (uint16_t)0;
-            initial_delay_ms = initialize_metrics(label, &master_ctx->dbr_session[index].metrics, wot, index);
-//======================================================================
-            async_create_incoming_event(
-                label,
-                &master_ctx->master_async,
-                &master_ctx->dbr_session[index].upp.uds[0]
-            );
-            LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->dbr_session[index].upp.pid);
         }
-    } else if (wot == DBW) {
-        const char *worker_name = "DBW";
-        double initial_delay_ms = (double)0;
-        master_ctx->dbw_session[index].upp.pid = fork();
-        if (master_ctx->dbw_session[index].upp.pid == -1) {
-            LOG_ERROR("%sfork (%s): %s", label, worker_name, strerror(errno));
-            return FAILURE;
-        } else if (master_ctx->dbw_session[index].upp.pid == 0) {
-            close_master_resource(master_ctx, wot, index);
-            CLOSE_UDS(&master_ctx->dbw_session[index].upp.uds[0]);
-            for (int j = 0; j < MAX_SIO_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->sio_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->sio_session[j].upp.uds[1]);
+        for (int j = 0; j < MAX_DBW_WORKERS; ++j) {
+            master_worker_session_t *jsession = get_master_worker_session(master_ctx, DBW, j);
+            if (jsession == NULL) {
+                return FAILURE;
             }
-            for (int j = 0; j < MAX_LOGIC_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->logic_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->logic_session[j].upp.uds[1]);
-            }
-            for (int j = 0; j < MAX_COW_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->cow_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->cow_session[j].upp.uds[1]);
-            }
-            for (int j = 0; j < MAX_DBR_WORKERS; ++j) {
-                CLOSE_UDS(&master_ctx->dbr_session[j].upp.uds[0]);
-                CLOSE_UDS(&master_ctx->dbr_session[j].upp.uds[1]);
-            }
-            for (int j = 0; j < MAX_DBW_WORKERS; ++j) {
+            if (wot == DBW) {
                 if (j != index) {
-                    CLOSE_UDS(&master_ctx->dbw_session[j].upp.uds[0]);
-                    CLOSE_UDS(&master_ctx->dbw_session[j].upp.uds[1]);
+                    CLOSE_UDS(&jsession->upp.uds[0]);
+                    CLOSE_UDS(&jsession->upp.uds[1]);
                 }
+            } else {
+                CLOSE_UDS(&jsession->upp.uds[0]);
+                CLOSE_UDS(&jsession->upp.uds[1]);
             }
-            worker_type_t x_wot = wot;
-            uint8_t x_index = index;
-            double x_initial_delay_ms = initial_delay_ms;
-            int *master_uds_fd = &master_ctx->dbw_session[index].upp.uds[1];
-            run_dbw_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
-            exit(EXIT_SUCCESS);
-        } else {
-            CLOSE_UDS(&master_ctx->dbw_session[index].upp.uds[1]);
-//======================================================================
-// Hitung delay start dan inisialisasi metrics
-//======================================================================
-            initial_delay_ms = initialize_metrics(label, &master_ctx->dbw_session[index].metrics, wot, index);
-//======================================================================
-            async_create_incoming_event(
-                label,
-                &master_ctx->master_async,
-                &master_ctx->dbw_session[index].upp.uds[0]
-            );
-            LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, master_ctx->dbw_session[index].upp.pid);
+        }
+        worker_type_t x_wot = wot;
+        uint8_t x_index = index;
+        double x_initial_delay_ms = initial_delay_ms;
+        int *master_uds_fd = &session->upp.uds[1];
+        switch (wot) {
+            case SIO: {
+                run_sio_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
+                exit(EXIT_SUCCESS);
+            }
+            case LOGIC: {
+                run_logic_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
+                exit(EXIT_SUCCESS);
+            }
+            case COW: {
+                run_cow_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
+                exit(EXIT_SUCCESS);
+            }
+            case DBR: {
+                run_dbr_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
+                exit(EXIT_SUCCESS);
+            }
+            case DBW: {
+                run_dbw_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
+                exit(EXIT_SUCCESS);
+            }
+            default:
+                return FAILURE;
         }
     } else {
-        return FAILURE;
+        CLOSE_UDS(&session->upp.uds[1]);
+//======================================================================
+// Hitung delay start dan inisialisasi metrics
+//======================================================================
+        session->task_count = (uint16_t)0;
+        initial_delay_ms = initialize_metrics(label, &session->metrics, wot, index);
+//======================================================================
+        async_create_incoming_event(
+            label,
+            &master_ctx->master_async,
+            &session->upp.uds[0]
+        );
+        LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, session->upp.pid);
     }
     return SUCCESS;
 }
