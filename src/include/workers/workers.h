@@ -35,7 +35,6 @@ typedef struct {
     uint64_t ack_rcvd_time;
     uint16_t len;
     uint8_t *data;
-    uint8_t last_trycount;
 } packet_t;
 
 typedef struct {
@@ -177,7 +176,6 @@ static inline void cleanup_packet_timer(const char *label, async_type_t *async, 
         free(h->data);
         h->data = NULL;
     }
-    h->last_trycount = (uint8_t)0;
     async_delete_event(label, async, &h->timer_fd);
     CLOSE_FD(&h->timer_fd);
 }
@@ -258,7 +256,6 @@ static inline void cleanup_packet(const char *label, async_type_t *async, packet
         free(h->data);
         h->data = NULL;
     }
-    h->last_trycount = (uint8_t)0;
     async_delete_event(label, async, &h->timer_fd);
     CLOSE_FD(&h->timer_fd);
 }
@@ -286,7 +283,6 @@ static inline void cleanup_packet_ack(const char *label, async_type_t *async, pa
         free(h->data);
         h->data = NULL;
     }
-    h->last_trycount = (uint8_t)0;
 }
 
 static inline void setup_packet_ack(packet_ack_t *h) {
