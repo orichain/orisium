@@ -139,7 +139,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     cleanup_packet_timer(worker_ctx->label, &worker_ctx->async, &session->heartbeat);
 
-    LOG_DEVEL_DEBUG("%sCOW RTT Heartbeat = %f", worker_ctx->label, session->rtt.value_prediction);
+    printf("%sCOW RTT Heartbeat = %f\n", worker_ctx->label, session->rtt.value_prediction);
 //======================================================================
     //session->metrics.last_ack = current_time.r_uint64_t;
     //session->metrics.count_ack += (double)1;
