@@ -22,6 +22,9 @@
 #include "workers/ipc/master_ipc_cmds.h"
 
 status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
+    uint8_t inc_ctr = oudp_datao->inc_ctr;
+    uint8_t l_inc_ctr = 0xFF;
+    uint8_t trycount = oudp_datao->trycount;
 //======================================================================
 // + Security
 //======================================================================
@@ -34,6 +37,13 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         LOG_ERROR("%sHello4_Ack Received Already.", worker_ctx->label);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
+    }
+    if (trycount > (uint8_t)1) {
+        if (inc_ctr != 0xFF) {
+            if (security->remote_ctr != oudp_datao->ctr) {
+                decrement_ctr(&security->remote_ctr, security->remote_nonce);
+            }
+        }
     }
 //======================================================================
     status_t cmac = orilink_check_mac_ctr(
@@ -58,6 +68,9 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
@@ -94,6 +107,9 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     if (!poly1305_verify(mac0, data_mac0)) {
         LOG_ERROR("%sFailed to Mac Tidak Sesuai. Worker error...", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }            
 //----------------------------------------------------------------------
@@ -123,6 +139,9 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         LOG_ERROR("%sberbeda wot %d <=> %d. Worker error...", worker_ctx->label, data_wot0, identity->local_wot);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
     uint8_t data_index0;
@@ -131,6 +150,9 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         LOG_ERROR("%sberbeda index. Worker error...", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
     uint8_t data_session_index0;
@@ -139,6 +161,9 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         LOG_ERROR("%sberbeda session_index.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }      
     uint64_t local_id_be;
@@ -148,6 +173,9 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         LOG_ERROR("%sberbeda id.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
 //======================================================================
@@ -166,6 +194,9 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     if (!poly1305_verify(mac1, data_mac1)) {
         LOG_ERROR("%sFailed to Mac Tidak Sesuai. Worker error...", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }            
 //----------------------------------------------------------------------
@@ -195,6 +226,9 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         LOG_ERROR("%sberbeda wot %d <=> %d. Worker error...", worker_ctx->label, data_wot1, identity->local_wot);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
     uint8_t data_index1;
@@ -203,6 +237,9 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         LOG_ERROR("%sberbeda index. Worker error...", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
     uint8_t data_session_index1;
@@ -211,6 +248,9 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         LOG_ERROR("%sberbeda session_index.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
     uint64_t remote_id_be;
@@ -223,11 +263,17 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     if (current_time.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
     if (async_create_timerfd(worker_ctx->label, &session->heartbeat.timer_fd) != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
     session->heartbeat.sent_try_count++;
@@ -240,11 +286,17 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
     if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat.timer_fd) != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
 //======================================================================
@@ -268,9 +320,12 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     if (orilink_cmd_result.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
-    uint8_t l_inc_ctr = orilink_cmd_result.r_orilink_protocol_t->inc_ctr;
+    l_inc_ctr = orilink_cmd_result.r_orilink_protocol_t->inc_ctr;
     puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
         worker_ctx->label,
         aes_key,
@@ -283,6 +338,9 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     if (udp_data.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         if (l_inc_ctr != 0xFF) {
             decrement_ctr(&security->local_ctr, security->local_nonce);
         }
@@ -291,6 +349,9 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, remote_addr, &udp_data, &session->heartbeat) != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         if (l_inc_ctr != 0xFF) {
             decrement_ctr(&security->local_ctr, security->local_nonce);
         }

@@ -15,6 +15,7 @@ struct sockaddr_in6;
 
 status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     uint8_t inc_ctr = oudp_datao->inc_ctr;
+    uint8_t trycount = oudp_datao->trycount;
 //======================================================================
 // + Security
 //======================================================================
@@ -27,6 +28,13 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
         LOG_ERROR("%sHeartbeat_Ack Received Already.", worker_ctx->label);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
+    }
+    if (trycount > (uint8_t)1) {
+        if (inc_ctr != 0xFF) {
+            if (security->remote_ctr != oudp_datao->ctr) {
+                decrement_ctr(&security->remote_ctr, security->remote_nonce);
+            }
+        }
     }
 //======================================================================
     status_t cmac = orilink_check_mac_ctr(

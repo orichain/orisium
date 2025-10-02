@@ -69,7 +69,9 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_receiver_timer_fd);
             CLOSE_FD(&session->heartbeat_receiver_timer_fd);
             if (inc_ctr != 0xFF) {
-                decrement_ctr(&security->remote_ctr, security->remote_nonce);
+                if (security->remote_ctr != oudp_datao->ctr) {
+                    decrement_ctr(&security->remote_ctr, security->remote_nonce);
+                }
             }
             session->heartbeat_ack.ack_sent = false;
         }

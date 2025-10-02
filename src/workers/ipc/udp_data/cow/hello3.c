@@ -41,10 +41,12 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
     }
     if (trycount > (uint8_t)1) {
         if (inc_ctr != 0xFF) {
+            if (security->remote_ctr != oudp_datao->ctr) {
 //----------------------------------------------------------------------
 // No Counter Yet
 //----------------------------------------------------------------------
-            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
+                //decrement_ctr(&security->remote_ctr, security->remote_nonce);
+            }
         }
         session->hello2_ack.ack_sent = false;
     }
