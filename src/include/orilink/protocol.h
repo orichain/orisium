@@ -11,19 +11,19 @@
 #include "ipc/protocol.h"
 
 typedef enum {
+    ORILINK_HELLO1_ACK = (uint8_t)0x80,
+    ORILINK_HELLO2_ACK = (uint8_t)0x81,
+    ORILINK_HELLO3_ACK = (uint8_t)0x82,
+    ORILINK_HELLO4_ACK = (uint8_t)0x83,
+    ORILINK_HEARTBEAT_ACK = (uint8_t)0x84,
+//----------------------------------------------------------------------
+// Need Ack
+//----------------------------------------------------------------------
     ORILINK_HELLO1 = (uint8_t)0x00,
-    ORILINK_HELLO1_ACK = (uint8_t)0x01,
-    ORILINK_HELLO2 = (uint8_t)0x02,
-    ORILINK_HELLO2_ACK = (uint8_t)0x03,
-    ORILINK_HELLO3 = (uint8_t)0x04,
-    ORILINK_HELLO3_ACK = (uint8_t)0x05,
-    ORILINK_HELLO4 = (uint8_t)0x06,
-    ORILINK_HELLO4_ACK = (uint8_t)0x07,
-    
-    ORILINK_HEARTBEAT = (uint8_t)0x10,
-    ORILINK_HEARTBEAT_ACK = (uint8_t)0x11,
-    ORILINK_HEARTBEAT_END = (uint8_t)0x12,
-    ORILINK_HEARTBEAT_FINALIZE = (uint8_t)0x13
+    ORILINK_HELLO2 = (uint8_t)0x01,
+    ORILINK_HELLO3 = (uint8_t)0x02,
+    ORILINK_HELLO4 = (uint8_t)0x03,
+    ORILINK_HEARTBEAT = (uint8_t)0x04
 } orilink_protocol_type_t;
 
 typedef struct {
@@ -56,16 +56,6 @@ typedef struct {
     uint64_t remote_id;
     double hb_interval;
 } orilink_heartbeat_t;
-
-typedef struct {
-    uint64_t local_id;
-    uint64_t remote_id;
-} orilink_heartbeat_end_t;
-
-typedef struct {
-    uint64_t local_id;
-    uint64_t remote_id;
-} orilink_heartbeat_finalize_t;
 
 typedef struct {
     uint64_t local_id;
@@ -149,8 +139,6 @@ typedef struct {
         orilink_hello4_ack_t *orilink_hello4_ack;
         orilink_heartbeat_t *orilink_heartbeat;
         orilink_heartbeat_t *orilink_heartbeat_ack;
-        orilink_heartbeat_end_t *orilink_heartbeat_end;
-        orilink_heartbeat_finalize_t *orilink_heartbeat_finalize;
 	} payload;
 } orilink_protocol_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan
@@ -211,10 +199,6 @@ static inline void CLOSE_ORILINK_PROTOCOL(orilink_protocol_t **protocol_ptr) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat);
         } else if (x->type == ORILINK_HEARTBEAT_ACK) {
             CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat_ack);
-        } else if (x->type == ORILINK_HEARTBEAT_END) {
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat_end);
-        } else if (x->type == ORILINK_HEARTBEAT_FINALIZE) {
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat_finalize);
         }
         free(x);
         *protocol_ptr = NULL;
@@ -269,7 +253,7 @@ puint8_t_size_t_status_t create_orilink_raw_protocol_packet(const char *label, u
 ssize_t_status_t send_orilink_raw_protocol_packet(const char *label, puint8_t_size_t_status_t *r, int *sock_fd, const struct sockaddr_in6 *dest_addr);
 orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *label, int *sock_fd, struct sockaddr_in6 *source_addr);
 status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data_t *iudp_datai, orilink_raw_protocol_t *oudp_datao);
-status_t orilink_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t* ctr, orilink_raw_protocol_t *r);
+status_t orilink_check_mac_ctr(const char *label, bool is_need_ack, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t* ctr, orilink_raw_protocol_t *r);
 orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t *key_aes, uint8_t *nonce, uint32_t *ctr, uint8_t* buffer, size_t len);
 
 #endif

@@ -21,8 +21,6 @@
 #include "orilink/hello4_ack.h"
 #include "orilink/heartbeat.h"
 #include "orilink/heartbeat_ack.h"
-#include "orilink/heartbeat_end.h"
-#include "orilink/heartbeat_finalize.h"
 #include "types.h"
 #include "log.h"
 #include "constants.h"
@@ -175,30 +173,6 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                 }
             }
             payload_fixed_size = sizeof(uint64_t) + sizeof(uint64_t) + DOUBLE_ARRAY_SIZE;
-            payload_dynamic_size = 0;
-            break;
-        }
-        case ORILINK_HEARTBEAT_END: {
-            if (!checkfixheader) {
-                if (!p->payload.orilink_heartbeat_end) {
-                    LOG_ERROR("%sORILINK_HEARTBEAT_END payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
-            payload_fixed_size = sizeof(uint64_t) + sizeof(uint64_t);
-            payload_dynamic_size = 0;
-            break;
-        }
-        case ORILINK_HEARTBEAT_FINALIZE: {
-            if (!checkfixheader) {
-                if (!p->payload.orilink_heartbeat_finalize) {
-                    LOG_ERROR("%sORILINK_HEARTBEAT_FINALIZE payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
-            payload_fixed_size = sizeof(uint64_t) + sizeof(uint64_t);
             payload_dynamic_size = 0;
             break;
         }
@@ -387,12 +361,6 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
             break;
         case ORILINK_HEARTBEAT_ACK:
             result_pyld = orilink_serialize_heartbeat_ack(label, p->payload.orilink_heartbeat_ack, current_buffer, *buffer_size, &offset);
-            break;
-        case ORILINK_HEARTBEAT_END:
-            result_pyld = orilink_serialize_heartbeat_end(label, p->payload.orilink_heartbeat_end, current_buffer, *buffer_size, &offset);
-            break;
-        case ORILINK_HEARTBEAT_FINALIZE:
-            result_pyld = orilink_serialize_heartbeat_finalize(label, p->payload.orilink_heartbeat_finalize, current_buffer, *buffer_size, &offset);
             break;
         default:
             LOG_ERROR("%sUnknown protocol type for serialization: 0x%02x", label, p->type);
@@ -629,14 +597,6 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
         ) != 0
     )
     {
-        uint32_t data_ctr = be32toh(data_ctr_be);
-        if (data_ctr != *(uint32_t *)ctr) {
-            LOG_ERROR("%sCounter tidak cocok. data_ctr: %ul, *ctr: %ul", label, data_ctr, *(uint32_t *)ctr);
-            CLOSE_ORILINK_PROTOCOL(&p);
-            free(key0);
-            result.status = FAILURE_CTRMSMTCH;
-            return result;
-        }
         size_t data_len = len -
                           AES_TAG_BYTES -
                           sizeof(uint32_t) -
@@ -940,46 +900,6 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
             result_pyld = orilink_deserialize_heartbeat_ack(label, p, buffer, len, &current_buffer_offset);
             break;
 		}
-        case ORILINK_HEARTBEAT_END: {
-			if (current_buffer_offset + fixed_header_size > len) {
-                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HEARTBEAT_END fixed header.", label);
-                CLOSE_ORILINK_PROTOCOL(&p);
-                free(key0);
-                result.status = FAILURE_OOBUF;
-                return result;
-            }
-            orilink_heartbeat_end_t *payload = (orilink_heartbeat_end_t*) calloc(1, sizeof(orilink_heartbeat_end_t));
-            if (!payload) {
-                LOG_ERROR("%sFailed to allocate orilink_heartbeat_end_t without FAM. %s", label, strerror(errno));
-                CLOSE_ORILINK_PROTOCOL(&p);
-                free(key0);
-                result.status = FAILURE_NOMEM;
-                return result;
-            }
-            p->payload.orilink_heartbeat_end = payload;
-            result_pyld = orilink_deserialize_heartbeat_end(label, p, buffer, len, &current_buffer_offset);
-            break;
-		}
-        case ORILINK_HEARTBEAT_FINALIZE: {
-			if (current_buffer_offset + fixed_header_size > len) {
-                LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HEARTBEAT_FINALIZE fixed header.", label);
-                CLOSE_ORILINK_PROTOCOL(&p);
-                free(key0);
-                result.status = FAILURE_OOBUF;
-                return result;
-            }
-            orilink_heartbeat_finalize_t *payload = (orilink_heartbeat_finalize_t*) calloc(1, sizeof(orilink_heartbeat_finalize_t));
-            if (!payload) {
-                LOG_ERROR("%sFailed to allocate orilink_heartbeat_finalize_t without FAM. %s", label, strerror(errno));
-                CLOSE_ORILINK_PROTOCOL(&p);
-                free(key0);
-                result.status = FAILURE_NOMEM;
-                return result;
-            }
-            p->payload.orilink_heartbeat_finalize = payload;
-            result_pyld = orilink_deserialize_heartbeat_finalize(label, p, buffer, len, &current_buffer_offset);
-            break;
-		}
         default:
             LOG_ERROR("%sUnknown protocol type for deserialization: 0x%02x", label, p->type);
             result.status = FAILURE_OPYLD;
@@ -1066,34 +986,7 @@ ssize_t_status_t send_orilink_raw_protocol_packet(const char *label, puint8_t_si
     return result;
 }
 
-status_t orilink_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t* ctr, orilink_raw_protocol_t *r) {
-	uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
-    if (memcmp(
-            key_aes, 
-            key0, 
-            HASHES_BYTES
-        ) != 0
-    )
-    {
-//======================================================================
-// + Security
-//======================================================================
-        if (r->trycount > (uint8_t)MAX_RETRY) {
-            LOG_ERROR("%sMax Try Count Reached", label);
-            free(key0);
-            return FAILURE_MAXTRY;
-        }
-//======================================================================
-        if (r->ctr != *(uint32_t *)ctr) {
-            LOG_ERROR("%sOrilink Counter tidak cocok. Protocol %d, data_ctr: %u, *ctr: %u", label, r->type, r->ctr, *(uint32_t *)ctr);
-            free(key0);
-            return FAILURE_CTRMSMTCH;
-        }
-        if (r->trycount > (uint8_t)1) {
-            LOG_INFO("%sTry Count %d", label, r->trycount);
-        }
-    }
-    free(key0);
+status_t orilink_check_mac_ctr(const char *label, bool is_need_ack, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t* ctr, orilink_raw_protocol_t *r) {
     uint8_t *data_4mac = (uint8_t*) calloc(1, AES_TAG_BYTES);
     if (!data_4mac) {
         LOG_ERROR("%sFailed to allocate data_4mac buffer. %s", label, strerror(errno));
@@ -1112,17 +1005,59 @@ status_t orilink_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key
     poly1305_init(&ctx, key_mac);
     poly1305_update(&ctx, dt, r->n - AES_TAG_BYTES);
     poly1305_finish(&ctx, mac);
-    if (poly1305_verify(mac, data_4mac)) {
-        LOG_DEBUG("%sMac cocok", label);
-        free(data_4mac);
-        free(dt);
-        return SUCCESS;
-    } else {
+    if (!poly1305_verify(mac, data_4mac)) {
         LOG_ERROR("%sOrilink Mac mismatch!", label);
         free(data_4mac);
         free(dt);
         return FAILURE_MACMSMTCH;
     }
+    free(data_4mac);
+    free(dt);
+	uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
+    if (memcmp(
+            key_aes, 
+            key0, 
+            HASHES_BYTES
+        ) != 0
+    )
+    {
+//======================================================================
+// + Security
+//======================================================================
+        if (r->trycount > (uint8_t)MAX_RETRY) {
+            LOG_ERROR("%sMax Try Count Reached", label);
+            free(key0);
+            return FAILURE_MAXTRY;
+        }
+//======================================================================
+        if (is_need_ack && r->inc_ctr != 0xFF && r->trycount > (uint8_t)1) {
+//----------------------------------------------------------------------
+// Give MAX_RETRY Space For Ack
+//----------------------------------------------------------------------
+            decrement_ctr(ctr, nonce);
+            if (r->ctr != *(uint32_t *)ctr) {
+                LOG_ERROR("%sOrilink Counter tidak cocok. Protocol %d, data_ctr: %u, *ctr: %u", label, r->type, r->ctr, *(uint32_t *)ctr);
+                free(key0);
+                return FAILURE_CTRMSMTCH;
+            }
+            if (r->trycount > (uint8_t)1) {
+                LOG_INFO("%sProtocol %d, Try Count %d", label, r->type, r->trycount);
+            }
+//----------------------------------------------------------------------
+            LOG_INFO("%sProtocol %d, Try Count %d", label, r->type, r->trycount);
+        } else {
+            if (r->ctr != *(uint32_t *)ctr) {
+                LOG_ERROR("%sOrilink Counter tidak cocok. Protocol %d, data_ctr: %u, *ctr: %u", label, r->type, r->ctr, *(uint32_t *)ctr);
+                free(key0);
+                return FAILURE_CTRMSMTCH;
+            }
+            if (r->trycount > (uint8_t)1) {
+                LOG_INFO("%sProtocol %d, Try Count %d", label, r->type, r->trycount);
+            }
+        }
+    }
+    free(key0);
+    return SUCCESS;
 }
 
 orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *label, int *sock_fd, struct sockaddr_in6 *source_addr) {

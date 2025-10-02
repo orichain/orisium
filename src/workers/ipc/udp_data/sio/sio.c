@@ -11,6 +11,7 @@
 #include "workers/ipc/handlers.h"
 #include "orilink/protocol.h"
 #include "workers/ipc/master_ipc_cmds.h"
+#include "stdbool.h"
 
 status_t handle_workers_ipc_udp_data_sio(worker_context_t *worker_ctx, void *worker_sessions, ipc_protocol_t* received_protocol) {
     ipc_udp_data_t *iudp_datai = received_protocol->payload.ipc_udp_data;
@@ -34,8 +35,10 @@ status_t handle_workers_ipc_udp_data_sio(worker_context_t *worker_ctx, void *wor
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
+    bool is_need_ack = (oudp_datao->type < (uint8_t)0x80);
     status_t cmac = orilink_check_mac_ctr(
         worker_ctx->label, 
+        is_need_ack,
         security->aes_key, 
         security->mac_key, 
         security->remote_nonce,
@@ -92,12 +95,6 @@ status_t handle_workers_ipc_udp_data_sio(worker_context_t *worker_ctx, void *wor
         }
         case ORILINK_HEARTBEAT_ACK: {
             if (handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {
-                return FAILURE;
-            }
-            break;
-        }
-        case ORILINK_HEARTBEAT_FINALIZE: {
-            if (handle_workers_ipc_udp_data_sio_heartbeat_finalize(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {
                 return FAILURE;
             }
             break;
