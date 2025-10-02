@@ -401,6 +401,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
             }
             return FAILURE;
         }
+        cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->hello4_ack);
         if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, remote_addr, &udp_data, &session->hello4_ack) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
@@ -444,6 +445,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         uint64_t interval_ull = session->hello3_ack.rcvd_time - session->hello3_ack.ack_sent_time;
         double rtt_value = (double)interval_ull;
         calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+        cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->hello3_ack);
         
         printf("%sRTT Hello-3 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
     }

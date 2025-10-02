@@ -202,11 +202,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             }
             return FAILURE;
         }
-        if (session->is_first_heartbeat) {
-            cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->hello4_ack);
-        } else {
-            cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->heartbeat_ack);
-        }
+        cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->heartbeat_ack);
 //======================================================================
 // Test Packet Dropped
 //======================================================================
@@ -315,6 +311,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             uint64_t interval_ull = session->hello4_ack.rcvd_time - session->hello4_ack.ack_sent_time;
             double rtt_value = (double)interval_ull;
             calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+            cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->hello4_ack);
             
             printf("%sRTT Hello-4 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
         }
