@@ -35,9 +35,29 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
         }
     }
     if (trycount > (uint8_t)1) {
+        if (inc_ctr != 0xFF) {
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         session->hello1_ack.ack_sent = false;
     }
     session->hello1_ack.last_trycount = trycount;
+//======================================================================
+    status_t cmac = orilink_check_mac_ctr(
+        worker_ctx->label, 
+        security->aes_key, 
+        security->mac_key, 
+        security->remote_nonce,
+        &security->remote_ctr, 
+        oudp_datao
+    );
+    if (cmac != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return cmac;
+    }
 //======================================================================
     worker_type_t remote_wot;
     uint8_t remote_index;

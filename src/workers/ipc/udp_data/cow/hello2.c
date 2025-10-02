@@ -11,7 +11,6 @@
 #include "pqc.h"
 #include "orilink/hello2_ack.h"
 #include "orilink/protocol.h"
-#include "async.h"
 #include "stdbool.h"
 #include "utilities.h"
 #include "constants.h"
@@ -43,11 +42,29 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
         }
     }
     if (trycount > (uint8_t)1) {
-        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_receiver_timer_fd);
-        CLOSE_FD(&session->heartbeat_receiver_timer_fd);
+        if (inc_ctr != 0xFF) {
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         session->hello1_ack.ack_sent = false;
     }
     session->hello1_ack.last_trycount = trycount;
+//======================================================================
+    status_t cmac = orilink_check_mac_ctr(
+        worker_ctx->label, 
+        security->aes_key, 
+        security->mac_key, 
+        security->remote_nonce,
+        &security->remote_ctr, 
+        oudp_datao
+    );
+    if (cmac != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return cmac;
+    }
 //======================================================================
     orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
         security->aes_key, security->remote_nonce, &security->remote_ctr,

@@ -66,8 +66,6 @@ typedef struct {
 	oricle_double_t rtt;
     oricle_double_t retry;
     oricle_double_t healthy;
-//======================================================================
-    uint8_t last_trycount;
 } sio_c_session_t; //Server
 
 typedef struct {
@@ -113,8 +111,6 @@ typedef struct {
     oricle_double_t retry;
     oricle_double_t healthy;
     oricle_long_double_t avgtt;
-//======================================================================
-    uint8_t last_trycount;
 } cow_c_session_t; //Client
 
 typedef struct {
@@ -300,7 +296,6 @@ static inline void setup_packet_ack(packet_ack_t *h) {
 }
 
 static inline status_t setup_cow_session(const char *label, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
-    single_session->last_trycount = (uint8_t)0;
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
     single_session->test_drop_heartbeat = 0;
@@ -346,7 +341,6 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
 }
 
 static inline void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session) {
-    single_session->last_trycount = (uint8_t)0;
     cleanup_packet(label, cow_async, &single_session->hello1);
     cleanup_packet(label, cow_async, &single_session->hello2);
     cleanup_packet(label, cow_async, &single_session->hello3);
@@ -392,7 +386,6 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
 }
 
 static inline status_t setup_sio_session(const char *label, sio_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
-    single_session->last_trycount = (uint8_t)0;
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
     single_session->test_drop_heartbeat_ack = 0;
@@ -433,7 +426,6 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
 }
 
 static inline void cleanup_sio_session(const char *label, async_type_t *sio_async, sio_c_session_t *single_session) {
-    single_session->last_trycount = (uint8_t)0;
     cleanup_packet_ack(label, sio_async, &single_session->hello1_ack);
     cleanup_packet_ack(label, sio_async, &single_session->hello2_ack);
     cleanup_packet_ack(label, sio_async, &single_session->hello3_ack);

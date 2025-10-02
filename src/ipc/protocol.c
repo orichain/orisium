@@ -799,6 +799,21 @@ ssize_t_status_t send_ipc_protocol_message(const char *label, uint8_t* key_aes, 
 }
 
 status_t ipc_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint32_t* ctr, ipc_raw_protocol_t *r) {
+    uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
+    if (memcmp(
+            key_aes, 
+            key0, 
+            HASHES_BYTES
+        ) != 0
+    )
+    {
+        if (r->ctr != *(uint32_t *)ctr) {
+            LOG_ERROR("%sIpc Counter tidak cocok. data_ctr: %ul, *ctr: %ul", label, r->ctr, *(uint32_t *)ctr);
+            free(key0);
+            return FAILURE_CTRMSMTCH;
+        }
+    }
+    free(key0);
     uint8_t *data_4mac = (uint8_t*) calloc(1, AES_TAG_BYTES);
     if (!data_4mac) {
         LOG_ERROR("%sFailed to allocate data_4mac buffer. %s", label, strerror(errno));
@@ -825,21 +840,6 @@ status_t ipc_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac
     }
     free(data_4mac);
     free(dt);
-    uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
-    if (memcmp(
-            key_aes, 
-            key0, 
-            HASHES_BYTES
-        ) != 0
-    )
-    {
-        if (r->ctr != *(uint32_t *)ctr) {
-            LOG_ERROR("%sIpc Counter tidak cocok. data_ctr: %ul, *ctr: %ul", label, r->ctr, *(uint32_t *)ctr);
-            free(key0);
-            return FAILURE_CTRMSMTCH;
-        }
-    }
-    free(key0);
     return SUCCESS;
 }
 

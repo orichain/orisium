@@ -31,6 +31,20 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
         return FAILURE;
     }
 //======================================================================
+    status_t cmac = orilink_check_mac_ctr(
+        worker_ctx->label, 
+        security->aes_key, 
+        security->mac_key, 
+        security->remote_nonce,
+        &security->remote_ctr, 
+        oudp_datao
+    );
+    if (cmac != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return cmac;
+    }
+//======================================================================
     worker_type_t remote_wot;
     uint8_t remote_index;
     uint8_t remote_session_index;
