@@ -39,6 +39,7 @@ status_t handle_workers_ipc_udp_data_cow(worker_context_t *worker_ctx, void *wor
     status_t cmac = orilink_check_mac_ctr(
         worker_ctx->label, 
         is_need_ack,
+        &session->last_trycount,
         security->aes_key, 
         security->mac_key, 
         security->remote_nonce,

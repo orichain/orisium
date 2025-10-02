@@ -986,7 +986,7 @@ ssize_t_status_t send_orilink_raw_protocol_packet(const char *label, puint8_t_si
     return result;
 }
 
-status_t orilink_check_mac_ctr(const char *label, bool is_need_ack, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t* ctr, orilink_raw_protocol_t *r) {
+status_t orilink_check_mac_ctr(const char *label, bool is_need_ack, uint8_t *last_trycount, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t* ctr, orilink_raw_protocol_t *r) {
     uint8_t *data_4mac = (uint8_t*) calloc(1, AES_TAG_BYTES);
     if (!data_4mac) {
         LOG_ERROR("%sFailed to allocate data_4mac buffer. %s", label, strerror(errno));
@@ -1034,12 +1034,18 @@ status_t orilink_check_mac_ctr(const char *label, bool is_need_ack, uint8_t* key
 //----------------------------------------------------------------------
 // Give MAX_RETRY Space For Ack
 //----------------------------------------------------------------------
+            if (r->trycount <= *last_trycount) {
+                LOG_ERROR("%sOrilink Counter tidak cocok. Protocol %d, data_ctr: %u, *ctr: %u", label, r->type, r->ctr, *(uint32_t *)ctr);
+                free(key0);
+                return FAILURE_IVLDTRY;
+            }
             decrement_ctr(ctr, nonce);
             if (r->ctr != *(uint32_t *)ctr) {
                 LOG_ERROR("%sOrilink Counter tidak cocok. Protocol %d, data_ctr: %u, *ctr: %u", label, r->type, r->ctr, *(uint32_t *)ctr);
                 free(key0);
                 return FAILURE_CTRMSMTCH;
             }
+            *last_trycount = r->trycount;
             if (r->trycount > (uint8_t)1) {
                 LOG_INFO("%sProtocol %d, Try Count %d", label, r->type, r->trycount);
             }
@@ -1050,6 +1056,9 @@ status_t orilink_check_mac_ctr(const char *label, bool is_need_ack, uint8_t* key
                 LOG_ERROR("%sOrilink Counter tidak cocok. Protocol %d, data_ctr: %u, *ctr: %u", label, r->type, r->ctr, *(uint32_t *)ctr);
                 free(key0);
                 return FAILURE_CTRMSMTCH;
+            }
+            if (is_need_ack && r->inc_ctr != 0xFF) {
+                *last_trycount = 0x01;
             }
             if (r->trycount > (uint8_t)1) {
                 LOG_INFO("%sProtocol %d, Try Count %d", label, r->type, r->trycount);
