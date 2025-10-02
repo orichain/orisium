@@ -1,6 +1,5 @@
 #include <inttypes.h>
 #include <time.h>
-#include <stdio.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -11,7 +10,6 @@
 #include "orilink/protocol.h"
 #include "stdbool.h"
 #include "async.h"
-#include "constants.h"
 
 struct sockaddr_in6;
 
@@ -36,6 +34,11 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE_MAXTRY;
     }
+    if (trycount <= session->heartbeat.last_trycount) {
+        LOG_ERROR("%sRetry Invalid.", worker_ctx->label);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE_IVLDTRY;
+    }
     if (trycount > (uint8_t)1) {
         if (inc_ctr != 0xFF) {
             if (security->remote_ctr != oudp_datao->ctr) {
@@ -43,6 +46,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
             }
         }
     }
+    session->heartbeat.last_trycount = trycount;
 //======================================================================
     status_t cmac = orilink_check_mac_ctr(
         worker_ctx->label, 

@@ -43,6 +43,11 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE_MAXTRY;
     }
+    if (trycount <= session->hello3.last_trycount) {
+        LOG_ERROR("%sRetry Invalid.", worker_ctx->label);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE_IVLDTRY;
+    }
     if (trycount > (uint8_t)1) {
         if (inc_ctr != 0xFF) {
             if (security->remote_ctr != oudp_datao->ctr) {
@@ -50,6 +55,7 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
             }
         }
     }
+    session->hello3.last_trycount = trycount;
 //======================================================================
     status_t cmac = orilink_check_mac_ctr(
         worker_ctx->label, 

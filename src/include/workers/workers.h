@@ -26,6 +26,19 @@ typedef struct {
 } node_metrics_t;
 
 typedef struct {
+    bool sent;
+    int sent_try_count;
+    uint64_t sent_time;
+    int timer_fd;
+    double interval_timer_fd;
+    bool ack_rcvd;
+    uint64_t ack_rcvd_time;
+    uint16_t len;
+    uint8_t *data;
+    uint8_t last_trycount;
+} packet_t;
+
+typedef struct {
     bool rcvd;
     uint64_t rcvd_time;
     bool ack_sent;
@@ -67,18 +80,6 @@ typedef struct {
     oricle_double_t retry;
     oricle_double_t healthy;
 } sio_c_session_t; //Server
-
-typedef struct {
-    bool sent;
-    int sent_try_count;
-    uint64_t sent_time;
-    int timer_fd;
-    double interval_timer_fd;
-    bool ack_rcvd;
-    uint64_t ack_rcvd_time;
-    uint16_t len;
-    uint8_t *data;
-} packet_t;
 
 typedef struct {
 //======================================================================
@@ -174,6 +175,7 @@ static inline void cleanup_packet_timer(const char *label, async_type_t *async, 
         free(h->data);
         h->data = NULL;
     }
+    h->last_trycount = (uint8_t)0;
     async_delete_event(label, async, &h->timer_fd);
     CLOSE_FD(&h->timer_fd);
 }
@@ -254,6 +256,7 @@ static inline void cleanup_packet(const char *label, async_type_t *async, packet
         free(h->data);
         h->data = NULL;
     }
+    h->last_trycount = (uint8_t)0;
     async_delete_event(label, async, &h->timer_fd);
     CLOSE_FD(&h->timer_fd);
 }
