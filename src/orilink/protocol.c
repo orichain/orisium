@@ -1039,7 +1039,9 @@ status_t orilink_check_mac_ctr(const char *label, bool is_need_ack, uint8_t *las
                 free(key0);
                 return FAILURE_IVLDTRY;
             }
-            decrement_ctr(ctr, nonce);
+            if (r->ctr != *(uint32_t *)ctr) {
+                decrement_ctr(ctr, nonce);
+            }
             if (r->ctr != *(uint32_t *)ctr) {
                 LOG_ERROR("%sOrilink Counter tidak cocok. Protocol %d, data_ctr: %u, *ctr: %u", label, r->type, r->ctr, *(uint32_t *)ctr);
                 free(key0);
