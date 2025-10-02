@@ -16,6 +16,7 @@
 #include "async.h"
 #include "stdbool.h"
 #include "utilities.h"
+#include "constants.h"
 
 status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     uint8_t inc_ctr = oudp_datao->inc_ctr;
@@ -33,6 +34,11 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
         LOG_ERROR("%sHello2_Ack Received Already.", worker_ctx->label);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
+    }
+    if (trycount > (uint8_t)MAX_RETRY) {
+        LOG_ERROR("%sMax Retry Reached.", worker_ctx->label);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE_MAXTRY;
     }
     if (trycount > (uint8_t)1) {
         if (inc_ctr != 0xFF) {
