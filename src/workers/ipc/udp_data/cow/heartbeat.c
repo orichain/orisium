@@ -16,10 +16,79 @@
 #include "workers/ipc/master_ipc_cmds.h"
 #include "constants.h"
 
+static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_session_t *session, orilink_identity_t *identity, uint64_t_status_t *current_time, uint8_t *trycount) {
+    if (async_create_timerfd(worker_ctx->label, &session->heartbeat_receiver_timer_fd) != SUCCESS) {
+        return FAILURE;
+    }
+    if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_receiver_timer_fd,
+        (time_t)session->heartbeat_interval,
+        (long)((session->heartbeat_interval - (time_t)session->heartbeat_interval) * 1e9),
+        (time_t)session->heartbeat_interval,
+        (long)((session->heartbeat_interval - (time_t)session->heartbeat_interval) * 1e9)) != SUCCESS)
+    {
+        return FAILURE;
+    }
+    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_receiver_timer_fd) != SUCCESS) {
+        return FAILURE;
+    }
+//======================================================================
+    if (session->is_first_heartbeat) {
+        if (*trycount > (uint8_t)1) {
+            double try_count = (double)session->hello4_ack.ack_sent_try_count;
+            calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+            session->hello4_ack.rcvd = true;
+            session->hello4_ack.rcvd_time = current_time->r_uint64_t;
+        } else {
+            double try_count = (double)session->hello4_ack.ack_sent_try_count-(double)1;
+            calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+            session->hello4_ack.rcvd = true;
+            session->hello4_ack.rcvd_time = current_time->r_uint64_t;
+            uint64_t interval_ull = session->hello4_ack.rcvd_time - session->hello4_ack.ack_sent_time;
+            double rtt_value = (double)interval_ull;
+            calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+            cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->hello4_ack);
+            
+            printf("%sRTT Hello-4 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
+        }
+    } else {
+        if (*trycount > (uint8_t)1) {
+            double try_count = (double)session->heartbeat_ack.ack_sent_try_count;
+            calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+            session->heartbeat_ack.rcvd = true;
+            session->heartbeat_ack.rcvd_time = current_time->r_uint64_t;
+        } else {
+            double try_count = (double)session->heartbeat_ack.ack_sent_try_count-(double)1;
+            calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+            session->heartbeat_ack.rcvd = true;
+            session->heartbeat_ack.rcvd_time = current_time->r_uint64_t;
+            uint64_t interval_ull = session->heartbeat_ack.rcvd_time - session->heartbeat_ack.ack_sent_time;
+            double rtt_value = (double)interval_ull;
+            calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+            
+            printf("%sSIO RTT Heartbeat = %f\n", worker_ctx->label, session->rtt.value_prediction);
+        }
+    }
+//======================================================================
+    if (session->is_first_heartbeat) {
+        session->is_first_heartbeat = false;
+        session->heartbeat_ack.ack_sent = true;
+    } else {
+        session->heartbeat_ack.ack_sent = true;
+    }
+//======================================================================
+//session->metrics.last_ack = current_time->r_uint64_t;
+//session->metrics.count_ack += (double)1;
+//session->metrics.sum_hb_interval += session->heartbeat_interval;
+//session->metrics.hb_interval = session->heartbeat_interval;
+//======================================================================
+    return SUCCESS;
+}
+
 status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     uint8_t inc_ctr = oudp_datao->inc_ctr;
     uint8_t l_inc_ctr = 0xFF;
     uint8_t trycount = oudp_datao->trycount;
+    bool dodec = false;
 //======================================================================
 // + Security
 //======================================================================
@@ -69,7 +138,8 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_receiver_timer_fd);
             CLOSE_FD(&session->heartbeat_receiver_timer_fd);
             if (inc_ctr != 0xFF) {
-                if (security->remote_ctr != oudp_datao->ctr) {
+                if (security->remote_ctr != oudp_datao->ctr && !dodec) {
+                    dodec = true;
                     decrement_ctr(&security->remote_ctr, security->remote_nonce);
                 }
             }
@@ -90,6 +160,36 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return cmac;
+    }
+//======================================================================
+// Initalize Or FAILURE Now
+//----------------------------------------------------------------------
+    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
+    if (current_time.status != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
+//======================================================================
+    if (trycount > (uint8_t)1 && session->heartbeat_ack.data) {
+        if (retry_packet_ack(worker_ctx, session, &session->heartbeat_ack) != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return FAILURE;
+        }
+        if (inc_ctr != 0xFF && dodec) {
+            increment_ctr(&security->remote_ctr, security->remote_nonce);
+            dodec = false;
+        }
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return last_execution(
+            worker_ctx, 
+            session, 
+            identity, 
+            &current_time, 
+            &trycount
+        );
     }
 //======================================================================
     orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
@@ -131,10 +231,28 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         session->heartbeat_interval = (double)NODE_CHECK_HEALTHY;
     }
 //======================================================================
-// Initalize Or FAILURE Now
+    session->heartbeat_ack.ack_sent_try_count++;
 //----------------------------------------------------------------------
-    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
-    if (current_time.status != SUCCESS) {
+// Use Delayed Timer session->heartbeat_receiver_timer_fd With Interval session->heartbeat_interval
+//----------------------------------------------------------------------
+//session->heartbeat_ack.ack_sent_time = current_time.r_uint64_t;
+//======================================================================
+    orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_heartbeat_ack(
+        worker_ctx->label,
+        0x01,
+        identity->remote_wot,
+        identity->remote_index,
+        identity->remote_session_index,
+        identity->local_wot,
+        identity->local_index,
+        identity->local_session_index,
+        identity->id_connection,
+        identity->local_id,
+        identity->remote_id,
+        session->heartbeat_interval,
+        session->heartbeat_ack.ack_sent_try_count
+    );
+    if (orilink_cmd_result.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
@@ -142,56 +260,62 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         }
         return FAILURE;
     }
-    session->heartbeat_ack.ack_sent_try_count++;
-//----------------------------------------------------------------------
-// Use Delayed Timer session->heartbeat_receiver_timer_fd With Interval session->heartbeat_interval
-//----------------------------------------------------------------------
-    //session->heartbeat_ack.ack_sent_time = current_time.r_uint64_t;
+    l_inc_ctr = orilink_cmd_result.r_orilink_protocol_t->inc_ctr;
+    puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
+        worker_ctx->label,
+        security->aes_key,
+        security->mac_key,
+        security->local_nonce,
+        &security->local_ctr,
+        orilink_cmd_result.r_orilink_protocol_t
+    );
+    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+    if (udp_data.status != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
+        if (l_inc_ctr != 0xFF) {
+            decrement_ctr(&security->local_ctr, security->local_nonce);
+        }
+        return FAILURE;
+    }
+    cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->heartbeat_ack);
 //======================================================================
-    if (trycount > (uint8_t)1) {
-        if (retry_packet_ack(worker_ctx, session, &session->heartbeat_ack) != SUCCESS) {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-            if (inc_ctr != 0xFF) {
-                decrement_ctr(&security->remote_ctr, security->remote_nonce);
-            }
-            return FAILURE;
+// Test Packet Dropped
+//======================================================================
+    session->test_drop_heartbeat_ack++;
+    if (
+        session->test_drop_heartbeat_ack == 3 ||
+        session->test_drop_heartbeat_ack == 5 ||
+        session->test_drop_heartbeat_ack == 7 ||
+        session->test_drop_heartbeat_ack == 9
+    )
+    {
+        printf("[Debug Here Helper]: Heartbeat Ack Packet Number %d. Sending To Fake Addr To Force Retry\n", session->test_drop_heartbeat_ack);
+        struct sockaddr_in6 fake_addr;
+        memset(&fake_addr, 0, sizeof(struct sockaddr_in6));
+        if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &fake_addr, &udp_data, &session->heartbeat_ack) != SUCCESS) {
+//----------------------------------------------------------------------
+// No Error Here
+// This Is A Test Drop Packet
+//----------------------------------------------------------------------
+        /*
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
+        if (l_inc_ctr != 0xFF) {
+            decrement_ctr(&security->local_ctr, security->local_nonce);
+        }
+        return FAILURE;
+        */
+//----------------------------------------------------------------------
         }
     } else {
-        orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_heartbeat_ack(
-            worker_ctx->label,
-            0x01,
-            identity->remote_wot,
-            identity->remote_index,
-            identity->remote_session_index,
-            identity->local_wot,
-            identity->local_index,
-            identity->local_session_index,
-            identity->id_connection,
-            identity->local_id,
-            identity->remote_id,
-            session->heartbeat_interval,
-            session->heartbeat_ack.ack_sent_try_count
-        );
-        if (orilink_cmd_result.status != SUCCESS) {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-            if (inc_ctr != 0xFF) {
-                decrement_ctr(&security->remote_ctr, security->remote_nonce);
-            }
-            return FAILURE;
-        }
-        l_inc_ctr = orilink_cmd_result.r_orilink_protocol_t->inc_ctr;
-        puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
-            worker_ctx->label,
-            security->aes_key,
-            security->mac_key,
-            security->local_nonce,
-            &security->local_ctr,
-            orilink_cmd_result.r_orilink_protocol_t
-        );
-        CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
-        if (udp_data.status != SUCCESS) {
+        if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, remote_addr, &udp_data, &session->heartbeat_ack) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
             if (inc_ctr != 0xFF) {
@@ -202,149 +326,29 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             }
             return FAILURE;
         }
-        cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->heartbeat_ack);
-//======================================================================
-// Test Packet Dropped
-//======================================================================
-        session->test_drop_heartbeat_ack++;
-        if (
-            session->test_drop_heartbeat_ack == 3 ||
-            session->test_drop_heartbeat_ack == 5 ||
-            session->test_drop_heartbeat_ack == 7 ||
-            session->test_drop_heartbeat_ack == 9
-        )
-        {
-            printf("[Debug Here Helper]: Heartbeat Ack Packet Number %d. Sending To Fake Addr To Force Retry\n", session->test_drop_heartbeat_ack);
-            struct sockaddr_in6 fake_addr;
-            memset(&fake_addr, 0, sizeof(struct sockaddr_in6));
-            if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &fake_addr, &udp_data, &session->heartbeat_ack) != SUCCESS) {
-//----------------------------------------------------------------------
-// No Error Here
-// This Is A Test Drop Packet
-//----------------------------------------------------------------------
-                /*
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-                if (inc_ctr != 0xFF) {
-                    decrement_ctr(&security->remote_ctr, security->remote_nonce);
-                }
-                if (l_inc_ctr != 0xFF) {
-                    decrement_ctr(&security->local_ctr, security->local_nonce);
-                }
-                return FAILURE;
-                */
-//----------------------------------------------------------------------
-            }
-        } else {
-            if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, remote_addr, &udp_data, &session->heartbeat_ack) != SUCCESS) {
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-                if (inc_ctr != 0xFF) {
-                    decrement_ctr(&security->remote_ctr, security->remote_nonce);
-                }
-                if (l_inc_ctr != 0xFF) {
-                    decrement_ctr(&security->local_ctr, security->local_nonce);
-                }
-                return FAILURE;
-            }
-            if (session->test_drop_heartbeat_ack >= 1000000) {
-                session->test_drop_heartbeat_ack = 0;
-            }
+        if (session->test_drop_heartbeat_ack >= 1000000) {
+            session->test_drop_heartbeat_ack = 0;
         }
-//======================================================================
     }
 //======================================================================
     CLOSE_IPC_PROTOCOL(&received_protocol);
 //----------------------------------------------------------------------                            
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
 //======================================================================
-    if (async_create_timerfd(worker_ctx->label, &session->heartbeat_receiver_timer_fd) != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+    status_t le = last_execution(
+        worker_ctx, 
+        session, 
+        identity, 
+        &current_time, 
+        &trycount
+    );
+    if (le != SUCCESS) {
         if (inc_ctr != 0xFF) {
             decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         if (l_inc_ctr != 0xFF) {
             decrement_ctr(&security->local_ctr, security->local_nonce);
         }
-        return FAILURE;
     }
-    if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_receiver_timer_fd,
-        (time_t)session->heartbeat_interval,
-        (long)((session->heartbeat_interval - (time_t)session->heartbeat_interval) * 1e9),
-        (time_t)session->heartbeat_interval,
-        (long)((session->heartbeat_interval - (time_t)session->heartbeat_interval) * 1e9)) != SUCCESS)
-    {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
-        if (l_inc_ctr != 0xFF) {
-            decrement_ctr(&security->local_ctr, security->local_nonce);
-        }
-        return FAILURE;
-    }
-    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_receiver_timer_fd) != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
-        if (l_inc_ctr != 0xFF) {
-            decrement_ctr(&security->local_ctr, security->local_nonce);
-        }
-        return FAILURE;
-    }
-//======================================================================
-    if (session->is_first_heartbeat) {
-        if (trycount > (uint8_t)1) {
-            double try_count = (double)session->hello4_ack.ack_sent_try_count;
-            calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
-            session->hello4_ack.rcvd = true;
-            session->hello4_ack.rcvd_time = current_time.r_uint64_t;
-        } else {
-            double try_count = (double)session->hello4_ack.ack_sent_try_count-(double)1;
-            calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
-            session->hello4_ack.rcvd = true;
-            session->hello4_ack.rcvd_time = current_time.r_uint64_t;
-            uint64_t interval_ull = session->hello4_ack.rcvd_time - session->hello4_ack.ack_sent_time;
-            double rtt_value = (double)interval_ull;
-            calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-            cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->hello4_ack);
-            
-            printf("%sRTT Hello-4 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
-        }
-    } else {
-        if (trycount > (uint8_t)1) {
-            double try_count = (double)session->heartbeat_ack.ack_sent_try_count;
-            calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
-            session->heartbeat_ack.rcvd = true;
-            session->heartbeat_ack.rcvd_time = current_time.r_uint64_t;
-        } else {
-            double try_count = (double)session->heartbeat_ack.ack_sent_try_count-(double)1;
-            calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
-            session->heartbeat_ack.rcvd = true;
-            session->heartbeat_ack.rcvd_time = current_time.r_uint64_t;
-            uint64_t interval_ull = session->heartbeat_ack.rcvd_time - session->heartbeat_ack.ack_sent_time;
-            double rtt_value = (double)interval_ull;
-            calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-            
-            printf("%sSIO RTT Heartbeat = %f\n", worker_ctx->label, session->rtt.value_prediction);
-        }
-    }
-//======================================================================
-    if (session->is_first_heartbeat) {
-        session->is_first_heartbeat = false;
-        session->heartbeat_ack.ack_sent = true;
-    } else {
-        session->heartbeat_ack.ack_sent = true;
-    }
-//======================================================================
-    //session->metrics.last_ack = current_time.r_uint64_t;
-    //session->metrics.count_ack += (double)1;
-    //session->metrics.sum_hb_interval += session->heartbeat_interval;
-    //session->metrics.hb_interval = session->heartbeat_interval;
-//======================================================================
-    return SUCCESS;
+    return le;
 }
