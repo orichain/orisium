@@ -63,6 +63,8 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return cctr;
         }
+        printf("COW Local Counter Decrement 1\n");
+        decrement_ctr(&security->local_ctr, security->local_nonce);
     } else {
         status_t cmac = orilink_check_mac_ctr(
             worker_ctx->label, 
