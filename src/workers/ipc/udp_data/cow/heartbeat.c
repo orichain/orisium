@@ -17,19 +17,38 @@
 #include "workers/ipc/master_ipc_cmds.h"
 #include "constants.h"
 
+static inline status_t create_heartbeat_receiver_timer_fd(worker_context_t *worker_ctx, sio_c_session_t *session) {
+    if (session->heartbeat_receiver_timer_fd == -1) {
+        if (async_create_timerfd(worker_ctx->label, &session->heartbeat_receiver_timer_fd) != SUCCESS) {
+            return FAILURE;
+        }
+        if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_receiver_timer_fd,
+            (time_t)session->heartbeat_interval,
+            (long)((session->heartbeat_interval - (time_t)session->heartbeat_interval) * 1e9),
+            (time_t)session->heartbeat_interval,
+            (long)((session->heartbeat_interval - (time_t)session->heartbeat_interval) * 1e9)) != SUCCESS)
+        {
+            return FAILURE;
+        }
+        if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_receiver_timer_fd) != SUCCESS) {
+            return FAILURE;
+        }
+    } else {
+        if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_receiver_timer_fd,
+            (time_t)session->heartbeat_interval,
+            (long)((session->heartbeat_interval - (time_t)session->heartbeat_interval) * 1e9),
+            (time_t)session->heartbeat_interval,
+            (long)((session->heartbeat_interval - (time_t)session->heartbeat_interval) * 1e9)) != SUCCESS)
+        {
+            return FAILURE;
+        }
+    }
+    return SUCCESS;
+}
+
 static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_session_t *session, orilink_identity_t *identity, uint64_t_status_t *current_time, uint8_t *trycount) {
-    if (async_create_timerfd(worker_ctx->label, &session->heartbeat_receiver_timer_fd) != SUCCESS) {
-        return FAILURE;
-    }
-    if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_receiver_timer_fd,
-        (time_t)session->heartbeat_interval,
-        (long)((session->heartbeat_interval - (time_t)session->heartbeat_interval) * 1e9),
-        (time_t)session->heartbeat_interval,
-        (long)((session->heartbeat_interval - (time_t)session->heartbeat_interval) * 1e9)) != SUCCESS)
-    {
-        return FAILURE;
-    }
-    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_receiver_timer_fd) != SUCCESS) {
+    status_t chst = create_heartbeat_receiver_timer_fd(worker_ctx, session);
+    if (chst != SUCCESS) {
         return FAILURE;
     }
 //======================================================================

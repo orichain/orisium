@@ -24,7 +24,6 @@
 status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     uint8_t inc_ctr = oudp_datao->inc_ctr;
     uint8_t l_inc_ctr = 0xFF;
-    uint8_t trycount = oudp_datao->trycount;
 //======================================================================
 // + Security
 //======================================================================
@@ -38,61 +37,19 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
-    if (trycount > (uint8_t)MAX_RETRY) {
-        LOG_ERROR("%sMax Retry Reached.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        return FAILURE_MAXTRY;
-    }
-    if (trycount <= session->hello3.last_trycount) {
-        LOG_ERROR("%sRetry Invalid.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        return FAILURE_IVLDTRY;
-    }
-    session->hello3.last_trycount = trycount;
 //======================================================================
-    if (security->remote_ctr != oudp_datao->ctr && inc_ctr != 0xFF) {
-        status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
-        if (cmac != SUCCESS) {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return cmac;
-        }
-        uint8_t imax = 0;
-        do {
-            imax++;
-            printf("COW Remote Counter Decrement 1\n");
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
-            printf("COW Local Counter Decrement 1\n");
-            decrement_ctr(&security->local_ctr, security->local_nonce);
-            if (imax >= (uint8_t)MAX_RETRY) {
-                break;
-            }
-        }
-        while (security->remote_ctr != oudp_datao->ctr);
-        status_t cctr = orilink_check_ctr(worker_ctx->label, security->aes_key, &security->remote_ctr, oudp_datao);
-        if (cctr != SUCCESS) {
-            for (uint8_t jmax=0;jmax<imax;++jmax) {
-                increment_ctr(&security->remote_ctr, security->remote_nonce);
-                increment_ctr(&security->local_ctr, security->local_nonce);
-            }
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return cctr;
-        }
-    } else {
-        status_t cmac = orilink_check_mac_ctr(
-            worker_ctx->label, 
-            security->aes_key, 
-            security->mac_key, 
-            security->remote_nonce,
-            &security->remote_ctr, 
-            oudp_datao
-        );
-        if (cmac != SUCCESS) {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return cmac;
-        }
+    status_t cmac = orilink_check_mac_ctr(
+        worker_ctx->label, 
+        security->aes_key, 
+        security->mac_key, 
+        security->remote_nonce,
+        &security->remote_ctr, 
+        oudp_datao
+    );
+    if (cmac != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return cmac;
     }
 //======================================================================
     orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
