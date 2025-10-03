@@ -130,8 +130,6 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             }
         }
         if (trycount > (uint8_t)1) {
-            async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_receiver_timer_fd);
-            CLOSE_FD(&session->heartbeat_receiver_timer_fd);
             session->hello4_ack.ack_sent = false;
         }
         session->hello4_ack.last_trycount = trycount;
@@ -198,8 +196,6 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             return cmac;
         }
     }
-    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_receiver_timer_fd);
-    CLOSE_FD(&session->heartbeat_receiver_timer_fd);
     session->heartbeat_ack.ack_sent = false;
 //======================================================================
 // Initalize Or FAILURE Now
@@ -273,9 +269,10 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
 //----------------------------------------------------------------------
 //session->heartbeat_ack.ack_sent_time = current_time.r_uint64_t;
 //======================================================================
+    l_inc_ctr = 0x01;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_heartbeat_ack(
         worker_ctx->label,
-        0x01,
+        l_inc_ctr,
         identity->remote_wot,
         identity->remote_index,
         identity->remote_session_index,
@@ -294,9 +291,11 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         if (inc_ctr != 0xFF) {
             decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
+        if (l_inc_ctr != 0xFF) {
+            decrement_ctr(&security->local_ctr, security->local_nonce);
+        }
         return FAILURE;
     }
-    l_inc_ctr = orilink_cmd_result.r_orilink_protocol_t->inc_ctr;
     puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
         worker_ctx->label,
         security->aes_key,

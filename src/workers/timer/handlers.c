@@ -181,13 +181,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //----------------------------------------------------------------------
                     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
                     if (current_time.status != SUCCESS) {
-                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
-                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
                         return FAILURE;
                     }
                     if (async_create_timerfd(worker_ctx->label, &session->heartbeat.timer_fd) != SUCCESS) {
-                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
-                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
                         return FAILURE;
                     }
                     session->heartbeat.sent_try_count++;
@@ -198,8 +194,6 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         (time_t)session->heartbeat.interval_timer_fd,
                         (long)((session->heartbeat.interval_timer_fd - (time_t)session->heartbeat.interval_timer_fd) * 1e9)) != SUCCESS)
                     {
-                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
-                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
                         return FAILURE;
                     }
                     if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat.timer_fd) != SUCCESS) {
@@ -210,9 +204,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //======================================================================
                     orilink_identity_t *identity = &session->identity;
                     orilink_security_t *security = &session->security;
+                    uint8_t l_inc_ctr = 0x01;
                     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_heartbeat(
                         worker_ctx->label,
-                        0x01,
+                        l_inc_ctr,
                         identity->remote_wot,
                         identity->remote_index,
                         identity->remote_session_index,
@@ -226,11 +221,11 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         session->heartbeat.sent_try_count
                     );
                     if (orilink_cmd_result.status != SUCCESS) {
-                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
-                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
+                        if (l_inc_ctr != 0xFF) {
+                            decrement_ctr(&security->local_ctr, security->local_nonce);
+                        }
                         return FAILURE;
                     }
-                    uint8_t l_inc_ctr = orilink_cmd_result.r_orilink_protocol_t->inc_ctr;
                     puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
                         worker_ctx->label,
                         security->aes_key,
@@ -241,16 +236,12 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     );
                     CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
                     if (udp_data.status != SUCCESS) {
-                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
-                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
                         if (l_inc_ctr != 0xFF) {
                             decrement_ctr(&security->local_ctr, security->local_nonce);
                         }
                         return FAILURE;
                     }
                     if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &session->identity.remote_addr, &udp_data, &session->heartbeat) != SUCCESS) {
-                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
-                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
                         if (l_inc_ctr != 0xFF) {
                             decrement_ctr(&security->local_ctr, security->local_nonce);
                         }
@@ -259,9 +250,6 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //======================================================================
                     session->heartbeat.sent = true;
                     session->heartbeat.ack_rcvd = false;
-//======================================================================
-                    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
-                    CLOSE_FD(&session->heartbeat_sender_timer_fd);
 //======================================================================
                     return SUCCESS;
                 }

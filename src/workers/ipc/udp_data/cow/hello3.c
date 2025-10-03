@@ -207,9 +207,10 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
     session->hello3_ack.ack_sent_try_count++;
     session->hello3_ack.ack_sent_time = current_time.r_uint64_t;
 //======================================================================
+    l_inc_ctr = 0x01;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello3_ack(
         worker_ctx->label,
-        0x01,
+        l_inc_ctr,
         identity->remote_wot,
         identity->remote_index,
         identity->remote_session_index,
@@ -231,9 +232,14 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
 //----------------------------------------------------------------------
             //decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
+        if (l_inc_ctr != 0xFF) {
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->local_ctr, security->local_nonce);
+        }
         return FAILURE;
     }
-    l_inc_ctr = orilink_cmd_result.r_orilink_protocol_t->inc_ctr;
     puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
         worker_ctx->label,
         security->aes_key,
