@@ -30,7 +30,7 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
         uint64_t interval_ull = session->hello1_ack.rcvd_time - session->hello1_ack.ack_sent_time;
         double rtt_value = (double)interval_ull;
         calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-        cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->hello1_ack);
+        cleanup_packet_ack(worker_ctx->label, &worker_ctx->async, &session->hello1_ack, false);
         
         printf("%sRTT Hello-1 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
     }
@@ -102,7 +102,7 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
         return FAILURE;
     }
 //======================================================================
-    if (trycount > (uint8_t)1 && session->hello2_ack.data) {
+    if (trycount > (uint8_t)1 && session->hello2_ack.data != NULL) {
         if (retry_packet_ack(worker_ctx, session, &session->hello2_ack) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
@@ -190,8 +190,76 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
     session->hello2_ack.ack_sent_try_count++;
     session->hello2_ack.ack_sent_time = current_time.r_uint64_t;
 //======================================================================
-    if (trycount > (uint8_t)1) {
-        if (retry_packet_ack(worker_ctx, session, &session->hello2_ack) != SUCCESS) {
+    orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello2_ack(
+        worker_ctx->label,
+        0x01,
+        identity->remote_wot,
+        identity->remote_index,
+        identity->remote_session_index,
+        identity->local_wot,
+        identity->local_index,
+        identity->local_session_index,
+        identity->id_connection,
+        identity->remote_id,
+        kem_ciphertext,
+        session->hello2_ack.ack_sent_try_count
+    );
+    if (orilink_cmd_result.status != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
+        return FAILURE;
+    }
+    l_inc_ctr = orilink_cmd_result.r_orilink_protocol_t->inc_ctr;
+    puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
+        worker_ctx->label,
+        security->aes_key,
+        security->mac_key,
+        security->local_nonce,
+        &security->local_ctr,
+        orilink_cmd_result.r_orilink_protocol_t
+    );
+    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+    if (udp_data.status != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
+        if (l_inc_ctr != 0xFF) {
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->local_ctr, security->local_nonce);
+        }
+        return FAILURE;
+    }
+    cleanup_packet_ack(worker_ctx->label, &worker_ctx->async, &session->hello2_ack, false);
+//======================================================================
+// Test Packet Dropped
+//======================================================================
+    session->test_drop_hello2_ack++;
+    if (
+        session->test_drop_hello2_ack == 1
+    )
+    {
+        printf("[Debug Here Helper]: Hello2 Ack Packet Number %d. Sending To Fake Addr To Force Retry\n", session->test_drop_hello2_ack);
+        struct sockaddr_in6 fake_addr;
+        memset(&fake_addr, 0, sizeof(struct sockaddr_in6));
+        if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &fake_addr, &udp_data, &session->hello2_ack) != SUCCESS) {
+//----------------------------------------------------------------------
+// No Error Here
+// This Is A Test Drop Packet
+//----------------------------------------------------------------------
+            /*
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
             if (inc_ctr != 0xFF) {
@@ -200,45 +268,17 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
 //----------------------------------------------------------------------
                 //decrement_ctr(&security->remote_ctr, security->remote_nonce);
             }
+            if (l_inc_ctr != 0xFF) {
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+                //decrement_ctr(&security->local_ctr, security->local_nonce);
+            }
             return FAILURE;
+            */
         }
     } else {
-        orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello2_ack(
-            worker_ctx->label,
-            0x01,
-            identity->remote_wot,
-            identity->remote_index,
-            identity->remote_session_index,
-            identity->local_wot,
-            identity->local_index,
-            identity->local_session_index,
-            identity->id_connection,
-            identity->remote_id,
-            kem_ciphertext,
-            session->hello2_ack.ack_sent_try_count
-        );
-        if (orilink_cmd_result.status != SUCCESS) {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-            if (inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-                //decrement_ctr(&security->remote_ctr, security->remote_nonce);
-            }
-            return FAILURE;
-        }
-        l_inc_ctr = orilink_cmd_result.r_orilink_protocol_t->inc_ctr;
-        puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
-            worker_ctx->label,
-            security->aes_key,
-            security->mac_key,
-            security->local_nonce,
-            &security->local_ctr,
-            orilink_cmd_result.r_orilink_protocol_t
-        );
-        CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
-        if (udp_data.status != SUCCESS) {
+        if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, remote_addr, &udp_data, &session->hello2_ack) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
             if (inc_ctr != 0xFF) {
@@ -255,65 +295,11 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
             }
             return FAILURE;
         }
-        cleanup_packet_ack_timer(worker_ctx->label, &worker_ctx->async, &session->hello2_ack);
-//======================================================================
-// Test Packet Dropped
-//======================================================================
-        session->test_drop_hello2_ack++;
-        if (
-            session->test_drop_hello2_ack == 1
-        )
-        {
-            printf("[Debug Here Helper]: Hello2 Ack Packet Number %d. Sending To Fake Addr To Force Retry\n", session->test_drop_hello2_ack);
-            struct sockaddr_in6 fake_addr;
-            memset(&fake_addr, 0, sizeof(struct sockaddr_in6));
-            if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &fake_addr, &udp_data, &session->hello2_ack) != SUCCESS) {
-//----------------------------------------------------------------------
-// No Error Here
-// This Is A Test Drop Packet
-//----------------------------------------------------------------------
-                /*
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-                if (inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-                    //decrement_ctr(&security->remote_ctr, security->remote_nonce);
-                }
-                if (l_inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-                    //decrement_ctr(&security->local_ctr, security->local_nonce);
-                }
-                return FAILURE;
-                */
-            }
-        } else {
-            if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, remote_addr, &udp_data, &session->hello2_ack) != SUCCESS) {
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-                if (inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-                    //decrement_ctr(&security->remote_ctr, security->remote_nonce);
-                }
-                if (l_inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-                    //decrement_ctr(&security->local_ctr, security->local_nonce);
-                }
-                return FAILURE;
-            }
-            if (session->test_drop_hello2_ack >= 1000000) {
-                session->test_drop_hello2_ack = 0;
-            }
+        if (session->test_drop_hello2_ack >= 1000000) {
+            session->test_drop_hello2_ack = 0;
         }
-//======================================================================
     }
+//======================================================================
 //----------------------------------------------------------------------
     CLOSE_IPC_PROTOCOL(&received_protocol);
 //----------------------------------------------------------------------                            

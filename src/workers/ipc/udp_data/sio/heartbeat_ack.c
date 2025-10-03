@@ -11,11 +11,14 @@
 #include "orilink/protocol.h"
 #include "stdbool.h"
 #include "async.h"
+#include "constants.h"
 
 struct sockaddr_in6;
 
 status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     uint8_t inc_ctr = oudp_datao->inc_ctr;
+    uint8_t trycount = oudp_datao->trycount;
+    bool dodec = false;
 //======================================================================
 // + Security
 //======================================================================
@@ -29,6 +32,25 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
+    if (trycount > (uint8_t)MAX_RETRY) {
+        LOG_ERROR("%sMax Retry Reached.", worker_ctx->label);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE_MAXTRY;
+    }
+    if (trycount <= session->heartbeat.last_trycount) {
+        LOG_ERROR("%sRetry Invalid.", worker_ctx->label);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE_IVLDTRY;
+    }
+    if (trycount > (uint8_t)1) {
+        if (inc_ctr != 0xFF) {
+            if (security->remote_ctr != oudp_datao->ctr && !dodec) {
+                dodec = true;
+                decrement_ctr(&security->remote_ctr, security->remote_nonce);
+            }
+        }
+    }
+    session->heartbeat.last_trycount = trycount;
 //======================================================================
     status_t cmac = orilink_check_mac_ctr(
         worker_ctx->label, 
@@ -130,7 +152,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
     uint64_t interval_ull = session->heartbeat.ack_rcvd_time - session->heartbeat.sent_time;
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-    cleanup_packet_timer(worker_ctx->label, &worker_ctx->async, &session->heartbeat);
+    cleanup_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
 
     printf("%sCOW RTT Heartbeat = %f\n", worker_ctx->label, session->rtt.value_prediction);
 //======================================================================

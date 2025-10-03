@@ -35,6 +35,7 @@ typedef struct {
     uint64_t ack_rcvd_time;
     uint16_t len;
     uint8_t *data;
+    uint8_t last_trycount;
 } packet_t;
 
 typedef struct {
@@ -167,29 +168,6 @@ static inline void initialize_node_metrics(const char *label, node_metrics_t* me
     metrics->count_ack = (double)0;
 }
 
-
-static inline void cleanup_packet_timer(const char *label, async_type_t *async, packet_t *h) {
-    h->interval_timer_fd = (double)1;
-    h->sent_try_count = 0x00;
-    h->len = (uint16_t)0;
-    if (h->data) {
-        free(h->data);
-        h->data = NULL;
-    }
-    async_delete_event(label, async, &h->timer_fd);
-    CLOSE_FD(&h->timer_fd);
-}
-
-static inline void cleanup_packet_ack_timer(const char *label, async_type_t *async, packet_ack_t *h) {
-    h->ack_sent_try_count = 0x00;
-    h->len = (uint16_t)0;
-    if (h->data) {
-        free(h->data);
-        h->data = NULL;
-    }
-    h->last_trycount = (uint8_t)0;
-}
-
 static inline void calculate_retry(const char *label, void *void_session, worker_type_t wot, double try_count) {
     switch (wot) {
         case COW: {
@@ -244,11 +222,13 @@ static inline void calculate_rtt(const char *label, void *void_session, worker_t
     }
 }
 
-static inline void cleanup_packet(const char *label, async_type_t *async, packet_t *h) {
-    h->sent = false;
-    h->sent_time = (uint64_t)0;
-    h->ack_rcvd_time = (uint64_t)0;
-    h->ack_rcvd = false;
+static inline void cleanup_packet(const char *label, async_type_t *async, packet_t *h, bool clean_state) {
+    if (clean_state) {
+        h->sent = false;
+        h->sent_time = (uint64_t)0;
+        h->ack_rcvd_time = (uint64_t)0;
+        h->ack_rcvd = false;
+    }
     h->interval_timer_fd = (double)1;
     h->sent_try_count = 0x00;
     h->len = (uint16_t)0;
@@ -256,6 +236,7 @@ static inline void cleanup_packet(const char *label, async_type_t *async, packet
         free(h->data);
         h->data = NULL;
     }
+    h->last_trycount = (uint8_t)0;
     async_delete_event(label, async, &h->timer_fd);
     CLOSE_FD(&h->timer_fd);
 }
@@ -269,20 +250,24 @@ static inline void setup_packet(packet_t *h, double interval_timer) {
     h->sent_try_count = 0x00;
     h->len = (uint16_t)0;
     h->data = NULL;
+    h->last_trycount = (uint8_t)0;
     h->timer_fd = -1;
 }
 
-static inline void cleanup_packet_ack(const char *label, async_type_t *async, packet_ack_t *h) {
-    h->rcvd = false;
-    h->rcvd_time = (uint64_t)0;
-    h->ack_sent_time = (uint64_t)0;
-    h->ack_sent = false;
+static inline void cleanup_packet_ack(const char *label, async_type_t *async, packet_ack_t *h, bool clean_state) {
+    if (clean_state) {
+        h->rcvd = false;
+        h->rcvd_time = (uint64_t)0;
+        h->ack_sent_time = (uint64_t)0;
+        h->ack_sent = false;
+    }
     h->ack_sent_try_count = 0x00;
     h->len = (uint16_t)0;
     if (h->data) {
         free(h->data);
         h->data = NULL;
     }
+    h->last_trycount = (uint8_t)0;
 }
 
 static inline void setup_packet_ack(packet_ack_t *h) {
@@ -340,11 +325,11 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
 }
 
 static inline void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session) {
-    cleanup_packet(label, cow_async, &single_session->hello1);
-    cleanup_packet(label, cow_async, &single_session->hello2);
-    cleanup_packet(label, cow_async, &single_session->hello3);
-    cleanup_packet(label, cow_async, &single_session->hello4);
-    cleanup_packet(label, cow_async, &single_session->heartbeat);
+    cleanup_packet(label, cow_async, &single_session->hello1, true);
+    cleanup_packet(label, cow_async, &single_session->hello2, true);
+    cleanup_packet(label, cow_async, &single_session->hello3, true);
+    cleanup_packet(label, cow_async, &single_session->hello4, true);
+    cleanup_packet(label, cow_async, &single_session->heartbeat, true);
     single_session->heartbeat_interval = (double)1;
     async_delete_event(label, cow_async, &single_session->heartbeat_sender_timer_fd);
     CLOSE_FD(&single_session->heartbeat_sender_timer_fd);
@@ -429,11 +414,11 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
 }
 
 static inline void cleanup_sio_session(const char *label, async_type_t *sio_async, sio_c_session_t *single_session) {
-    cleanup_packet_ack(label, sio_async, &single_session->hello1_ack);
-    cleanup_packet_ack(label, sio_async, &single_session->hello2_ack);
-    cleanup_packet_ack(label, sio_async, &single_session->hello3_ack);
-    cleanup_packet_ack(label, sio_async, &single_session->hello4_ack);
-    cleanup_packet_ack(label, sio_async, &single_session->heartbeat_ack);
+    cleanup_packet_ack(label, sio_async, &single_session->hello1_ack, true);
+    cleanup_packet_ack(label, sio_async, &single_session->hello2_ack, true);
+    cleanup_packet_ack(label, sio_async, &single_session->hello3_ack, true);
+    cleanup_packet_ack(label, sio_async, &single_session->hello4_ack, true);
+    cleanup_packet_ack(label, sio_async, &single_session->heartbeat_ack, true);
     single_session->heartbeat_interval = (double)1;
     single_session->is_first_heartbeat = false;
     async_delete_event(label, sio_async, &single_session->heartbeat_receiver_timer_fd);

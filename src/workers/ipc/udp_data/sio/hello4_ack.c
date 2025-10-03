@@ -24,6 +24,8 @@
 status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     uint8_t inc_ctr = oudp_datao->inc_ctr;
     uint8_t l_inc_ctr = 0xFF;
+    uint8_t trycount = oudp_datao->trycount;
+    bool dodec = false;
 //======================================================================
 // + Security
 //======================================================================
@@ -37,6 +39,25 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
+    if (trycount > (uint8_t)MAX_RETRY) {
+        LOG_ERROR("%sMax Retry Reached.", worker_ctx->label);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE_MAXTRY;
+    }
+    if (trycount <= session->hello4.last_trycount) {
+        LOG_ERROR("%sRetry Invalid.", worker_ctx->label);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE_IVLDTRY;
+    }
+    if (trycount > (uint8_t)1) {
+        if (inc_ctr != 0xFF) {
+            if (security->remote_ctr != oudp_datao->ctr && !dodec) {
+                dodec = true;
+                decrement_ctr(&security->remote_ctr, security->remote_nonce);
+            }
+        }
+    }
+    session->hello4.last_trycount = trycount;
 //======================================================================
     status_t cmac = orilink_check_mac_ctr(
         worker_ctx->label, 
@@ -366,7 +387,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     uint64_t interval_ull = session->hello4.ack_rcvd_time - session->hello4.sent_time;
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-    cleanup_packet_timer(worker_ctx->label, &worker_ctx->async, &session->hello4);
+    cleanup_packet(worker_ctx->label, &worker_ctx->async, &session->hello4, false);
     
     printf("%sRTT Hello-4 = %f\n", worker_ctx->label, session->rtt.value_prediction);
 //======================================================================
