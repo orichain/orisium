@@ -57,17 +57,28 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return cmac;
         }
-        printf("COW Remote Counter Decrement 1\n");
-        decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        uint8_t imax = 0;
+        do {
+            imax++;
+            printf("COW Remote Counter Decrement 1\n");
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+            printf("COW Local Counter Decrement 1\n");
+            decrement_ctr(&security->local_ctr, security->local_nonce);
+            if (imax >= (uint8_t)MAX_RETRY) {
+                break;
+            }
+        }
+        while (security->remote_ctr != oudp_datao->ctr);
         status_t cctr = orilink_check_ctr(worker_ctx->label, security->aes_key, &security->remote_ctr, oudp_datao);
         if (cctr != SUCCESS) {
-            increment_ctr(&security->remote_ctr, security->remote_nonce);
+            for (uint8_t jmax=0;jmax<imax;++jmax) {
+                increment_ctr(&security->remote_ctr, security->remote_nonce);
+                increment_ctr(&security->local_ctr, security->local_nonce);
+            }
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return cctr;
         }
-        printf("COW Local Counter Decrement 1\n");
-        decrement_ctr(&security->local_ctr, security->local_nonce);
     } else {
         status_t cmac = orilink_check_mac_ctr(
             worker_ctx->label, 
