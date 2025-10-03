@@ -86,6 +86,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         increment_ctr(&security->remote_ctr, security->remote_nonce);
         status_t cctr = orilink_check_ctr(worker_ctx->label, security->aes_key, &security->remote_ctr, oudp_datao);
         if (cctr != SUCCESS) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return cctr;
