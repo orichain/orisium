@@ -68,6 +68,10 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
     }
     session->hello2_ack.last_trycount = trycount;
 //======================================================================
+        memcpy(tmp_local_nonce, security->local_nonce, AES_NONCE_BYTES);
+        memset(security->local_nonce, 0, AES_NONCE_BYTES);
+        memset(security->mac_key, 0, HASHES_BYTES);
+//======================================================================
     if (trycount == (uint8_t)1 && inc_ctr != 0xFF &&security->remote_ctr != oudp_datao->ctr) {
         status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
         if (cmac != SUCCESS) {
