@@ -5,6 +5,7 @@
 #include <time.h>
 #include <inttypes.h>
 #include <math.h>
+#include <stdlib.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -25,7 +26,6 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     uint8_t inc_ctr = oudp_datao->inc_ctr;
     uint8_t l_inc_ctr = 0xFF;
     uint8_t trycount = oudp_datao->trycount;
-    bool dodec = false;
 //======================================================================
 // + Security
 //======================================================================
@@ -49,28 +49,59 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE_IVLDTRY;
     }
-    if (trycount > (uint8_t)1) {
-        if (inc_ctr != 0xFF) {
-            if (security->remote_ctr != oudp_datao->ctr && !dodec) {
-                dodec = true;
-                decrement_ctr(&security->remote_ctr, security->remote_nonce);
-            }
-        }
-    }
     session->hello4.last_trycount = trycount;
 //======================================================================
-    status_t cmac = orilink_check_mac_ctr(
-        worker_ctx->label, 
-        security->aes_key, 
-        security->mac_key, 
-        security->remote_nonce,
-        &security->remote_ctr, 
-        oudp_datao
-    );
-    if (cmac != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        return cmac;
+    if (trycount == (uint8_t)1) {
+        status_t cmac = orilink_check_mac_ctr(
+            worker_ctx->label, 
+            security->aes_key, 
+            security->mac_key, 
+            security->remote_nonce,
+            &security->remote_ctr, 
+            oudp_datao
+        );
+        if (cmac != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return cmac;
+        }
+    } else {
+        if (inc_ctr != 0xFF) {
+            if (security->remote_ctr != oudp_datao->ctr) {
+                uint8_t *tmp_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
+                if (!tmp_nonce) {
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                    return FAILURE_NOMEM;
+                }
+                uint32_t tmp_ctr = security->remote_ctr;
+                memcpy(tmp_nonce, security->remote_nonce, AES_NONCE_BYTES);
+                decrement_ctr(&tmp_ctr, tmp_nonce);
+                status_t cctr = orilink_check_ctr(worker_ctx->label, security->aes_key, &tmp_ctr, oudp_datao);
+                if (cctr != SUCCESS) {
+                    memset(tmp_nonce, 0, AES_NONCE_BYTES);
+                    free(tmp_nonce);
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                    return cctr;
+                }
+                memset(tmp_nonce, 0, AES_NONCE_BYTES);
+                free(tmp_nonce);
+            } else {
+                status_t cctr = orilink_check_ctr(worker_ctx->label, security->aes_key, &security->remote_ctr, oudp_datao);
+                if (cctr != SUCCESS) {
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                    return cctr;
+                }
+            }
+        }
+        status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
+        if (cmac != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return cmac;
+        }
     }
 //======================================================================
     orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,

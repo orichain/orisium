@@ -986,6 +986,55 @@ ssize_t_status_t send_orilink_raw_protocol_packet(const char *label, puint8_t_si
     return result;
 }
 
+status_t orilink_check_mac(const char *label, uint8_t* key_mac, orilink_raw_protocol_t *r) {
+    uint8_t *data_4mac = (uint8_t*) calloc(1, AES_TAG_BYTES);
+    if (!data_4mac) {
+        LOG_ERROR("%sFailed to allocate data_4mac buffer. %s", label, strerror(errno));
+        return FAILURE_NOMEM;
+    }
+    uint8_t *dt = (uint8_t*) calloc(1, r->n - AES_TAG_BYTES);
+    if (!dt) {
+        LOG_ERROR("%sFailed to allocate dt buffer. %s", label, strerror(errno));
+        free(data_4mac);
+        return FAILURE_NOMEM;
+    }
+    memcpy(data_4mac, r->recv_buffer, AES_TAG_BYTES);
+    memcpy(dt, r->recv_buffer + AES_TAG_BYTES, r->n - AES_TAG_BYTES);
+    uint8_t mac[AES_TAG_BYTES];
+    poly1305_context ctx;
+    poly1305_init(&ctx, key_mac);
+    poly1305_update(&ctx, dt, r->n - AES_TAG_BYTES);
+    poly1305_finish(&ctx, mac);
+    if (!poly1305_verify(mac, data_4mac)) {
+        LOG_ERROR("%sOrilink Mac mismatch!", label);
+        free(data_4mac);
+        free(dt);
+        return FAILURE_MACMSMTCH;
+    }
+    free(data_4mac);
+    free(dt);
+    return SUCCESS;
+}
+
+status_t orilink_check_ctr(const char *label, uint8_t* key_aes, uint32_t* ctr, orilink_raw_protocol_t *r) {
+    uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
+    if (memcmp(
+            key_aes, 
+            key0, 
+            HASHES_BYTES
+        ) != 0
+    )
+    {
+        if (r->ctr != *(uint32_t *)ctr) {
+            LOG_ERROR("%sOrilink Counter tidak cocok. Protocol %d, data_ctr: %u, *ctr: %u", label, r->type, r->ctr, *(uint32_t *)ctr);
+            free(key0);
+            return FAILURE_CTRMSMTCH;
+        }
+    }
+    free(key0);
+    return SUCCESS;
+}
+
 status_t orilink_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t* ctr, orilink_raw_protocol_t *r) {
     uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
     if (memcmp(
