@@ -273,16 +273,11 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //----------------------------------------------------------------------
                     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
                     if (current_time.status != SUCCESS) {
-                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_receiver_timer_fd);
-                        CLOSE_FD(&session->heartbeat_receiver_timer_fd);
                         return FAILURE;
                     }
 //======================================================================
                     session->heartbeat_ack.ack_sent_time = current_time.r_uint64_t;
                     session->heartbeat_ack.rcvd = false;
-//======================================================================
-                    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_receiver_timer_fd);
-                    CLOSE_FD(&session->heartbeat_receiver_timer_fd);
 //======================================================================
                     return SUCCESS;
                 }
