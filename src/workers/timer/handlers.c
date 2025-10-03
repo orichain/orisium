@@ -37,10 +37,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //----------------------------------------------------------------------
                         cleanup_cow_session(worker_ctx->label, &worker_ctx->async, session);
                         if (setup_cow_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
-                            continue;
+                            return FAILURE;
                         }
                         if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
-                            continue;
+                            return FAILURE;
                         }
 //----------------------------------------------------------------------
                         return SUCCESS;
@@ -50,7 +50,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     session->hello1.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
                     if (retry_packet(worker_ctx, session, &session->hello1) != SUCCESS) {
-                        continue;
+                        return FAILURE;
                     }
                     return SUCCESS;
                 } else if (*current_fd == session->hello2.timer_fd) {
@@ -67,10 +67,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //----------------------------------------------------------------------
                         cleanup_cow_session(worker_ctx->label, &worker_ctx->async, session);
                         if (setup_cow_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
-                            continue;
+                            return FAILURE;
                         }
                         if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
-                            continue;
+                            return FAILURE;
                         }
 //----------------------------------------------------------------------
                         return SUCCESS;
@@ -80,7 +80,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     session->hello2.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
                     if (retry_packet(worker_ctx, session, &session->hello2) != SUCCESS) {
-                        continue;
+                        return FAILURE;
                     }
                     return SUCCESS;
                 } else if (*current_fd == session->hello3.timer_fd) {
@@ -97,10 +97,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //----------------------------------------------------------------------
                         cleanup_cow_session(worker_ctx->label, &worker_ctx->async, session);
                         if (setup_cow_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
-                            continue;
+                            return FAILURE;
                         }
                         if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
-                            continue;
+                            return FAILURE;
                         }
 //----------------------------------------------------------------------
                         return SUCCESS;
@@ -110,7 +110,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     session->hello3.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
                     if (retry_packet(worker_ctx, session, &session->hello3) != SUCCESS) {
-                        continue;
+                        return FAILURE;
                     }
                     return SUCCESS;
                 } else if (*current_fd == session->hello4.timer_fd) {
@@ -127,10 +127,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //----------------------------------------------------------------------
                         cleanup_cow_session(worker_ctx->label, &worker_ctx->async, session);
                         if (setup_cow_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
-                            continue;
+                            return FAILURE;
                         }
                         if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
-                            continue;
+                            return FAILURE;
                         }
 //----------------------------------------------------------------------
                         return SUCCESS;
@@ -140,7 +140,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     session->hello4.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
                     if (retry_packet(worker_ctx, session, &session->hello4) != SUCCESS) {
-                        continue;
+                        return FAILURE;
                     }
                     return SUCCESS;
                 } else if (*current_fd == session->heartbeat.timer_fd) {
@@ -157,10 +157,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //----------------------------------------------------------------------
                         cleanup_cow_session(worker_ctx->label, &worker_ctx->async, session);
                         if (setup_cow_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
-                            continue;
+                            return FAILURE;
                         }
                         if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
-                            continue;
+                            return FAILURE;
                         }
 //----------------------------------------------------------------------
                         return SUCCESS;
@@ -170,7 +170,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     session->heartbeat.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
                     if (retry_packet(worker_ctx, session, &session->heartbeat) != SUCCESS) {
-                        continue;
+                        return FAILURE;
                     }
                     return SUCCESS;
                 } else if (*current_fd == session->heartbeat_sender_timer_fd) {
