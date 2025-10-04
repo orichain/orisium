@@ -38,18 +38,38 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
         return FAILURE;
     }
 //======================================================================
-    status_t cmac = orilink_check_mac_ctr(
-        worker_ctx->label, 
-        security->aes_key, 
-        security->mac_key, 
-        security->remote_nonce,
-        &security->remote_ctr, 
-        oudp_datao
-    );
-    if (cmac != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        return cmac;
+    if (security->remote_ctr != oudp_datao->ctr && inc_ctr != 0xFF) {
+        status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
+        if (cmac != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return cmac;
+        }
+        printf("%sResync Back Remote Counter.\n", worker_ctx->label);
+        decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        status_t cctr = orilink_check_ctr(worker_ctx->label, security->aes_key, &security->remote_ctr, oudp_datao);
+        if (cctr != SUCCESS) {
+            increment_ctr(&security->remote_ctr, security->remote_nonce);
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return cctr;
+        }
+        printf("%sResync Back Local Counter.\n", worker_ctx->label);
+        decrement_ctr(&security->local_ctr, security->local_nonce);
+    } else {
+        status_t cmac = orilink_check_mac_ctr(
+            worker_ctx->label, 
+            security->aes_key, 
+            security->mac_key, 
+            security->remote_nonce,
+            &security->remote_ctr, 
+            oudp_datao
+        );
+        if (cmac != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return cmac;
+        }
     }
 //======================================================================
     orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
