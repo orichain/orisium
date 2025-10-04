@@ -21,7 +21,7 @@ static inline status_t create_heartbeat_receiver_timer_fd(worker_context_t *work
 //======================================================================
 // + Accuracy
 //======================================================================
-    double timer_interval = session->heartbeat_interval - ((double)100000 / (double)1e9);
+    double timer_interval = session->heartbeat_interval - ((double)110000 / (double)1e9);
 //======================================================================
     if (session->heartbeat_receiver_timer_fd == -1) {
         if (async_create_timerfd(worker_ctx->label, &session->heartbeat_receiver_timer_fd) != SUCCESS) {
