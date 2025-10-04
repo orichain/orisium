@@ -204,14 +204,17 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
                         return FAILURE;
                     }
-                    //printf("Hereeeeeeeeeeeeeeeeeeeee....... handlers.c COW *current_fd == session->heartbeat_sender_timer_fd FD %d\n", session->heartbeat.timer_fd);
+                    //printf("Hereeeeeeeeeeeeeeeeeeeee....... handlers.c SIO *current_fd == session->heartbeat_sender_timer_fd FD %d\n", session->heartbeat.timer_fd);
                     if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat.timer_fd) != SUCCESS) {
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
                         return FAILURE;
                     }
 //======================================================================
+// Acumulate Different RTT Between Peers
+//======================================================================
                     double hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
+                    hb_interval += session->rtt.value_prediction / (double)1e9;
 //======================================================================
                     orilink_identity_t *identity = &session->identity;
                     orilink_security_t *security = &session->security;
@@ -265,8 +268,14 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         return FAILURE;
                     }
 //======================================================================
+// Heartbeat Ack Security 1 & Security 2 Open
+//======================================================================
                     session->heartbeat.sent = true;
                     session->heartbeat.ack_rcvd = false;
+//======================================================================
+// Heartbeat Security 2 Open
+//======================================================================
+                    session->heartbeat_ack.rcvd = false;
 //======================================================================
                     async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                     CLOSE_FD(&session->heartbeat_sender_timer_fd);
@@ -348,7 +357,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         return FAILURE;
                     }
 //======================================================================
+// Acumulate Different RTT Between Peers
+//======================================================================
                     double hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
+                    hb_interval += session->rtt.value_prediction / (double)1e9;
 //======================================================================
                     orilink_identity_t *identity = &session->identity;
                     orilink_security_t *security = &session->security;
@@ -402,8 +414,13 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         return FAILURE;
                     }
 //======================================================================
+// Heartbeat Ack Security 1 & Security 2 Open
+//======================================================================
                     session->heartbeat.sent = true;
                     session->heartbeat.ack_rcvd = false;
+//======================================================================
+// Heartbeat Security 2 Open
+//======================================================================
                     session->heartbeat_ack.rcvd = false;
 //======================================================================
                     async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);

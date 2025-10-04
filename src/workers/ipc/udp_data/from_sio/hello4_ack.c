@@ -292,7 +292,10 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         return FAILURE;
     }
 //======================================================================
+// Acumulate Different RTT Between Peers
+//======================================================================
     double hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
+    hb_interval += session->rtt.value_prediction / (double)1e9;
 //======================================================================
     l_inc_ctr = 0x01;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_heartbeat(
@@ -374,7 +377,11 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     printf("%sRTT Hello-4 = %f\n", worker_ctx->label, session->rtt.value_prediction);
 //======================================================================
     session->heartbeat.sent = true;
+//======================================================================
+// Heartbeat Security 1 & Security 2 Open
+//======================================================================
     session->heartbeat_ack.ack_sent = true;
+    session->heartbeat_ack.rcvd = false;
 //======================================================================
     return SUCCESS;
 }

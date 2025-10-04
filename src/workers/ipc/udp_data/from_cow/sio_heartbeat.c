@@ -18,15 +18,21 @@
 #include "constants.h"
 
 static inline status_t create_heartbeat_sender_timer_fd(worker_context_t *worker_ctx, sio_c_session_t *session) {
+//======================================================================
+// Acumulate Different RTT Between Peers
+//======================================================================
+    double timer_interval = session->heartbeat_interval;
+    timer_interval += session->rtt.value_prediction / (double)1e9;
     if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
         return FAILURE;
     }
-    //printf("Hereeeeeeeeeeeeeeeeeeeee....... sio_heartbeat.c create_heartbeat_sender_timer_fd FD %d\n", session->heartbeat_sender_timer_fd);
+//======================================================================
+    //printf("Hereeeeeeeeeeeeeeeeeeeee....... cow_heartbeat.c create_heartbeat_sender_timer_fd FD %d\n", session->heartbeat_sender_timer_fd);
     if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_sender_timer_fd,
-        (time_t)session->heartbeat_interval,
-        (long)((session->heartbeat_interval - (time_t)session->heartbeat_interval) * 1e9),
-        (time_t)session->heartbeat_interval,
-        (long)((session->heartbeat_interval - (time_t)session->heartbeat_interval) * 1e9)) != SUCCESS)
+        (time_t)timer_interval,
+        (long)((timer_interval - (time_t)timer_interval) * 1e9),
+        (time_t)timer_interval,
+        (long)((timer_interval - (time_t)timer_interval) * 1e9)) != SUCCESS)
     {
         return FAILURE;
     }
@@ -62,8 +68,13 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
             
             printf("%sRTT Hello-4 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
         }
-    }
+    } else {
 //======================================================================
+// Heartbeat Security 2 Close
+//======================================================================
+        session->heartbeat_ack.rcvd = true;
+//======================================================================
+    }
     if (session->is_first_heartbeat) {
         session->is_first_heartbeat = false;
         session->heartbeat_ack.ack_sent = true;
