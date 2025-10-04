@@ -104,15 +104,21 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             return FAILURE;
         }
         if (session->hello4_ack.rcvd) {
-            if (trycount > (uint8_t)MAX_RETRY) {
+            if (trycount != (uint8_t)1) {
+                if (trycount > (uint8_t)MAX_RETRY) {
+                    LOG_ERROR("%sHeartbeat Received Already.", worker_ctx->label);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                    return FAILURE_MAXTRY;
+                }
+                if (trycount <= session->hello4_ack.last_trycount) {
+                    LOG_ERROR("%sHeartbeat Received Already.", worker_ctx->label);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                    return FAILURE_IVLDTRY;
+                }
+            } else {
                 LOG_ERROR("%sHeartbeat Received Already.", worker_ctx->label);
                 CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-                return FAILURE_MAXTRY;
-            }
-            if (trycount <= session->hello4_ack.last_trycount) {
-                LOG_ERROR("%sHeartbeat Received Already.", worker_ctx->label);
-                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-                return FAILURE_IVLDTRY;
+                return FAILURE;
             }
         }
         if (trycount > (uint8_t)1) {
@@ -126,15 +132,21 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             return FAILURE;
         }
         if (session->heartbeat_ack.rcvd) {
-            if (trycount > (uint8_t)MAX_RETRY) {
+            if (trycount != (uint8_t)1) {
+                if (trycount > (uint8_t)MAX_RETRY) {
+                    LOG_ERROR("%sHeartbeat Received Already.", worker_ctx->label);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                    return FAILURE_MAXTRY;
+                }
+                if (trycount <= session->heartbeat_ack.last_trycount) {
+                    LOG_ERROR("%sHeartbeat Received Already.", worker_ctx->label);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                    return FAILURE_IVLDTRY;
+                }
+            } else {
                 LOG_ERROR("%sHeartbeat Received Already.", worker_ctx->label);
                 CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-                return FAILURE_MAXTRY;
-            }
-            if (trycount <= session->heartbeat_ack.last_trycount) {
-                LOG_ERROR("%sHeartbeat Received Already.", worker_ctx->label);
-                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-                return FAILURE_IVLDTRY;
+                return FAILURE;
             }
         }
         session->heartbeat_ack.last_trycount = trycount;

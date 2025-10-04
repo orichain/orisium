@@ -54,15 +54,21 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
         return FAILURE;
     }
     if (session->hello1_ack.rcvd) {
-        if (trycount > (uint8_t)MAX_RETRY) {
+        if (trycount != (uint8_t)1) {
+            if (trycount > (uint8_t)MAX_RETRY) {
+                LOG_ERROR("%sHello2 Received Already.", worker_ctx->label);
+                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                return FAILURE_MAXTRY;
+            }
+            if (trycount <= session->heartbeat_ack.last_trycount) {
+                LOG_ERROR("%sHello2 Received Already.", worker_ctx->label);
+                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                return FAILURE_IVLDTRY;
+            }
+        } else {
             LOG_ERROR("%sHello2 Received Already.", worker_ctx->label);
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE_MAXTRY;
-        }
-        if (trycount <= session->hello1_ack.last_trycount) {
-            LOG_ERROR("%sHello2 Received Already.", worker_ctx->label);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE_IVLDTRY;
+            return FAILURE;
         }
     }
     session->hello1_ack.last_trycount = trycount;

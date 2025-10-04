@@ -384,6 +384,11 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     single_session->test_drop_heartbeat_ack = 0;
 //----------------------------------------------------------------------
     setup_packet_ack(&single_session->hello1_ack);
+//----------------------------------------------------------------------
+// Hello1 Security Open
+//----------------------------------------------------------------------
+    single_session->hello1_ack.ack_sent = true;
+//----------------------------------------------------------------------
     setup_packet_ack(&single_session->hello2_ack);
     setup_packet_ack(&single_session->hello3_ack);
     setup_packet_ack(&single_session->hello4_ack);
