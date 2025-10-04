@@ -329,20 +329,11 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
     memset(kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
     memset(kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
 //======================================================================
-    status_t le = last_execution(
+    return last_execution(
         worker_ctx, 
         session, 
         identity, 
         &current_time, 
         &trycount
     );
-    if (le != SUCCESS) {
-        if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
-        if (l_inc_ctr != 0xFF) {
-            decrement_ctr(&security->local_ctr, security->local_nonce);
-        }
-    }
-    return le;
 }
