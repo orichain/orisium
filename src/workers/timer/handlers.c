@@ -23,6 +23,8 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
             for (uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
                 cow_c_session_t *session;
                 session = &c_sessions[i];
+                orilink_identity_t *identity = &session->identity;
+                orilink_security_t *security = &session->security;
                 if (*current_fd == session->hello1.timer_fd) {
                     uint64_t u;
                     read(session->hello1.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
@@ -49,7 +51,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     double try_count = (double)session->hello1.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     session->hello1.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
-                    if (retry_packet(worker_ctx, session, &session->hello1) != SUCCESS) {
+                    if (retry_packet(worker_ctx, identity, security, &session->hello1) != SUCCESS) {
                         return FAILURE;
                     }
                     return SUCCESS;
@@ -79,7 +81,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     double try_count = (double)session->hello2.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     session->hello2.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
-                    if (retry_packet(worker_ctx, session, &session->hello2) != SUCCESS) {
+                    if (retry_packet(worker_ctx, identity, security, &session->hello2) != SUCCESS) {
                         return FAILURE;
                     }
                     return SUCCESS;
@@ -109,7 +111,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     double try_count = (double)session->hello3.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     session->hello3.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
-                    if (retry_packet(worker_ctx, session, &session->hello3) != SUCCESS) {
+                    if (retry_packet(worker_ctx, identity, security, &session->hello3) != SUCCESS) {
                         return FAILURE;
                     }
                     return SUCCESS;
@@ -139,7 +141,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     double try_count = (double)session->hello4.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     session->hello4.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
-                    if (retry_packet(worker_ctx, session, &session->hello4) != SUCCESS) {
+                    if (retry_packet(worker_ctx, identity, security, &session->hello4) != SUCCESS) {
                         return FAILURE;
                     }
                     return SUCCESS;
@@ -169,7 +171,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     double try_count = (double)session->heartbeat.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     session->heartbeat.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
-                    if (retry_packet(worker_ctx, session, &session->heartbeat) != SUCCESS) {
+                    if (retry_packet(worker_ctx, identity, security, &session->heartbeat) != SUCCESS) {
                         return FAILURE;
                     }
                     return SUCCESS;
@@ -181,9 +183,13 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //----------------------------------------------------------------------
                     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
                     if (current_time.status != SUCCESS) {
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
                         return FAILURE;
                     }
                     if (async_create_timerfd(worker_ctx->label, &session->heartbeat.timer_fd) != SUCCESS) {
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
                         return FAILURE;
                     }
                     session->heartbeat.sent_try_count++;
@@ -194,9 +200,14 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         (time_t)session->heartbeat.interval_timer_fd,
                         (long)((session->heartbeat.interval_timer_fd - (time_t)session->heartbeat.interval_timer_fd) * 1e9)) != SUCCESS)
                     {
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
                         return FAILURE;
                     }
+                    //printf("Hereeeeeeeeeeeeeeeeeeeee....... handlers.c COW *current_fd == session->heartbeat_sender_timer_fd FD %d\n", session->heartbeat.timer_fd);
                     if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat.timer_fd) != SUCCESS) {
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
                         return FAILURE;
                     }
 //======================================================================
@@ -221,6 +232,8 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         session->heartbeat.sent_try_count
                     );
                     if (orilink_cmd_result.status != SUCCESS) {
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
                         if (l_inc_ctr != 0xFF) {
                             decrement_ctr(&security->local_ctr, security->local_nonce);
                         }
@@ -236,12 +249,16 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     );
                     CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
                     if (udp_data.status != SUCCESS) {
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
                         if (l_inc_ctr != 0xFF) {
                             decrement_ctr(&security->local_ctr, security->local_nonce);
                         }
                         return FAILURE;
                     }
                     if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &session->identity.remote_addr, &udp_data, &session->heartbeat) != SUCCESS) {
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
                         if (l_inc_ctr != 0xFF) {
                             decrement_ctr(&security->local_ctr, security->local_nonce);
                         }
@@ -251,6 +268,8 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     session->heartbeat.sent = true;
                     session->heartbeat.ack_rcvd = false;
 //======================================================================
+                    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                    CLOSE_FD(&session->heartbeat_sender_timer_fd);
                     return SUCCESS;
                 }
             }
@@ -261,24 +280,134 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
             for (uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
                 sio_c_session_t *session;
                 session = &c_sessions[i];
-                if (*current_fd == session->heartbeat_receiver_timer_fd) {
+                orilink_identity_t *identity = &session->identity;
+                orilink_security_t *security = &session->security;
+                if (*current_fd == session->heartbeat.timer_fd) {
                     uint64_t u;
-                    read(session->heartbeat_receiver_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-//======================================================================
-// Delayed
-// session->heartbeat_ack.ack_sent_time = current_time.r_uint64_t;
-// session->heartbeat_ack.rcvd = false;
+                    read(session->heartbeat.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    worker_type_t c_wot = session->identity.local_wot;
+                    uint8_t c_index = session->identity.local_index;
+                    uint8_t c_session_index = session->identity.local_session_index;
+                    if (session->heartbeat.sent_try_count > MAX_RETRY) {
+                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->heartbeat.interval_timer_fd, session->heartbeat.sent_try_count);
+//----------------------------------------------------------------------
+// Disconnected => 1. Reset Session
+//                 2. Send Info To Master
+//----------------------------------------------------------------------
+                        cleanup_sio_session(worker_ctx->label, &worker_ctx->async, session);
+                        if (setup_sio_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
+                            return FAILURE;
+                        }
+                        if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
+                            return FAILURE;
+                        }
+//----------------------------------------------------------------------
+                        return SUCCESS;
+                    }
+                    LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->heartbeat.interval_timer_fd);
+                    double try_count = (double)session->heartbeat.sent_try_count;
+                    calculate_retry(worker_ctx->label, session, c_wot, try_count);
+                    session->heartbeat.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                    if (retry_packet(worker_ctx, identity, security, &session->heartbeat) != SUCCESS) {
+                        return FAILURE;
+                    }
+                    return SUCCESS;
+                } else if (*current_fd == session->heartbeat_sender_timer_fd) {
+                    uint64_t u;
+                    read(session->heartbeat_sender_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
                     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
                     if (current_time.status != SUCCESS) {
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
+                        return FAILURE;
+                    }
+                    if (async_create_timerfd(worker_ctx->label, &session->heartbeat.timer_fd) != SUCCESS) {
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
+                        return FAILURE;
+                    }
+                    session->heartbeat.sent_try_count++;
+                    session->heartbeat.sent_time = current_time.r_uint64_t;
+                    if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat.timer_fd,
+                        (time_t)session->heartbeat.interval_timer_fd,
+                        (long)((session->heartbeat.interval_timer_fd - (time_t)session->heartbeat.interval_timer_fd) * 1e9),
+                        (time_t)session->heartbeat.interval_timer_fd,
+                        (long)((session->heartbeat.interval_timer_fd - (time_t)session->heartbeat.interval_timer_fd) * 1e9)) != SUCCESS)
+                    {
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
+                        return FAILURE;
+                    }
+                    //printf("Hereeeeeeeeeeeeeeeeeeeee....... handlers.c SIO *current_fd == session->heartbeat_sender_timer_fd FD %d\n", session->heartbeat.timer_fd);
+                    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat.timer_fd) != SUCCESS) {
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
                         return FAILURE;
                     }
 //======================================================================
-                    session->heartbeat_ack.ack_sent_time = current_time.r_uint64_t;
+                    double hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
+//======================================================================
+                    orilink_identity_t *identity = &session->identity;
+                    orilink_security_t *security = &session->security;
+                    uint8_t l_inc_ctr = 0x01;
+                    orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_heartbeat(
+                        worker_ctx->label,
+                        l_inc_ctr,
+                        identity->remote_wot,
+                        identity->remote_index,
+                        identity->remote_session_index,
+                        identity->local_wot,
+                        identity->local_index,
+                        identity->local_session_index,
+                        identity->id_connection,
+                        identity->local_id,
+                        identity->remote_id,
+                        hb_interval,
+                        session->heartbeat.sent_try_count
+                    );
+                    if (orilink_cmd_result.status != SUCCESS) {
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
+                        if (l_inc_ctr != 0xFF) {
+                            decrement_ctr(&security->local_ctr, security->local_nonce);
+                        }
+                        return FAILURE;
+                    }
+                    puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
+                        worker_ctx->label,
+                        security->aes_key,
+                        security->mac_key,
+                        security->local_nonce,
+                        &security->local_ctr,
+                        orilink_cmd_result.r_orilink_protocol_t
+                    );
+                    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+                    if (udp_data.status != SUCCESS) {
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
+                        if (l_inc_ctr != 0xFF) {
+                            decrement_ctr(&security->local_ctr, security->local_nonce);
+                        }
+                        return FAILURE;
+                    }
+                    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &session->identity.remote_addr, &udp_data, &session->heartbeat) != SUCCESS) {
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
+                        if (l_inc_ctr != 0xFF) {
+                            decrement_ctr(&security->local_ctr, security->local_nonce);
+                        }
+                        return FAILURE;
+                    }
+//======================================================================
+                    session->heartbeat.sent = true;
+                    session->heartbeat.ack_rcvd = false;
                     session->heartbeat_ack.rcvd = false;
 //======================================================================
+                    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                    CLOSE_FD(&session->heartbeat_sender_timer_fd);
                     return SUCCESS;
                 }
             }

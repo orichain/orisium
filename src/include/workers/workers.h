@@ -64,10 +64,11 @@ typedef struct {
 //======================================================================
 // HEARTBEAT
 //======================================================================
+    packet_t heartbeat;
     packet_ack_t heartbeat_ack;
     uint64_t heartbeat_interval;
     bool is_first_heartbeat;
-    int heartbeat_receiver_timer_fd;
+    int heartbeat_sender_timer_fd;
     
     int test_drop_hello1_ack;
     int test_drop_hello2_ack;
@@ -102,8 +103,11 @@ typedef struct {
 // HEARTBEAT
 //======================================================================
     packet_t heartbeat;
+    packet_ack_t heartbeat_ack;
     uint64_t heartbeat_interval;
     int heartbeat_sender_timer_fd;
+    
+    int test_drop_heartbeat_ack;
 //----------------------------------------------------------------------
     node_metrics_t metrics;
 //======================================================================
@@ -149,8 +153,8 @@ void run_logic_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_
 void run_cow_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
 void run_dbr_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
 void run_dbw_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
-status_t retry_packet(worker_context_t *worker_ctx, cow_c_session_t *session, packet_t *packet);
-status_t retry_packet_ack(worker_context_t *worker_ctx, sio_c_session_t *session, packet_ack_t *packet_ack);
+status_t retry_packet(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, packet_t *packet);
+status_t retry_packet_ack(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, packet_ack_t *packet_ack);
 
 static inline void initialize_node_metrics(const char *label, node_metrics_t* metrics) {
     uint64_t_status_t rt = get_monotonic_time_ns(label);
@@ -281,11 +285,14 @@ static inline void setup_packet_ack(packet_ack_t *h) {
 static inline status_t setup_cow_session(const char *label, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
+    single_session->test_drop_heartbeat_ack = 0;
+//----------------------------------------------------------------------
     setup_packet(&single_session->hello1, (double)1);
     setup_packet(&single_session->hello2, (double)1);
     setup_packet(&single_session->hello3, (double)1);
     setup_packet(&single_session->hello4, (double)1);
     setup_packet(&single_session->heartbeat, (double)1);
+    setup_packet_ack(&single_session->heartbeat_ack);
     single_session->heartbeat_interval = (double)1;
     single_session->heartbeat_sender_timer_fd = -1;
     setup_oricle_double(&single_session->retry, (double)0);
@@ -327,6 +334,7 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
     cleanup_packet(label, cow_async, &single_session->hello3, true);
     cleanup_packet(label, cow_async, &single_session->hello4, true);
     cleanup_packet(label, cow_async, &single_session->heartbeat, true);
+    cleanup_packet_ack(label, cow_async, &single_session->heartbeat_ack, true);
     single_session->heartbeat_interval = (double)1;
     async_delete_event(label, cow_async, &single_session->heartbeat_sender_timer_fd);
     CLOSE_FD(&single_session->heartbeat_sender_timer_fd);
@@ -379,10 +387,11 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     setup_packet_ack(&single_session->hello2_ack);
     setup_packet_ack(&single_session->hello3_ack);
     setup_packet_ack(&single_session->hello4_ack);
+    setup_packet(&single_session->heartbeat, (double)1);
     setup_packet_ack(&single_session->heartbeat_ack);
     single_session->heartbeat_interval = (double)1;
     single_session->is_first_heartbeat = false;
-    single_session->heartbeat_receiver_timer_fd = -1;
+    single_session->heartbeat_sender_timer_fd = -1;
     setup_oricle_double(&single_session->retry, (double)0);
     setup_oricle_double(&single_session->rtt, (double)0);
     setup_oricle_double(&single_session->healthy, (double)100);
@@ -415,11 +424,12 @@ static inline void cleanup_sio_session(const char *label, async_type_t *sio_asyn
     cleanup_packet_ack(label, sio_async, &single_session->hello2_ack, true);
     cleanup_packet_ack(label, sio_async, &single_session->hello3_ack, true);
     cleanup_packet_ack(label, sio_async, &single_session->hello4_ack, true);
+    cleanup_packet(label, sio_async, &single_session->heartbeat, true);
     cleanup_packet_ack(label, sio_async, &single_session->heartbeat_ack, true);
     single_session->heartbeat_interval = (double)1;
     single_session->is_first_heartbeat = false;
-    async_delete_event(label, sio_async, &single_session->heartbeat_receiver_timer_fd);
-    CLOSE_FD(&single_session->heartbeat_receiver_timer_fd);
+    async_delete_event(label, sio_async, &single_session->heartbeat_sender_timer_fd);
+    CLOSE_FD(&single_session->heartbeat_sender_timer_fd);
     cleanup_oricle_double(&single_session->retry);
     cleanup_oricle_double(&single_session->rtt);
     cleanup_oricle_double(&single_session->healthy);

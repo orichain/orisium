@@ -12,7 +12,7 @@
 #include "orilink/heartbeat_ack.h"
 #include "constants.h"
 
-status_t orilink_serialize_heartbeat_ack(const char *label, const orilink_heartbeat_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
+status_t orilink_serialize_heartbeat_ack(const char *label, const orilink_heartbeat_ack_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
     if (!payload || !current_buffer || !offset) {
         LOG_ERROR("%sInvalid input pointers.", label);
         return FAILURE;
@@ -26,11 +26,6 @@ status_t orilink_serialize_heartbeat_ack(const char *label, const orilink_heartb
     uint64_t remote_id_be = htobe64(payload->remote_id);
     memcpy(current_buffer + current_offset_local, &remote_id_be, sizeof(uint64_t));
     current_offset_local += sizeof(uint64_t);
-    if (CHECK_BUFFER_BOUNDS(current_offset_local, DOUBLE_ARRAY_SIZE, buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    uint8_t hb_interval_be[8];
-    double_to_uint8_be(payload->hb_interval, hb_interval_be);
-    memcpy(current_buffer + current_offset_local, hb_interval_be, DOUBLE_ARRAY_SIZE);
-    current_offset_local += DOUBLE_ARRAY_SIZE; 
     *offset = current_offset_local;
     return SUCCESS;
 }
@@ -42,7 +37,7 @@ status_t orilink_deserialize_heartbeat_ack(const char *label, orilink_protocol_t
     }
     size_t current_offset = *offset_ptr;
     const uint8_t *cursor = buffer + current_offset;
-    orilink_heartbeat_t *payload = p->payload.orilink_heartbeat_ack;
+    orilink_heartbeat_ack_t *payload = p->payload.orilink_heartbeat_ack;
     if (current_offset + sizeof(uint64_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading local_id.", label);
         return FAILURE_OOBUF;
@@ -61,15 +56,6 @@ status_t orilink_deserialize_heartbeat_ack(const char *label, orilink_protocol_t
     payload->remote_id = be64toh(remote_id_be);
     cursor += sizeof(uint64_t);
     current_offset += sizeof(uint64_t);
-    if (current_offset + DOUBLE_ARRAY_SIZE > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading hb_interval.", label);
-        return FAILURE_OOBUF;
-    }
-    uint8_t hb_interval_be[8];
-    memcpy(hb_interval_be, cursor, DOUBLE_ARRAY_SIZE);
-    payload->hb_interval = uint8_be_to_double(hb_interval_be);
-    cursor += DOUBLE_ARRAY_SIZE;
-    current_offset += DOUBLE_ARRAY_SIZE;
     *offset_ptr = current_offset;
     return SUCCESS;
 }
@@ -86,7 +72,6 @@ orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_ack(
     uint64_t id_connection, 
     uint64_t local_id,
     uint64_t remote_id,
-    double hb_interval,
     uint8_t trycount
 )
 {
@@ -110,15 +95,14 @@ orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat_ack(
     result.r_orilink_protocol_t->id_connection = id_connection;
     result.r_orilink_protocol_t->trycount = trycount;
 	result.r_orilink_protocol_t->type = ORILINK_HEARTBEAT_ACK;
-	orilink_heartbeat_t *payload = (orilink_heartbeat_t *)calloc(1, sizeof(orilink_heartbeat_t));
+	orilink_heartbeat_ack_t *payload = (orilink_heartbeat_ack_t *)calloc(1, sizeof(orilink_heartbeat_ack_t));
 	if (!payload) {
-		LOG_ERROR("%sFailed to allocate orilink_heartbeat_t payload. %s", label, strerror(errno));
+		LOG_ERROR("%sFailed to allocate orilink_heartbeat_ack_t payload. %s", label, strerror(errno));
 		CLOSE_ORILINK_PROTOCOL(&result.r_orilink_protocol_t);
 		return result;
 	}
     payload->local_id = local_id;
     payload->remote_id = remote_id;
-    payload->hb_interval = hb_interval;
 	result.r_orilink_protocol_t->payload.orilink_heartbeat_ack = payload;
 	result.status = SUCCESS;
 	return result;

@@ -59,6 +59,11 @@ typedef struct {
 
 typedef struct {
     uint64_t local_id;
+    uint64_t remote_id;
+} orilink_heartbeat_ack_t;
+
+typedef struct {
+    uint64_t local_id;
     uint8_t publickey1[KEM_PUBLICKEY_BYTES / 2];
 } orilink_hello1_t;
 
@@ -138,7 +143,7 @@ typedef struct {
         orilink_hello4_t *orilink_hello4;
         orilink_hello4_ack_t *orilink_hello4_ack;
         orilink_heartbeat_t *orilink_heartbeat;
-        orilink_heartbeat_t *orilink_heartbeat_ack;
+        orilink_heartbeat_ack_t *orilink_heartbeat_ack;
 	} payload;
 } orilink_protocol_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan

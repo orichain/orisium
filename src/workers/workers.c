@@ -100,9 +100,7 @@ void cleanup_worker(worker_context_t *ctx) {
     free(ctx->label);
 }
 
-status_t retry_packet(worker_context_t *worker_ctx, cow_c_session_t *session, packet_t *packet) {
-    orilink_identity_t *identity = &session->identity;
-    orilink_security_t *security = &session->security;
+status_t retry_packet(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, packet_t *packet) {
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
@@ -161,9 +159,7 @@ status_t retry_packet(worker_context_t *worker_ctx, cow_c_session_t *session, pa
     return SUCCESS;
 }
 
-status_t retry_packet_ack(worker_context_t *worker_ctx, sio_c_session_t *session, packet_ack_t *packet_ack) {
-    orilink_identity_t *identity = &session->identity;
-    orilink_security_t *security = &session->security;
+status_t retry_packet_ack(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, packet_ack_t *packet_ack) {
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------

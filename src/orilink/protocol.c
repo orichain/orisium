@@ -172,7 +172,7 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                     return result;
                 }
             }
-            payload_fixed_size = sizeof(uint64_t) + sizeof(uint64_t) + DOUBLE_ARRAY_SIZE;
+            payload_fixed_size = sizeof(uint64_t) + sizeof(uint64_t);
             payload_dynamic_size = 0;
             break;
         }
@@ -888,9 +888,9 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            orilink_heartbeat_t *payload = (orilink_heartbeat_t*) calloc(1, sizeof(orilink_heartbeat_t));
+            orilink_heartbeat_ack_t *payload = (orilink_heartbeat_ack_t*) calloc(1, sizeof(orilink_heartbeat_ack_t));
             if (!payload) {
-                LOG_ERROR("%sFailed to allocate orilink_heartbeat_t without FAM. %s", label, strerror(errno));
+                LOG_ERROR("%sFailed to allocate orilink_heartbeat_ack_t without FAM. %s", label, strerror(errno));
                 CLOSE_ORILINK_PROTOCOL(&p);
                 free(key0);
                 result.status = FAILURE_NOMEM;

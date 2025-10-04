@@ -11,11 +11,11 @@
 #include "workers/ipc/handlers.h"
 #include "orilink/protocol.h"
 
-status_t handle_workers_ipc_udp_data_cow(worker_context_t *worker_ctx, void *worker_sessions, ipc_protocol_t* received_protocol) {
+status_t handle_workers_ipc_udp_data_sio(worker_context_t *worker_ctx, void *worker_sessions, ipc_protocol_t* received_protocol) {
     ipc_udp_data_t *iudp_datai = received_protocol->payload.ipc_udp_data;
     uint16_t slot_found = iudp_datai->session_index;
-    sio_c_session_t *sio_c_session = (sio_c_session_t *)worker_sessions;
-    sio_c_session_t *session = &sio_c_session[slot_found];
+    cow_c_session_t *cow_c_session = (cow_c_session_t *)worker_sessions;
+    cow_c_session_t *session = &cow_c_session[slot_found];
     orilink_identity_t *identity = &session->identity;
     orilink_security_t *security = &session->security;
 //----------------------------------------------------------------------
@@ -34,38 +34,44 @@ status_t handle_workers_ipc_udp_data_cow(worker_context_t *worker_ctx, void *wor
         return FAILURE;
     }
     switch (oudp_datao->type) {
-        case ORILINK_HELLO1: {
-            if (handle_workers_ipc_udp_data_cow_hello1(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {
+        case ORILINK_HELLO1_ACK: {
+            if (handle_workers_ipc_udp_data_sio_hello1_ack(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {
                 return FAILURE;
             }
             break;
         }
-        case ORILINK_HELLO2: {
-            if (handle_workers_ipc_udp_data_cow_hello2(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {
+        case ORILINK_HELLO2_ACK: {
+            if (handle_workers_ipc_udp_data_sio_hello2_ack(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {
                 return FAILURE;
             }
             break;
         }
-        case ORILINK_HELLO3: {
-            if (handle_workers_ipc_udp_data_cow_hello3(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {
+        case ORILINK_HELLO3_ACK: {
+            if (handle_workers_ipc_udp_data_sio_hello3_ack(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {
                 return FAILURE;
             }
             break;
         }
-        case ORILINK_HELLO4: {
-            if (handle_workers_ipc_udp_data_cow_hello4(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {
+        case ORILINK_HELLO4_ACK: {
+            if (handle_workers_ipc_udp_data_sio_hello4_ack(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {
                 return FAILURE;
             }
             break;
         }
         case ORILINK_HEARTBEAT: {
-            if (handle_workers_ipc_udp_data_cow_heartbeat(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {
+            if (handle_workers_ipc_udp_data_sio_heartbeat(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {
+                return FAILURE;
+            }
+            break;
+        }
+        case ORILINK_HEARTBEAT_ACK: {
+            if (handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {
                 return FAILURE;
             }
             break;
         }
         default:
-            LOG_ERROR("%sUnknown ORILINK protocol type %d from Remote COW-%d[%d]. Ignoring.", worker_ctx->label, oudp_datao->type, oudp_datao->local_index, oudp_datao->local_session_index);
+            LOG_ERROR("%sUnknown ORILINK protocol type %d from Remote SIO-%d[%d]. Ignoring.", worker_ctx->label, oudp_datao->type, oudp_datao->local_index, oudp_datao->local_session_index);
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
     }

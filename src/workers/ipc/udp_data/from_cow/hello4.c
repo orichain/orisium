@@ -129,7 +129,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     }
 //======================================================================
     if (trycount > (uint8_t)1 && session->hello4_ack.data != NULL) {
-        if (retry_packet_ack(worker_ctx, session, &session->hello4_ack) != SUCCESS) {
+        if (retry_packet_ack(worker_ctx, identity, security, &session->hello4_ack) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return FAILURE;
