@@ -52,7 +52,7 @@ Security is maintained through a strict two-tiered cryptographic state:
 
 The protocol includes a highly-secure mechanism to recover from extreme state drift:
 
-  * **Temporary Rollback Check:** If a packet arrives with a non-matching counter, the protocol performs a temporary, non-destructive check. It copies the current counter (tmp\_ctr), decrements it, and **tests** if the packet validates against the previous state.
+  * **Temporary Retry Validation ($\text{Rollback}$ Check):** This mechanism is now specifically dedicated to **validating delayed or retransmitted packets (retries)**. If an *out-of-order* packet arrives, the protocol performs a temporary, non-destructive check. It copies the current counter (tmp\_ctr), decrements it, and **tests** if the packet validates against a potential previous state. This ensures that the system can securely process a legitimate $\text{retry}$ without compromising the live session state.
   * **Secure Implementation:** The actual live session counter is **never modified** unless this check is passed. This design means the mechanism functions as a **cryptographic safety net** for critical failure scenarios, rather than a routine recovery tool.
 
 -----
