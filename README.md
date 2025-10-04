@@ -14,7 +14,7 @@ Orisium is a **custom, low-latency P2P transport protocol** designed for real-ti
 * **Strict Serial Handshake:** Utilizes a rigid serial state machine (`HELLO` to `FINISH`) to ensure every cryptographic handshake step and **PQC Key Exchange** is verified and authenticated.
 * **Absolute Anti-Replay:** The protocol strictly rejects re-received packets (including retries of old handshake packets) to maintain state integrity and prevent replay attacks.
 
-### 2. Adaptive Dual-State Architecture
+## 2. Adaptive Dual-State Architecture
 Orisium separates traffic into two functionally distinct streams to optimize reliability without sacrificing speed, eliminating the classic Speed vs. Reliability trade-off.
 
 | Stream | Flow Nature | Purpose & Key Innovation |
@@ -22,39 +22,39 @@ Orisium separates traffic into two functionally distinct streams to optimize rel
 | **Control Stream** | **Serial & Reliable** (Requires ACK) | Establishes the PQC session, performs **Network Orchestration**, and manages **Node Hierarchy**. Failure here triggers a controlled session disconnect. |
 | **Data Stream** | **Parallel & Reliable** (Selective Repeat/Per-Packet Timer) | High-speed *payload* transmission. **Eliminates Head-of-Line Blocking (HOLB)**, ensuring minimal *worst-case latency* for data. Failure only triggers packet retransmission. |
 
-### Core Security & Resilience
+## 3. Core Security & Resilience
 
 Orisium is a **secure, resilient, and stateful transport protocol built on top of UDP**. Unlike traditional protocols that rely on TCP/TLS, Orisium is designed to **survive and maintain cryptographic integrity** in highly lossy, unstable, or actively censored network environments.
 
 Our design philosophy centers around maintaining a strict two-tiered cryptographic state:
 
-#### 1. Hierarchical Counter Management
+### a. Hierarchical Counter Management
 
 We separate the global session security from individual stream data integrity:
 
-* **Heartbeat Counter (Global State):** This serves as the **master clock** and custodian of the session's current cryptographic state. The Heartbeat counter only advances when a valid, authenticated Heartbeat frame is received. Its primary function is to lock the session's security state, making it highly **resilient against general replay attacks.**
+* **Heartbeat Counter (Global State):** This serves as the **master clock** and custodian of the session's current cryptographic state. The Heartbeat counter only advances when a valid, authenticated Heartbeat frame is received. Its primary function is to lock the session's security state, making it highly **resilient against general replay attacks**.
 * **Prepared/Re Counter (Data Stream State):** This counter is used for securing each individual data stream packet. The integrity of these data stream counters is **tethered** to the validity of the global Heartbeat state.
 
-#### 2. Stream State Synchronization ($\text{SYN\_DATA}$)
+### b. Stream State Synchronization (SYN\_DATA)
 
-To initiate a new data stream, the protocol utilizes the $\text{SYN\_DATA}$ frame:
+To initiate a new data stream, the protocol utilizes the **SYN\_DATA** frame:
 
-* The $\text{SYN\_DATA}$ frame is used to communicate the **last verified $\text{Heartbeat}$ base counter** to the receiving endpoint.
-* This mechanism ensures that **every new data stream begins with a cryptographically unique state** derived from the current Heartbeat, thus preventing $\text{Nonce}$ reuse and establishing stream-specific integrity.
+* The **SYN\_DATA** frame is used to communicate the **last verified Heartbeat base counter** to the receiving endpoint.
+* This mechanism ensures that **every new data stream begins with a cryptographically unique state** derived from the current Heartbeat, thus preventing **Nonce** reuse and establishing stream-specific integrity.
 
-#### 3. Advanced Failure Recovery (Rollback Mechanism)
+### c. Advanced Failure Recovery (Rollback Mechanism)
 
 Orisium employs a targeted recovery mechanism to avoid connection drops in the face of critical network anomalies:
 
 * The explicit **Cryptographic Counter Rollback/Resync** mechanism is an emergency feature triggered only when the Heartbeat counter falls severely out of synchronization.
-* By rolling back to the last known secure state, Orisium allows the connection to **quickly recover and continue** (e.g., observed recovery time $\sim9.5 \text{ ms}$ in tests) without terminating the long-lived session. This aggressive focus on *survival* makes Orisium ideal for **VPN, $\text{VoIP}$, and other Internet Freedom tools** operating under network suppression.
+* By rolling back to the last known secure state, Orisium allows the connection to **quickly recover and continue** (e.g., observed recovery time $\sim9.5 \text{ ms}$ in tests) without terminating the long-lived session. This aggressive focus on **survival** makes Orisium ideal for **VPN, $\text{VoIP}$, and other Internet Freedom tools** operating under network suppression.
 
-### 3. Intelligent Network Control
+## 4. Intelligent Network Control
 The protocol achieves resilience and efficiency through advanced adaptive logic:
 * **Adaptive Heartbeat:** Employs a **Kalman Filter** to predict network conditions (RTT, jitter) and dynamically adjusts the heartbeat interval ($4 \text{ seconds} \times 2^{\text{prediction}}$). This provides both rapid *liveness* detection and responsible bandwidth use.
 * **Mobile Efficiency:** The heartbeat interval is deliberately extended for mobile clients (e.g., $20-30 \text{ seconds}$) to prevent **cellular radio wake-up** and subsequent **battery drain**.
 
-### 4. High-Throughput Data Optimization
+## 5. High-Throughput Data Optimization
 * **Selective Repeat (SR):** Each data packet operates with its own timer and is retransmitted independently. This guarantees **maximum throughput** by ensuring only lost packets are resent.
 * **Responsible Flow Control:** Transmission is governed by the **Receive Window Buffer** (set at **256 packets** or $\approx 300 \text{ KB}$), preventing receiver overload and maintaining network stability.
 * **Safe Fragmentation:** Data is segmented into $\approx 1200 \text{ byte}$ fragments, mitigating the risks of IP fragmentation and optimizing UDP payload size.
