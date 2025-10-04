@@ -42,12 +42,14 @@ To initiate a new data stream, the protocol utilizes the **SYN\_DATA** frame:
 * The **SYN\_DATA** frame is used to communicate the **last verified Heartbeat base counter** to the receiving endpoint.
 * This mechanism ensures that **every new data stream begins with a cryptographically unique state** derived from the current Heartbeat, thus preventing **Nonce** reuse and establishing stream-specific integrity.
 
-### c. Advanced Failure Recovery (Rollback Mechanism)
+### feat: Rearchitect Heartbeat to Dual-Directional State Synchronization
 
-Orisium employs a targeted recovery mechanism to avoid connection drops in the face of critical network anomalies:
+Refactored the Heartbeat mechanism from a potentially time-dependent, one-way system to a robust two-way (SIO <-> COW) synchronized state check.
 
-* The explicit **Cryptographic Counter Rollback/Resync** mechanism is an emergency feature triggered only when the Heartbeat counter falls severely out of synchronization.
-* By rolling back to the last known secure state, Orisium allows the connection to **quickly recover and continue** (e.g., observed recovery time $\sim9.5 \text{ ms}$ in tests) without terminating the long-lived session. This aggressive focus on **survival** makes Orisium ideal for **VPN, $\text{VoIP}$, and other Internet Freedom tools** operating under network suppression.
+Key changes:
+- **Replaced Rollback Trigger:** Eliminated the likelihood of critical cryptographic state rollback by resolving underlying timer/state drift issues.
+- **Enabled RTT Measurement:** The ping-pong exchange establishes clear, active Round-Trip Time (RTT) measurement.
+- **Explicit State Agreement:** The new cycle (Request -> Delay -> ACK -> Delay -> Request) forces both endpoints to explicitly agree on session timing, significantly boosting stability and security integrity.
 
 ## 4. Intelligent Network Control
 The protocol achieves resilience and efficiency through advanced adaptive logic:
