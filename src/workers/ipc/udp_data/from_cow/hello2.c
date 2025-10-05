@@ -105,7 +105,6 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
             return cmac;
         }
     }
-    session->hello2_ack.ack_sent = false;
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
