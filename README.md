@@ -1,5 +1,3 @@
------
-
 # Orisium
 
 Orisium is a **high-performance, resilient Peer-to-Peer (P2P) network** designed for global scalability, attack resilience, and robust decentralization. Utilizing a dynamic hierarchical architecture and a specialized custom $\text{UDP}$-based protocol, Orisium provides a superior, secure foundation for next-generation decentralized applications.
@@ -52,6 +50,8 @@ Security is maintained through a strict two-tiered cryptographic state:
 
 The protocol includes a highly-secure mechanism to recover from extreme state drift:
 
+  * **Cryptographic Anchor State (The Heartbeat Checkpoint):** To prevent **Counter Break** failures due to transient network delay/loss, the protocol implements a specific anchor state (`packet_anchor`) for Heartbeat packets. This state holds the $\text{CTR}$ and $\text{Nonce}$ of the **last successfully ACKed packet**.
+  * **State-Aware Retry Logic:** When the Heartbeat timer expires, the protocol **strictly refuses to advance the counter ($\text{CTR}$)** unless the $\text{ACK}$ for the last sent packet has been received. Instead, it initiates a **retry** using the $\text{CTR}$ from the anchor state. This ensures that the system's live counter state is **never compromised** by a simple timer expiration.
   * **Temporary Retry Validation ($\text{Rollback}$ Check):** This mechanism is now specifically dedicated to **validating delayed or retransmitted packets (retries)**. If an *out-of-order* packet arrives, the protocol performs a temporary, non-destructive check. It copies the current counter (tmp\_ctr), decrements it, and **tests** if the packet validates against a potential previous state. This ensures that the system can securely process a legitimate $\text{retry}$ without compromising the live session state.
   * **Secure Implementation:** The actual live session counter is **never modified** unless this check is passed. This design means the mechanism functions as a **cryptographic safety net** for critical failure scenarios, rather than a routine recovery tool.
 
@@ -132,7 +132,7 @@ Internal communication (`master` $\leftrightarrow$ `logic` $\leftrightarrow$ `co
 The main development and testing environment currently uses **Rocky Linux 10** and **CentOS Stream 9**.
 
 ```bash
-git clone https://github.com/orichain/orisium.git
+git clone [https://github.com/orichain/orisium.git](https://github.com/orichain/orisium.git)
 cd orisium
 git submodule update --init --recursive
 gmake clean debug

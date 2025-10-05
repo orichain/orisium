@@ -2,7 +2,6 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -16,7 +15,7 @@
 #include "orilink/protocol.h"
 #include "stdbool.h"
 
-static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_session_t *session, orilink_identity_t *identity, uint64_t_status_t *current_time, uint8_t *trycount) {
+static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, uint64_t_status_t *current_time, uint8_t *trycount) {
     if (*trycount > (uint8_t)1) {
         double try_count = (double)session->hello2_ack.ack_sent_try_count;
         calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
@@ -36,6 +35,13 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
     }
 //======================================================================
     session->hello3_ack.ack_sent = true;
+//----------------------------------------------------------------------
+    session->packet_anchor.last_rcvd_ctr = security->remote_ctr;
+    memcpy(session->packet_anchor.last_rcvd_nonce, security->remote_nonce, AES_NONCE_BYTES);
+//----------------------------------------------------------------------
+// -1 Because Of Passing Deserialize Process that is +1
+//----------------------------------------------------------------------
+    decrement_ctr(&session->packet_anchor.last_rcvd_ctr, session->packet_anchor.last_rcvd_nonce);
 //======================================================================
     return SUCCESS;
 }
@@ -51,6 +57,7 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
 //======================================================================
     if (!session->hello2_ack.ack_sent) {
         LOG_ERROR("%sReceive Hello3 But This Worker Session Is Never Sending Hello2_Ack.", worker_ctx->label);
+        CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
@@ -58,16 +65,19 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
         if (trycount != (uint8_t)1) {
             if (trycount > (uint8_t)MAX_RETRY) {
                 LOG_ERROR("%sHello3 Received Already.", worker_ctx->label);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
                 CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
                 return FAILURE_MAXTRY;
             }
             if (trycount <= session->heartbeat_ack.last_trycount) {
                 LOG_ERROR("%sHello3 Received Already.", worker_ctx->label);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
                 CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
                 return FAILURE_IVLDTRY;
             }
         } else {
             LOG_ERROR("%sHello3 Received Already.", worker_ctx->label);
+            CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return FAILURE;
         }
@@ -88,26 +98,13 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return cmac;
         }
-        printf("SIO Temporary Remote Counter Decrement 1\n");
-        uint8_t *tmp_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-        if (!tmp_nonce) {
+        if (!is_same_ctr(&session->packet_anchor.last_rcvd_ctr, session->packet_anchor.last_rcvd_nonce, &oudp_datao->ctr, session->packet_anchor.last_rcvd_nonce)) {
+            LOG_ERROR("%sHello3 Received Already.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE_NOMEM;
+            return FAILURE;
         }
-        uint32_t tmp_ctr = security->remote_ctr;
-        memcpy(tmp_nonce, security->remote_nonce, AES_NONCE_BYTES);
-        decrement_ctr(&tmp_ctr, tmp_nonce);
-        status_t cctr = orilink_check_ctr(worker_ctx->label, security->aes_key, &tmp_ctr, oudp_datao);
-        if (cctr != SUCCESS) {
-            memset(tmp_nonce, 0, AES_NONCE_BYTES);
-            free(tmp_nonce);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return cctr;
-        }
-        memset(tmp_nonce, 0, AES_NONCE_BYTES);
-        free(tmp_nonce);
+        printf("%sRetry Detected\n", worker_ctx->label);
     } else {
         status_t cmac = orilink_check_mac_ctr(
             worker_ctx->label, 
@@ -153,6 +150,7 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
             worker_ctx, 
             session, 
             identity, 
+            security,
             &current_time, 
             &trycount
         );
@@ -353,6 +351,7 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
         worker_ctx, 
         session, 
         identity, 
+        security,
         &current_time, 
         &trycount
     );
