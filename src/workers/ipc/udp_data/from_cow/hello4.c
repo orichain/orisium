@@ -18,7 +18,7 @@
 #include "orilink/protocol.h"
 #include "stdbool.h"
 
-static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, uint64_t_status_t *current_time, uint8_t *trycount) {
+static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_session_t *session, orilink_identity_t *identity, uint64_t_status_t *current_time, uint8_t *trycount) {
     if (*trycount > (uint8_t)1) {
         double try_count = (double)session->hello3_ack.ack_sent_try_count;
         calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
@@ -32,19 +32,12 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
         uint64_t interval_ull = session->hello3_ack.rcvd_time - session->hello3_ack.ack_sent_time;
         double rtt_value = (double)interval_ull;
         calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-        cleanup_packet_ack(worker_ctx->label, &worker_ctx->async, &session->hello3_ack, false);
+        reset_packet_ack_data(&session->hello3_ack);
         
         printf("%sRTT Hello-3 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
     }
 //======================================================================
     session->hello4_ack.ack_sent = true;
-//----------------------------------------------------------------------
-    session->packet_anchor.last_rcvd_ctr = security->remote_ctr;
-    memcpy(session->packet_anchor.last_rcvd_nonce, security->remote_nonce, AES_NONCE_BYTES);
-//----------------------------------------------------------------------
-// -1 Because Of Passing Deserialize Process that is +1
-//----------------------------------------------------------------------
-    decrement_ctr(&session->packet_anchor.last_rcvd_ctr, session->packet_anchor.last_rcvd_nonce);
 //----------------------------------------------------------------------
 // Initialize First Time Heartbeat
 //----------------------------------------------------------------------
@@ -58,6 +51,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     uint8_t inc_ctr = oudp_datao->inc_ctr;
     uint8_t l_inc_ctr = 0xFF;
     uint8_t trycount = oudp_datao->trycount;
+    uint8_t retry_index = 0xff;
 //======================================================================
 // + Security
 //======================================================================
@@ -70,13 +64,13 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     if (session->hello3_ack.rcvd) {
         if (trycount != (uint8_t)1) {
             if (trycount > (uint8_t)MAX_RETRY) {
-                LOG_ERROR("%sHello4 Received Already.", worker_ctx->label);
+                LOG_ERROR("%sHello4 Max retry.", worker_ctx->label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
                 return FAILURE_MAXTRY;
             }
             if (trycount <= session->heartbeat_ack.last_trycount) {
-                LOG_ERROR("%sHello4 Received Already.", worker_ctx->label);
+                LOG_ERROR("%sHello4 Try Count Invalid.", worker_ctx->label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
                 return FAILURE_IVLDTRY;
@@ -90,19 +84,18 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     }
     session->hello3_ack.last_trycount = trycount;
 //======================================================================
-    if (trycount != (uint8_t)1 && inc_ctr != 0xFF && security->remote_ctr != oudp_datao->ctr) {
+    if (
+        trycount != (uint8_t)1 &&
+        inc_ctr != 0xFF
+    )
+    {
         status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
         if (cmac != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return cmac;
         }
-        if (!is_same_ctr(&session->packet_anchor.last_rcvd_ctr, session->packet_anchor.last_rcvd_nonce, &oudp_datao->ctr, session->packet_anchor.last_rcvd_nonce)) {
-            LOG_ERROR("%sHello4 Received Already.", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE;
-        }
+        retry_index = (uint8_t)MAX_RETRY - (uint8_t)1;
         printf("%sRetry Detected\n", worker_ctx->label);
     } else {
         status_t cmac = orilink_check_mac_ctr(
@@ -130,8 +123,16 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         return FAILURE;
     }
 //======================================================================
-    if (trycount > (uint8_t)1 && session->hello4_ack.data != NULL) {
-        if (retry_packet_ack(worker_ctx, identity, security, &session->hello4_ack) != SUCCESS) {
+    if (trycount > (uint8_t)1) {
+        if (retry_index != 0xff) {
+            if (session->hello4_ack.data[retry_index] != NULL) {
+                if (retry_packet_ack(worker_ctx, identity, security, &session->hello4_ack, retry_index) != SUCCESS) {
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                    return FAILURE;
+                }
+            }
+        } else {
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return FAILURE;
@@ -142,7 +143,6 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
             worker_ctx, 
             session, 
             identity, 
-            security,
             &current_time, 
             &trycount
         );
@@ -459,7 +459,6 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         }
         return FAILURE;
     }
-    cleanup_packet_ack(worker_ctx->label, &worker_ctx->async, &session->hello4_ack, false);
 //======================================================================
 // Test Packet Dropped
 //======================================================================
@@ -517,9 +516,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         }
     }
 //======================================================================
-//----------------------------------------------------------------------
     CLOSE_IPC_PROTOCOL(&received_protocol);
-//----------------------------------------------------------------------                            
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
 //======================================================================
     memcpy(&identity->remote_addr, remote_addr, sizeof(struct sockaddr_in6));
@@ -534,7 +531,6 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         worker_ctx, 
         session, 
         identity, 
-        security,
         &current_time, 
         &trycount
     );

@@ -108,8 +108,8 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
 //======================================================================
     session->heartbeat_ack.rcvd = false;
 //======================================================================
-    session->packet_anchor.last_acked_ctr = session->packet_anchor.last_ctr;
-    memcpy(session->packet_anchor.last_acked_nonce, session->packet_anchor.last_nonce, AES_NONCE_BYTES);
+    session->heartbeat_ack.anchor.last_acked_ctr = session->heartbeat_ack.anchor.last_ctr;
+    memcpy(session->heartbeat_ack.anchor.last_acked_nonce, session->heartbeat_ack.anchor.last_nonce, AES_NONCE_BYTES);
 //======================================================================
     //session->metrics.last_ack = current_time.r_uint64_t;
     //session->metrics.count_ack += (double)1;

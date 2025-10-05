@@ -378,7 +378,10 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     
     printf("%sRTT Hello-4 = %f\n", worker_ctx->label, session->rtt.value_prediction);
 //======================================================================
+// Heartbeat Ack Security 1 & Security 2 Open
+//======================================================================
     session->heartbeat.sent = true;
+    session->heartbeat.ack_rcvd = false;
 //======================================================================
 // Heartbeat Security 1 & Security 2 Open
 //======================================================================

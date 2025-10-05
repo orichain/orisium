@@ -175,11 +175,16 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     if (retry_packet(worker_ctx, identity, security, &session->heartbeat) != SUCCESS) {
                         return FAILURE;
                     }
+//======================================================================
+// Heartbeat Ack Security 1 & Security 2 Open
+//======================================================================
+                    session->heartbeat.sent = true;
+                    session->heartbeat.ack_rcvd = false;
                     return SUCCESS;
                 } else if (*current_fd == session->heartbeat_sender_timer_fd) {
                     uint64_t u;
                     read(session->heartbeat_sender_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                    if (is_same_ctr(&session->packet_anchor.last_ctr, session->packet_anchor.last_nonce, &session->packet_anchor.last_acked_ctr, session->packet_anchor.last_acked_nonce)) {
+                    if (is_same_ctr(&session->heartbeat_ack.anchor.last_ctr, session->heartbeat_ack.anchor.last_nonce, &session->heartbeat_ack.anchor.last_acked_ctr, session->heartbeat_ack.anchor.last_acked_nonce)) {
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
@@ -279,8 +284,8 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //======================================================================
                         session->heartbeat_ack.rcvd = false;
 //======================================================================
-                        session->packet_anchor.last_ctr = security->remote_ctr;
-                        memcpy(session->packet_anchor.last_nonce, security->remote_nonce, AES_NONCE_BYTES);
+                        session->heartbeat_ack.anchor.last_acked_ctr = security->remote_ctr;
+                        memcpy(session->heartbeat_ack.anchor.last_acked_nonce, security->remote_nonce, AES_NONCE_BYTES);
 //======================================================================
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
@@ -354,7 +359,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 } else if (*current_fd == session->heartbeat_sender_timer_fd) {
                     uint64_t u;
                     read(session->heartbeat_sender_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                    if (is_same_ctr(&session->packet_anchor.last_ctr, session->packet_anchor.last_nonce, &session->packet_anchor.last_acked_ctr, session->packet_anchor.last_acked_nonce)) {
+                    if (is_same_ctr(&session->heartbeat_ack.anchor.last_ctr, session->heartbeat_ack.anchor.last_nonce, &session->heartbeat_ack.anchor.last_acked_ctr, session->heartbeat_ack.anchor.last_acked_nonce)) {
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
@@ -454,8 +459,8 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //======================================================================
                         session->heartbeat_ack.rcvd = false;
 //======================================================================
-                        session->packet_anchor.last_ctr = security->remote_ctr;
-                        memcpy(session->packet_anchor.last_nonce, security->remote_nonce, AES_NONCE_BYTES);
+                        session->heartbeat_ack.anchor.last_acked_ctr = security->remote_ctr;
+                        memcpy(session->heartbeat_ack.anchor.last_acked_nonce, security->remote_nonce, AES_NONCE_BYTES);
 //======================================================================
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
