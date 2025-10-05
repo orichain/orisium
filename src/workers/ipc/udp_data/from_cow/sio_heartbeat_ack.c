@@ -1,5 +1,4 @@
 #include <inttypes.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "log.h"
@@ -11,6 +10,7 @@
 #include "orilink/protocol.h"
 #include "stdbool.h"
 #include "constants.h"
+#include "async.h"
 
 struct sockaddr_in6;
 
@@ -105,7 +105,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     cleanup_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
 
-    printf("%sRTT Heartbeat = %f\n", worker_ctx->label, session->rtt.value_prediction);
+    LOG_DEVEL_DEBUG("%sRTT Heartbeat = %f", worker_ctx->label, session->rtt.value_prediction);
 //======================================================================
 // Heartbeat Security 2 Open
 //======================================================================
