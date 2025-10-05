@@ -85,7 +85,11 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
         return FAILURE;
     }
 //======================================================================
-    if (trycount > (uint8_t)1) {
+    if (
+        trycount != (uint8_t)1 &&
+        inc_ctr != 0xFF
+    )
+    {
         if (retry_index != 0xff) {
             if (session->hello1_ack.data[retry_index] != NULL) {
                 if (retry_packet_ack(worker_ctx, identity, security, &session->hello1_ack, retry_index) != SUCCESS) {

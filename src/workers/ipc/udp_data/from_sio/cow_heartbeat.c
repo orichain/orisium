@@ -152,7 +152,12 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
         return FAILURE;
     }
 //======================================================================
-    if (trycount > (uint8_t)1) {
+    if (
+        trycount != (uint8_t)1 &&
+        inc_ctr != 0xFF &&
+        security->remote_ctr != oudp_datao_ctr
+    )
+    {
         if (retry_index != 0xff) {
             if (session->heartbeat_ack.data[retry_index] != NULL) {
                 if (retry_packet_ack(worker_ctx, identity, security, &session->heartbeat_ack, retry_index) != SUCCESS) {
