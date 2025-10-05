@@ -110,6 +110,7 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
 //----------------------------------------------------------------------
         return SUCCESS;
     }
+    session->hello1_ack.ack_sent = false;
 //======================================================================
     worker_type_t remote_wot;
     uint8_t remote_index;

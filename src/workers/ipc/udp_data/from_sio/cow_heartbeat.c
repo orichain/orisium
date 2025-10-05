@@ -30,7 +30,7 @@ static inline status_t create_heartbeat_sender_timer_fd(worker_context_t *worker
     if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
         return FAILURE;
     }
-    //printf("Hereeeeeeeeeeeeeeeeeeeee....... cow_heartbeat.c create_heartbeat_sender_timer_fd FD %d\n", session->heartbeat_sender_timer_fd);
+    //LOG_DEBUG_DEVEL("Hereeeeeeeeeeeeeeeeeeeee....... cow_heartbeat.c create_heartbeat_sender_timer_fd FD %d", session->heartbeat_sender_timer_fd);
     if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_sender_timer_fd,
         (time_t)timer_interval,
         (long)((timer_interval - (time_t)timer_interval) * 1e9),
@@ -126,7 +126,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return FAILURE;
         }
-        printf("%sRetry Detected\n", worker_ctx->label);
+        LOG_DEBUG_DEVEL("%sRetry Detected", worker_ctx->label);
     } else {
         status_t cmac = orilink_check_mac_ctr(
             worker_ctx->label, 
@@ -142,6 +142,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
             return cmac;
         }
     }
+    session->heartbeat_ack.ack_sent = false;
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
@@ -295,7 +296,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
         session->test_drop_heartbeat_ack == 9
     )
     {
-        printf("[Debug Here Helper]: Heartbeat Ack Packet Number %d. Sending To Fake Addr To Force Retry\n", session->test_drop_heartbeat_ack);
+        LOG_DEBUG_DEVEL("[Debug Here Helper]: Heartbeat Ack Packet Number %d. Sending To Fake Addr To Force Retry", session->test_drop_heartbeat_ack);
         struct sockaddr_in6 fake_addr;
         memset(&fake_addr, 0, sizeof(struct sockaddr_in6));
         if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &fake_addr, &udp_data, &session->heartbeat_ack) != SUCCESS) {

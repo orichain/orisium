@@ -89,6 +89,9 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
         return FAILURE;
     }
 //======================================================================
+    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+    CLOSE_FD(&session->heartbeat_sender_timer_fd);
+//======================================================================
     CLOSE_IPC_PROTOCOL(&received_protocol);
 //----------------------------------------------------------------------
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);

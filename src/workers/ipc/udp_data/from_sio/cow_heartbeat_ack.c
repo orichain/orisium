@@ -89,6 +89,9 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
         return FAILURE;
     }
 //======================================================================
+    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+    CLOSE_FD(&session->heartbeat_sender_timer_fd);
+//======================================================================
     CLOSE_IPC_PROTOCOL(&received_protocol);
 //----------------------------------------------------------------------
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
@@ -102,7 +105,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     cleanup_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
 
-    printf("%sRTT Heartbeat = %f\n", worker_ctx->label, session->rtt.value_prediction);
+    LOG_DEBUG_DEVEL("%sRTT Heartbeat = %f\n", worker_ctx->label, session->rtt.value_prediction);
 //======================================================================
 // Heartbeat Security 2 Open
 //======================================================================
