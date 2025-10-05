@@ -171,10 +171,8 @@ status_t retry_packet_ack(worker_context_t *worker_ctx, orilink_identity_t *iden
 
 static inline uint8_t ctr_is_in_anchor(packet_anchor_t *h, uint32_t *ctr) {
     for (uint8_t i=0x00;i<(uint8_t)MAX_RETRY;++i) {
-        if (h->last_rcvd_nonce != NULL) {
-            if (*ctr == h->last_rcvd_ctr[i]) {
-                return i;
-            }
+        if (*ctr == h->last_rcvd_ctr[i]) {
+            return i;
         }
     }
     return 0xff;
