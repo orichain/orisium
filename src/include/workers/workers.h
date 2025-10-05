@@ -49,6 +49,13 @@ typedef struct {
 } packet_ack_t;
 
 typedef struct {
+    uint8_t *last_nonce;
+    uint32_t last_ctr;
+    uint8_t *last_acked_nonce;
+    uint32_t last_acked_ctr;
+} heartbeat_anchor_t;
+
+typedef struct {
 //======================================================================
 // IDENTITY & SECURITY
 //======================================================================    
@@ -69,6 +76,7 @@ typedef struct {
     uint64_t heartbeat_interval;
     bool is_first_heartbeat;
     int heartbeat_sender_timer_fd;
+    heartbeat_anchor_t hb_anchor;
     
     int test_drop_hello1_ack;
     int test_drop_hello2_ack;
@@ -106,6 +114,7 @@ typedef struct {
     packet_ack_t heartbeat_ack;
     uint64_t heartbeat_interval;
     int heartbeat_sender_timer_fd;
+    heartbeat_anchor_t hb_anchor;
     
     int test_drop_heartbeat_ack;
 //----------------------------------------------------------------------
@@ -283,6 +292,12 @@ static inline void setup_packet_ack(packet_ack_t *h) {
 }
 
 static inline status_t setup_cow_session(const char *label, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
+//----------------------------------------------------------------------
+    single_session->hb_anchor.last_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
+    single_session->hb_anchor.last_ctr = (uint32_t)0;
+    single_session->hb_anchor.last_acked_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
+    single_session->hb_anchor.last_acked_ctr = (uint32_t)0;
+//----------------------------------------------------------------------
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
     single_session->test_drop_heartbeat_ack = 0;
@@ -329,6 +344,14 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
 }
 
 static inline void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session) {
+//----------------------------------------------------------------------
+    memset(single_session->hb_anchor.last_nonce, 0, AES_NONCE_BYTES);
+    free(single_session->hb_anchor.last_nonce);
+    single_session->hb_anchor.last_ctr = (uint32_t)0;
+    memset(single_session->hb_anchor.last_acked_nonce, 0, AES_NONCE_BYTES);
+    free(single_session->hb_anchor.last_acked_nonce);
+    single_session->hb_anchor.last_acked_ctr = (uint32_t)0;
+//----------------------------------------------------------------------
     cleanup_packet(label, cow_async, &single_session->hello1, true);
     cleanup_packet(label, cow_async, &single_session->hello2, true);
     cleanup_packet(label, cow_async, &single_session->hello3, true);
@@ -375,6 +398,12 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
 }
 
 static inline status_t setup_sio_session(const char *label, sio_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
+//----------------------------------------------------------------------
+    single_session->hb_anchor.last_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
+    single_session->hb_anchor.last_ctr = (uint32_t)0;
+    single_session->hb_anchor.last_acked_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
+    single_session->hb_anchor.last_acked_ctr = (uint32_t)0;
+//----------------------------------------------------------------------
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
     single_session->test_drop_hello1_ack = 0;
@@ -425,6 +454,14 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
 }
 
 static inline void cleanup_sio_session(const char *label, async_type_t *sio_async, sio_c_session_t *single_session) {
+//----------------------------------------------------------------------
+    memset(single_session->hb_anchor.last_nonce, 0, AES_NONCE_BYTES);
+    free(single_session->hb_anchor.last_nonce);
+    single_session->hb_anchor.last_ctr = (uint32_t)0;
+    memset(single_session->hb_anchor.last_acked_nonce, 0, AES_NONCE_BYTES);
+    free(single_session->hb_anchor.last_acked_nonce);
+    single_session->hb_anchor.last_acked_ctr = (uint32_t)0;
+//----------------------------------------------------------------------
     cleanup_packet_ack(label, sio_async, &single_session->hello1_ack, true);
     cleanup_packet_ack(label, sio_async, &single_session->hello2_ack, true);
     cleanup_packet_ack(label, sio_async, &single_session->hello3_ack, true);
