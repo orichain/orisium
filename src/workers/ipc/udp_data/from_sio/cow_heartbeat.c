@@ -142,7 +142,6 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
             return cmac;
         }
     }
-    session->heartbeat_ack.ack_sent = false;
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
