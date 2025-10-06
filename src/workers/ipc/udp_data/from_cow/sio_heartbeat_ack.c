@@ -40,10 +40,14 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return cmac;
         }
-        cleanup_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
-        session->heartbeat_ack.rcvd = false;
+//======================================================================
+// Stop Timer Sender, But Don't Stop Timer Retry
+// We Have Send Heartbeat But Remote Peer Was Not Ready
+//======================================================================
+        //cleanup_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
         CLOSE_FD(&session->heartbeat_sender_timer_fd);
+//======================================================================
         return SUCCESS;
     }
 //======================================================================
