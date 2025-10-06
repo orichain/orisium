@@ -124,16 +124,16 @@ Orisium is a foundational layer designed to solve critical scalability challenge
 
 -----
 
-## 🛠️ Modular Architecture
+### 🛠️ Modular Architecture (Revision)
 
-Internal communication (`master` $\leftrightarrow$ `logic` $\leftrightarrow$ `cow`) is handled by **Unix Domain Sockets (UDS)** for maximum $\text{IPC}$ speed and security, avoiding shared memory to eliminate *race conditions*.
+Internal communication (`master` $\leftrightarrow$ `logic` $\leftrightarrow$ `cow`) is handled by **Unix Domain Sockets (UDS)** for maximum $\text{IPC}$ speed and security, **avoiding shared memory to eliminate *race conditions***. This multi-process design ensures that **protocol-level stateful operations, such as retry logic and holepunching, do not introduce system-wide bottlenecks.**
 
 | Component | Count | Primary Task |
 | :--- | :--- | :--- |
-| `logic` | 4 | Protocol state machine, connection control, *handshake*, and reliability functions. |
+| **`logic`** | **4** | **High-level state machine, session control, $\text{PQC}$ key management, and protocol logic (e.g., Adaptive Heartbeat decisions, $\text{SYN\_DATA}$ flow control).** |
 | `master` | 1 | Main $\text{UDP}$ listener, header disassembly, and forwarding to worker $\text{sio}$. |
 | `sio` | 2 | Initial parsing, *checksum* verification, and internal packet routing. |
-| `cow` | 5 | *Outbound client* for horizontal and *upstream* connections (multiplexes $\sim 65$ sessions per process). |
+| **`cow`** | **5** | *Outbound client* for horizontal and *upstream* connections (multiplexes $\sim 65$ sessions per process), **handling the low-level handshake, reliability functions, and $\text{I/O}$ multiplexing.** |
 | `r-lmdb` | 5 | Local database reader (*read-only*). |
 | `w-lmdb` | 1 | Local database writer (*write-heavy*). |
 
