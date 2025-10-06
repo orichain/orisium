@@ -8,7 +8,7 @@ Orisium is a **high-performance, resilient Peer-to-Peer (P2P) network** designed
 
 ## 🔒 Secure & Hyper-Efficient P2P Transport Layer
 
-Orisium is a **custom, ultra-low-latency P2P transport protocol** built on top of UDP and implemented in $\text{C}$. The protocol strategically combines **Post-Quantum Cryptography (PQC)** with an **Adaptive Dual-State Architecture** and intelligent flow control to meet the demanding requirements of real-time, decentralized networking.
+Orisium is a **custom, ultra-low-latency P2P transport protocol** built on top of $\text{UDP}$ and implemented in $\text{C}$. The protocol strategically combines **Post-Quantum Cryptography (PQC)** with an **Adaptive Dual-State Architecture** and intelligent flow control to meet the demanding requirements of real-time, decentralized networking.
 
 -----
 
@@ -54,7 +54,7 @@ The protocol includes a highly-secure mechanism to recover from extreme state dr
 
   * **Cryptographic Anchor State (The Heartbeat Checkpoint):** To prevent **Counter Break** failures due to transient network delay/loss, the protocol implements a specific anchor state (`packet_anchor`) for Heartbeat packets. This state holds the $\text{CTR}$ and $\text{Nonce}$ of the **last successfully ACKed packet**.
   * **State-Aware Retry Logic:** When the Heartbeat timer expires, the protocol **strictly refuses to advance the counter ($\text{CTR}$)** unless the $\text{ACK}$ for the last sent packet has been received. Instead, it initiates a **retry** using the $\text{CTR}$ from the anchor state. This ensures that the system's live counter state is **never compromised** by a simple timer expiration.
-  * **Temporary Retry Validation ($\text{Rollback}$ Check):** This mechanism is now specifically dedicated to **validating delayed or retransmitted packets (retries)**. If an *out-of-order* packet arrives, the protocol performs a temporary, non-destructive check. It copies the current counter (tmp\_ctr), decrements it, and **tests** if the packet validates against a potential previous state. This ensures that the system can securely process a legitimate $\text{retry}$ without compromising the live session state.
+  * **Temporary Retry Validation ($\text{Rollback}$ Check):** This mechanism is now specifically dedicated to **validating delayed or retransmitted packets (retries)**. If an *out-of-order* packet arrives, the protocol performs a temporary, non-destructive check. It copies the current counter ($\text{tmp\_ctr}$), decrements it, and **tests** if the packet validates against a potential previous state. This ensures that the system can securely process a legitimate $\text{retry}$ without compromising the live session state.
   * **Secure Implementation:** The actual live session counter is **never modified** unless this check is passed. This design means the mechanism functions as a **cryptographic safety net** for critical failure scenarios, rather than a routine recovery tool.
 
 #### c. Guaranteed Session Persistence (The Core Differentiator)
@@ -63,8 +63,43 @@ The protocol includes a highly-secure mechanism to recover from extreme state dr
 
 The $\text{State-Aware Retry Logic}$ serves as the protocol's **core self-healing mechanism**, specifically designed to handle counter drift caused by transient network glitches or packet loss without breaking the cryptographic session.
 
-  * **Minimizing Rehandshake Latency:** When a Counter mismatch or brief $\text{timeout}$ occurs, the system utilizes the $\text{Retry}$ mechanism to quickly resynchronize the $\text{Heartbeat}$ $\text{CTR}$ with the Peer's last validated state (typically resolved in **$\mathbf{2 \text{ to } 4 \text{ seconds}}$**, as observed in real-world logs), thus **eliminating the need for a full, high-latency PQC rehandshake**.
-  * **Proof of Resilience:** Real-world logging demonstrates that even under stress, this logic successfully resolves state conflicts, maintaining connection persistence with extremely low Round Trip Times ($\mathbf{\sim 6.7 \text{ ms}}$ $\text{RTT}$) and effectively converting rare sync failures into immediate, non-disruptive self-repairs.
+  * **Minimizing Rehandshake Latency:** When a Counter mismatch or brief $\text{timeout}$ occurs, the system utilizes the $\text{Retry}$ mechanism to quickly resynchronize the $\text{Heartbeat}$ $\text{CTR}$ with the Peer's last validated state, thus **eliminating the need for a full, high-latency PQC rehandshake**.
+
+-----
+
+### Empirical Proof: Successful Non-Disruptive Recovery
+
+Operational logs from a live system validate Orisium's Session Persistence mechanism. A network glitch resulting in $\text{packet loss}$ (triggering the **Retry Detected** at $\text{16:14:46}$) was successfully managed with **a single retry**, recovering the session in just **$\mathbf{2}$ seconds** without a disconnect, while maintaining ultra-low $\text{RTT}$.
+
+| Time | Event | Last RTT (ns) | Performance Analysis |
+| :---: | :--- | :---: | :--- |
+| $\text{16:14:43}$ | Normal $\text{Heartbeat ACK}$ | $\mathbf{6,819,191}$ | Stable $\text{RTT}$ of $\mathbf{6.819}$ $\text{ms}$. |
+| $\mathbf{16:14:46}$ | **Retry Detected** 🚨 | $-$ | $\text{ACK}$ lost/delayed; Orisium initiates $\text{State-Aware Retry}$. |
+| $\mathbf{16:14:48}$ | **Recovery Complete** | $\mathbf{6,818,712}$ | Session recovered **in 2 seconds** at stable $\mathbf{6.818}$ $\text{ms}$ $\text{RTT}$. |
+
+```bash
+[SIO 0]: RTT Heartbeat = 6819982.742828 ns
+[2025-10-06 16:14:23] [DEVEL-DEBUG] (src/workers/ipc/udp_data/from_cow/sio_heartbeat_ack.c:handle_workers_ipc_udp_data_cow_heartbeat_ack:129)
+[SIO 0]: RTT Heartbeat = 6819744.191073 ns
+[2025-10-06 16:14:27] [DEVEL-DEBUG] ...
+[SIO 0]: RTT Heartbeat = 6819552.788785 ns
+[2025-10-06 16:14:31] [DEVEL-DEBUG] ...
+[SIO 0]: RTT Heartbeat = 6819247.042004 ns
+[2025-10-06 16:14:35] [DEVEL-DEBUG] ...
+[SIO 0]: RTT Heartbeat = 6819256.383345 ns
+[2025-10-06 16:14:39] [DEVEL-DEBUG] ...
+[SIO 0]: RTT Heartbeat = 6819436.128572 ns
+[2025-10-06 16:14:43] [DEVEL-DEBUG] ...
+[SIO 0]: RTT Heartbeat = 6819191.437310 ns
+[2025-10-06 16:14:46] [DEVEL-DEBUG] (src/workers/ipc/udp_data/from_cow/sio_heartbeat.c:handle_workers_ipc_udp_data_cow_heartbeat:186)
+[SIO 0]: Retry Detected
+[2025-10-06 16:14:48] [DEVEL-DEBUG] (src/workers/ipc/udp_data/from_cow/sio_heartbeat_ack.c:handle_workers_ipc_udp_data_cow_heartbeat_ack:129)
+[SIO 0]: RTT Heartbeat = 6818712.171478 ns
+[2025-10-06 16:14:53] [DEVEL-DEBUG] ...
+[SIO 0]: RTT Heartbeat = 6818428.670894 ns
+[2025-10-06 16:14:57] [DEVEL-DEBUG] ...
+```
+
   * **SYN\_DATA Prioritization:** Any outgoing **`SYN_DATA`** packets are strategically **queued** during a Heartbeat Request cycle and are only released **immediately upon receiving a valid `Heartbeat_ACK`**. This guarantees that high-priority data is sent using the most recently validated cryptographic $\text{Counter}$ state, preserving data integrity while maintaining ultra-low latency.
 
 -----
@@ -73,10 +108,10 @@ The $\text{State-Aware Retry Logic}$ serves as the protocol's **core self-healin
 
 The protocol achieves superior resilience and efficiency through advanced adaptive logic:
 
-  * **Adaptive Heartbeat (The Kalman Rocket):** Employs a **Kalman Filter** to predict network conditions based on accumulated **Retry Count** (reliability) and RTT (performance). The heartbeat interval is dynamically adjusted: Interval = Base $\times$ $2^{\text{retry.prediction}}$.
+  * **Adaptive Heartbeat (The Kalman Rocket):** Employs a **Kalman Filter** to predict network conditions based on accumulated **Retry Count** (reliability) and RTT (performance). The heartbeat interval is dynamically adjusted: $\text{Interval} = \text{Base} \times 2^{\text{retry.prediction}}$.
       * This intelligent **Exponential Backoff** ensures $\text{Orisium}$ avoids detection by network filters and prevents network congestion (*congestion avoidance*).
-  * **Two-Way State Synchronization:** The **Ping-Pong Heartbeat cycle** forces both SIO and COW endpoints into a mutual agreement on session timing and state. This eliminates *timer drift* and the need for frequent, costly rollback attempts.
-  * **Mobile Efficiency:** The heartbeat interval is deliberately extended for mobile clients (e.g., 20-30 seconds) to prevent **cellular radio wake-up** and subsequent **battery drain**.
+  * **Two-Way State Synchronization:** The **Ping-Pong Heartbeat cycle** forces both $\text{SIO}$ and $\text{COW}$ endpoints into a mutual agreement on session timing and state. This eliminates *timer drift* and the need for frequent, costly rollback attempts.
+  * **Mobile Efficiency:** The heartbeat interval is deliberately extended for mobile clients (e.g., $20-30$ seconds) to prevent **cellular radio wake-up** and subsequent **battery drain**.
 
 -----
 
