@@ -57,15 +57,15 @@ The protocol includes a highly-secure mechanism to recover from extreme state dr
   * **Temporary Retry Validation ($\text{Rollback}$ Check):** This mechanism is now specifically dedicated to **validating delayed or retransmitted packets (retries)**. If an *out-of-order* packet arrives, the protocol performs a temporary, non-destructive check. It copies the current counter (tmp\_ctr), decrements it, and **tests** if the packet validates against a potential previous state. This ensures that the system can securely process a legitimate $\text{retry}$ without compromising the live session state.
   * **Secure Implementation:** The actual live session counter is **never modified** unless this check is passed. This design means the mechanism functions as a **cryptographic safety net** for critical failure scenarios, rather than a routine recovery tool.
 
-#### **c. Guaranteed Session Persistence (The Core Differentiator)**
+#### c. Guaranteed Session Persistence (The Core Differentiator)
 
 **Orisium is fundamentally engineered for *always-on* connections by prioritizing internal state recovery over costly disconnection/rehandshake cycles.**
 
 The $\text{State-Aware Retry Logic}$ serves as the protocol's **core self-healing mechanism**, specifically designed to handle counter drift caused by transient network glitches or packet loss without breaking the cryptographic session.
 
-  * **Minimizing Rehandshake Latency:** When a $\text{Counter}$ mismatch or brief $\text{timeout}$ occurs, the system utilizes the $\text{Retry}$ mechanism to quickly resynchronize the $\text{Heartbeat}$ $\text{CTR}$ with the $\text{Peer}$'s last validated state (typically resolved in **$\mathbf{2 \text{ to } 4 \text{ seconds}}$**, as observed in real-world logs), thus **eliminating the need for a full, high-latency PQC rehandshake**.
+  * **Minimizing Rehandshake Latency:** When a Counter mismatch or brief $\text{timeout}$ occurs, the system utilizes the $\text{Retry}$ mechanism to quickly resynchronize the $\text{Heartbeat}$ $\text{CTR}$ with the Peer's last validated state (typically resolved in **$\mathbf{2 \text{ to } 4 \text{ seconds}}$**, as observed in real-world logs), thus **eliminating the need for a full, high-latency PQC rehandshake**.
   * **Proof of Resilience:** Real-world logging demonstrates that even under stress, this logic successfully resolves state conflicts, maintaining connection persistence with extremely low Round Trip Times ($\mathbf{\sim 6.7 \text{ ms}}$ $\text{RTT}$) and effectively converting rare sync failures into immediate, non-disruptive self-repairs.
-  * **SYN\_DATA Prioritization:** Any outgoing $\text{SYN\_DATA}$ packets are strategically **queued** during a Heartbeat Request cycle and are only released **immediately upon receiving a valid $\text{Heartbeat\_ACK}$**. This guarantees that high-priority data is sent using the most recently validated cryptographic $\text{Counter}$ state, preserving data integrity while maintaining ultra-low latency.
+  * **SYN\_DATA Prioritization:** Any outgoing **`SYN_DATA`** packets are strategically **queued** during a Heartbeat Request cycle and are only released **immediately upon receiving a valid `Heartbeat_ACK`**. This guarantees that high-priority data is sent using the most recently validated cryptographic $\text{Counter}$ state, preserving data integrity while maintaining ultra-low latency.
 
 -----
 
