@@ -18,10 +18,14 @@
 #define MAX_MASTER_COW_SESSIONS (MAX_COW_WORKERS * MAX_CONNECTION_PER_COW_WORKER)
 #define MAX_DOWNSTREAM_NODES_LIMIT 25
 //----------------------------------------------------------------------
-#define NODE_HEARTBEAT_INTERVAL 4
-#define NODE_HEARTBEAT_MAX_RETRY 3
+// Test 2 Seconds
+//----------------------------------------------------------------------
+#define NODE_HEARTBEAT_INTERVAL 2
 #define NODE_CHECK_HEALTHY_X 3
-#define NODE_CHECK_HEALTHY NODE_CHECK_HEALTHY_X * NODE_HEARTBEAT_INTERVAL
+//----------------------------------------------------------------------
+// 2-Way Heartbeat (2 * NODE_HEARTBEAT_INTERVAL)
+//----------------------------------------------------------------------
+#define NODE_CHECK_HEALTHY NODE_CHECK_HEALTHY_X * 2 * NODE_HEARTBEAT_INTERVAL
 //----------------------------------------------------------------------
 #define WORKER_HEARTBEAT_INTERVAL 3
 #define WORKER_CHECK_HEALTHY_X 3
