@@ -318,7 +318,7 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     uint64_t interval_ull = session->hello3.ack_rcvd_time - session->hello3.sent_time;
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-    cleanup_packet(worker_ctx->label, &worker_ctx->async, &session->hello3, false);
+    cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello3, false);
     
     printf("%sRTT Hello-3 = %f\n", worker_ctx->label, session->rtt.value_prediction);
     

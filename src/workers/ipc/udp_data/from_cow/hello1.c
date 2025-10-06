@@ -20,7 +20,6 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
     uint8_t inc_ctr = oudp_datao->inc_ctr;
     uint8_t l_inc_ctr = 0xFF;
     uint8_t trycount = oudp_datao->trycount;
-    uint8_t retry_index = 0xff;
 //======================================================================
 // + Security
 //======================================================================
@@ -58,7 +57,6 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return cmac;
         }
-        retry_index = (uint8_t)MAX_RETRY - (uint8_t)1;
         printf("%sRetry Detected\n", worker_ctx->label);
     } else {
         status_t cmac = orilink_check_mac_ctr(
@@ -90,18 +88,12 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
         inc_ctr != 0xFF
     )
     {
-        if (retry_index != 0xff) {
-            if (session->hello1_ack.data[retry_index] != NULL) {
-                if (retry_packet_ack(worker_ctx, identity, security, &session->hello1_ack, retry_index) != SUCCESS) {
-                    CLOSE_IPC_PROTOCOL(&received_protocol);
-                    CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-                    return FAILURE;
-                }
+        if (session->hello1_ack.data != NULL) {
+            if (retry_control_packet_ack(worker_ctx, identity, security, &session->hello1_ack) != SUCCESS) {
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                return FAILURE;
             }
-        } else {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE;
         }
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);

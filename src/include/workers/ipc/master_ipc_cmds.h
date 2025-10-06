@@ -14,7 +14,7 @@ status_t worker_master_udp_data(
     uint8_t index,
     struct sockaddr_in6 *addr,
     puint8_t_size_t_status_t *r,
-    packet_t *h
+    control_packet_t *h
 );
 status_t worker_master_udp_data_ack(
     const char *label, 
@@ -23,7 +23,7 @@ status_t worker_master_udp_data_ack(
     uint8_t index,
     struct sockaddr_in6 *addr,
     puint8_t_size_t_status_t *r,
-    packet_ack_t *h
+    control_packet_ack_t *h
 );
 status_t worker_master_udp_data_finalize(
     const char *label, 

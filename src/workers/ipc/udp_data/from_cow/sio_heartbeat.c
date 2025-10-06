@@ -63,7 +63,7 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
             uint64_t interval_ull = session->hello4_ack.rcvd_time - session->hello4_ack.ack_sent_time;
             double rtt_value = (double)interval_ull;
             calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-            reset_packet_ack_data(&session->hello4_ack);
+            cleanup_control_packet_ack(&session->hello4_ack, false, CDT_RESET);
             
             LOG_DEVEL_DEBUG("%sRTT Hello-4 Ack = %f", worker_ctx->label, session->rtt.value_prediction);
         }
@@ -73,7 +73,7 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
 //======================================================================
         session->heartbeat_ack.rcvd = true;
 //======================================================================
-        reset_packet_ack_try_count(&session->heartbeat_ack);
+        cleanup_control_packet_ack(&session->heartbeat_ack, false, CDT_NOACTION);
 //======================================================================
     }
     if (session->is_first_heartbeat) {
@@ -96,7 +96,6 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     uint8_t l_inc_ctr = 0xFF;
     uint8_t trycount = oudp_datao->trycount;
     uint32_t oudp_datao_ctr = oudp_datao->ctr;
-    uint8_t retry_index = 0xff;
 //======================================================================
 // + Security
 //======================================================================
@@ -175,7 +174,6 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return cmac;
         }
-        retry_index = (uint8_t)MAX_RETRY - (uint8_t)1;
         if (!ctr_is_in_anchor(&session->heartbeat_ack.anchor, &oudp_datao_ctr)) {
             LOG_ERROR("%sHeartbeat Retry Ctr Is To Old.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -214,18 +212,12 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         security->remote_ctr != oudp_datao_ctr
     )
     {
-        if (retry_index != 0xff) {
-            if (session->heartbeat_ack.data[retry_index] != NULL) {
-                if (retry_packet_ack(worker_ctx, identity, security, &session->heartbeat_ack, retry_index) != SUCCESS) {
-                    CLOSE_IPC_PROTOCOL(&received_protocol);
-                    CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-                    return FAILURE;
-                }
+        if (session->heartbeat_ack.data != NULL) {
+            if (retry_control_packet_ack(worker_ctx, identity, security, &session->heartbeat_ack) != SUCCESS) {
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                return FAILURE;
             }
-        } else {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE;
         }
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);

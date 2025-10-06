@@ -62,6 +62,12 @@ typedef enum {
 } info_type_t;
 
 typedef enum {
+    CDT_NOACTION = (uint8_t)0x00,
+    CDT_RESET = (uint8_t)0x01,
+    CDT_FREE = (uint8_t)0x02
+} clean_data_type_t;
+
+typedef enum {
 	TIT_TIMEOUT = (uint8_t)0xff
 } task_info_type_t;
 

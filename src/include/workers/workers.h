@@ -35,7 +35,7 @@ typedef struct {
 //======================================================================
     uint8_t *last_rcvd_nonce;
     uint32_t last_rcvd_ctr;
-} packet_anchor_t;
+} control_packet_anchor_t;
 
 typedef struct {
     bool sent;
@@ -47,7 +47,7 @@ typedef struct {
     uint64_t ack_rcvd_time;
     uint16_t len;
     uint8_t *data;
-} packet_t;
+} control_packet_t;
 
 typedef struct {
     bool rcvd;
@@ -55,11 +55,11 @@ typedef struct {
     bool ack_sent;
     int ack_sent_try_count;
     uint64_t ack_sent_time;
-    uint16_t len[MAX_RETRY];
-    uint8_t *data[MAX_RETRY];
+    uint16_t len;
+    uint8_t *data;
     uint8_t last_trycount;
-    packet_anchor_t anchor;
-} packet_ack_t;
+    control_packet_anchor_t anchor;
+} control_packet_ack_t;
 
 typedef struct {
 //======================================================================
@@ -70,15 +70,15 @@ typedef struct {
 //======================================================================
 // HELLO
 //======================================================================
-    packet_ack_t hello1_ack;
-    packet_ack_t hello2_ack;
-    packet_ack_t hello3_ack;
-    packet_ack_t hello4_ack;
+    control_packet_ack_t hello1_ack;
+    control_packet_ack_t hello2_ack;
+    control_packet_ack_t hello3_ack;
+    control_packet_ack_t hello4_ack;
 //======================================================================
 // HEARTBEAT
 //======================================================================
-    packet_t heartbeat;
-    packet_ack_t heartbeat_ack;
+    control_packet_t heartbeat;
+    control_packet_ack_t heartbeat_ack;
     uint64_t heartbeat_interval;
     bool is_first_heartbeat;
     int heartbeat_sender_timer_fd;
@@ -108,15 +108,15 @@ typedef struct {
 //======================================================================
 // HELLO
 //======================================================================
-    packet_t hello1;
-    packet_t hello2;
-    packet_t hello3;
-    packet_t hello4;
+    control_packet_t hello1;
+    control_packet_t hello2;
+    control_packet_t hello3;
+    control_packet_t hello4;
 //======================================================================
 // HEARTBEAT
 //======================================================================
-    packet_t heartbeat;
-    packet_ack_t heartbeat_ack;
+    control_packet_t heartbeat;
+    control_packet_ack_t heartbeat_ack;
     uint64_t heartbeat_interval;
     int heartbeat_sender_timer_fd;
 //----------------------------------------------------------------------
@@ -166,10 +166,10 @@ void run_logic_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_
 void run_cow_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
 void run_dbr_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
 void run_dbw_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
-status_t retry_packet(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, packet_t *packet);
-status_t retry_packet_ack(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, packet_ack_t *packet_ack, uint8_t index);
+status_t retry_control_packet(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, control_packet_t *control_packet);
+status_t retry_control_packet_ack(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, control_packet_ack_t *control_packet_ack);
 
-static inline bool ctr_is_in_anchor(packet_anchor_t *h, uint32_t *ctr) {
+static inline bool ctr_is_in_anchor(control_packet_anchor_t *h, uint32_t *ctr) {
     if (*ctr == h->last_rcvd_ctr) {
         return true;
     }
@@ -245,7 +245,7 @@ static inline void calculate_rtt(const char *label, void *void_session, worker_t
     }
 }
 
-static inline void cleanup_packet(const char *label, async_type_t *async, packet_t *h, bool clean_state) {
+static inline void cleanup_control_packet(const char *label, async_type_t *async, control_packet_t *h, bool clean_state) {
     if (clean_state) {
         h->sent = false;
         h->sent_time = (uint64_t)0;
@@ -263,7 +263,7 @@ static inline void cleanup_packet(const char *label, async_type_t *async, packet
     CLOSE_FD(&h->timer_fd);
 }
 
-static inline void setup_packet(packet_t *h, double interval_timer) {
+static inline void setup_control_packet(control_packet_t *h, double interval_timer) {
     h->sent = false;
     h->sent_time = (uint64_t)0;
     h->ack_rcvd_time = (uint64_t)0;
@@ -275,58 +275,48 @@ static inline void setup_packet(packet_t *h, double interval_timer) {
     h->timer_fd = -1;
 }
 
-static inline void reset_packet_ack_try_count(packet_ack_t *h) {
-    h->ack_sent_try_count = 0x00;
-    h->last_trycount = (uint8_t)0;
-}
-
-static inline void reset_packet_ack_data(packet_ack_t *h) {
-    for (uint8_t i = 0; i < MAX_RETRY; ++i) {
-        if (h->data[i]) {
-            memset(h->data[i], 0, h->len[i]);
-        }
-    }
-}
-
-static inline void cleanup_packet_ack(packet_ack_t *h, bool clean_state) {
-//----------------------------------------------------------------------
-    memset(h->anchor.last_nonce, 0, AES_NONCE_BYTES);
-    free(h->anchor.last_nonce);
-    h->anchor.last_ctr = (uint32_t)0;
-    memset(h->anchor.last_acked_nonce, 0, AES_NONCE_BYTES);
-    free(h->anchor.last_acked_nonce);
-    h->anchor.last_acked_ctr = (uint32_t)0;
-    memset(h->anchor.last_rcvd_nonce, 0, AES_NONCE_BYTES);
-    free(h->anchor.last_rcvd_nonce);
-    h->anchor.last_rcvd_ctr = (uint32_t)0;
-//----------------------------------------------------------------------
+static inline void cleanup_control_packet_ack(control_packet_ack_t *h, bool clean_state, clean_data_type_t clean_data) {
     if (clean_state) {
         h->rcvd = false;
         h->rcvd_time = (uint64_t)0;
         h->ack_sent_time = (uint64_t)0;
         h->ack_sent = false;
     }
-    reset_packet_ack_try_count(h);
+    //----------------------------------------------------------------------
+    switch (clean_data) {
+        case CDT_RESET: {
+            memset(h->anchor.last_nonce, 0, AES_NONCE_BYTES);
+            memset(h->anchor.last_acked_nonce, 0, AES_NONCE_BYTES);
+            memset(h->anchor.last_rcvd_nonce, 0, AES_NONCE_BYTES);
+            memset(h->data, 0, h->len);
+            h->len = (uint16_t)0;
+            break;
+        }
+        case CDT_FREE: {
+            memset(h->anchor.last_nonce, 0, AES_NONCE_BYTES);
+            free(h->anchor.last_nonce);
+            h->anchor.last_ctr = (uint32_t)0;
+            memset(h->anchor.last_acked_nonce, 0, AES_NONCE_BYTES);
+            free(h->anchor.last_acked_nonce);
+            h->anchor.last_acked_ctr = (uint32_t)0;
+            memset(h->anchor.last_rcvd_nonce, 0, AES_NONCE_BYTES);
+            free(h->anchor.last_rcvd_nonce);
+            h->anchor.last_rcvd_ctr = (uint32_t)0;
+            if (h->data) {
+                memset(h->data, 0, h->len);
+                free(h->data);
+                h->data = NULL;
+            }
+            h->len = (uint16_t)0;
+            break;
+        }
+        default:
+    }
+    h->ack_sent_try_count = 0x00;
+    h->last_trycount = (uint8_t)0;
 }
 
-static inline void add_packet_ack(packet_ack_t *h, uint8_t *data, uint16_t len) {
-    if (h->data[0]) {
-        free(h->data[0]);
-        h->data[0] = NULL;
-    }
-    h->len[0] = (uint16_t)0;
-    for (uint8_t i = 1; i < MAX_RETRY; ++i) {
-        uint8_t index_1 = i - (uint8_t)1;
-        h->data[index_1] = h->data[i];
-        h->len[index_1] = h->len[i];
-        h->data[i] = NULL;
-        h->len[i] = (uint16_t)0;
-    }
-    h->len[MAX_RETRY-1] = len;
-    h->data[MAX_RETRY-1] = data;
-}
-
-static inline void setup_packet_ack(packet_ack_t *h) {
+static inline void setup_control_packet_ack(control_packet_ack_t *h) {
 //----------------------------------------------------------------------
     h->anchor.last_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
     h->anchor.last_ctr = (uint32_t)0;
@@ -340,10 +330,8 @@ static inline void setup_packet_ack(packet_ack_t *h) {
     h->ack_sent_time = (uint64_t)0;
     h->ack_sent = false;
     h->ack_sent_try_count = 0x00;
-    for (uint8_t i=0;i<MAX_RETRY;++i) {
-        h->data[i] = NULL;
-        h->len[i] = (uint16_t)0;
-    }
+    h->data = NULL;
+    h->len = (uint16_t)0;
     h->last_trycount = (uint8_t)0;
 }
 
@@ -352,12 +340,12 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
 //----------------------------------------------------------------------
     single_session->test_drop_heartbeat_ack = 0;
 //----------------------------------------------------------------------
-    setup_packet(&single_session->hello1, (double)1);
-    setup_packet(&single_session->hello2, (double)1);
-    setup_packet(&single_session->hello3, (double)1);
-    setup_packet(&single_session->hello4, (double)1);
-    setup_packet(&single_session->heartbeat, (double)1);
-    setup_packet_ack(&single_session->heartbeat_ack);
+    setup_control_packet(&single_session->hello1, (double)1);
+    setup_control_packet(&single_session->hello2, (double)1);
+    setup_control_packet(&single_session->hello3, (double)1);
+    setup_control_packet(&single_session->hello4, (double)1);
+    setup_control_packet(&single_session->heartbeat, (double)1);
+    setup_control_packet_ack(&single_session->heartbeat_ack);
     single_session->heartbeat_interval = (double)1;
     single_session->heartbeat_sender_timer_fd = -1;
     setup_oricle_double(&single_session->retry, (double)0);
@@ -394,12 +382,12 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
 }
 
 static inline void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session) {
-    cleanup_packet(label, cow_async, &single_session->hello1, true);
-    cleanup_packet(label, cow_async, &single_session->hello2, true);
-    cleanup_packet(label, cow_async, &single_session->hello3, true);
-    cleanup_packet(label, cow_async, &single_session->hello4, true);
-    cleanup_packet(label, cow_async, &single_session->heartbeat, true);
-    cleanup_packet_ack(&single_session->heartbeat_ack, true);
+    cleanup_control_packet(label, cow_async, &single_session->hello1, true);
+    cleanup_control_packet(label, cow_async, &single_session->hello2, true);
+    cleanup_control_packet(label, cow_async, &single_session->hello3, true);
+    cleanup_control_packet(label, cow_async, &single_session->hello4, true);
+    cleanup_control_packet(label, cow_async, &single_session->heartbeat, true);
+    cleanup_control_packet_ack(&single_session->heartbeat_ack, true, CDT_FREE);
     single_session->heartbeat_interval = (double)1;
     async_delete_event(label, cow_async, &single_session->heartbeat_sender_timer_fd);
     CLOSE_FD(&single_session->heartbeat_sender_timer_fd);
@@ -448,17 +436,17 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     single_session->test_drop_hello4_ack = 0;
     single_session->test_drop_heartbeat_ack = 0;
 //----------------------------------------------------------------------
-    setup_packet_ack(&single_session->hello1_ack);
+    setup_control_packet_ack(&single_session->hello1_ack);
 //----------------------------------------------------------------------
 // Hello1 Security Open
 //----------------------------------------------------------------------
     single_session->hello1_ack.ack_sent = true;
 //----------------------------------------------------------------------
-    setup_packet_ack(&single_session->hello2_ack);
-    setup_packet_ack(&single_session->hello3_ack);
-    setup_packet_ack(&single_session->hello4_ack);
-    setup_packet(&single_session->heartbeat, (double)1);
-    setup_packet_ack(&single_session->heartbeat_ack);
+    setup_control_packet_ack(&single_session->hello2_ack);
+    setup_control_packet_ack(&single_session->hello3_ack);
+    setup_control_packet_ack(&single_session->hello4_ack);
+    setup_control_packet(&single_session->heartbeat, (double)1);
+    setup_control_packet_ack(&single_session->heartbeat_ack);
     single_session->heartbeat_interval = (double)1;
     single_session->is_first_heartbeat = false;
     single_session->heartbeat_sender_timer_fd = -1;
@@ -490,12 +478,12 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
 }
 
 static inline void cleanup_sio_session(const char *label, async_type_t *sio_async, sio_c_session_t *single_session) {
-    cleanup_packet_ack(&single_session->hello1_ack, true);
-    cleanup_packet_ack(&single_session->hello2_ack, true);
-    cleanup_packet_ack(&single_session->hello3_ack, true);
-    cleanup_packet_ack(&single_session->hello4_ack, true);
-    cleanup_packet(label, sio_async, &single_session->heartbeat, true);
-    cleanup_packet_ack(&single_session->heartbeat_ack, true);
+    cleanup_control_packet_ack(&single_session->hello1_ack, true, CDT_FREE);
+    cleanup_control_packet_ack(&single_session->hello2_ack, true, CDT_FREE);
+    cleanup_control_packet_ack(&single_session->hello3_ack, true, CDT_FREE);
+    cleanup_control_packet_ack(&single_session->hello4_ack, true, CDT_FREE);
+    cleanup_control_packet(label, sio_async, &single_session->heartbeat, true);
+    cleanup_control_packet_ack(&single_session->heartbeat_ack, true, CDT_FREE);
     single_session->heartbeat_interval = (double)1;
     single_session->is_first_heartbeat = false;
     async_delete_event(label, sio_async, &single_session->heartbeat_sender_timer_fd);

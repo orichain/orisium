@@ -52,7 +52,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     double try_count = (double)session->hello1.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     session->hello1.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
-                    if (retry_packet(worker_ctx, identity, security, &session->hello1) != SUCCESS) {
+                    if (retry_control_packet(worker_ctx, identity, security, &session->hello1) != SUCCESS) {
                         return FAILURE;
                     }
                     return SUCCESS;
@@ -82,7 +82,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     double try_count = (double)session->hello2.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     session->hello2.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
-                    if (retry_packet(worker_ctx, identity, security, &session->hello2) != SUCCESS) {
+                    if (retry_control_packet(worker_ctx, identity, security, &session->hello2) != SUCCESS) {
                         return FAILURE;
                     }
                     return SUCCESS;
@@ -112,7 +112,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     double try_count = (double)session->hello3.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     session->hello3.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
-                    if (retry_packet(worker_ctx, identity, security, &session->hello3) != SUCCESS) {
+                    if (retry_control_packet(worker_ctx, identity, security, &session->hello3) != SUCCESS) {
                         return FAILURE;
                     }
                     return SUCCESS;
@@ -142,7 +142,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     double try_count = (double)session->hello4.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     session->hello4.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
-                    if (retry_packet(worker_ctx, identity, security, &session->hello4) != SUCCESS) {
+                    if (retry_control_packet(worker_ctx, identity, security, &session->hello4) != SUCCESS) {
                         return FAILURE;
                     }
                     return SUCCESS;
@@ -172,7 +172,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     double try_count = (double)session->heartbeat.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     session->heartbeat.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
-                    if (retry_packet(worker_ctx, identity, security, &session->heartbeat) != SUCCESS) {
+                    if (retry_control_packet(worker_ctx, identity, security, &session->heartbeat) != SUCCESS) {
                         return FAILURE;
                     }
 //======================================================================
@@ -352,7 +352,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     double try_count = (double)session->heartbeat.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     session->heartbeat.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
-                    if (retry_packet(worker_ctx, identity, security, &session->heartbeat) != SUCCESS) {
+                    if (retry_control_packet(worker_ctx, identity, security, &session->heartbeat) != SUCCESS) {
                         return FAILURE;
                     }
 //======================================================================

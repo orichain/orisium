@@ -100,7 +100,7 @@ void cleanup_worker(worker_context_t *ctx) {
     free(ctx->label);
 }
 
-status_t retry_packet(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, packet_t *packet) {
+status_t retry_control_packet(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, control_packet_t *control_packet) {
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
@@ -108,33 +108,33 @@ status_t retry_packet(worker_context_t *worker_ctx, orilink_identity_t *identity
     if (current_time.status != SUCCESS) {
         return FAILURE;
     }
-    packet->sent_try_count++;
-    packet->sent_time = current_time.r_uint64_t;
-    if (async_set_timerfd_time(worker_ctx->label, &packet->timer_fd,
-        (time_t)packet->interval_timer_fd,
-        (long)((packet->interval_timer_fd - (time_t)packet->interval_timer_fd) * 1e9),
-        (time_t)packet->interval_timer_fd,
-        (long)((packet->interval_timer_fd - (time_t)packet->interval_timer_fd) * 1e9)) != SUCCESS)
+    control_packet->sent_try_count++;
+    control_packet->sent_time = current_time.r_uint64_t;
+    if (async_set_timerfd_time(worker_ctx->label, &control_packet->timer_fd,
+        (time_t)control_packet->interval_timer_fd,
+        (long)((control_packet->interval_timer_fd - (time_t)control_packet->interval_timer_fd) * 1e9),
+        (time_t)control_packet->interval_timer_fd,
+        (long)((control_packet->interval_timer_fd - (time_t)control_packet->interval_timer_fd) * 1e9)) != SUCCESS)
     {
         return FAILURE;
     }
 //======================================================================
     puint8_t_size_t_status_t udp_data;
     udp_data.status = SUCCESS;
-    udp_data.r_size_t = packet->len;
-    udp_data.r_puint8_t = (uint8_t *)calloc(1, packet->len);
-    memcpy(udp_data.r_puint8_t, packet->data, packet->len);
+    udp_data.r_size_t = control_packet->len;
+    udp_data.r_puint8_t = (uint8_t *)calloc(1, control_packet->len);
+    memcpy(udp_data.r_puint8_t, control_packet->data, control_packet->len);
 //----------------------------------------------------------------------
 // Update trycount
 //----------------------------------------------------------------------
-    memcpy(udp_data.r_puint8_t + AES_TAG_BYTES + sizeof(uint32_t), &packet->sent_try_count, sizeof(uint8_t));
-    size_t data_4mac_len = packet->len - AES_TAG_BYTES;
+    memcpy(udp_data.r_puint8_t + AES_TAG_BYTES + sizeof(uint32_t), &control_packet->sent_try_count, sizeof(uint8_t));
+    size_t data_4mac_len = control_packet->len - AES_TAG_BYTES;
     uint8_t *data_4mac = (uint8_t *)calloc(1, data_4mac_len);
     if (!data_4mac) {
         LOG_ERROR("%sError calloc data_4mac for mac: %s", worker_ctx->label, strerror(errno));
-        free(packet->data);
-        packet->data = NULL;
-        packet->len = 0;
+        free(control_packet->data);
+        control_packet->data = NULL;
+        control_packet->len = 0;
         return FAILURE_NOMEM;
     }
     memcpy(data_4mac, udp_data.r_puint8_t + AES_TAG_BYTES, data_4mac_len);
@@ -146,20 +146,20 @@ status_t retry_packet(worker_context_t *worker_ctx, orilink_identity_t *identity
     memcpy(udp_data.r_puint8_t, mac, AES_TAG_BYTES);
     free(data_4mac);
 //----------------------------------------------------------------------    
-    free(packet->data);
-    packet->data = NULL;
-    packet->len = 0;
+    free(control_packet->data);
+    control_packet->data = NULL;
+    control_packet->len = 0;
     if (udp_data.status != SUCCESS) {
         return FAILURE;
     }
-    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &identity->remote_addr, &udp_data, packet) != SUCCESS) {
+    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &identity->remote_addr, &udp_data, control_packet) != SUCCESS) {
         return FAILURE;
     }
 //======================================================================
     return SUCCESS;
 }
 
-status_t retry_packet_ack(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, packet_ack_t *packet_ack, uint8_t index) {
+status_t retry_control_packet_ack(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, control_packet_ack_t *control_packet_ack) {
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
@@ -167,19 +167,19 @@ status_t retry_packet_ack(worker_context_t *worker_ctx, orilink_identity_t *iden
     if (current_time.status != SUCCESS) {
         return FAILURE;
     }
-    packet_ack->ack_sent_try_count++;
-    packet_ack->ack_sent_time = current_time.r_uint64_t;
+    control_packet_ack->ack_sent_try_count++;
+    control_packet_ack->ack_sent_time = current_time.r_uint64_t;
 //======================================================================
     puint8_t_size_t_status_t udp_data;
     udp_data.status = SUCCESS;
-    udp_data.r_size_t = packet_ack->len[index];
-    udp_data.r_puint8_t = (uint8_t *)calloc(1, packet_ack->len[index]);
-    memcpy(udp_data.r_puint8_t, packet_ack->data[index], packet_ack->len[index]);
+    udp_data.r_size_t = control_packet_ack->len;
+    udp_data.r_puint8_t = (uint8_t *)calloc(1, control_packet_ack->len);
+    memcpy(udp_data.r_puint8_t, control_packet_ack->data, control_packet_ack->len);
 //----------------------------------------------------------------------
 // Update trycount
 //----------------------------------------------------------------------
-    memcpy(udp_data.r_puint8_t + AES_TAG_BYTES + sizeof(uint32_t), &packet_ack->ack_sent_try_count, sizeof(uint8_t));
-    size_t data_4mac_len = packet_ack->len[index] - AES_TAG_BYTES;
+    memcpy(udp_data.r_puint8_t + AES_TAG_BYTES + sizeof(uint32_t), &control_packet_ack->ack_sent_try_count, sizeof(uint8_t));
+    size_t data_4mac_len = control_packet_ack->len - AES_TAG_BYTES;
     uint8_t *data_4mac = (uint8_t *)calloc(1, data_4mac_len);
     if (!data_4mac) {
         LOG_ERROR("%sError calloc data_4mac for mac: %s", worker_ctx->label, strerror(errno));
@@ -197,7 +197,7 @@ status_t retry_packet_ack(worker_context_t *worker_ctx, orilink_identity_t *iden
     if (udp_data.status != SUCCESS) {
         return FAILURE;
     }
-    if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &identity->remote_addr, &udp_data, packet_ack) != SUCCESS) {
+    if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &identity->remote_addr, &udp_data, control_packet_ack) != SUCCESS) {
         return FAILURE;
     }
 //======================================================================
