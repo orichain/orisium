@@ -79,7 +79,7 @@ static inline void decrement_ctr(uint32_t *ctr, uint8_t *nonce) {
     }
 }
 
-static inline bool is_greater_ctr(uint32_t *ctr1, uint8_t *nonce1, uint32_t *ctr2, uint8_t *nonce2) {
+static inline bool is_1greater_ctr(uint32_t *ctr1, uint32_t *ctr2, uint8_t *nonce2) {
     uint8_t *tmp_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
     if (!tmp_nonce) {
         false;
@@ -88,22 +88,22 @@ static inline bool is_greater_ctr(uint32_t *ctr1, uint8_t *nonce1, uint32_t *ctr
     memcpy(tmp_nonce, nonce2, AES_NONCE_BYTES);
     uint32_t tmp_ctr = *ctr2;
     increment_ctr(&tmp_ctr, tmp_nonce);
-    bool isgtr = is_same_ctr(&tmp_ctr, tmp_nonce, ctr1, nonce1);
+    bool isgtr = (*ctr1 == tmp_ctr);
     memset(tmp_nonce, 0, AES_NONCE_BYTES);
     free(tmp_nonce);
     return isgtr;
 }
 
-static inline bool is_lower_ctr(uint32_t *ctr1, uint8_t *nonce1, uint32_t *ctr2, uint8_t *nonce2) {
+static inline bool is_1lower_ctr(uint32_t *ctr1, uint32_t *ctr2, uint8_t *nonce2) {
     uint8_t *tmp_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
     if (!tmp_nonce) {
         false;
         return FAILURE_NOMEM;
     }
-    memcpy(tmp_nonce, nonce1, AES_NONCE_BYTES);
-    uint32_t tmp_ctr = *ctr1;
-    increment_ctr(&tmp_ctr, tmp_nonce);
-    bool islwr = is_same_ctr(&tmp_ctr, tmp_nonce, ctr1, nonce1);
+    memcpy(tmp_nonce, nonce2, AES_NONCE_BYTES);
+    uint32_t tmp_ctr = *ctr2;
+    decrement_ctr(&tmp_ctr, tmp_nonce);
+    bool islwr = (*ctr1 == tmp_ctr);
     memset(tmp_nonce, 0, AES_NONCE_BYTES);
     free(tmp_nonce);
     return islwr;

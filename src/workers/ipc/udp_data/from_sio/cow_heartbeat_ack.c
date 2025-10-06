@@ -16,6 +16,7 @@ struct sockaddr_in6;
 
 status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     uint8_t inc_ctr = oudp_datao->inc_ctr;
+    uint32_t oudp_datao_ctr = oudp_datao->ctr;
 //======================================================================
 // + Security
 //======================================================================
@@ -37,16 +38,23 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return cmac;
         }
+        if (is_1lower_ctr(&oudp_datao_ctr, &security->remote_ctr, security->remote_nonce)) {
 //======================================================================
 // Stop Timer Sender, But Don't Stop Timer Retry
 // Retry with last ctr and trycount = 1
 // We Have Send Heartbeat But Remote Peer Was Not Ready
 //======================================================================
-        session->heartbeat.sent_try_count = 0x00;
-        //cleanup_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
-        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
-        CLOSE_FD(&session->heartbeat_sender_timer_fd);
+            session->heartbeat.sent_try_count = 0x00;
+            //cleanup_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
+            async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+            CLOSE_FD(&session->heartbeat_sender_timer_fd);
 //======================================================================
+        } else {
+            LOG_ERROR("%sHeartbeat_Ack Received Already. Protocol %d, data_ctr: %u, *ctr: %u", worker_ctx->label, oudp_datao->type, oudp_datao->ctr, security->remote_ctr);
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return FAILURE;
+        }
         return SUCCESS;
     }
 //======================================================================

@@ -98,17 +98,33 @@ CFILES := $(shell find . $(EXCLUDE_PATHS) -name '*.c' -print)
 all: prod
 	
 define install_pkg
-	@echo "🔧 Menginstall $(1)..."
+	@echo "🔧 Memeriksa dan menginstall $(1)..."
 	@if [ "$(PKG_MANAGER)" = "unsupported" ]; then \
 		echo "❌ Distribusi tidak didukung. Install $(1) secara manual."; \
 	elif [ "$(PKG_MANAGER)" = "apt" ]; then \
-		$(USE_SUDO) apt update && $(USE_SUDO) apt install -y $(1) || true; \
+		if dpkg -s $(1) >/dev/null 2>&1; then \
+			echo "✅ $(1) sudah terinstal. Melewati instalasi."; \
+		else \
+			$(USE_SUDO) apt update && $(USE_SUDO) apt install -y $(1) || true; \
+		fi; \
 	elif [ "$(PKG_MANAGER)" = "dnf" ] || [ "$(PKG_MANAGER)" = "yum" ]; then \
-		$(USE_SUDO) $(PKG_MANAGER) install -y $(1) || true; \
+		if rpm -q $(1) >/dev/null 2>&1; then \
+			echo "✅ $(1) sudah terinstal. Melewati instalasi."; \
+		else \
+			$(USE_SUDO) $(PKG_MANAGER) install -y $(1) || true; \
+		fi; \
 	elif [ "$(PKG_MANAGER)" = "pacman" ]; then \
-		$(USE_SUDO) pacman -S --noconfirm $(1) || true; \
+		if pacman -Q $(1) >/dev/null 2>&1; then \
+			echo "✅ $(1) sudah terinstal. Melewati instalasi."; \
+		else \
+			$(USE_SUDO) pacman -S --noconfirm $(1) || true; \
+		fi; \
 	elif [ "$(PKG_MANAGER)" = "zypper" ]; then \
-		$(USE_SUDO) zypper install -y $(1) || true; \
+		if zypper se --installed-only $(1) >/dev/null 2>&1; then \
+			echo "✅ $(1) sudah terinstal. Melewati instalasi."; \
+		else \
+			$(USE_SUDO) zypper install -y $(1) || true; \
+		fi; \
 	else \
 		echo "⚠️ Tidak bisa menginstall $(1)."; \
 	fi

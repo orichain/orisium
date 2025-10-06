@@ -1026,7 +1026,7 @@ status_t orilink_check_ctr(const char *label, uint8_t* key_aes, uint32_t* ctr, o
     )
     {
         if (r->ctr != *(uint32_t *)ctr) {
-            LOG_ERROR("%sOrilink Counter tidak cocok. Protocol %d, data_ctr: %u, *ctr: %u", label, r->type, r->ctr, *(uint32_t *)ctr);
+            LOG_ERROR("%sOrilink Counter not match. Protocol %d, data_ctr: %u, *ctr: %u", label, r->type, r->ctr, *(uint32_t *)ctr);
             free(key0);
             return FAILURE_CTRMSMTCH;
         }
@@ -1045,7 +1045,7 @@ status_t orilink_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key
     )
     {
         if (r->ctr != *(uint32_t *)ctr) {
-            LOG_ERROR("%sOrilink Counter tidak cocok. Protocol %d, data_ctr: %u, *ctr: %u", label, r->type, r->ctr, *(uint32_t *)ctr);
+            LOG_ERROR("%sOrilink Counter not match. Protocol %d, data_ctr: %u, *ctr: %u", label, r->type, r->ctr, *(uint32_t *)ctr);
             free(key0);
             return FAILURE_CTRMSMTCH;
         }
