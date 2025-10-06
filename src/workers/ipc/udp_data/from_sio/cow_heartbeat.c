@@ -3,7 +3,6 @@
 #include <time.h>
 #include <netinet/in.h>
 #include <string.h>
-#include <stdlib.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -18,33 +17,29 @@
 #include "constants.h"
 
 static inline status_t create_heartbeat_sender_timer_fd(worker_context_t *worker_ctx, cow_c_session_t *session) {
-    if (!session->is_ctrjump) {
 //======================================================================
 // Acumulate Different RTT Between Peers
 //======================================================================
-        double timer_interval = session->heartbeat_interval;
-        timer_interval += session->rtt.value_prediction / (double)1e9;
-        if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
-            return FAILURE;
-        }
+    double timer_interval = session->heartbeat_interval;
+    timer_interval += session->rtt.value_prediction / (double)1e9;
+    if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
+        return FAILURE;
+    }
 //======================================================================
-        if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
-            return FAILURE;
-        }
-        //LOG_DEVEL_DEBUG("Hereeeeeeeeeeeeeeeeeeeee....... cow_heartbeat.c create_heartbeat_sender_timer_fd FD %d", session->heartbeat_sender_timer_fd);
-        if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_sender_timer_fd,
-            (time_t)timer_interval,
-            (long)((timer_interval - (time_t)timer_interval) * 1e9),
-            (time_t)timer_interval,
-            (long)((timer_interval - (time_t)timer_interval) * 1e9)) != SUCCESS)
-        {
-            return FAILURE;
-        }
-        if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd) != SUCCESS) {
-            return FAILURE;
-        }
-    } else {
-        session->is_ctrjump = false;
+    if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
+        return FAILURE;
+    }
+    //LOG_DEVEL_DEBUG("Hereeeeeeeeeeeeeeeeeeeee....... cow_heartbeat.c create_heartbeat_sender_timer_fd FD %d", session->heartbeat_sender_timer_fd);
+    if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_sender_timer_fd,
+        (time_t)timer_interval,
+        (long)((timer_interval - (time_t)timer_interval) * 1e9),
+        (time_t)timer_interval,
+        (long)((timer_interval - (time_t)timer_interval) * 1e9)) != SUCCESS)
+    {
+        return FAILURE;
+    }
+    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd) != SUCCESS) {
+        return FAILURE;
     }
     return SUCCESS;
 }
@@ -123,9 +118,9 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return cmac;
         }
-        retry_index = ctr_is_in_anchor(&session->heartbeat_ack.anchor, &oudp_datao_ctr);
-        if (retry_index == 0xff) {
-            LOG_ERROR("%sHeartbeat No Ctr In Anchor.", worker_ctx->label);
+        retry_index = (uint8_t)MAX_RETRY - (uint8_t)1;
+        if (!ctr_is_in_anchor(&session->heartbeat_ack.anchor, &oudp_datao_ctr)) {
+            LOG_ERROR("%sHeartbeat Retry Ctr Is To Old.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return FAILURE;
@@ -184,6 +179,13 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
             &current_time, 
             &trycount
         );
+    }
+//======================================================================
+    if (!is_same_ctr(&session->heartbeat_ack.anchor.last_ctr, session->heartbeat_ack.anchor.last_nonce, &session->heartbeat_ack.anchor.last_acked_ctr, session->heartbeat_ack.anchor.last_acked_nonce)) {
+        LOG_DEVEL_DEBUG("%sNot Ready For New Heartbeat", worker_ctx->label);
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
     }
 //======================================================================
     orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
@@ -274,20 +276,8 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
         }
         return FAILURE;
     }
-    uint8_t *last_rcvd_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-    if (!last_rcvd_nonce) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
-        if (l_inc_ctr != 0xFF) {
-            decrement_ctr(&security->local_ctr, security->local_nonce);
-        }
-        return FAILURE_NOMEM;
-    }
-    memcpy(last_rcvd_nonce, security->remote_nonce, AES_NONCE_BYTES);
-    uint32_t last_rcvd_ctr = security->remote_ctr;
+    memcpy(session->heartbeat_ack.anchor.last_rcvd_nonce, security->remote_nonce, AES_NONCE_BYTES);
+    session->heartbeat_ack.anchor.last_rcvd_ctr = security->remote_ctr;
 //======================================================================
 // Test Packet Dropped
 //======================================================================
@@ -339,8 +329,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
 //----------------------------------------------------------------------
 // -1 Because Of Passing Deserialize Process that is +1
 //----------------------------------------------------------------------
-    decrement_ctr(&last_rcvd_ctr, last_rcvd_nonce);
-    add_packet_ack_anchor(&session->heartbeat_ack.anchor, last_rcvd_nonce, last_rcvd_ctr);
+    decrement_ctr(&session->heartbeat_ack.anchor.last_rcvd_ctr, session->heartbeat_ack.anchor.last_rcvd_nonce);
 //======================================================================
     CLOSE_IPC_PROTOCOL(&received_protocol);
 //----------------------------------------------------------------------                            

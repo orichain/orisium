@@ -33,8 +33,8 @@ typedef struct {
 //======================================================================
 // For Validating Retry
 //======================================================================
-    uint8_t *last_rcvd_nonce[MAX_RETRY];
-    uint32_t last_rcvd_ctr[MAX_RETRY];
+    uint8_t *last_rcvd_nonce;
+    uint32_t last_rcvd_ctr;
 } packet_anchor_t;
 
 typedef struct {
@@ -82,7 +82,6 @@ typedef struct {
     uint64_t heartbeat_interval;
     bool is_first_heartbeat;
     int heartbeat_sender_timer_fd;
-    bool is_ctrjump;
 //----------------------------------------------------------------------
     int test_drop_hello1_ack;
     int test_drop_hello2_ack;
@@ -120,7 +119,6 @@ typedef struct {
     packet_ack_t heartbeat_ack;
     uint64_t heartbeat_interval;
     int heartbeat_sender_timer_fd;
-    bool is_ctrjump;
 //----------------------------------------------------------------------
     int test_drop_heartbeat_ack;
 //----------------------------------------------------------------------
@@ -171,13 +169,11 @@ void run_dbw_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
 status_t retry_packet(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, packet_t *packet);
 status_t retry_packet_ack(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, packet_ack_t *packet_ack, uint8_t index);
 
-static inline uint8_t ctr_is_in_anchor(packet_anchor_t *h, uint32_t *ctr) {
-    for (uint8_t i=0x00;i<(uint8_t)MAX_RETRY;++i) {
-        if (*ctr == h->last_rcvd_ctr[i]) {
-            return i;
-        }
+static inline bool ctr_is_in_anchor(packet_anchor_t *h, uint32_t *ctr) {
+    if (*ctr == h->last_rcvd_ctr) {
+        return true;
     }
-    return 0xff;
+    return false;
 }
 
 static inline void initialize_node_metrics(const char *label, node_metrics_t* metrics) {
@@ -286,10 +282,6 @@ static inline void reset_packet_ack_try_count(packet_ack_t *h) {
 
 static inline void reset_packet_ack_data(packet_ack_t *h) {
     for (uint8_t i = 0; i < MAX_RETRY; ++i) {
-        if (h->anchor.last_rcvd_nonce[i]) {
-            memset(h->anchor.last_rcvd_nonce[i], 0, AES_NONCE_BYTES);
-        }
-        h->anchor.last_rcvd_ctr[i] = (uint32_t)0;
         if (h->data[i]) {
             memset(h->data[i], 0, h->len[i]);
         }
@@ -298,26 +290,15 @@ static inline void reset_packet_ack_data(packet_ack_t *h) {
 
 static inline void cleanup_packet_ack(packet_ack_t *h, bool clean_state) {
 //----------------------------------------------------------------------
-    for (uint8_t i = 0; i < MAX_RETRY; ++i) {
-        if (h->anchor.last_rcvd_nonce[i]) {
-            memset(h->anchor.last_rcvd_nonce[i], 0, AES_NONCE_BYTES);
-            free(h->anchor.last_rcvd_nonce[i]);
-            h->anchor.last_rcvd_nonce[i] = NULL;
-        }
-        h->anchor.last_rcvd_ctr[i] = (uint32_t)0;
-        if (h->data[i]) {
-            free(h->data[i]);
-            h->data[i] = NULL;
-        }
-        h->len[i] = (uint16_t)0;
-    }
-//----------------------------------------------------------------------
     memset(h->anchor.last_nonce, 0, AES_NONCE_BYTES);
     free(h->anchor.last_nonce);
     h->anchor.last_ctr = (uint32_t)0;
     memset(h->anchor.last_acked_nonce, 0, AES_NONCE_BYTES);
     free(h->anchor.last_acked_nonce);
     h->anchor.last_acked_ctr = (uint32_t)0;
+    memset(h->anchor.last_rcvd_nonce, 0, AES_NONCE_BYTES);
+    free(h->anchor.last_rcvd_nonce);
+    h->anchor.last_rcvd_ctr = (uint32_t)0;
 //----------------------------------------------------------------------
     if (clean_state) {
         h->rcvd = false;
@@ -345,34 +326,14 @@ static inline void add_packet_ack(packet_ack_t *h, uint8_t *data, uint16_t len) 
     h->data[MAX_RETRY-1] = data;
 }
 
-static inline void add_packet_ack_anchor(packet_anchor_t *h, uint8_t *nonce, uint32_t ctr) {
-    if (h->last_rcvd_nonce[0]) {
-        free(h->last_rcvd_nonce[0]);
-        h->last_rcvd_nonce[0] = NULL;
-    }
-    h->last_rcvd_ctr[0] = (uint32_t)0;
-    for (uint8_t i = 1; i < MAX_RETRY; ++i) {
-        uint8_t index_1 = i - (uint8_t)1;
-        h->last_rcvd_nonce[index_1] = h->last_rcvd_nonce[i];
-        h->last_rcvd_ctr[index_1] = h->last_rcvd_ctr[i];
-        h->last_rcvd_nonce[i] = NULL;
-        h->last_rcvd_ctr[i] = (uint32_t)0;
-    }
-    h->last_rcvd_ctr[MAX_RETRY-1] = ctr;
-    h->last_rcvd_nonce[MAX_RETRY-1] = nonce;
-}
-
 static inline void setup_packet_ack(packet_ack_t *h) {
-//----------------------------------------------------------------------
-    for (uint8_t i=0;i<MAX_RETRY;++i) {
-        h->anchor.last_rcvd_nonce[i] = NULL;
-        h->anchor.last_rcvd_ctr[i] = (uint32_t)0;
-    }
 //----------------------------------------------------------------------
     h->anchor.last_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
     h->anchor.last_ctr = (uint32_t)0;
     h->anchor.last_acked_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
     h->anchor.last_acked_ctr = (uint32_t)0;
+    h->anchor.last_rcvd_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
+    h->anchor.last_rcvd_ctr = (uint32_t)0;
 //----------------------------------------------------------------------
     h->rcvd = false;
     h->rcvd_time = (uint64_t)0;
@@ -389,7 +350,6 @@ static inline void setup_packet_ack(packet_ack_t *h) {
 static inline status_t setup_cow_session(const char *label, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
-    single_session->is_ctrjump = false;
     single_session->test_drop_heartbeat_ack = 0;
 //----------------------------------------------------------------------
     setup_packet(&single_session->hello1, (double)1);
@@ -434,7 +394,6 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
 }
 
 static inline void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session) {
-    single_session->is_ctrjump = false;
     cleanup_packet(label, cow_async, &single_session->hello1, true);
     cleanup_packet(label, cow_async, &single_session->hello2, true);
     cleanup_packet(label, cow_async, &single_session->hello3, true);
@@ -483,7 +442,6 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
 static inline status_t setup_sio_session(const char *label, sio_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
-    single_session->is_ctrjump = false;
     single_session->test_drop_hello1_ack = 0;
     single_session->test_drop_hello2_ack = 0;
     single_session->test_drop_hello3_ack = 0;
@@ -532,7 +490,6 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
 }
 
 static inline void cleanup_sio_session(const char *label, async_type_t *sio_async, sio_c_session_t *single_session) {
-    single_session->is_ctrjump = false;
     cleanup_packet_ack(&single_session->hello1_ack, true);
     cleanup_packet_ack(&single_session->hello2_ack, true);
     cleanup_packet_ack(&single_session->hello3_ack, true);
