@@ -25,15 +25,27 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
-//======================================================================
-    /*
     if (session->heartbeat.ack_rcvd) {
-        LOG_ERROR("%sHeartbeat_Ack Received Already.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        return FAILURE;
+        status_t cmac = orilink_check_mac_ctr(
+            worker_ctx->label, 
+            security->aes_key, 
+            security->mac_key, 
+            security->remote_nonce,
+            &security->remote_ctr, 
+            oudp_datao
+        );
+        if (cmac != SUCCESS) {
+            LOG_ERROR("%sHeartbeat_Ack Received Already.", worker_ctx->label);
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return cmac;
+        }
+        cleanup_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
+        session->heartbeat_ack.rcvd = false;
+        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+        CLOSE_FD(&session->heartbeat_sender_timer_fd);
+        return SUCCESS;
     }
-    */
 //======================================================================
     status_t cmac = orilink_check_mac_ctr(
         worker_ctx->label, 

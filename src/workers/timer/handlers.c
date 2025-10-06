@@ -179,7 +179,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 // Heartbeat Ack Security 1 & Security 2 Open
 //======================================================================
                     session->heartbeat.sent = true;
-                    //session->heartbeat.ack_rcvd = false;
+                    session->heartbeat.ack_rcvd = false;
                     return SUCCESS;
                 } else if (*current_fd == session->heartbeat_sender_timer_fd) {
                     uint64_t u;
@@ -278,7 +278,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 // Heartbeat Ack Security 1 & Security 2 Open
 //======================================================================
                         session->heartbeat.sent = true;
-                        //session->heartbeat.ack_rcvd = false;
+                        session->heartbeat.ack_rcvd = false;
 //======================================================================
 // Heartbeat Security 2 Open
 //======================================================================
@@ -359,7 +359,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 // Heartbeat Ack Security 1 & Security 2 Open
 //======================================================================
                     session->heartbeat.sent = true;
-                    //session->heartbeat.ack_rcvd = false;
+                    session->heartbeat.ack_rcvd = false;
                     return SUCCESS;
                 } else if (*current_fd == session->heartbeat_sender_timer_fd) {
                     uint64_t u;
@@ -458,7 +458,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 // Heartbeat Ack Security 1 & Security 2 Open
 //======================================================================
                         session->heartbeat.sent = true;
-                        //session->heartbeat.ack_rcvd = false;
+                        session->heartbeat.ack_rcvd = false;
 //======================================================================
 // Heartbeat Security 2 Open
 //======================================================================
