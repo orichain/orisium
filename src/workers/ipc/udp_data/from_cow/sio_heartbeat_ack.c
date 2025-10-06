@@ -42,8 +42,10 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
         }
 //======================================================================
 // Stop Timer Sender, But Don't Stop Timer Retry
+// Retry with last ctr and trycount = 1
 // We Have Send Heartbeat But Remote Peer Was Not Ready
 //======================================================================
+        session->heartbeat.sent_try_count = 0x00;
         //cleanup_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
         CLOSE_FD(&session->heartbeat_sender_timer_fd);
