@@ -26,12 +26,9 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
         return FAILURE;
     }
     if (session->heartbeat.ack_rcvd) {
-        status_t cmac = orilink_check_mac_ctr(
+        status_t cmac = orilink_check_mac(
             worker_ctx->label, 
-            security->aes_key, 
             security->mac_key, 
-            security->remote_nonce,
-            &security->remote_ctr, 
             oudp_datao
         );
         if (cmac != SUCCESS) {
