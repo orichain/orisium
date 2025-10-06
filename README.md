@@ -132,7 +132,7 @@ Internal communication (`master` $\leftrightarrow$ `logic` $\leftrightarrow$ `co
 The main development and testing environment currently uses **Rocky Linux 10** and **CentOS Stream 9**.
 
 ```bash
-git clone [https://github.com/orichain/orisium.git](https://github.com/orichain/orisium.git)
+git clone https://github.com/orichain/orisium.git
 cd orisium
 git submodule update --init --recursive
 gmake clean debug
