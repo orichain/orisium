@@ -355,6 +355,11 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     if (retry_packet(worker_ctx, identity, security, &session->heartbeat) != SUCCESS) {
                         return FAILURE;
                     }
+//======================================================================
+// Heartbeat Ack Security 1 & Security 2 Open
+//======================================================================
+                    session->heartbeat.sent = true;
+                    session->heartbeat.ack_rcvd = false;
                     return SUCCESS;
                 } else if (*current_fd == session->heartbeat_sender_timer_fd) {
                     uint64_t u;
