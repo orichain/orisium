@@ -45,6 +45,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
 // We Have Send Heartbeat But Remote Peer Was Not Ready
 //======================================================================
             LOG_DEVEL_DEBUG("%sCtr Jump Detected", worker_ctx->label);
+            session->is_ctrjump = true;
             session->heartbeat.sent_try_count = 0x00;
             //cleanup_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
             async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);

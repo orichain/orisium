@@ -18,7 +18,7 @@
 #define MAX_MASTER_COW_SESSIONS (MAX_COW_WORKERS * MAX_CONNECTION_PER_COW_WORKER)
 #define MAX_DOWNSTREAM_NODES_LIMIT 25
 //----------------------------------------------------------------------
-// Test 2 Seconds
+// Test 2 Secs
 //----------------------------------------------------------------------
 #define NODE_HEARTBEAT_INTERVAL 2
 #define NODE_CHECK_HEALTHY_X 3

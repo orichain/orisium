@@ -18,26 +18,30 @@
 #include "constants.h"
 
 static inline status_t create_heartbeat_sender_timer_fd(worker_context_t *worker_ctx, sio_c_session_t *session) {
+    if (!session->is_ctrjump) {
 //======================================================================
 // Acumulate Different RTT Between Peers
 //======================================================================
-    double timer_interval = session->heartbeat_interval;
-    timer_interval += session->rtt.value_prediction / (double)1e9;
-    if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
-        return FAILURE;
-    }
+        double timer_interval = session->heartbeat_interval;
+        timer_interval += session->rtt.value_prediction / (double)1e9;
+        if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
+            return FAILURE;
+        }
 //======================================================================
-    //LOG_DEVEL_DEBUG("Hereeeeeeeeeeeeeeeeeeeee....... cow_heartbeat.c create_heartbeat_sender_timer_fd FD %d", session->heartbeat_sender_timer_fd);
-    if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_sender_timer_fd,
-        (time_t)timer_interval,
-        (long)((timer_interval - (time_t)timer_interval) * 1e9),
-        (time_t)timer_interval,
-        (long)((timer_interval - (time_t)timer_interval) * 1e9)) != SUCCESS)
-    {
-        return FAILURE;
-    }
-    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd) != SUCCESS) {
-        return FAILURE;
+        //LOG_DEVEL_DEBUG("Hereeeeeeeeeeeeeeeeeeeee....... cow_heartbeat.c create_heartbeat_sender_timer_fd FD %d", session->heartbeat_sender_timer_fd);
+        if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_sender_timer_fd,
+            (time_t)timer_interval,
+            (long)((timer_interval - (time_t)timer_interval) * 1e9),
+            (time_t)timer_interval,
+            (long)((timer_interval - (time_t)timer_interval) * 1e9)) != SUCCESS)
+        {
+            return FAILURE;
+        }
+        if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd) != SUCCESS) {
+            return FAILURE;
+        }
+    } else {
+        session->is_ctrjump = false;
     }
     return SUCCESS;
 }

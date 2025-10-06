@@ -82,7 +82,8 @@ typedef struct {
     uint64_t heartbeat_interval;
     bool is_first_heartbeat;
     int heartbeat_sender_timer_fd;
-    
+    bool is_ctrjump;
+//----------------------------------------------------------------------
     int test_drop_hello1_ack;
     int test_drop_hello2_ack;
     int test_drop_hello3_ack;
@@ -119,7 +120,8 @@ typedef struct {
     packet_ack_t heartbeat_ack;
     uint64_t heartbeat_interval;
     int heartbeat_sender_timer_fd;
-    
+    bool is_ctrjump;
+//----------------------------------------------------------------------
     int test_drop_heartbeat_ack;
 //----------------------------------------------------------------------
     node_metrics_t metrics;
@@ -387,6 +389,7 @@ static inline void setup_packet_ack(packet_ack_t *h) {
 static inline status_t setup_cow_session(const char *label, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
+    single_session->is_ctrjump = false;
     single_session->test_drop_heartbeat_ack = 0;
 //----------------------------------------------------------------------
     setup_packet(&single_session->hello1, (double)1);
@@ -431,6 +434,7 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
 }
 
 static inline void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session) {
+    single_session->is_ctrjump = false;
     cleanup_packet(label, cow_async, &single_session->hello1, true);
     cleanup_packet(label, cow_async, &single_session->hello2, true);
     cleanup_packet(label, cow_async, &single_session->hello3, true);
@@ -479,6 +483,7 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
 static inline status_t setup_sio_session(const char *label, sio_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
+    single_session->is_ctrjump = false;
     single_session->test_drop_hello1_ack = 0;
     single_session->test_drop_hello2_ack = 0;
     single_session->test_drop_hello3_ack = 0;
@@ -527,6 +532,7 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
 }
 
 static inline void cleanup_sio_session(const char *label, async_type_t *sio_async, sio_c_session_t *single_session) {
+    single_session->is_ctrjump = false;
     cleanup_packet_ack(&single_session->hello1_ack, true);
     cleanup_packet_ack(&single_session->hello2_ack, true);
     cleanup_packet_ack(&single_session->hello3_ack, true);
