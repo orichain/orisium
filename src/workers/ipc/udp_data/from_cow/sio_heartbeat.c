@@ -42,31 +42,18 @@ static inline status_t create_heartbeat_sender_timer_fd(worker_context_t *worker
 }
 
 static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_session_t *session, orilink_identity_t *identity, uint64_t_status_t *current_time, uint8_t *trycount) {
-    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
-    CLOSE_FD(&session->heartbeat_sender_timer_fd);
-    status_t chst = create_heartbeat_sender_timer_fd(worker_ctx, session);
-    if (chst != SUCCESS) {
-        return FAILURE;
-    }
 //======================================================================
     if (session->is_first_heartbeat) {
-        if (*trycount > (uint8_t)1) {
-            double try_count = (double)session->hello4_ack.ack_sent_try_count;
-            calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
-            session->hello4_ack.rcvd = true;
-            session->hello4_ack.rcvd_time = current_time->r_uint64_t;
-        } else {
-            double try_count = (double)session->hello4_ack.ack_sent_try_count-(double)1;
-            calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
-            session->hello4_ack.rcvd = true;
-            session->hello4_ack.rcvd_time = current_time->r_uint64_t;
-            uint64_t interval_ull = session->hello4_ack.rcvd_time - session->hello4_ack.ack_sent_time;
-            double rtt_value = (double)interval_ull;
-            calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-            cleanup_control_packet_ack(&session->hello4_ack, false, CDT_RESET);
-            
-            LOG_DEVEL_DEBUG("%sRTT Hello-4 Ack = %f", worker_ctx->label, session->rtt.value_prediction);
-        }
+        double try_count = (double)session->hello4_ack.ack_sent_try_count-(double)1;
+        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+        session->hello4_ack.rcvd = true;
+        session->hello4_ack.rcvd_time = current_time->r_uint64_t;
+        uint64_t interval_ull = session->hello4_ack.rcvd_time - session->hello4_ack.ack_sent_time;
+        double rtt_value = (double)interval_ull;
+        calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+        cleanup_control_packet_ack(&session->hello4_ack, false, CDT_RESET);
+        
+        LOG_DEVEL_DEBUG("%sRTT Hello-4 Ack = %f", worker_ctx->label, session->rtt.value_prediction);
     } else {
 //======================================================================
 // Heartbeat Security 2 Close
@@ -231,7 +218,11 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     }
 //======================================================================
     //if (!is_same_ctr(&session->heartbeat_ack.anchor.last_ctr, session->heartbeat_ack.anchor.last_nonce, &session->heartbeat_ack.anchor.last_acked_ctr, session->heartbeat_ack.anchor.last_acked_nonce)) {
-    if (session->heartbeat.timer_fd != -1) {
+    if (
+        session->heartbeat.timer_fd != -1 ||
+        session->heartbeat_sender_timer_fd != -1
+    )
+    {
         LOG_DEVEL_DEBUG("%sNot Ready For New Heartbeat. Still trying to get Ack.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
@@ -385,11 +376,19 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
 //----------------------------------------------------------------------                            
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
 //======================================================================
-    return last_execution(
+    status_t le = last_execution(
         worker_ctx, 
         session, 
         identity, 
         &current_time, 
         &trycount
     );
+    if (le != SUCCESS) {
+        return FAILURE;
+    }
+    status_t chst = create_heartbeat_sender_timer_fd(worker_ctx, session);
+    if (chst != SUCCESS) {
+        return FAILURE;
+    }
+    return SUCCESS;
 }
