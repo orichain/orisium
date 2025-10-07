@@ -14,6 +14,7 @@ struct sockaddr_in6;
 
 status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     uint8_t inc_ctr = oudp_datao->inc_ctr;
+    uint32_t oudp_datao_ctr = oudp_datao->ctr;
 //======================================================================
 // + Security
 //======================================================================
@@ -24,10 +25,29 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
         return FAILURE;
     }
     if (session->heartbeat.ack_rcvd) {
-        LOG_ERROR("%sHeartbeat_Ack Received Already. Protocol %d, data_ctr: %u, *ctr: %u", worker_ctx->label, oudp_datao->type, oudp_datao->ctr, security->remote_ctr);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        return FAILURE;
+        status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
+        if (cmac != SUCCESS) {
+            LOG_ERROR("%sHeartbeat_Ack Received Already(1). Protocol %d, data_ctr: %u, *ctr: %u", worker_ctx->label, oudp_datao->type, oudp_datao->ctr, security->remote_ctr);
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return FAILURE;
+        }
+        if (!is_1lower_ctr(&oudp_datao_ctr, &security->remote_ctr, security->remote_nonce)) {
+            LOG_ERROR("%sHeartbeat_Ack Received Already(2). Protocol %d, data_ctr: %u, *ctr: %u", worker_ctx->label, oudp_datao->type, oudp_datao->ctr, security->remote_ctr);
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return FAILURE;
+        }
+        LOG_ERROR("%sHeartbeat_Ack Received Already(3). Protocol %d, data_ctr: %u, *ctr: %u", worker_ctx->label, oudp_datao->type, oudp_datao->ctr, security->remote_ctr);
+//======================================================================
+        cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
+        session->heartbeat.sent = true;
+        session->heartbeat.ack_rcvd = false;
+        session->heartbeat_ack.rcvd = false;                    
+        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+        CLOSE_FD(&session->heartbeat_sender_timer_fd);
+//======================================================================
+        return SUCCESS;
     }
 //======================================================================
     status_t cmac = orilink_check_mac_ctr(
