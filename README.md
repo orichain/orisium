@@ -2,7 +2,7 @@
 
 # Orisium
 
-Orisium is a **high-performance, resilient Peer-to-Peer (P2P) network** designed for global scalability, attack resilience, and robust decentralization. Utilizing a dynamic hierarchical architecture and a specialized custom $\text{UDP}$-based protocol, Orisium provides a superior, secure foundation for next-generation decentralized applications.
+Orisium is a **high-performance, resilient Peer-to-Peer (P2P) transport protocol** engineered for **geometric scalability**, **Byzantine fault tolerance**, and robust decentralization.
 
 -----
 
