@@ -52,6 +52,11 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
         double rtt_value = (double)interval_ull;
         calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
         cleanup_control_packet_ack(&session->hello4_ack, false, CDT_RESET);
+//----------------------------------------------------------------------
+        if (worker_master_task_info(worker_ctx, identity->local_session_index, TIT_SECURE) != SUCCESS) {
+            return FAILURE;
+        }
+//----------------------------------------------------------------------
         
         LOG_DEVEL_DEBUG("%sRTT Hello-4 Ack = %f", worker_ctx->label, session->rtt.value_prediction);
     } else {

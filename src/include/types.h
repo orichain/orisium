@@ -68,6 +68,7 @@ typedef enum {
 } clean_data_type_t;
 
 typedef enum {
+    TIT_SECURE = (uint8_t)0x00,
 	TIT_TIMEOUT = (uint8_t)0xff
 } task_info_type_t;
 

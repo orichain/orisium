@@ -68,6 +68,7 @@ typedef struct {
 typedef struct {
 	uint8_t sio_index;
     bool in_use;
+    bool in_secure;
     uint64_t id_connection;
     struct sockaddr_in6 remote_addr;
 } master_sio_c_session_t;
@@ -75,6 +76,7 @@ typedef struct {
 typedef struct {
 	uint8_t cow_index;
     bool in_use;
+    bool in_secure;
     uint64_t id_connection;
     struct sockaddr_in6 remote_addr;
 } master_cow_c_session_t;
@@ -87,8 +89,8 @@ typedef struct {
     int shutdown_event_fd;
     async_type_t master_async;
 //----------------------------------------------------------------------
-    int last_sio_rr_idx;
-    int last_cow_rr_idx;
+    uint8_t last_sio_rr_idx;
+    uint8_t last_cow_rr_idx;
 //----------------------------------------------------------------------
     uint16_t listen_port;
     bootstrap_nodes_t bootstrap_nodes;

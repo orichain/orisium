@@ -34,11 +34,29 @@ status_t handle_master_ipc_task_info(const char *label, master_context_t *master
                 case SIO: {
                     master_ctx->sio_c_session[(rcvd_index * MAX_CONNECTION_PER_SIO_WORKER) + itask_infoi->session_index].sio_index = 0xff;
                     master_ctx->sio_c_session[(rcvd_index * MAX_CONNECTION_PER_SIO_WORKER) + itask_infoi->session_index].in_use = false;
+                    master_ctx->sio_c_session[(rcvd_index * MAX_CONNECTION_PER_SIO_WORKER) + itask_infoi->session_index].in_secure = false;
                     break;
                 }
                 case COW: {
                     master_ctx->cow_c_session[(rcvd_index * MAX_CONNECTION_PER_COW_WORKER) + itask_infoi->session_index].cow_index = 0xff;
                     master_ctx->cow_c_session[(rcvd_index * MAX_CONNECTION_PER_COW_WORKER) + itask_infoi->session_index].in_use = false;
+                    master_ctx->cow_c_session[(rcvd_index * MAX_CONNECTION_PER_COW_WORKER) + itask_infoi->session_index].in_secure = false;
+                    break;
+                }
+                default:
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    return FAILURE;
+            }
+            break;
+        }
+        case TIT_SECURE: {
+            switch (rcvd_wot) {
+                case SIO: {
+                    master_ctx->sio_c_session[(rcvd_index * MAX_CONNECTION_PER_SIO_WORKER) + itask_infoi->session_index].in_secure = true;
+                    break;
+                }
+                case COW: {
+                    master_ctx->cow_c_session[(rcvd_index * MAX_CONNECTION_PER_COW_WORKER) + itask_infoi->session_index].in_secure = true;
                     break;
                 }
                 default:

@@ -8,18 +8,18 @@
 #include "types.h"
 #include "master/master.h"
 
-int select_best_worker(const char *label, master_context_t *master_ctx, worker_type_t wot) {
+uint8_t select_best_worker(const char *label, master_context_t *master_ctx, worker_type_t wot) {
     const char *worker_name = get_master_worker_name(wot);
-    int selected_worker_idx = -1;
+    uint8_t selected_worker_idx = 0xff;
     long double min_avg_task_time = LDBL_MAX;
     uint64_t min_longest_task_time = ULLONG_MAX;
     
-    int temp_best_idx_t1 = -1;
+    uint8_t temp_best_idx_t1 = 0xff;
     if (wot == SIO) {
         for (uint8_t i = 0; i < MAX_SIO_WORKERS; ++i) {
             master_worker_session_t *session = get_master_worker_session(master_ctx, SIO, i);
             if (session == NULL) {
-                return -1;
+                return 0xff;
             }
             if (session->task_count < MAX_CONNECTION_PER_SIO_WORKER) {
                 if (session->isactive && session->ishealthy) {
@@ -34,7 +34,7 @@ int select_best_worker(const char *label, master_context_t *master_ctx, worker_t
         for (uint8_t i = 0; i < MAX_COW_WORKERS; ++i) {
             master_worker_session_t *session = get_master_worker_session(master_ctx, COW, i);
             if (session == NULL) {
-                return -1;
+                return 0xff;
             }
             if (session->task_count < MAX_CONNECTION_PER_COW_WORKER) {
                 if (session->isactive && session->ishealthy) {
@@ -46,7 +46,7 @@ int select_best_worker(const char *label, master_context_t *master_ctx, worker_t
             }
         }
     }
-    if (temp_best_idx_t1 != -1) {
+    if (temp_best_idx_t1 != 0xff) {
         if (min_avg_task_time > 0.0L) {
             selected_worker_idx = temp_best_idx_t1;
             LOG_DEBUG("%sSelecting %s worker %d based on lowest Avg Task Time: %Lf", 
@@ -57,12 +57,12 @@ int select_best_worker(const char *label, master_context_t *master_ctx, worker_t
     } else {
         LOG_DEBUG("%sNo not-full %s workers found for Avg Task Time check. All might be full. Falling back.", label, worker_name);
     }
-    int temp_best_idx_t2 = -1;
+    uint8_t temp_best_idx_t2 = 0xff;
     if (wot == SIO) {
         for (uint8_t i = 0; i < MAX_SIO_WORKERS; ++i) {
             master_worker_session_t *session = get_master_worker_session(master_ctx, SIO, i);
             if (session == NULL) {
-                return -1;
+                return 0xff;
             }
             if (session->task_count < MAX_CONNECTION_PER_SIO_WORKER) {
                 if (session->isactive && session->ishealthy) {
@@ -77,7 +77,7 @@ int select_best_worker(const char *label, master_context_t *master_ctx, worker_t
         for (uint8_t i = 0; i < MAX_COW_WORKERS; ++i) {
             master_worker_session_t *session = get_master_worker_session(master_ctx, COW, i);
             if (session == NULL) {
-                return -1;
+                return 0xff;
             }
             if (session->task_count < MAX_CONNECTION_PER_COW_WORKER) {
                 if (session->isactive && session->ishealthy) {
@@ -89,7 +89,7 @@ int select_best_worker(const char *label, master_context_t *master_ctx, worker_t
             }
         }
     }
-    if (temp_best_idx_t2 != -1) {
+    if (temp_best_idx_t2 != 0xff) {
         if (min_longest_task_time > 0ULL) {
             selected_worker_idx = temp_best_idx_t2;
             LOG_DEBUG("%sSelecting %s worker %d based on lowest Longest Task Time: %" PRIu64, 
@@ -100,15 +100,15 @@ int select_best_worker(const char *label, master_context_t *master_ctx, worker_t
     } else {
         LOG_DEBUG("%sNo not-full %s workers found for Longest Task Time check. All might be full. Falling back to Round Robin.", label, worker_name);
     }
-    int temp_best_idx_t3 = -1;
+    uint8_t temp_best_idx_t3 = 0xff;
     if (wot == SIO) {
-        int start_rr_check_idx = master_ctx->last_sio_rr_idx; 
+        uint8_t start_rr_check_idx = master_ctx->last_sio_rr_idx; 
         for (uint8_t i = 0; i < MAX_SIO_WORKERS; ++i) {
             master_worker_session_t *session = get_master_worker_session(master_ctx, SIO, i);
             if (session == NULL) {
-                return -1;
+                return 0xff;
             }
-            int current_rr_idx = (start_rr_check_idx + i) % MAX_SIO_WORKERS;
+            uint8_t current_rr_idx = (start_rr_check_idx + i) % MAX_SIO_WORKERS;
             if (master_ctx->sio_session[current_rr_idx].task_count < MAX_CONNECTION_PER_SIO_WORKER) {
                 if (master_ctx->sio_session[current_rr_idx].isactive && master_ctx->sio_session[current_rr_idx].ishealthy) {
                     temp_best_idx_t3 = current_rr_idx;
@@ -118,13 +118,13 @@ int select_best_worker(const char *label, master_context_t *master_ctx, worker_t
             }
         }
     } else if (wot == COW) {
-        int start_rr_check_idx = master_ctx->last_cow_rr_idx; 
+        uint8_t start_rr_check_idx = master_ctx->last_cow_rr_idx; 
         for (uint8_t i = 0; i < MAX_COW_WORKERS; ++i) {
             master_worker_session_t *session = get_master_worker_session(master_ctx, COW, i);
             if (session == NULL) {
-                return -1;
+                return 0xff;
             }
-            int current_rr_idx = (start_rr_check_idx + i) % MAX_COW_WORKERS;
+            uint8_t current_rr_idx = (start_rr_check_idx + i) % MAX_COW_WORKERS;
             if (master_ctx->cow_session[current_rr_idx].task_count < MAX_CONNECTION_PER_COW_WORKER) {
                 if (master_ctx->cow_session[current_rr_idx].isactive && master_ctx->cow_session[current_rr_idx].ishealthy) {
                     temp_best_idx_t3 = current_rr_idx;
@@ -134,12 +134,12 @@ int select_best_worker(const char *label, master_context_t *master_ctx, worker_t
             }
         }
     }
-    if (temp_best_idx_t3 != -1) {
+    if (temp_best_idx_t3 != 0xff) {
         selected_worker_idx = temp_best_idx_t3;
         LOG_DEBUG("%sSelecting %s worker %d using Round Robin (fallback).", label, worker_name, selected_worker_idx);
         return selected_worker_idx;
     } else {
         LOG_ERROR("%sNo %s worker available (all might be full/unhealthy/nonactive).", label, worker_name);
-        return -1;
+        return 0xff;
     }
 }

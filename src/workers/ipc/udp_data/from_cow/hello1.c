@@ -202,7 +202,7 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
 //======================================================================
     session->test_drop_hello1_ack++;
     if (
-        session->test_drop_hello1_ack == 2
+        session->test_drop_hello1_ack == 1
     )
     {
         printf("[Debug Here Helper]: Hello1 Ack Packet Number %d. Sending To Fake Addr To Force Retry\n", session->test_drop_hello1_ack);

@@ -46,6 +46,7 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
     for (uint8_t sio_worker_idx=0;sio_worker_idx<MAX_SIO_WORKERS; ++sio_worker_idx) {
         for(uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
             master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].in_use = false;
+            master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].in_secure = false;
             master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].sio_index = 0xff;
             memset(&master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].remote_addr, 0, sizeof(struct sockaddr_in6));
             master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].id_connection = 0xffffffffffffffff;
@@ -54,6 +55,7 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
     for (uint8_t cow_worker_idx=0;cow_worker_idx<MAX_COW_WORKERS; ++cow_worker_idx) {
         for(uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
             master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].in_use = false;
+            master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].in_secure = false;
             master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].cow_index = 0xff;
             memset(&master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].remote_addr, 0, sizeof(struct sockaddr_in6));
             master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].id_connection = 0xffffffffffffffff;
@@ -340,8 +342,8 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                     continue;
                                 }
                                 for (int ic = 0; ic < master_ctx->bootstrap_nodes.len; ic++) {
-                                    int cow_worker_idx = select_best_worker(label, master_ctx, COW);
-                                    if (cow_worker_idx == -1) {
+                                    uint8_t worker_index = select_best_worker(label, master_ctx, COW);
+                                    if (worker_index == 0xff) {
                                         LOG_ERROR("%sFailed to select an COW worker for new task. Initiating graceful shutdown...", label);
                                         master_ctx->shutdown_requested = 1;
                                         master_workers_info(label, master_ctx, IT_SHUTDOWN);
@@ -349,30 +351,30 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                     }
                                     uint8_t slot_found = 0xff;
                                     for(uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
-                                        if(!master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].in_use) {
-                                            master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].cow_index = cow_worker_idx;
-                                            master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].in_use = true;
+                                        if(!master_ctx->cow_c_session[(worker_index * MAX_CONNECTION_PER_COW_WORKER) + i].in_use) {
+                                            master_ctx->cow_c_session[(worker_index * MAX_CONNECTION_PER_COW_WORKER) + i].cow_index = worker_index;
+                                            master_ctx->cow_c_session[(worker_index * MAX_CONNECTION_PER_COW_WORKER) + i].in_use = true;
                                             slot_found = i;
                                             break;
                                         }
                                     }
                                     if (slot_found == 0xff) {
-                                        LOG_ERROR("%sWARNING: No free session slots in cow-%d sessions. Initiating graceful shutdown...", label, cow_worker_idx);
+                                        LOG_ERROR("%sWARNING: No free session slots in cow-%d sessions. Initiating graceful shutdown...", label, worker_index);
                                         master_ctx->shutdown_requested = 1;
                                         master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                         continue;
                                     }
-                                    if (new_task_metrics(label, master_ctx, COW, cow_worker_idx) != SUCCESS) {
-                                        LOG_ERROR("%sFailed to input new task in COW %d metrics. Initiating graceful shutdown...", label, cow_worker_idx);
+                                    if (new_task_metrics(label, master_ctx, COW, worker_index) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to input new task in COW %d metrics. Initiating graceful shutdown...", label, worker_index);
                                         master_ctx->shutdown_requested = 1;
                                         master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                         continue;
                                     }
-                                    uint64_t *id_connection = &master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + slot_found].id_connection;
-                                    struct sockaddr_in6 *remote_addr = &master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + slot_found].remote_addr;
+                                    uint64_t *id_connection = &master_ctx->cow_c_session[(worker_index * MAX_CONNECTION_PER_COW_WORKER) + slot_found].id_connection;
+                                    struct sockaddr_in6 *remote_addr = &master_ctx->cow_c_session[(worker_index * MAX_CONNECTION_PER_COW_WORKER) + slot_found].remote_addr;
                                     if (generate_uint64_t_id(label, id_connection) != SUCCESS) goto exit;
                                     memcpy(remote_addr, &master_ctx->bootstrap_nodes.addr[ic], sizeof(struct sockaddr_in6));
-                                    if (master_cow_connect(label, master_ctx, remote_addr, cow_worker_idx, slot_found, *id_connection) != SUCCESS) goto exit;
+                                    if (master_cow_connect(label, master_ctx, remote_addr, worker_index, slot_found, *id_connection) != SUCCESS) goto exit;
                                 }
                                 if (setup_master_socket_udp(label, master_ctx) != SUCCESS) {
                                     LOG_ERROR("%sFailed to setup_master_socket_udp. Initiating graceful shutdown...", label);
