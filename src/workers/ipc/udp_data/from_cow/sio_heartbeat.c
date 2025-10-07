@@ -22,11 +22,11 @@ static inline status_t create_heartbeat_sender_timer_fd(worker_context_t *worker
 //======================================================================
     double timer_interval = session->heartbeat_interval;
     timer_interval += session->rtt.value_prediction / (double)1e9;
-    timer_interval += session->retry.value_prediction;
+    timer_interval += pow((double)2, (double)session->retry.value_prediction);
+//======================================================================
     if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
         return FAILURE;
     }
-//======================================================================
     //LOG_DEVEL_DEBUG("Hereeeeeeeeeeeeeeeeeeeee....... cow_heartbeat.c create_heartbeat_sender_timer_fd FD %d", session->heartbeat_sender_timer_fd);
     if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_sender_timer_fd,
         (time_t)timer_interval,
