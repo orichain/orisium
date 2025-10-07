@@ -183,17 +183,16 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 } else if (*current_fd == session->heartbeat_sender_timer_fd) {
                     uint64_t u;
                     read(session->heartbeat_sender_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                    if (session->heartbeat_ack.last_trycount > 0x01) {
+                    if (session->heartbeat_interval_extended_retrycount != 0x00) {
 //======================================================================
 // Retry Detected
-//======================================================================
-                        double try_count = (double)session->heartbeat_ack.last_trycount-(double)1;
-                        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
 //======================================================================
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
 //======================================================================
-                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
+                        double timer_interval = (double)session->heartbeat_interval_extended_retrycount;
+                        session->heartbeat_interval_extended_retrycount = 0x00;
+                        timer_interval += session->rtt.value_prediction / (double)1e9;
                         LOG_DEVEL_DEBUG("%sRetry Detected. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
                         if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
                             return FAILURE;
@@ -363,17 +362,16 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 } else if (*current_fd == session->heartbeat_sender_timer_fd) {
                     uint64_t u;
                     read(session->heartbeat_sender_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                    if (session->heartbeat_ack.last_trycount > 0x01) {
+                    if (session->heartbeat_interval_extended_retrycount != 0x00) {
 //======================================================================
 // Retry Detected
-//======================================================================
-                        double try_count = (double)session->heartbeat_ack.last_trycount-(double)1;
-                        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
 //======================================================================
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
 //======================================================================
-                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
+                        double timer_interval = (double)session->heartbeat_interval_extended_retrycount;
+                        session->heartbeat_interval_extended_retrycount = 0x00;
+                        timer_interval += session->rtt.value_prediction / (double)1e9;
                         LOG_DEVEL_DEBUG("%sRetry Detected. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
                         if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
                             return FAILURE;

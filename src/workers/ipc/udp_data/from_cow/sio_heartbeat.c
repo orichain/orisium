@@ -168,6 +168,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             return FAILURE;
         }
         LOG_DEVEL_DEBUG("%sRetry Detected", worker_ctx->label);
+        session->heartbeat_interval_extended_retrycount++;
     } else {
         status_t cmac = orilink_check_mac_ctr(
             worker_ctx->label, 
