@@ -40,11 +40,12 @@ Orisium separates traffic into two functionally distinct streams to simultaneous
 
 Orisium is engineered to **survive and maintain cryptographic integrity** in highly lossy, unstable, or actively censored network environments.
 
-#### a. Hierarchical Counter Management
+#### a. 4-Way Heartbeat Counter Locking Protocol (The Core Innovation)
 
-Security is maintained through a strict two-tiered cryptographic state:
+Security for the entire session is maintained through a strict, self-locking mechanism focused on the Heartbeat exchange:
 
-  * **Heartbeat Counter (Global State):** Serves as the **master clock** and custodian of the session's current cryptographic state. Its primary function is to lock the session's security state, making it highly **resilient against general replay attacks**.
+  * **4-Way Heartbeat Protocol:** The Heartbeat exchange is implemented as a **4-way state machine** (similar to $\text{TCP}$'s $\text{SYN/ACK/FIN}$ structure but without waiting for a final $\text{ACK}$ to advance the state). This allows the system to **lock the session's base cryptographic state** immediately after the peer acknowledges the request.
+  * **Counter Locking (Global State):** The Heartbeat Counter serves as the **master clock** and custodian of the session's current cryptographic state. Its primary function is to **lock the session's security state** upon successful completion of the first half of the 4-way exchange, making it highly **resilient against general replay attacks**.
   * **Prepared/Re Counter (Data Stream State):** Used for securing each individual data stream packet. The integrity of these counters is **tethered** to the validity of the global $\text{Heartbeat}$ state.
   * **Stream State Synchronization (SYN\_DATA):** This frame communicates the **last verified $\text{Heartbeat}$ base counter** to the receiving endpoint, ensuring **every new data stream begins with a cryptographically unique state** (preventing $\text{Nonce}$ reuse).
 
@@ -52,9 +53,9 @@ Security is maintained through a strict two-tiered cryptographic state:
 
 The protocol includes a highly-secure mechanism to recover from extreme state drift:
 
-  * **Cryptographic Anchor State (The Heartbeat Checkpoint):** To prevent **Counter Break** failures due to transient network delay/loss, the protocol implements a specific anchor state (`packet_anchor`) for Heartbeat packets. This state holds the $\text{CTR}$ and $\text{Nonce}$ of the **last successfully ACKed packet**.
-  * **State-Aware Retry Logic:** When the Heartbeat timer expires, the protocol **strictly refuses to advance the counter ($\text{CTR}$)** unless the $\text{ACK}$ for the last sent packet has been received. Instead, it initiates a **retry** using the $\text{CTR}$ from the anchor state. This ensures that the system's live counter state is **never compromised** by a simple timer expiration.
-  * **Secure Implementation:** The actual live session counter is **never modified** unless this check is passed. This design means the mechanism functions as a **cryptographic safety net** for critical failure scenarios, rather than a routine recovery tool.
+  * **Cryptographic Anchor State (The Heartbeat Checkpoint):** To prevent **Counter Break** failures due to transient network delay/loss, the protocol implements a specific anchor state (`packet_anchor`) for Heartbeat packets. This state holds the $\text{CTR}$ and $\text{Nonce}$ of the **last successfully received and validated Heartbeat packet**.
+  * **State-Aware Retry Logic:** When the Heartbeat timer expires, the protocol initiates a **retry** using the $\text{CTR}$ from the anchor state. The system **strictly advances the live counter ($\text{CTR}$) only upon the successful completion of the Heartbeat's 4-way protocol.**
+  * **Secure Implementation:** The actual live session counter is **never modified** outside the strict state transitions of the 4-way Heartbeat protocol. This design means the retry mechanism functions as a **cryptographic safety net** for critical failure scenarios, rather than a routine recovery tool.
 
 #### c. Guaranteed Session Persistence (The Core Differentiator)
 
@@ -99,7 +100,7 @@ Operational logs from a live system validate Orisium's Session Persistence mecha
 [2025-10-06 16:14:57] [DEVEL-DEBUG] ...
 ```
 
-  * **SYN\_DATA Prioritization:** Any outgoing **`SYN_DATA`** packets are strategically **queued** during a Heartbeat Request cycle and are only released **immediately upon receiving a valid `Heartbeat_ACK`**. This guarantees that high-priority data is sent using the most recently validated cryptographic $\text{Counter}$ state, preserving data integrity while maintaining ultra-low latency.
+  * **SYN\_DATA Prioritization:** Any outgoing **`SYN_DATA`** packets are strategically **queued** during a Heartbeat Request cycle and are only released **immediately upon the cryptographic state being locked** via the 4-way protocol. This guarantees that high-priority data is sent using the most recently validated cryptographic $\text{Counter}$ state, preserving data integrity while maintaining ultra-low latency.
 
 -----
 
