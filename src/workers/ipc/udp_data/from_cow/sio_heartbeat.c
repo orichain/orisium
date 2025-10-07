@@ -177,7 +177,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             return cmac;
         }
         if (!ctr_is_in_anchor(&session->heartbeat_ack.anchor, &oudp_datao_ctr)) {
-            LOG_ERROR("%sHeartbeat Retry Ctr Is To Old.", worker_ctx->label);
+            LOG_ERROR("%sHeartbeat Retry Ctr Is Not In Anchor.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return FAILURE;
