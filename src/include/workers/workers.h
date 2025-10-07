@@ -26,10 +26,6 @@ typedef struct {
 } node_metrics_t;
 
 typedef struct {
-    uint8_t *last_nonce;
-    uint32_t last_ctr;
-    uint8_t *last_acked_nonce;
-    uint32_t last_acked_ctr;
 //======================================================================
 // For Validating Retry
 //======================================================================
@@ -285,20 +281,12 @@ static inline void cleanup_control_packet_ack(control_packet_ack_t *h, bool clea
     //----------------------------------------------------------------------
     switch (clean_data) {
         case CDT_RESET: {
-            memset(h->anchor.last_nonce, 0, AES_NONCE_BYTES);
-            memset(h->anchor.last_acked_nonce, 0, AES_NONCE_BYTES);
             memset(h->anchor.last_rcvd_nonce, 0, AES_NONCE_BYTES);
             memset(h->data, 0, h->len);
             h->len = (uint16_t)0;
             break;
         }
         case CDT_FREE: {
-            memset(h->anchor.last_nonce, 0, AES_NONCE_BYTES);
-            free(h->anchor.last_nonce);
-            h->anchor.last_ctr = (uint32_t)0;
-            memset(h->anchor.last_acked_nonce, 0, AES_NONCE_BYTES);
-            free(h->anchor.last_acked_nonce);
-            h->anchor.last_acked_ctr = (uint32_t)0;
             memset(h->anchor.last_rcvd_nonce, 0, AES_NONCE_BYTES);
             free(h->anchor.last_rcvd_nonce);
             h->anchor.last_rcvd_ctr = (uint32_t)0;
@@ -318,10 +306,6 @@ static inline void cleanup_control_packet_ack(control_packet_ack_t *h, bool clea
 
 static inline void setup_control_packet_ack(control_packet_ack_t *h) {
 //----------------------------------------------------------------------
-    h->anchor.last_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-    h->anchor.last_ctr = (uint32_t)0;
-    h->anchor.last_acked_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-    h->anchor.last_acked_ctr = (uint32_t)0;
     h->anchor.last_rcvd_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
     h->anchor.last_rcvd_ctr = (uint32_t)0;
 //----------------------------------------------------------------------

@@ -1,5 +1,4 @@
 #include <inttypes.h>
-#include <string.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -9,7 +8,6 @@
 #include "workers/ipc/handlers.h"
 #include "orilink/protocol.h"
 #include "stdbool.h"
-#include "constants.h"
 #include "async.h"
 
 struct sockaddr_in6;
@@ -110,9 +108,6 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
 // Heartbeat Security 2 Open
 //======================================================================
     session->heartbeat_ack.rcvd = false;
-//======================================================================
-    session->heartbeat_ack.anchor.last_acked_ctr = session->heartbeat_ack.anchor.last_ctr;
-    memcpy(session->heartbeat_ack.anchor.last_acked_nonce, session->heartbeat_ack.anchor.last_nonce, AES_NONCE_BYTES);
 //======================================================================
     //session->metrics.last_ack = current_time.r_uint64_t;
     //session->metrics.count_ack += (double)1;
