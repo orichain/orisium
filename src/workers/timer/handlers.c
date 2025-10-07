@@ -190,7 +190,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
 //======================================================================
-                        double timer_interval = (double)session->heartbeat_interval_extended_retrycount;
+                        double timer_interval = (double)session->heartbeat_interval_extended_retrycount * pow((double)2, (double)session->retry.value_prediction);
                         session->heartbeat_interval_extended_retrycount = 0x00;
                         timer_interval += session->rtt.value_prediction / (double)1e9;
                         LOG_DEVEL_DEBUG("%sRetry Detected. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
@@ -369,7 +369,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
 //======================================================================
-                        double timer_interval = (double)session->heartbeat_interval_extended_retrycount;
+                        double timer_interval = (double)session->heartbeat_interval_extended_retrycount * pow((double)2, (double)session->retry.value_prediction);
                         session->heartbeat_interval_extended_retrycount = 0x00;
                         timer_interval += session->rtt.value_prediction / (double)1e9;
                         LOG_DEVEL_DEBUG("%sRetry Detected. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
