@@ -197,7 +197,6 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         session->heartbeat_interval_extended_retrycount = 0x00;
                         double timer_interval = session->heartbeat_interval;
                         timer_interval += session->rtt.value_prediction / (double)1e9;
-                        timer_interval *= session->retry.value_prediction;
                         LOG_DEVEL_DEBUG("%sRetry Detected. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
                         if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
                             return FAILURE;
@@ -381,7 +380,6 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         session->heartbeat_interval_extended_retrycount = 0x00;
                         double timer_interval = session->heartbeat_interval;
                         timer_interval += session->rtt.value_prediction / (double)1e9;
-                        timer_interval *= session->retry.value_prediction;
                         LOG_DEVEL_DEBUG("%sRetry Detected. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
                         if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
                             return FAILURE;

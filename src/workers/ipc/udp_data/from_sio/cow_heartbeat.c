@@ -22,7 +22,6 @@ static inline status_t create_heartbeat_sender_timer_fd(worker_context_t *worker
 //======================================================================
     double timer_interval = session->heartbeat_interval;
     timer_interval += session->rtt.value_prediction / (double)1e9;
-    timer_interval *= session->retry.value_prediction;
     if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
         return FAILURE;
     }
