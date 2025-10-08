@@ -38,7 +38,6 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
             return FAILURE;
         }
         LOG_ERROR("%sHeartbeat_Ack Received Already(3). Protocol %d, data_ctr: %u, *ctr: %u", worker_ctx->label, oudp_datao->type, oudp_datao->ctr, security->remote_ctr);
-        session->heartbeat_break = true;
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;

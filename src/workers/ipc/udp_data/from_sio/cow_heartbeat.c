@@ -277,7 +277,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
         session->test_drop_heartbeat_ack == 3 ||
         session->test_drop_heartbeat_ack == 5 ||
         session->test_drop_heartbeat_ack == 7 ||
-        session->test_drop_heartbeat_ack == 9
+        session->test_drop_heartbeat_ack == 8
     )
     {
         LOG_DEVEL_DEBUG("[Debug Here Helper]: Heartbeat Ack Packet Number %d. Sending To Fake Addr To Force Retry", session->test_drop_heartbeat_ack);

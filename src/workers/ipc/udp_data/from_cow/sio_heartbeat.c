@@ -227,7 +227,8 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
 //======================================================================
     //if (!is_same_ctr(&session->heartbeat_ack.anchor.last_ctr, session->heartbeat_ack.anchor.last_nonce, &session->heartbeat_ack.anchor.last_acked_ctr, session->heartbeat_ack.anchor.last_acked_nonce)) {
     if (
-        session->heartbeat.timer_fd != -1
+        session->heartbeat.timer_fd != -1 ||
+        session->heartbeat_sender_timer_fd != -1
     )
     {
         LOG_DEVEL_DEBUG("%sNot Ready For New Heartbeat. Still trying to get Ack.", worker_ctx->label);

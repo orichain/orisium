@@ -12,7 +12,7 @@
 
 status_t setup_master_socket_udp(const char *label, master_context_t *master_ctx) {
     struct sockaddr_in6 addr;
-    int opt = 1;
+    //int opt = 1;
     int v6only = 0;
     
     master_ctx->udp_sock = socket(AF_INET6, SOCK_DGRAM, 0);
@@ -25,10 +25,12 @@ status_t setup_master_socket_udp(const char *label, master_context_t *master_ctx
         LOG_ERROR("%sset_nonblocking failed.", label);
         return r_snbkg;
     }
+    /*
     if (setsockopt(master_ctx->udp_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
         LOG_ERROR("%ssetsockopt failed. %s", label, strerror(errno));
         return FAILURE;
     }
+    */
     if (setsockopt(master_ctx->udp_sock, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) == -1) {
 		LOG_ERROR("%ssetsockopt failed. %s", label, strerror(errno));
         return FAILURE;

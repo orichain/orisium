@@ -79,7 +79,6 @@ typedef struct {
     uint8_t heartbeat_interval_extended_retrycount;
     bool is_first_heartbeat;
     int heartbeat_sender_timer_fd;
-    bool heartbeat_break;
 //----------------------------------------------------------------------
     int test_drop_hello1_ack;
     int test_drop_hello2_ack;
@@ -417,7 +416,6 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
 }
 
 static inline status_t setup_sio_session(const char *label, sio_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
-    single_session->heartbeat_break = false;
     single_session->heartbeat_interval_extended_retrycount = 0x00;
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
@@ -469,7 +467,6 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
 }
 
 static inline void cleanup_sio_session(const char *label, async_type_t *sio_async, sio_c_session_t *single_session) {
-    single_session->heartbeat_break = false;
     single_session->heartbeat_interval_extended_retrycount = 0x00;
     cleanup_control_packet_ack(&single_session->hello1_ack, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->hello2_ack, true, CDT_FREE);
