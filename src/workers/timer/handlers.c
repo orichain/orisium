@@ -257,10 +257,6 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         return SUCCESS;
                     }
 //======================================================================
-// Initialize session->heartbeat
-//======================================================================
-                    cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
-//======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
                     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
@@ -452,10 +448,6 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         }
                         return SUCCESS;
                     }
-//======================================================================
-// Initialize session->heartbeat
-//======================================================================
-                    cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------

@@ -20,7 +20,7 @@
 //----------------------------------------------------------------------
 // Test 2 Secs
 //----------------------------------------------------------------------
-#define NODE_HEARTBEAT_INTERVAL 2
+#define NODE_HEARTBEAT_INTERVAL 15
 #define NODE_CHECK_HEALTHY_X 3
 //----------------------------------------------------------------------
 // 2-Way Heartbeat (2 * NODE_HEARTBEAT_INTERVAL)
