@@ -272,6 +272,9 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     }
     session->heartbeat.sent_try_count++;
     session->heartbeat.sent_time = current_time.r_uint64_t;
+//----------------------------------------------------------------------
+    session->heartbeat.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+//----------------------------------------------------------------------
     if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat.timer_fd,
         (time_t)session->heartbeat.interval_timer_fd,
         (long)((session->heartbeat.interval_timer_fd - (time_t)session->heartbeat.interval_timer_fd) * 1e9),

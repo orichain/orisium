@@ -227,13 +227,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 } else if (*current_fd == session->heartbeat_sender_timer_fd) {
                     uint64_t u;
                     read(session->heartbeat_sender_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                    if (
-                        session->retry.value_prediction > (double)1 ||
-                        session->heartbeat.timer_fd != -1
-                    )
-                    {
+                    if (session->heartbeat.timer_fd != -1) {
 //======================================================================
-// Retry Detected (Peer Retry || Our Retry)
+// Retry Timer Is Running
 //======================================================================
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
@@ -242,7 +238,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         if (timer_interval <= (double)0) {
                             timer_interval = (double)1;
                         }
-                        LOG_DEVEL_DEBUG("%sRetry Detected. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
+                        LOG_DEVEL_DEBUG("%sRetry Timer Is Running. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
                         if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
                             return FAILURE;
                         }
@@ -425,13 +421,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 } else if (*current_fd == session->heartbeat_sender_timer_fd) {
                     uint64_t u;
                     read(session->heartbeat_sender_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                    if (
-                        session->retry.value_prediction > (double)1 ||
-                        session->heartbeat.timer_fd != -1
-                    )
-                    {
+                    if (session->heartbeat.timer_fd != -1) {
 //======================================================================
-// Retry Detected (Peer Retry || Our Retry)
+// Retry Timer Is Running
 //======================================================================
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
@@ -440,7 +432,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         if (timer_interval <= (double)0) {
                             timer_interval = (double)1;
                         }
-                        LOG_DEVEL_DEBUG("%sRetry Detected. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
+                        LOG_DEVEL_DEBUG("%sRetry Timer Is Running. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
                         if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
                             return FAILURE;
                         }
