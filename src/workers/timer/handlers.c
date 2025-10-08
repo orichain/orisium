@@ -30,14 +30,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     read(session->hello1.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
                     if (session->hello1.ack_rcvd) {
 //======================================================================
-// Ack Received Already
-// This epoll timer event came very timely with the IPC Udp Data Event.
+// Let The Timer Dies By Itself
 //======================================================================
-                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->hello1.timer_fd);
-                        CLOSE_FD(&session->hello1.timer_fd);
-//======================================================================
-                        LOG_DEVEL_DEBUG("%sReceived Already.", worker_ctx->label);
-//======================================================================
+                        cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello1, false);
+                        LOG_DEVEL_DEBUG("%sTimer Retry Hello1 Closed", worker_ctx->label);
                         return SUCCESS;
                     }
                     worker_type_t c_wot = session->identity.local_wot;
@@ -72,14 +68,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     read(session->hello2.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
                     if (session->hello2.ack_rcvd) {
 //======================================================================
-// Ack Received Already
-// This epoll timer event came very timely with the IPC Udp Data Event.
+// Let The Timer Dies By Itself
 //======================================================================
-                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->hello2.timer_fd);
-                        CLOSE_FD(&session->hello2.timer_fd);
-//======================================================================
-                        LOG_DEVEL_DEBUG("%sReceived Already.", worker_ctx->label);
-//======================================================================
+                        cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello2, false);
+                        LOG_DEVEL_DEBUG("%sTimer Retry Hello2 Closed", worker_ctx->label);
                         return SUCCESS;
                     }
                     worker_type_t c_wot = session->identity.local_wot;
@@ -114,14 +106,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     read(session->hello3.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
                     if (session->hello3.ack_rcvd) {
 //======================================================================
-// Ack Received Already
-// This epoll timer event came very timely with the IPC Udp Data Event.
+// Let The Timer Dies By Itself
 //======================================================================
-                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->hello3.timer_fd);
-                        CLOSE_FD(&session->hello3.timer_fd);
-//======================================================================
-                        LOG_DEVEL_DEBUG("%sReceived Already.", worker_ctx->label);
-//======================================================================
+                        cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello3, false);
+                        LOG_DEVEL_DEBUG("%sTimer Retry Hello3 Closed", worker_ctx->label);
                         return SUCCESS;
                     }
                     worker_type_t c_wot = session->identity.local_wot;
@@ -156,14 +144,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     read(session->hello4.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
                     if (session->hello4.ack_rcvd) {
 //======================================================================
-// Ack Received Already
-// This epoll timer event came very timely with the IPC Udp Data Event.
+// Let The Timer Dies By Itself
 //======================================================================
-                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->hello4.timer_fd);
-                        CLOSE_FD(&session->hello4.timer_fd);
-//======================================================================
-                        LOG_DEVEL_DEBUG("%sReceived Already.", worker_ctx->label);
-//======================================================================
+                        cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello4, false);
+                        LOG_DEVEL_DEBUG("%sTimer Retry Hello4 Closed", worker_ctx->label);
                         return SUCCESS;
                     }
                     worker_type_t c_wot = session->identity.local_wot;
@@ -198,14 +182,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     read(session->heartbeat.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
                     if (session->heartbeat.ack_rcvd) {
 //======================================================================
-// Ack Received Already
-// This epoll timer event came very timely with the IPC Udp Data Event.
+// Let The Timer Dies By Itself
 //======================================================================
-                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat.timer_fd);
-                        CLOSE_FD(&session->heartbeat.timer_fd);
-//======================================================================
-                        LOG_DEVEL_DEBUG("%sReceived Already.", worker_ctx->label);
-//======================================================================
+                        cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
+                        LOG_DEVEL_DEBUG("%sTimer Retry Heartbeat Closed", worker_ctx->label);
                         return SUCCESS;
                     }
                     worker_type_t c_wot = session->identity.local_wot;
@@ -256,7 +236,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //======================================================================
                         uint8_t extended = session->heartbeat_interval_extended_retrycount;
                         session->heartbeat_interval_extended_retrycount = 0x00;
-                        double timer_interval = pow((double)2, (double)extended);
+                        double timer_interval = pow((double)2, (double)extended)-(double)1;
                         timer_interval += pow((double)2, (double)session->retry.value_prediction);
                         LOG_DEVEL_DEBUG("%sRetry Detected. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
                         if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
@@ -394,14 +374,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     read(session->heartbeat.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
                     if (session->heartbeat.ack_rcvd) {
 //======================================================================
-// Ack Received Already
-// This epoll timer event came very timely with the IPC Udp Data Event.
+// Let The Timer Dies By Itself
 //======================================================================
-                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat.timer_fd);
-                        CLOSE_FD(&session->heartbeat.timer_fd);
-//======================================================================
-                        LOG_DEVEL_DEBUG("%sReceived Already.", worker_ctx->label);
-//======================================================================
+                        cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
+                        LOG_DEVEL_DEBUG("%sTimer Retry Heartbeat Closed", worker_ctx->label);
                         return SUCCESS;
                     }
                     worker_type_t c_wot = session->identity.local_wot;
@@ -452,7 +428,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //======================================================================
                         uint8_t extended = session->heartbeat_interval_extended_retrycount;
                         session->heartbeat_interval_extended_retrycount = 0x00;
-                        double timer_interval = pow((double)2, (double)extended);
+                        double timer_interval = pow((double)2, (double)extended)-(double)1;
                         timer_interval += pow((double)2, (double)session->retry.value_prediction);
                         LOG_DEVEL_DEBUG("%sRetry Detected. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
                         if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
