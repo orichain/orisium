@@ -108,6 +108,9 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
     }
     session->hello2.sent_try_count++;
     session->hello2.sent_time = current_time.r_uint64_t;
+//----------------------------------------------------------------------
+    session->hello2.interval_timer_fd = (double)1;
+//----------------------------------------------------------------------
     if (async_set_timerfd_time(worker_ctx->label, &session->hello2.timer_fd,
         (time_t)session->hello2.interval_timer_fd,
         (long)((session->hello2.interval_timer_fd - (time_t)session->hello2.interval_timer_fd) * 1e9),

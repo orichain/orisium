@@ -134,7 +134,9 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
         case ORILINK_HELLO4:
         case ORILINK_HELLO4_ACK:
         case ORILINK_HEARTBEAT:
-        case ORILINK_HEARTBEAT_ACK: {
+        case ORILINK_HEARTBEAT_ACK:
+        case ORILINK_INFO:
+        case ORILINK_INFO_ACK: {
             worker_type_t wot = orcvdo.r_orilink_raw_protocol_t->remote_wot;
             uint8_t worker_index = orcvdo.r_orilink_raw_protocol_t->remote_index;
             uint8_t session_index = orcvdo.r_orilink_raw_protocol_t->remote_session_index;
