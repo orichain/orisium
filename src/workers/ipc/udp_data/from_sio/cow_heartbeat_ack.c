@@ -14,6 +14,7 @@ struct sockaddr_in6;
 status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     uint8_t inc_ctr = oudp_datao->inc_ctr;
     uint32_t oudp_datao_ctr = oudp_datao->ctr;
+    bool is_rollback = false;
 //======================================================================
 // + Security
 //======================================================================
@@ -40,7 +41,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
         LOG_ERROR("%sHeartbeat_Ack Received Already(3). Protocol %d, data_ctr: %u, *ctr: %u", worker_ctx->label, oudp_datao->type, oudp_datao->ctr, security->remote_ctr);
 //----------------------------------------------------------------------
         decrement_ctr(&security->local_ctr, security->local_nonce);
-        decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        is_rollback = true;
 //----------------------------------------------------------------------
     }
 //======================================================================
@@ -56,6 +57,10 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return cmac;
+    }
+//----------------------------------------------------------------------
+    if (is_rollback) {
+        decrement_ctr(&security->remote_ctr, security->remote_nonce);
     }
 //======================================================================
     orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
