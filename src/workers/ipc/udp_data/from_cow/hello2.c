@@ -17,16 +17,17 @@
 #include "constants.h"
 
 static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_session_t *session, orilink_identity_t *identity, uint64_t_status_t *current_time, uint8_t *trycount) {
-    if (*trycount > (uint8_t)1) {
-        double try_count = (double)session->hello1_ack.ack_sent_try_count;
-        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
-        session->hello1_ack.rcvd = true;
-        session->hello1_ack.rcvd_time = current_time->r_uint64_t;
-    } else {
+//======================================================================
+// 
+//----------------------------------------------------------------------
+    if (session->hello1_ack.ack_sent_try_count > (uint8_t)0) {
         double try_count = (double)session->hello1_ack.ack_sent_try_count-(double)1;
         calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
-        session->hello1_ack.rcvd = true;
-        session->hello1_ack.rcvd_time = current_time->r_uint64_t;
+    }
+//======================================================================
+    session->hello1_ack.rcvd = true;
+    session->hello1_ack.rcvd_time = current_time->r_uint64_t;
+    if (*trycount == (uint8_t)1) {
         uint64_t interval_ull = session->hello1_ack.rcvd_time - session->hello1_ack.ack_sent_time;
         double rtt_value = (double)interval_ull;
         calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);

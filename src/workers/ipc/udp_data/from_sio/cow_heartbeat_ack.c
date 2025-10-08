@@ -107,8 +107,13 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
 //----------------------------------------------------------------------
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
 //======================================================================
-    double try_count = (double)session->heartbeat.sent_try_count-(double)1;
-    calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+// 
+//----------------------------------------------------------------------
+    if (session->heartbeat.sent_try_count > (uint8_t)0) {
+        double try_count = (double)session->heartbeat.sent_try_count-(double)1;
+        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+    }
+//======================================================================
     session->heartbeat.ack_rcvd = true;
     session->heartbeat.ack_rcvd_time = current_time.r_uint64_t;
     uint64_t interval_ull = session->heartbeat.ack_rcvd_time - session->heartbeat.sent_time;

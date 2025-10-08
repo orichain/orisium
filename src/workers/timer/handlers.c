@@ -69,6 +69,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     if (session->hello2.ack_rcvd) {
 //======================================================================
 // Let The Timer Dies By Itself
+// do not disturb or be disturbed by other epoll events
 //======================================================================
                         cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello2, false);
                         LOG_DEVEL_DEBUG("%sTimer Retry Hello2 Closed", worker_ctx->label);
@@ -107,6 +108,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     if (session->hello3.ack_rcvd) {
 //======================================================================
 // Let The Timer Dies By Itself
+// do not disturb or be disturbed by other epoll events
 //======================================================================
                         cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello3, false);
                         LOG_DEVEL_DEBUG("%sTimer Retry Hello3 Closed", worker_ctx->label);
@@ -145,6 +147,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     if (session->hello4.ack_rcvd) {
 //======================================================================
 // Let The Timer Dies By Itself
+// do not disturb or be disturbed by other epoll events
 //======================================================================
                         cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello4, false);
                         LOG_DEVEL_DEBUG("%sTimer Retry Hello4 Closed", worker_ctx->label);
@@ -183,6 +186,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     if (session->heartbeat.ack_rcvd) {
 //======================================================================
 // Let The Timer Dies By Itself
+// do not disturb or be disturbed by other epoll events
 //======================================================================
                         cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
                         LOG_DEVEL_DEBUG("%sTimer Retry Heartbeat Closed", worker_ctx->label);
@@ -224,7 +228,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint64_t u;
                     read(session->heartbeat_sender_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
                     if (
-                        session->heartbeat_interval_extended_retrycount != 0x00 ||
+                        session->retry.value_prediction > (double)1 ||
                         session->heartbeat.timer_fd != -1
                     )
                     {
@@ -234,10 +238,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
 //======================================================================
-                        uint8_t extended = session->heartbeat_interval_extended_retrycount;
-                        session->heartbeat_interval_extended_retrycount = 0x00;
-                        double timer_interval = pow((double)2, (double)extended)-(double)1;
-                        timer_interval += pow((double)2, (double)session->retry.value_prediction);
+                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
+                        if (timer_interval <= (double)0) {
+                            timer_interval = (double)1;
+                        }
                         LOG_DEVEL_DEBUG("%sRetry Detected. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
                         if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
                             return FAILURE;
@@ -272,9 +276,6 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     }
                     session->heartbeat.sent_try_count++;
                     session->heartbeat.sent_time = current_time.r_uint64_t;
-//----------------------------------------------------------------------
-                    session->heartbeat.interval_timer_fd = (double)1;
-//----------------------------------------------------------------------
                     if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat.timer_fd,
                         (time_t)session->heartbeat.interval_timer_fd,
                         (long)((session->heartbeat.interval_timer_fd - (time_t)session->heartbeat.interval_timer_fd) * 1e9),
@@ -378,6 +379,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     if (session->heartbeat.ack_rcvd) {
 //======================================================================
 // Let The Timer Dies By Itself
+// do not disturb or be disturbed by other epoll events
 //======================================================================
                         cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
                         LOG_DEVEL_DEBUG("%sTimer Retry Heartbeat Closed", worker_ctx->label);
@@ -419,7 +421,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint64_t u;
                     read(session->heartbeat_sender_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
                     if (
-                        session->heartbeat_interval_extended_retrycount != 0x00 ||
+                        session->retry.value_prediction > (double)1 ||
                         session->heartbeat.timer_fd != -1
                     )
                     {
@@ -429,10 +431,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
 //======================================================================
-                        uint8_t extended = session->heartbeat_interval_extended_retrycount;
-                        session->heartbeat_interval_extended_retrycount = 0x00;
-                        double timer_interval = pow((double)2, (double)extended)-(double)1;
-                        timer_interval += pow((double)2, (double)session->retry.value_prediction);
+                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
+                        if (timer_interval <= (double)0) {
+                            timer_interval = (double)1;
+                        }
                         LOG_DEVEL_DEBUG("%sRetry Detected. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
                         if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
                             return FAILURE;
@@ -467,9 +469,6 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     }
                     session->heartbeat.sent_try_count++;
                     session->heartbeat.sent_time = current_time.r_uint64_t;
-//----------------------------------------------------------------------
-                    session->heartbeat.interval_timer_fd = (double)1;
-//----------------------------------------------------------------------
                     if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat.timer_fd,
                         (time_t)session->heartbeat.interval_timer_fd,
                         (long)((session->heartbeat.interval_timer_fd - (time_t)session->heartbeat.interval_timer_fd) * 1e9),

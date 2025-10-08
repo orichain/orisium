@@ -76,7 +76,6 @@ typedef struct {
     control_packet_t heartbeat;
     control_packet_ack_t heartbeat_ack;
     uint64_t heartbeat_interval;
-    uint8_t heartbeat_interval_extended_retrycount;
     bool is_first_heartbeat;
     int heartbeat_sender_timer_fd;
 //----------------------------------------------------------------------
@@ -115,7 +114,6 @@ typedef struct {
     control_packet_t heartbeat;
     control_packet_ack_t heartbeat_ack;
     uint64_t heartbeat_interval;
-    uint8_t heartbeat_interval_extended_retrycount;
     int heartbeat_sender_timer_fd;
 //----------------------------------------------------------------------
     int test_drop_heartbeat_ack;
@@ -194,20 +192,22 @@ static inline void calculate_retry(const char *label, void *void_session, worker
         case COW: {
             cow_c_session_t *session = (cow_c_session_t *)void_session;
             char *desc;
-            int needed = snprintf(NULL, 0, "retry session %d", session->identity.local_session_index);
+            int needed = snprintf(NULL, 0, "[RETRY %d]: ", session->identity.local_session_index);
             desc = malloc(needed + 1);
-            snprintf(desc, needed + 1, "retry session %d", session->identity.local_session_index);
+            snprintf(desc, needed + 1, "[RETRY %d]: ", session->identity.local_session_index);
             calculate_oricle_double(label, desc, &session->retry, try_count, ((double)MAX_RETRY * (double)2));
+            printf("%s%s Value Prediction: %f\n", label, desc, session->retry.value_prediction);
             free(desc);
             break;
         }
         case SIO: {
             sio_c_session_t *session = (sio_c_session_t *)void_session;
             char *desc;
-            int needed = snprintf(NULL, 0, "retry session %d", session->identity.local_session_index);
+            int needed = snprintf(NULL, 0, "[RETRY %d]: ", session->identity.local_session_index);
             desc = malloc(needed + 1);
-            snprintf(desc, needed + 1, "retry session %d", session->identity.local_session_index);
+            snprintf(desc, needed + 1, "[RETRY %d]: ", session->identity.local_session_index);
             calculate_oricle_double(label, desc, &session->retry, try_count, ((double)MAX_RETRY * (double)2));
+            printf("%s%s Value Prediction: %f\n", label, desc, session->retry.value_prediction);
             free(desc);
             break;
         }
@@ -221,20 +221,22 @@ static inline void calculate_rtt(const char *label, void *void_session, worker_t
         case COW: {
             cow_c_session_t *session = (cow_c_session_t *)void_session;
             char *desc;
-            int needed = snprintf(NULL, 0, "rtt session %d", session->identity.local_session_index);
+            int needed = snprintf(NULL, 0, "[RTT %d]: ", session->identity.local_session_index);
             desc = malloc(needed + 1);
-            snprintf(desc, needed + 1, "rtt session %d", session->identity.local_session_index);
+            snprintf(desc, needed + 1, "[RTT %d]: ", session->identity.local_session_index);
             calculate_oricle_double(label, desc, &session->rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
+            //printf("%s%s Value Prediction: %f\n", label, desc, session->rtt.value_prediction);
             free(desc);
             break;
         }
         case SIO: {
             sio_c_session_t *session = (sio_c_session_t *)void_session;
             char *desc;
-            int needed = snprintf(NULL, 0, "rtt session %d", session->identity.local_session_index);
+            int needed = snprintf(NULL, 0, "[RTT %d]: ", session->identity.local_session_index);
             desc = malloc(needed + 1);
-            snprintf(desc, needed + 1, "rtt session %d", session->identity.local_session_index);
+            snprintf(desc, needed + 1, "[RTT %d]: ", session->identity.local_session_index);
             calculate_oricle_double(label, desc, &session->rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
+            //printf("%s%s Value Prediction: %f\n", label, desc, session->rtt.value_prediction);
             free(desc);
             break;
         }
@@ -322,7 +324,6 @@ static inline void setup_control_packet_ack(control_packet_ack_t *h) {
 }
 
 static inline status_t setup_cow_session(const char *label, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
-    single_session->heartbeat_interval_extended_retrycount = 0x00;
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
     single_session->test_drop_heartbeat_ack = 0;
@@ -369,7 +370,6 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
 }
 
 static inline void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session) {
-    single_session->heartbeat_interval_extended_retrycount = 0x00;
     cleanup_control_packet(label, cow_async, &single_session->hello1, true);
     cleanup_control_packet(label, cow_async, &single_session->hello2, true);
     cleanup_control_packet(label, cow_async, &single_session->hello3, true);
@@ -416,7 +416,6 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
 }
 
 static inline status_t setup_sio_session(const char *label, sio_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
-    single_session->heartbeat_interval_extended_retrycount = 0x00;
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
     single_session->test_drop_hello1_ack = 0;
@@ -467,7 +466,6 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
 }
 
 static inline void cleanup_sio_session(const char *label, async_type_t *sio_async, sio_c_session_t *single_session) {
-    single_session->heartbeat_interval_extended_retrycount = 0x00;
     cleanup_control_packet_ack(&single_session->hello1_ack, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->hello2_ack, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->hello3_ack, true, CDT_FREE);

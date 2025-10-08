@@ -108,9 +108,6 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
     }
     session->hello2.sent_try_count++;
     session->hello2.sent_time = current_time.r_uint64_t;
-//----------------------------------------------------------------------
-    session->hello2.interval_timer_fd = (double)1;
-//----------------------------------------------------------------------
     if (async_set_timerfd_time(worker_ctx->label, &session->hello2.timer_fd,
         (time_t)session->hello2.interval_timer_fd,
         (long)((session->hello2.interval_timer_fd - (time_t)session->hello2.interval_timer_fd) * 1e9),
@@ -199,8 +196,13 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
     identity->remote_session_index = remote_session_index;
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
 //======================================================================
-    double try_count = (double)session->hello1.sent_try_count-(double)1;
-    calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+// 
+//----------------------------------------------------------------------
+    if (session->hello1.sent_try_count > (uint8_t)0) {
+        double try_count = (double)session->hello1.sent_try_count-(double)1;
+        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+    }
+//======================================================================
     session->hello1.ack_rcvd = true;
     session->hello1.ack_rcvd_time = current_time.r_uint64_t;
     uint64_t interval_ull = session->hello1.ack_rcvd_time - session->hello1.sent_time;

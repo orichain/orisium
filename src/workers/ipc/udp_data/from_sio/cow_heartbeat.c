@@ -45,6 +45,13 @@ static inline status_t create_heartbeat_sender_timer_fd(worker_context_t *worker
 
 static inline status_t last_execution(worker_context_t *worker_ctx, cow_c_session_t *session, orilink_identity_t *identity, uint64_t_status_t *current_time, uint8_t *trycount) {
 //======================================================================
+// 
+//----------------------------------------------------------------------
+    if (session->heartbeat_ack.ack_sent_try_count > (uint8_t)0) {
+        double try_count = (double)session->heartbeat_ack.ack_sent_try_count-(double)1;
+        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+    }
+//======================================================================
 // Heartbeat Security 2 Close
 //======================================================================
     session->heartbeat_ack.rcvd = true;
@@ -117,7 +124,6 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
             return FAILURE;
         }
         LOG_DEVEL_DEBUG("%sRetry Detected", worker_ctx->label);
-        session->heartbeat_interval_extended_retrycount++;
     } else {
         status_t cmac = orilink_check_mac_ctr(
             worker_ctx->label, 
@@ -167,7 +173,6 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
         );
     }
 //======================================================================
-    //if (!is_same_ctr(&session->heartbeat_ack.anchor.last_ctr, session->heartbeat_ack.anchor.last_nonce, &session->heartbeat_ack.anchor.last_acked_ctr, session->heartbeat_ack.anchor.last_acked_nonce)) {
     if (
         session->heartbeat.timer_fd != -1 ||
         session->heartbeat_sender_timer_fd != -1
