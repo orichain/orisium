@@ -223,36 +223,6 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 } else if (*current_fd == session->heartbeat_sender_timer_fd) {
                     uint64_t u;
                     read(session->heartbeat_sender_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                    if (session->heartbeat_break) {
-                        session->heartbeat_break = false;
-//======================================================================
-// Heartbeat Break
-//======================================================================
-                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
-                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
-//======================================================================
-                        double timer_interval = session->heartbeat_interval;
-                        timer_interval *= (double)WORKER_CHECK_HEALTHY_X;
-                        timer_interval += session->rtt.value_prediction / (double)1e9;
-                        timer_interval += pow((double)2, (double)session->retry.value_prediction);
-                        LOG_DEVEL_DEBUG("%s <= Heartbeat Initiator. Break For %fsec", worker_ctx->label, timer_interval);
-                        if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
-                            return FAILURE;
-                        }
-//======================================================================
-                        if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_sender_timer_fd,
-                            (time_t)timer_interval,
-                            (long)((timer_interval - (time_t)timer_interval) * 1e9),
-                            (time_t)timer_interval,
-                            (long)((timer_interval - (time_t)timer_interval) * 1e9)) != SUCCESS)
-                        {
-                            return FAILURE;
-                        }
-                        if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd) != SUCCESS) {
-                            return FAILURE;
-                        }
-                        return SUCCESS;
-                    }
                     if (
                         session->heartbeat_interval_extended_retrycount != 0x00 ||
                         session->heartbeat.timer_fd != -1
@@ -445,6 +415,36 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 } else if (*current_fd == session->heartbeat_sender_timer_fd) {
                     uint64_t u;
                     read(session->heartbeat_sender_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    if (session->heartbeat_break) {
+                        session->heartbeat_break = false;
+//======================================================================
+// Heartbeat Break
+//======================================================================
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
+//======================================================================
+                        double timer_interval = session->heartbeat_interval;
+                        timer_interval += session->rtt.value_prediction / (double)1e9;
+                        timer_interval += pow((double)2, (double)session->retry.value_prediction);
+                        timer_interval *= (double)MAX_RETRY;
+                        LOG_DEVEL_DEBUG("%s <= Heartbeat Initiator. Break For %fsec", worker_ctx->label, timer_interval);
+                        if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
+                            return FAILURE;
+                        }
+//======================================================================
+                        if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat_sender_timer_fd,
+                            (time_t)timer_interval,
+                            (long)((timer_interval - (time_t)timer_interval) * 1e9),
+                            (time_t)timer_interval,
+                            (long)((timer_interval - (time_t)timer_interval) * 1e9)) != SUCCESS)
+                        {
+                            return FAILURE;
+                        }
+                        if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd) != SUCCESS) {
+                            return FAILURE;
+                        }
+                        return SUCCESS;
+                    }
                     if (
                         session->heartbeat_interval_extended_retrycount != 0x00 ||
                         session->heartbeat.timer_fd != -1
