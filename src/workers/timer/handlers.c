@@ -196,10 +196,8 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //======================================================================
                         uint8_t extended = session->heartbeat_interval_extended_retrycount;
                         session->heartbeat_interval_extended_retrycount = 0x00;
-                        double timer_interval = session->heartbeat_interval;
-                        timer_interval += session->rtt.value_prediction / (double)1e9;
+                        double timer_interval = pow((double)2, (double)extended);
                         timer_interval += pow((double)2, (double)session->retry.value_prediction);
-                        timer_interval += pow((double)2, (double)extended);
                         LOG_DEVEL_DEBUG("%sRetry Detected. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
                         if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
                             return FAILURE;
@@ -382,10 +380,8 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //======================================================================
                         uint8_t extended = session->heartbeat_interval_extended_retrycount;
                         session->heartbeat_interval_extended_retrycount = 0x00;
-                        double timer_interval = session->heartbeat_interval;
-                        timer_interval += session->rtt.value_prediction / (double)1e9;
+                        double timer_interval = pow((double)2, (double)extended);
                         timer_interval += pow((double)2, (double)session->retry.value_prediction);
-                        timer_interval += pow((double)2, (double)extended);
                         LOG_DEVEL_DEBUG("%sRetry Detected. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
                         if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
                             return FAILURE;
