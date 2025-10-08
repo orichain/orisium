@@ -39,12 +39,9 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
         }
         LOG_ERROR("%sHeartbeat_Ack Received Already(3). Protocol %d, data_ctr: %u, *ctr: %u", worker_ctx->label, oudp_datao->type, oudp_datao->ctr, security->remote_ctr);
 //----------------------------------------------------------------------
-        //decrement_ctr(&security->local_ctr, security->local_nonce);
-        //decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        decrement_ctr(&security->local_ctr, security->local_nonce);
+        decrement_ctr(&security->remote_ctr, security->remote_nonce);
 //----------------------------------------------------------------------
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        return FAILURE;
     }
 //======================================================================
     status_t cmac = orilink_check_mac_ctr(

@@ -3,6 +3,7 @@
 #include <time.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <math.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
