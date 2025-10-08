@@ -28,6 +28,18 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 if (*current_fd == session->hello1.timer_fd) {
                     uint64_t u;
                     read(session->hello1.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    if (session->hello1.ack_rcvd) {
+//======================================================================
+// Ack Received Already
+// This epoll timer event came very timely with the IPC Udp Data Event.
+//======================================================================
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->hello1.timer_fd);
+                        CLOSE_FD(&session->hello1.timer_fd);
+//======================================================================
+                        LOG_DEVEL_DEBUG("%sReceived Already.", worker_ctx->label);
+//======================================================================
+                        return SUCCESS;
+                    }
                     worker_type_t c_wot = session->identity.local_wot;
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
@@ -58,6 +70,18 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 } else if (*current_fd == session->hello2.timer_fd) {
                     uint64_t u;
                     read(session->hello2.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    if (session->hello2.ack_rcvd) {
+//======================================================================
+// Ack Received Already
+// This epoll timer event came very timely with the IPC Udp Data Event.
+//======================================================================
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->hello2.timer_fd);
+                        CLOSE_FD(&session->hello2.timer_fd);
+//======================================================================
+                        LOG_DEVEL_DEBUG("%sReceived Already.", worker_ctx->label);
+//======================================================================
+                        return SUCCESS;
+                    }
                     worker_type_t c_wot = session->identity.local_wot;
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
@@ -88,6 +112,18 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 } else if (*current_fd == session->hello3.timer_fd) {
                     uint64_t u;
                     read(session->hello3.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    if (session->hello3.ack_rcvd) {
+//======================================================================
+// Ack Received Already
+// This epoll timer event came very timely with the IPC Udp Data Event.
+//======================================================================
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->hello3.timer_fd);
+                        CLOSE_FD(&session->hello3.timer_fd);
+//======================================================================
+                        LOG_DEVEL_DEBUG("%sReceived Already.", worker_ctx->label);
+//======================================================================
+                        return SUCCESS;
+                    }
                     worker_type_t c_wot = session->identity.local_wot;
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
@@ -118,6 +154,18 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 } else if (*current_fd == session->hello4.timer_fd) {
                     uint64_t u;
                     read(session->hello4.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    if (session->hello4.ack_rcvd) {
+//======================================================================
+// Ack Received Already
+// This epoll timer event came very timely with the IPC Udp Data Event.
+//======================================================================
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->hello4.timer_fd);
+                        CLOSE_FD(&session->hello4.timer_fd);
+//======================================================================
+                        LOG_DEVEL_DEBUG("%sReceived Already.", worker_ctx->label);
+//======================================================================
+                        return SUCCESS;
+                    }
                     worker_type_t c_wot = session->identity.local_wot;
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
@@ -148,6 +196,18 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 } else if (*current_fd == session->heartbeat.timer_fd) {
                     uint64_t u;
                     read(session->heartbeat.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    if (session->heartbeat.ack_rcvd) {
+//======================================================================
+// Ack Received Already
+// This epoll timer event came very timely with the IPC Udp Data Event.
+//======================================================================
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat.timer_fd);
+                        CLOSE_FD(&session->heartbeat.timer_fd);
+//======================================================================
+                        LOG_DEVEL_DEBUG("%sReceived Already.", worker_ctx->label);
+//======================================================================
+                        return SUCCESS;
+                    }
                     worker_type_t c_wot = session->identity.local_wot;
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
@@ -332,6 +392,18 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 if (*current_fd == session->heartbeat.timer_fd) {
                     uint64_t u;
                     read(session->heartbeat.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    if (session->heartbeat.ack_rcvd) {
+//======================================================================
+// Ack Received Already
+// This epoll timer event came very timely with the IPC Udp Data Event.
+//======================================================================
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat.timer_fd);
+                        CLOSE_FD(&session->heartbeat.timer_fd);
+//======================================================================
+                        LOG_DEVEL_DEBUG("%sReceived Already.", worker_ctx->label);
+//======================================================================
+                        return SUCCESS;
+                    }
                     worker_type_t c_wot = session->identity.local_wot;
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
