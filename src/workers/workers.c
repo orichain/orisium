@@ -18,6 +18,7 @@
 #include "orilink/protocol.h"
 #include "poly1305-donna.h"
 #include "workers/ipc/master_ipc_cmds.h"
+#include "workers/timer/handlers.h"
 
 status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
     ctx->pid = getpid();
@@ -110,12 +111,8 @@ status_t retry_control_packet(worker_context_t *worker_ctx, orilink_identity_t *
     }
     control_packet->sent_try_count++;
     control_packet->sent_time = current_time.r_uint64_t;
-    if (async_set_timerfd_time(worker_ctx->label, &control_packet->timer_fd,
-        (time_t)control_packet->interval_timer_fd,
-        (long)((control_packet->interval_timer_fd - (time_t)control_packet->interval_timer_fd) * 1e9),
-        (time_t)control_packet->interval_timer_fd,
-        (long)((control_packet->interval_timer_fd - (time_t)control_packet->interval_timer_fd) * 1e9)) != SUCCESS)
-    {
+//======================================================================
+    if (update_timer(worker_ctx, &control_packet->timer_fd, control_packet->interval_timer_fd) != SUCCESS) {
         return FAILURE;
     }
 //======================================================================

@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <netinet/in.h>
-#include <time.h>
 #include <math.h>
 
 #include "log.h"
@@ -12,8 +11,8 @@
 #include "orilink/hello1.h"
 #include "orilink/protocol.h"
 #include "workers/ipc/master_ipc_cmds.h"
+#include "workers/timer/handlers.h"
 #include "utilities.h"
-#include "async.h"
 #include "stdbool.h"
 
 status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *worker_sessions, ipc_raw_protocol_t_status_t *ircvdi) {
@@ -85,28 +84,14 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
         CLOSE_IPC_PROTOCOL(&received_protocol);
         return FAILURE;
     }
-//----------------------------------------------------------------------
-    if (async_create_timerfd(worker_ctx->label, &session->hello1.timer_fd) != SUCCESS) {
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+//======================================================================
+    double retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
+    session->hello1.interval_timer_fd = retry_timer_interval;
+    if (create_timer(worker_ctx, &session->hello1.timer_fd, retry_timer_interval) != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
         return FAILURE;
     }
-//----------------------------------------------------------------------
-    session->hello1.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
-//----------------------------------------------------------------------
-    if (async_set_timerfd_time(worker_ctx->label, &session->hello1.timer_fd,
-        (time_t)session->hello1.interval_timer_fd,
-        (long)((session->hello1.interval_timer_fd - (time_t)session->hello1.interval_timer_fd) * 1e9),
-        (time_t)session->hello1.interval_timer_fd,
-        (long)((session->hello1.interval_timer_fd - (time_t)session->hello1.interval_timer_fd) * 1e9)) != SUCCESS)
-    {
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
-        return FAILURE;
-    }
-    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->hello1.timer_fd) != SUCCESS) {
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
-        return FAILURE;
-    }
-//----------------------------------------------------------------------
+//======================================================================
     CLOSE_IPC_PROTOCOL(&received_protocol);
 //======================================================================
     session->hello1.sent = true;

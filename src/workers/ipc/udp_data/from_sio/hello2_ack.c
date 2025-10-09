@@ -2,7 +2,6 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <stdio.h>
-#include <time.h>
 #include <math.h>
 
 #include "log.h"
@@ -11,10 +10,10 @@
 #include "workers/workers.h"
 #include "workers/ipc/handlers.h"
 #include "workers/ipc/master_ipc_cmds.h"
+#include "workers/timer/handlers.h"
 #include "pqc.h"
 #include "orilink/hello3.h"
 #include "orilink/protocol.h"
-#include "async.h"
 #include "stdbool.h"
 #include "utilities.h"
 
@@ -156,40 +155,21 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
         }
         return FAILURE;
     }
-//----------------------------------------------------------------------
-    if (async_create_timerfd(worker_ctx->label, &session->hello3.timer_fd) != SUCCESS) {
+//======================================================================
+    double retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
+    session->hello3.interval_timer_fd = retry_timer_interval;
+    if (create_timer(worker_ctx, &session->hello3.timer_fd, retry_timer_interval) != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
             decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
-        return FAILURE;
-    }
-//----------------------------------------------------------------------
-    session->hello3.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
-//----------------------------------------------------------------------
-    if (async_set_timerfd_time(worker_ctx->label, &session->hello3.timer_fd,
-        (time_t)session->hello3.interval_timer_fd,
-        (long)((session->hello3.interval_timer_fd - (time_t)session->hello3.interval_timer_fd) * 1e9),
-        (time_t)session->hello3.interval_timer_fd,
-        (long)((session->hello3.interval_timer_fd - (time_t)session->hello3.interval_timer_fd) * 1e9)) != SUCCESS)
-    {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        if (l_inc_ctr != 0xFF) {
+            decrement_ctr(&security->local_ctr, security->local_nonce);
         }
         return FAILURE;
     }
-    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->hello3.timer_fd) != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
-        return FAILURE;
-    }
-//----------------------------------------------------------------------
+//======================================================================
     CLOSE_IPC_PROTOCOL(&received_protocol);
 //----------------------------------------------------------------------                            
     memcpy(&identity->remote_addr, remote_addr, sizeof(struct sockaddr_in6));

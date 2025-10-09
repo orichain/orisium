@@ -13,6 +13,7 @@
 #include "orilink/protocol.h"
 #include "stdbool.h"
 #include "orilink/heartbeat_ack.h"
+#include "workers/timer/handlers.h"
 #include "async.h"
 #include "workers/ipc/master_ipc_cmds.h"
 #include "constants.h"
@@ -407,7 +408,14 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     if (le != SUCCESS) {
         return FAILURE;
     }
-    status_t chst = create_heartbeat_sender_timer_fd(worker_ctx, session);
+//======================================================================
+// Acumulate Different RTT Between Peers
+//======================================================================
+    double timer_interval = session->heartbeat_interval;
+    timer_interval += session->rtt.value_prediction / (double)1e9;
+    timer_interval += pow((double)2, (double)session->retry.value_prediction);
+//======================================================================
+    status_t chst = create_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval);
     if (chst != SUCCESS) {
         return FAILURE;
     }
