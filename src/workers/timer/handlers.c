@@ -58,7 +58,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->hello1.interval_timer_fd);
                     double try_count = (double)session->hello1.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
-                    session->hello1.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                    session->hello1.interval_timer_fd = (double)2 * pow((double)2, (double)session->retry.value_prediction);
                     if (retry_control_packet(worker_ctx, identity, security, &session->hello1) != SUCCESS) {
                         return FAILURE;
                     }
@@ -97,7 +97,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->hello2.interval_timer_fd);
                     double try_count = (double)session->hello2.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
-                    session->hello2.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                    session->hello2.interval_timer_fd = (double)2 * pow((double)2, (double)session->retry.value_prediction);
                     if (retry_control_packet(worker_ctx, identity, security, &session->hello2) != SUCCESS) {
                         return FAILURE;
                     }
@@ -136,7 +136,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->hello3.interval_timer_fd);
                     double try_count = (double)session->hello3.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
-                    session->hello3.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                    session->hello3.interval_timer_fd = (double)2 * pow((double)2, (double)session->retry.value_prediction);
                     if (retry_control_packet(worker_ctx, identity, security, &session->hello3) != SUCCESS) {
                         return FAILURE;
                     }
@@ -175,7 +175,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->hello4.interval_timer_fd);
                     double try_count = (double)session->hello4.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
-                    session->hello4.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                    session->hello4.interval_timer_fd = (double)2 * pow((double)2, (double)session->retry.value_prediction);
                     if (retry_control_packet(worker_ctx, identity, security, &session->hello4) != SUCCESS) {
                         return FAILURE;
                     }
@@ -214,7 +214,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->heartbeat.interval_timer_fd);
                     double try_count = (double)session->heartbeat.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
-                    session->heartbeat.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                    session->heartbeat.interval_timer_fd = (double)2 * pow((double)2, (double)session->retry.value_prediction);
                     if (retry_control_packet(worker_ctx, identity, security, &session->heartbeat) != SUCCESS) {
                         return FAILURE;
                     }
@@ -234,10 +234,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
 //======================================================================
-                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
-                        if (timer_interval <= (double)0) {
-                            timer_interval = (double)1;
-                        }
+                        double timer_interval = (double)2 * pow((double)2, (double)session->retry.value_prediction);
                         LOG_DEVEL_DEBUG("%sRetry Timer Is Running. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
                         if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
                             return FAILURE;
@@ -408,7 +405,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->heartbeat.interval_timer_fd);
                     double try_count = (double)session->heartbeat.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
-                    session->heartbeat.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                    session->heartbeat.interval_timer_fd = (double)2 * pow((double)2, (double)session->retry.value_prediction);
                     if (retry_control_packet(worker_ctx, identity, security, &session->heartbeat) != SUCCESS) {
                         return FAILURE;
                     }
@@ -428,10 +425,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
 //======================================================================
-                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
-                        if (timer_interval <= (double)0) {
-                            timer_interval = (double)1;
-                        }
+                        double timer_interval = (double)2 * pow((double)2, (double)session->retry.value_prediction);
                         LOG_DEVEL_DEBUG("%sRetry Timer Is Running. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
                         if (async_create_timerfd(worker_ctx->label, &session->heartbeat_sender_timer_fd) != SUCCESS) {
                             return FAILURE;
