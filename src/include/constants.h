@@ -17,6 +17,9 @@
 #define MAX_MASTER_SIO_SESSIONS (MAX_SIO_WORKERS * MAX_CONNECTION_PER_SIO_WORKER)
 #define MAX_MASTER_COW_SESSIONS (MAX_COW_WORKERS * MAX_CONNECTION_PER_COW_WORKER)
 #define MAX_DOWNSTREAM_NODES_LIMIT 25
+
+//----------------------------------------------------------------------
+#define KALMAN_CALIBRATION_SAMPLES 50
 //----------------------------------------------------------------------
 // Test 2 Secs
 //----------------------------------------------------------------------
@@ -53,7 +56,6 @@
 #define IPC_VERSION_MAJOR 0x00
 #define IPC_VERSION_MINOR 0x01
 
-#define KALMAN_CALIBRATION_SAMPLES 50
 #define KALMAN_ALPHA_EWMA 0.2
 #define HEALTHY_THRESHOLD 75
 

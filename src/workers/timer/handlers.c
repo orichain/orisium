@@ -325,6 +325,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     if (async_create_timerfd(worker_ctx->label, &session->heartbeat.timer_fd) != SUCCESS) {
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
+                        if (l_inc_ctr != 0xFF) {
+                            decrement_ctr(&security->local_ctr, security->local_nonce);
+                        }
                         return FAILURE;
                     }
 //----------------------------------------------------------------------
@@ -338,12 +341,18 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     {
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
+                        if (l_inc_ctr != 0xFF) {
+                            decrement_ctr(&security->local_ctr, security->local_nonce);
+                        }
                         return FAILURE;
                     }
                     //printf("Hereeeeeeeeeeeeeeeeeeeee....... handlers.c SIO *current_fd == session->heartbeat_sender_timer_fd FD %d\n", session->heartbeat.timer_fd);
                     if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat.timer_fd) != SUCCESS) {
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
+                        if (l_inc_ctr != 0xFF) {
+                            decrement_ctr(&security->local_ctr, security->local_nonce);
+                        }
                         return FAILURE;
                     }
 //======================================================================
@@ -515,6 +524,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     if (async_create_timerfd(worker_ctx->label, &session->heartbeat.timer_fd) != SUCCESS) {
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
+                        if (l_inc_ctr != 0xFF) {
+                            decrement_ctr(&security->local_ctr, security->local_nonce);
+                        }
                         return FAILURE;
                     }
 //----------------------------------------------------------------------
@@ -528,12 +540,18 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     {
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
+                        if (l_inc_ctr != 0xFF) {
+                            decrement_ctr(&security->local_ctr, security->local_nonce);
+                        }
                         return FAILURE;
                     }
                     //printf("Hereeeeeeeeeeeeeeeeeeeee....... handlers.c SIO *current_fd == session->heartbeat_sender_timer_fd FD %d\n", session->heartbeat.timer_fd);
                     if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat.timer_fd) != SUCCESS) {
                         async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                         CLOSE_FD(&session->heartbeat_sender_timer_fd);
+                        if (l_inc_ctr != 0xFF) {
+                            decrement_ctr(&security->local_ctr, security->local_nonce);
+                        }
                         return FAILURE;
                     }
 //======================================================================
