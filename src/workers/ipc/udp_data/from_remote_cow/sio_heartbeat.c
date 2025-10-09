@@ -355,7 +355,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         LOG_DEVEL_DEBUG("[Debug Here Helper]: Heartbeat Ack Packet Number %d. Sending To Fake Addr To Force Retry", session->test_drop_heartbeat_ack);
         struct sockaddr_in6 fake_addr;
         memset(&fake_addr, 0, sizeof(struct sockaddr_in6));
-        if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &fake_addr, &udp_data, &session->heartbeat_ack) != SUCCESS) {
+        if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, identity->local_session_index, &fake_addr, &udp_data, &session->heartbeat_ack) != SUCCESS) {
 //----------------------------------------------------------------------
 // No Error Here
 // This Is A Test Drop Packet
@@ -374,7 +374,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
 //----------------------------------------------------------------------
         }
     } else {
-        if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, remote_addr, &udp_data, &session->heartbeat_ack) != SUCCESS) {
+        if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, identity->local_session_index, remote_addr, &udp_data, &session->heartbeat_ack) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
             if (inc_ctr != 0xFF) {

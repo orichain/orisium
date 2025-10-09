@@ -149,7 +149,7 @@ status_t retry_control_packet(worker_context_t *worker_ctx, orilink_identity_t *
     if (udp_data.status != SUCCESS) {
         return FAILURE;
     }
-    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &identity->remote_addr, &udp_data, control_packet) != SUCCESS) {
+    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, identity->local_session_index, &identity->remote_addr, &udp_data, control_packet) != SUCCESS) {
         return FAILURE;
     }
 //======================================================================
@@ -194,7 +194,7 @@ status_t retry_control_packet_ack(worker_context_t *worker_ctx, orilink_identity
     if (udp_data.status != SUCCESS) {
         return FAILURE;
     }
-    if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &identity->remote_addr, &udp_data, control_packet_ack) != SUCCESS) {
+    if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, identity->local_session_index, &identity->remote_addr, &udp_data, control_packet_ack) != SUCCESS) {
         return FAILURE;
     }
 //======================================================================

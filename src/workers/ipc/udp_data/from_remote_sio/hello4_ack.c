@@ -12,7 +12,6 @@
 #include "constants.h"
 #include "workers/workers.h"
 #include "workers/ipc/handlers.h"
-#include "workers/timer/handlers.h"
 #include "poly1305-donna.h"
 #include "aes.h"
 #include "orilink/protocol.h"
@@ -316,21 +315,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         }
         return FAILURE;
     }
-    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, remote_addr, &udp_data, &session->heartbeat) != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
-        if (l_inc_ctr != 0xFF) {
-            decrement_ctr(&security->local_ctr, security->local_nonce);
-        }
-        return FAILURE;
-    }
-//======================================================================
-    double retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
-    session->heartbeat.interval_timer_fd = retry_timer_interval;
-    if (create_timer(worker_ctx, &session->heartbeat.timer_fd, retry_timer_interval) != SUCCESS) {
+    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, identity->local_session_index, remote_addr, &udp_data, &session->heartbeat) != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {

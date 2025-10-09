@@ -58,6 +58,12 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
             }
             break;
         }
+        case IPC_UDP_DATA_ACK: {
+            if (handle_workers_ipc_udp_data_ack(worker_ctx, worker_sessions, &ircvdi) != SUCCESS) {
+                return FAILURE;
+            }
+            break;
+        }
         default:
             LOG_ERROR("%sUnknown IPC protocol type %d from Master. Ignoring.", worker_ctx->label, ircvdi.r_ipc_raw_protocol_t->type);
             CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);

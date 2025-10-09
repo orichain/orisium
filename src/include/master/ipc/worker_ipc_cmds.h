@@ -17,5 +17,15 @@ status_t master_worker_udp_data(
     struct sockaddr_in6 *addr,
     orilink_raw_protocol_t *r
 );
+status_t master_worker_udp_data_ack(
+    const char *label, 
+    master_context_t *master_ctx, 
+    worker_type_t wot, 
+    uint8_t index,
+    uint8_t session_index,
+    uint8_t orilink_protocol,
+    uint8_t trycount,
+    status_t status
+);
 
 #endif

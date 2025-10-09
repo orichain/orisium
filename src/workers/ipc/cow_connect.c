@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <netinet/in.h>
-#include <math.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -11,7 +10,6 @@
 #include "orilink/hello1.h"
 #include "orilink/protocol.h"
 #include "workers/ipc/master_ipc_cmds.h"
-#include "workers/timer/handlers.h"
 #include "utilities.h"
 #include "stdbool.h"
 
@@ -80,14 +78,7 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
         CLOSE_IPC_PROTOCOL(&received_protocol);
         return FAILURE;
     }
-    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &identity->remote_addr, &udp_data, &session->hello1) != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        return FAILURE;
-    }
-//======================================================================
-    double retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
-    session->hello1.interval_timer_fd = retry_timer_interval;
-    if (create_timer(worker_ctx, &session->hello1.timer_fd, retry_timer_interval) != SUCCESS) {
+    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, identity->local_session_index, &identity->remote_addr, &udp_data, &session->hello1) != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         return FAILURE;
     }

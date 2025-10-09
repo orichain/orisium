@@ -16,8 +16,9 @@ typedef enum {
     
     IPC_MASTER_COW_CONNECT = (uint8_t)0x10,
     
-    IPC_WORKER_MASTER_TASK_INFO = (uint8_t)0xfc,
-    IPC_UDP_DATA = (uint8_t)0xfd,
+    IPC_WORKER_MASTER_TASK_INFO = (uint8_t)0xfb,
+    IPC_UDP_DATA = (uint8_t)0xfc,
+    IPC_UDP_DATA_ACK = (uint8_t)0xfd,
     IPC_WORKER_MASTER_HEARTBEAT = (uint8_t)0xfe,
     IPC_MASTER_WORKER_INFO = (uint8_t)0xff
 } ipc_protocol_type_t;
@@ -37,6 +38,13 @@ typedef struct {
     uint8_t data[];
 //----------------------------------------------------------------------
 } ipc_udp_data_t;
+
+typedef struct {
+    uint8_t session_index;
+    uint8_t orilink_protocol;
+    uint8_t trycount;
+    status_t status;
+} ipc_udp_data_ack_t;
 
 typedef struct {
     uint8_t session_index;
@@ -82,6 +90,7 @@ typedef struct {
 		ipc_worker_master_heartbeat_t *ipc_worker_master_heartbeat;
         ipc_master_cow_connect_t *ipc_master_cow_connect;
         ipc_udp_data_t *ipc_udp_data;
+        ipc_udp_data_ack_t *ipc_udp_data_ack;
         ipc_worker_master_hello1_t *ipc_worker_master_hello1;
         ipc_master_worker_hello1_ack_t *ipc_master_worker_hello1_ack;
         ipc_worker_master_hello2_t *ipc_worker_master_hello2;
@@ -118,6 +127,8 @@ static inline void CLOSE_IPC_PROTOCOL(ipc_protocol_t **protocol_ptr) {
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_cow_connect);
         } else if (x->type == IPC_UDP_DATA) {
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_udp_data);
+        } else if (x->type == IPC_UDP_DATA_ACK) {
+            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_udp_data_ack);
         } else if (x->type == IPC_WORKER_MASTER_HELLO1) {
             memset(x->payload.ipc_worker_master_hello1->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
             CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_worker_master_hello1);

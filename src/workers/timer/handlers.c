@@ -327,22 +327,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //======================================================================
                         return FAILURE;
                     }
-                    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &session->identity.remote_addr, &udp_data, &session->heartbeat) != SUCCESS) {
-                        if (l_inc_ctr != 0xFF) {
-                            decrement_ctr(&security->local_ctr, security->local_nonce);
-                        }
-//======================================================================
-                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
-                        if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
-                            return FAILURE;
-                        }
-//======================================================================
-                        return FAILURE;
-                    }
-//----------------------------------------------------------------------
-                    double retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
-                    session->heartbeat.interval_timer_fd = retry_timer_interval;
-                    if (create_timer(worker_ctx, &session->heartbeat.timer_fd, retry_timer_interval) != SUCCESS) {
+                    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, identity->local_session_index, &session->identity.remote_addr, &udp_data, &session->heartbeat) != SUCCESS) {
                         if (l_inc_ctr != 0xFF) {
                             decrement_ctr(&security->local_ctr, security->local_nonce);
                         }
@@ -528,22 +513,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //======================================================================
                         return FAILURE;
                     }
-                    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, &session->identity.remote_addr, &udp_data, &session->heartbeat) != SUCCESS) {
-                        if (l_inc_ctr != 0xFF) {
-                            decrement_ctr(&security->local_ctr, security->local_nonce);
-                        }
-//======================================================================
-                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
-                        if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
-                            return FAILURE;
-                        }
-//======================================================================
-                        return FAILURE;
-                    }
-//----------------------------------------------------------------------
-                    double retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
-                    session->heartbeat.interval_timer_fd = retry_timer_interval;
-                    if (create_timer(worker_ctx, &session->heartbeat.timer_fd, retry_timer_interval) != SUCCESS) {
+                    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, identity->local_session_index, &session->identity.remote_addr, &udp_data, &session->heartbeat) != SUCCESS) {
                         if (l_inc_ctr != 0xFF) {
                             decrement_ctr(&security->local_ctr, security->local_nonce);
                         }
