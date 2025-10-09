@@ -46,28 +46,8 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
         CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
         return FAILURE;
     }
-    if (async_create_timerfd(worker_ctx->label, &session->hello1.timer_fd) != SUCCESS) {
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
-        return FAILURE;
-    }
     session->hello1.sent_try_count++;
     session->hello1.sent_time = current_time.r_uint64_t;
-//----------------------------------------------------------------------
-    session->hello1.interval_timer_fd = (double)2 * pow((double)2, (double)session->retry.value_prediction);
-//----------------------------------------------------------------------
-    if (async_set_timerfd_time(worker_ctx->label, &session->hello1.timer_fd,
-        (time_t)session->hello1.interval_timer_fd,
-        (long)((session->hello1.interval_timer_fd - (time_t)session->hello1.interval_timer_fd) * 1e9),
-        (time_t)session->hello1.interval_timer_fd,
-        (long)((session->hello1.interval_timer_fd - (time_t)session->hello1.interval_timer_fd) * 1e9)) != SUCCESS)
-    {
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
-        return FAILURE;
-    }
-    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->hello1.timer_fd) != SUCCESS) {
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
-        return FAILURE;
-    }
 //======================================================================
     identity->id_connection = icow_connecti->id_connection;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello1(
@@ -105,6 +85,28 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
         CLOSE_IPC_PROTOCOL(&received_protocol);
         return FAILURE;
     }
+//----------------------------------------------------------------------
+    if (async_create_timerfd(worker_ctx->label, &session->hello1.timer_fd) != SUCCESS) {
+        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        return FAILURE;
+    }
+//----------------------------------------------------------------------
+    session->hello1.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+//----------------------------------------------------------------------
+    if (async_set_timerfd_time(worker_ctx->label, &session->hello1.timer_fd,
+        (time_t)session->hello1.interval_timer_fd,
+        (long)((session->hello1.interval_timer_fd - (time_t)session->hello1.interval_timer_fd) * 1e9),
+        (time_t)session->hello1.interval_timer_fd,
+        (long)((session->hello1.interval_timer_fd - (time_t)session->hello1.interval_timer_fd) * 1e9)) != SUCCESS)
+    {
+        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        return FAILURE;
+    }
+    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->hello1.timer_fd) != SUCCESS) {
+        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        return FAILURE;
+    }
+//----------------------------------------------------------------------
     CLOSE_IPC_PROTOCOL(&received_protocol);
 //======================================================================
     session->hello1.sent = true;

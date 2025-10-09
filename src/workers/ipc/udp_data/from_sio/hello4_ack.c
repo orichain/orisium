@@ -262,40 +262,8 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         }
         return FAILURE;
     }
-    if (async_create_timerfd(worker_ctx->label, &session->heartbeat.timer_fd) != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
-        return FAILURE;
-    }
     session->heartbeat.sent_try_count++;
     session->heartbeat.sent_time = current_time.r_uint64_t;
-//----------------------------------------------------------------------
-    session->heartbeat.interval_timer_fd = (double)2 * pow((double)2, (double)session->retry.value_prediction);
-//----------------------------------------------------------------------
-    if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat.timer_fd,
-        (time_t)session->heartbeat.interval_timer_fd,
-        (long)((session->heartbeat.interval_timer_fd - (time_t)session->heartbeat.interval_timer_fd) * 1e9),
-        (time_t)session->heartbeat.interval_timer_fd,
-        (long)((session->heartbeat.interval_timer_fd - (time_t)session->heartbeat.interval_timer_fd) * 1e9)) != SUCCESS)
-    {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
-        return FAILURE;
-    }
-    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat.timer_fd) != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
-        return FAILURE;
-    }
 //======================================================================
 // Acumulate Different RTT Between Peers
 //======================================================================
@@ -357,6 +325,39 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         }
         if (l_inc_ctr != 0xFF) {
             decrement_ctr(&security->local_ctr, security->local_nonce);
+        }
+        return FAILURE;
+    }
+//----------------------------------------------------------------------
+    if (async_create_timerfd(worker_ctx->label, &session->heartbeat.timer_fd) != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
+        return FAILURE;
+    }
+//----------------------------------------------------------------------
+    session->heartbeat.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+//----------------------------------------------------------------------
+    if (async_set_timerfd_time(worker_ctx->label, &session->heartbeat.timer_fd,
+        (time_t)session->heartbeat.interval_timer_fd,
+        (long)((session->heartbeat.interval_timer_fd - (time_t)session->heartbeat.interval_timer_fd) * 1e9),
+        (time_t)session->heartbeat.interval_timer_fd,
+        (long)((session->heartbeat.interval_timer_fd - (time_t)session->heartbeat.interval_timer_fd) * 1e9)) != SUCCESS)
+    {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
+        return FAILURE;
+    }
+    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat.timer_fd) != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+            decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         return FAILURE;
     }
