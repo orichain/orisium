@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <math.h>
+#include <stdio.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -35,7 +36,10 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
         case ORILINK_HEARTBEAT: {
             if (iudp_data_acki->trycount == (uint8_t)1 && iudp_data_acki->status == SUCCESS) {
 //======================================================================
-                double retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
+                double retry_timer_interval = (double)2;
+                retry_timer_interval += session->rtt.value_prediction / (double)1e9;
+                retry_timer_interval = pow(retry_timer_interval, (double)session->retry.value_prediction);
+                printf("%s===Initial Retry Interva %f ===\n", worker_ctx->label, retry_timer_interval);
                 session->heartbeat.interval_timer_fd = retry_timer_interval;
                 if (create_timer(worker_ctx, &session->heartbeat.timer_fd, retry_timer_interval) != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);

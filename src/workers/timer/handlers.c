@@ -57,7 +57,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->hello1.interval_timer_fd);
                     double try_count = (double)session->hello1.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
-                    session->hello1.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                    double retry_timer_interval = (double)2;
+                    retry_timer_interval += session->rtt.value_prediction / (double)1e9;
+                    retry_timer_interval = pow(retry_timer_interval, (double)session->retry.value_prediction);
+                    session->hello1.interval_timer_fd = retry_timer_interval;
                     if (retry_control_packet(worker_ctx, identity, security, &session->hello1) != SUCCESS) {
                         return FAILURE;
                     }
@@ -96,7 +99,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->hello2.interval_timer_fd);
                     double try_count = (double)session->hello2.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
-                    session->hello2.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                    double retry_timer_interval = (double)2;
+                    retry_timer_interval += session->rtt.value_prediction / (double)1e9;
+                    retry_timer_interval = pow(retry_timer_interval, (double)session->retry.value_prediction);
+                    session->hello2.interval_timer_fd = retry_timer_interval;
                     if (retry_control_packet(worker_ctx, identity, security, &session->hello2) != SUCCESS) {
                         return FAILURE;
                     }
@@ -135,7 +141,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->hello3.interval_timer_fd);
                     double try_count = (double)session->hello3.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
-                    session->hello3.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                    double retry_timer_interval = (double)2;
+                    retry_timer_interval += session->rtt.value_prediction / (double)1e9;
+                    retry_timer_interval = pow(retry_timer_interval, (double)session->retry.value_prediction);
+                    session->hello3.interval_timer_fd = retry_timer_interval;
                     if (retry_control_packet(worker_ctx, identity, security, &session->hello3) != SUCCESS) {
                         return FAILURE;
                     }
@@ -174,7 +183,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->hello4.interval_timer_fd);
                     double try_count = (double)session->hello4.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
-                    session->hello4.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                    double retry_timer_interval = (double)2;
+                    retry_timer_interval += session->rtt.value_prediction / (double)1e9;
+                    retry_timer_interval = pow(retry_timer_interval, (double)session->retry.value_prediction);
+                    session->hello4.interval_timer_fd = retry_timer_interval;
                     if (retry_control_packet(worker_ctx, identity, security, &session->hello4) != SUCCESS) {
                         return FAILURE;
                     }
@@ -182,7 +194,11 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 } else if (*current_fd == session->heartbeat.timer_fd) {
                     uint64_t u;
                     read(session->heartbeat.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                    if (session->heartbeat.ack_rcvd) {
+                    if (
+                        session->heartbeat.ack_rcvd ||
+                        session->heartbeat_sender_timer_fd != -1
+                    )
+                    {
 //======================================================================
 // Let The Timer Dies By Itself
 // do not disturb or be disturbed by other epoll events
@@ -213,7 +229,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->heartbeat.interval_timer_fd);
                     double try_count = (double)session->heartbeat.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
-                    session->heartbeat.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                    double retry_timer_interval = (double)2;
+                    retry_timer_interval += session->rtt.value_prediction / (double)1e9;
+                    retry_timer_interval = pow(retry_timer_interval, (double)session->retry.value_prediction);
+                    session->heartbeat.interval_timer_fd = retry_timer_interval;
                     if (retry_control_packet(worker_ctx, identity, security, &session->heartbeat) != SUCCESS) {
                         return FAILURE;
                     }
@@ -230,7 +249,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //----------------------------------------------------------------------
 // Retry Timer Is Running
 //----------------------------------------------------------------------
-                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
+                        double timer_interval = (double)2;
+                        timer_interval += session->rtt.value_prediction / (double)1e9;
+                        timer_interval = pow(timer_interval, (double)session->retry.value_prediction);
                         LOG_DEVEL_DEBUG("%sRetry Timer Is Running. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
                         if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                             return FAILURE;
@@ -247,7 +268,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //----------------------------------------------------------------------
 // Do One Time (Toggle) Adaptive Interval
 //----------------------------------------------------------------------
-                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
+                        double timer_interval = (double)2;
+                        timer_interval += session->rtt.value_prediction / (double)1e9;
+                        timer_interval = pow(timer_interval, (double)session->retry.value_prediction);
                         LOG_DEVEL_DEBUG("%sAdaptive Heartbeat Interval. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
                         if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                             return FAILURE;
@@ -261,7 +284,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
                     if (current_time.status != SUCCESS) {
 //======================================================================
-                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
+                        double timer_interval = (double)2;
+                        timer_interval += session->rtt.value_prediction / (double)1e9;
+                        timer_interval = pow(timer_interval, (double)session->retry.value_prediction);
                         if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                             return FAILURE;
                         }
@@ -273,8 +298,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //======================================================================
 // Acumulate Different RTT Between Peers
 //======================================================================
-                    double hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
+                    double hb_interval = (double)2;
                     hb_interval += session->rtt.value_prediction / (double)1e9;
+                    hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow(hb_interval, (double)session->retry.value_prediction);
 //======================================================================
                     orilink_identity_t *identity = &session->identity;
                     orilink_security_t *security = &session->security;
@@ -299,7 +325,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                             decrement_ctr(&security->local_ctr, security->local_nonce);
                         }
 //======================================================================
-                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
+                        double timer_interval = (double)2;
+                        timer_interval += session->rtt.value_prediction / (double)1e9;
+                        timer_interval = pow(timer_interval, (double)session->retry.value_prediction);
                         if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                             return FAILURE;
                         }
@@ -320,7 +348,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                             decrement_ctr(&security->local_ctr, security->local_nonce);
                         }
 //======================================================================
-                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
+                        double timer_interval = (double)2;
+                        timer_interval += session->rtt.value_prediction / (double)1e9;
+                        timer_interval = pow(timer_interval, (double)session->retry.value_prediction);
                         if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                             return FAILURE;
                         }
@@ -332,7 +362,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                             decrement_ctr(&security->local_ctr, security->local_nonce);
                         }
 //======================================================================
-                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
+                        double timer_interval = (double)2;
+                        timer_interval += session->rtt.value_prediction / (double)1e9;
+                        timer_interval = pow(timer_interval, (double)session->retry.value_prediction);
                         if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                             return FAILURE;
                         }
@@ -368,7 +400,11 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 if (*current_fd == session->heartbeat.timer_fd) {
                     uint64_t u;
                     read(session->heartbeat.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                    if (session->heartbeat.ack_rcvd) {
+                    if (
+                        session->heartbeat.ack_rcvd ||
+                        session->heartbeat_sender_timer_fd != -1
+                    )
+                    {
 //======================================================================
 // Let The Timer Dies By Itself
 // do not disturb or be disturbed by other epoll events
@@ -399,7 +435,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     LOG_DEBUG("%sSession %d: interval = %lf.", worker_ctx->label, i, session->heartbeat.interval_timer_fd);
                     double try_count = (double)session->heartbeat.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
-                    session->heartbeat.interval_timer_fd = pow((double)2, (double)session->retry.value_prediction);
+                    double retry_timer_interval = (double)2;
+                    retry_timer_interval += session->rtt.value_prediction / (double)1e9;
+                    retry_timer_interval = pow(retry_timer_interval, (double)session->retry.value_prediction);
+                    session->heartbeat.interval_timer_fd = retry_timer_interval;
                     if (retry_control_packet(worker_ctx, identity, security, &session->heartbeat) != SUCCESS) {
                         return FAILURE;
                     }
@@ -416,7 +455,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //----------------------------------------------------------------------
 // Retry Timer Is Running
 //----------------------------------------------------------------------
-                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
+                        double timer_interval = (double)2;
+                        timer_interval += session->rtt.value_prediction / (double)1e9;
+                        timer_interval = pow(timer_interval, (double)session->retry.value_prediction);
                         LOG_DEVEL_DEBUG("%sRetry Timer Is Running. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
                         if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                             return FAILURE;
@@ -433,7 +474,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //----------------------------------------------------------------------
 // Do One Time (Toggle) Adaptive Interval
 //----------------------------------------------------------------------
-                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
+                        double timer_interval = (double)2;
+                        timer_interval += session->rtt.value_prediction / (double)1e9;
+                        timer_interval = pow(timer_interval, (double)session->retry.value_prediction);
                         LOG_DEVEL_DEBUG("%sAdaptive Heartbeat Interval. Add Interval To Heartbeat Timer Sender For %fsec", worker_ctx->label, timer_interval);
                         if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                             return FAILURE;
@@ -447,7 +490,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
                     if (current_time.status != SUCCESS) {
 //======================================================================
-                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
+                        double timer_interval = (double)2;
+                        timer_interval += session->rtt.value_prediction / (double)1e9;
+                        timer_interval = pow(timer_interval, (double)session->retry.value_prediction);
                         if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                             return FAILURE;
                         }
@@ -459,8 +504,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //======================================================================
 // Acumulate Different RTT Between Peers
 //======================================================================
-                    double hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
+                    double hb_interval = (double)2;
                     hb_interval += session->rtt.value_prediction / (double)1e9;
+                    hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow(hb_interval, (double)session->retry.value_prediction);
 //======================================================================
                     orilink_identity_t *identity = &session->identity;
                     orilink_security_t *security = &session->security;
@@ -485,7 +531,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                             decrement_ctr(&security->local_ctr, security->local_nonce);
                         }
 //======================================================================
-                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
+                        double timer_interval = (double)2;
+                        timer_interval += session->rtt.value_prediction / (double)1e9;
+                        timer_interval = pow(timer_interval, (double)session->retry.value_prediction);
                         if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                             return FAILURE;
                         }
@@ -506,7 +554,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                             decrement_ctr(&security->local_ctr, security->local_nonce);
                         }
 //======================================================================
-                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
+                        double timer_interval = (double)2;
+                        timer_interval += session->rtt.value_prediction / (double)1e9;
+                        timer_interval = pow(timer_interval, (double)session->retry.value_prediction);
                         if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                             return FAILURE;
                         }
@@ -518,7 +568,9 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                             decrement_ctr(&security->local_ctr, security->local_nonce);
                         }
 //======================================================================
-                        double timer_interval = pow((double)2, (double)session->retry.value_prediction);
+                        double timer_interval = (double)2;
+                        timer_interval += session->rtt.value_prediction / (double)1e9;
+                        timer_interval = pow(timer_interval, (double)session->retry.value_prediction);
                         if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                             return FAILURE;
                         }
@@ -540,6 +592,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                     CLOSE_FD(&session->heartbeat_sender_timer_fd);
                     return SUCCESS;
+
                 }
             }
             break;
