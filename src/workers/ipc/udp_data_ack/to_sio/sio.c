@@ -34,7 +34,7 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
             break;
         }
         case ORILINK_HEARTBEAT: {
-            if (iudp_data_acki->trycount == (uint8_t)1 && iudp_data_acki->status == SUCCESS) {
+            if (iudp_data_acki->trycount == (uint8_t)1) {
 //======================================================================
                 double retry_timer_interval = (double)2;
                 retry_timer_interval += session->rtt.value_prediction / (double)1e9;

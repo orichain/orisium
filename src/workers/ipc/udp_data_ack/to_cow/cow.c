@@ -18,7 +18,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
     cow_c_session_t *session = &cow_c_session[session_index];
     switch ((orilink_protocol_type_t)iudp_data_acki->orilink_protocol) {
         case ORILINK_HELLO1: {
-            if (iudp_data_acki->trycount == (uint8_t)1 && iudp_data_acki->status == SUCCESS) {
+            if (iudp_data_acki->trycount == (uint8_t)1) {
 //======================================================================
                 double retry_timer_interval = (double)2;
                 retry_timer_interval += session->rtt.value_prediction / (double)1e9;
@@ -34,7 +34,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
             break;
         }
         case ORILINK_HELLO2: {
-            if (iudp_data_acki->trycount == (uint8_t)1 && iudp_data_acki->status == SUCCESS) {
+            if (iudp_data_acki->trycount == (uint8_t)1) {
 //======================================================================
                 double retry_timer_interval = (double)2;
                 retry_timer_interval += session->rtt.value_prediction / (double)1e9;
@@ -50,7 +50,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
             break;
         }
         case ORILINK_HELLO3: {
-            if (iudp_data_acki->trycount == (uint8_t)1 && iudp_data_acki->status == SUCCESS) {
+            if (iudp_data_acki->trycount == (uint8_t)1) {
 //======================================================================
                 double retry_timer_interval = (double)2;
                 retry_timer_interval += session->rtt.value_prediction / (double)1e9;
@@ -66,7 +66,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
             break;
         }
         case ORILINK_HELLO4: {
-            if (iudp_data_acki->trycount == (uint8_t)1 && iudp_data_acki->status == SUCCESS) {
+            if (iudp_data_acki->trycount == (uint8_t)1) {
 //======================================================================
                 double retry_timer_interval = (double)2;
                 retry_timer_interval += session->rtt.value_prediction / (double)1e9;
@@ -82,7 +82,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
             break;
         }
         case ORILINK_HEARTBEAT: {
-            if (iudp_data_acki->trycount == (uint8_t)1 && iudp_data_acki->status == SUCCESS) {
+            if (iudp_data_acki->trycount == (uint8_t)1) {
 //======================================================================
                 double retry_timer_interval = (double)2;
                 retry_timer_interval += session->rtt.value_prediction / (double)1e9;

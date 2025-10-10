@@ -315,11 +315,9 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
         return FAILURE;
     }
 //======================================================================
-// Acumulate Different RTT Between Peers
-//======================================================================
-    double timer_interval = session->heartbeat_interval;
+    double timer_interval = (double)2;
     timer_interval += session->rtt.value_prediction / (double)1e9;
-    timer_interval += pow((double)2, (double)session->retry.value_prediction);
+    timer_interval = pow(timer_interval, (double)session->retry.value_prediction);
 //======================================================================
     status_t chst = create_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval);
     if (chst != SUCCESS) {
