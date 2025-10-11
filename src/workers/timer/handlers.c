@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <inttypes.h>
 #include <stddef.h>
+#include <stdio.h>
 
 #include "types.h"
 #include "workers/workers.h"
@@ -25,9 +26,20 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 session = &c_sessions[i];
                 orilink_identity_t *identity = &session->identity;
                 orilink_security_t *security = &session->security;
-                if (*current_fd == session->hello1.timer_fd) {
+                if (*current_fd == session->hello1.creator_timer_fd) {
                     uint64_t u;
-                    read(session->hello1.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    read(session->hello1.creator_timer_fd, &u, sizeof(u));
+                    if (create_timer(worker_ctx, &session->hello1.timer_fd, session->hello1.interval_timer_fd) != SUCCESS) {
+                        double create_interval = (double)RETRY_TIMER_CREATE_DELAY_NS / (double)1e9;
+                        update_timer(worker_ctx, &session->hello1.creator_timer_fd, create_interval);
+                        return FAILURE;
+                    }
+                    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->hello1.creator_timer_fd);
+                    CLOSE_FD(&session->hello1.creator_timer_fd);
+                    return SUCCESS;
+                } else if (*current_fd == session->hello1.timer_fd) {
+                    uint64_t u;
+                    read(session->hello1.timer_fd, &u, sizeof(u));
                     if (session->hello1.ack_rcvd) {
 //======================================================================
 // Let The Timer Dies By Itself
@@ -70,9 +82,20 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         return FAILURE;
                     }
                     return SUCCESS;
+                } else if (*current_fd == session->hello2.creator_timer_fd) {
+                    uint64_t u;
+                    read(session->hello2.creator_timer_fd, &u, sizeof(u));
+                    if (create_timer(worker_ctx, &session->hello2.timer_fd, session->hello2.interval_timer_fd) != SUCCESS) {
+                        double create_interval = (double)RETRY_TIMER_CREATE_DELAY_NS / (double)1e9;
+                        update_timer(worker_ctx, &session->hello2.creator_timer_fd, create_interval);
+                        return FAILURE;
+                    }
+                    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->hello2.creator_timer_fd);
+                    CLOSE_FD(&session->hello2.creator_timer_fd);
+                    return SUCCESS;
                 } else if (*current_fd == session->hello2.timer_fd) {
                     uint64_t u;
-                    read(session->hello2.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    read(session->hello2.timer_fd, &u, sizeof(u));
                     if (session->hello2.ack_rcvd) {
 //======================================================================
 // Let The Timer Dies By Itself
@@ -116,9 +139,20 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         return FAILURE;
                     }
                     return SUCCESS;
+                } else if (*current_fd == session->hello3.creator_timer_fd) {
+                    uint64_t u;
+                    read(session->hello3.creator_timer_fd, &u, sizeof(u));
+                    if (create_timer(worker_ctx, &session->hello3.timer_fd, session->hello3.interval_timer_fd) != SUCCESS) {
+                        double create_interval = (double)RETRY_TIMER_CREATE_DELAY_NS / (double)1e9;
+                        update_timer(worker_ctx, &session->hello3.creator_timer_fd, create_interval);
+                        return FAILURE;
+                    }
+                    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->hello3.creator_timer_fd);
+                    CLOSE_FD(&session->hello3.creator_timer_fd);
+                    return SUCCESS;
                 } else if (*current_fd == session->hello3.timer_fd) {
                     uint64_t u;
-                    read(session->hello3.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    read(session->hello3.timer_fd, &u, sizeof(u));
                     if (session->hello3.ack_rcvd) {
 //======================================================================
 // Let The Timer Dies By Itself
@@ -162,9 +196,20 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         return FAILURE;
                     }
                     return SUCCESS;
+                } else if (*current_fd == session->hello4.creator_timer_fd) {
+                    uint64_t u;
+                    read(session->hello4.creator_timer_fd, &u, sizeof(u));
+                    if (create_timer(worker_ctx, &session->hello4.timer_fd, session->hello4.interval_timer_fd) != SUCCESS) {
+                        double create_interval = (double)RETRY_TIMER_CREATE_DELAY_NS / (double)1e9;
+                        update_timer(worker_ctx, &session->hello4.creator_timer_fd, create_interval);
+                        return FAILURE;
+                    }
+                    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->hello4.creator_timer_fd);
+                    CLOSE_FD(&session->hello4.creator_timer_fd);
+                    return SUCCESS;
                 } else if (*current_fd == session->hello4.timer_fd) {
                     uint64_t u;
-                    read(session->hello4.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    read(session->hello4.timer_fd, &u, sizeof(u));
                     if (session->hello4.ack_rcvd) {
 //======================================================================
 // Let The Timer Dies By Itself
@@ -208,9 +253,36 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         return FAILURE;
                     }
                     return SUCCESS;
+                } else if (*current_fd == session->heartbeat.creator_timer_fd) {
+                    uint64_t u;
+                    read(session->heartbeat.creator_timer_fd, &u, sizeof(u));
+                    double retry_timer_interval = session->heartbeat.interval_timer_fd;
+                    session->test_double_heartbeat++;
+                    if (
+                        session->test_double_heartbeat == 7 ||
+                        session->test_double_heartbeat == 9 ||
+                        session->test_double_heartbeat == 11
+                    )
+                    {
+                        LOG_DEVEL_DEBUG("[Debug Here Helper]: Heartbeat Packet Number %d. Test Burst/Double. Retry Interval To 0.000001", session->test_drop_heartbeat_ack);
+                        retry_timer_interval = (double)0.000001;
+                    } else {
+                        if (session->test_double_heartbeat >= 1000000) {
+                            session->test_double_heartbeat = 0;
+                        }
+                    }
+                    printf("%s===Initial Retry Interva %f ===\n", worker_ctx->label, retry_timer_interval);
+                    if (create_timer(worker_ctx, &session->heartbeat.timer_fd, retry_timer_interval) != SUCCESS) {
+                        double create_interval = (double)RETRY_TIMER_CREATE_DELAY_NS / (double)1e9;
+                        update_timer(worker_ctx, &session->heartbeat.creator_timer_fd, create_interval);
+                        return FAILURE;
+                    }
+                    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat.creator_timer_fd);
+                    CLOSE_FD(&session->heartbeat.creator_timer_fd);
+                    return SUCCESS;
                 } else if (*current_fd == session->heartbeat.timer_fd) {
                     uint64_t u;
-                    read(session->heartbeat.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    read(session->heartbeat.timer_fd, &u, sizeof(u));
                     if (session->heartbeat.ack_rcvd) {
 //======================================================================
 // Let The Timer Dies By Itself
@@ -261,10 +333,14 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     return SUCCESS;
                 } else if (*current_fd == session->heartbeat_sender_timer_fd) {
                     uint64_t u;
-                    read(session->heartbeat_sender_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    read(session->heartbeat_sender_timer_fd, &u, sizeof(u));
                     double timer_interval = session->heartbeat_interval * pow((double)2, (double)session->retry.value_prediction);
                     timer_interval += session->rtt.value_prediction / (double)1e9;
-                    if (session->heartbeat.timer_fd != -1) {
+                    if (
+                        session->heartbeat.timer_fd != -1 ||
+                        session->heartbeat.creator_timer_fd != -1
+                    )
+                    {
 //======================================================================
 // Let The Retry Timer Finish The Retry Job
 //======================================================================
@@ -357,7 +433,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     return SUCCESS;
                 } else if (*current_fd == session->heartbeat_openner_timer_fd) {
                     uint64_t u;
-                    read(session->heartbeat_openner_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    read(session->heartbeat_openner_timer_fd, &u, sizeof(u));
                     session->heartbeat_openned = true;
                     async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd);
                     CLOSE_FD(&session->heartbeat_openner_timer_fd);
@@ -373,9 +449,36 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                 session = &c_sessions[i];
                 orilink_identity_t *identity = &session->identity;
                 orilink_security_t *security = &session->security;
-                if (*current_fd == session->heartbeat.timer_fd) {
+                if (*current_fd == session->heartbeat.creator_timer_fd) {
                     uint64_t u;
-                    read(session->heartbeat.timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    read(session->heartbeat.creator_timer_fd, &u, sizeof(u));
+                    double retry_timer_interval = session->heartbeat.interval_timer_fd;
+                    session->test_double_heartbeat++;
+                    if (
+                        session->test_double_heartbeat == 7 ||
+                        session->test_double_heartbeat == 9 ||
+                        session->test_double_heartbeat == 11
+                    )
+                    {
+                        LOG_DEVEL_DEBUG("[Debug Here Helper]: Heartbeat Packet Number %d. Test Burst/Double. Retry Interval To 0.000001", session->test_drop_heartbeat_ack);
+                        retry_timer_interval = (double)0.000001;
+                    } else {
+                        if (session->test_double_heartbeat >= 1000000) {
+                            session->test_double_heartbeat = 0;
+                        }
+                    }
+                    printf("%s===Initial Retry Interva %f ===\n", worker_ctx->label, retry_timer_interval);
+                    if (create_timer(worker_ctx, &session->heartbeat.timer_fd, retry_timer_interval) != SUCCESS) {
+                        double create_interval = (double)RETRY_TIMER_CREATE_DELAY_NS / (double)1e9;
+                        update_timer(worker_ctx, &session->heartbeat.creator_timer_fd, create_interval);
+                        return FAILURE;
+                    }
+                    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat.creator_timer_fd);
+                    CLOSE_FD(&session->heartbeat.creator_timer_fd);
+                    return SUCCESS;
+                } else if (*current_fd == session->heartbeat.timer_fd) {
+                    uint64_t u;
+                    read(session->heartbeat.timer_fd, &u, sizeof(u));
                     if (session->heartbeat.ack_rcvd) {
 //======================================================================
 // Let The Timer Dies By Itself
@@ -426,10 +529,14 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     return SUCCESS;
                 } else if (*current_fd == session->heartbeat_sender_timer_fd) {
                     uint64_t u;
-                    read(session->heartbeat_sender_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    read(session->heartbeat_sender_timer_fd, &u, sizeof(u));
                     double timer_interval = session->heartbeat_interval * pow((double)2, (double)session->retry.value_prediction);
                     timer_interval += session->rtt.value_prediction / (double)1e9;
-                    if (session->heartbeat.timer_fd != -1) {
+                    if (
+                        session->heartbeat.timer_fd != -1 ||
+                        session->heartbeat.creator_timer_fd != -1
+                    )
+                    {
 //======================================================================
 // Let The Retry Timer Finish The Retry Job
 //======================================================================
@@ -522,7 +629,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     return SUCCESS;
                 } else if (*current_fd == session->heartbeat_openner_timer_fd) {
                     uint64_t u;
-                    read(session->heartbeat_openner_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
+                    read(session->heartbeat_openner_timer_fd, &u, sizeof(u));
                     session->heartbeat_openned = true;
                     async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd);
                     CLOSE_FD(&session->heartbeat_openner_timer_fd);
