@@ -104,7 +104,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
     uint64_t interval_ull = session->heartbeat.ack_rcvd_time - session->heartbeat.sent_time;
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-    cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
+    //cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
 
     LOG_DEVEL_DEBUG("%sRTT Heartbeat = %f", worker_ctx->label, session->rtt.value_prediction);
 //======================================================================
