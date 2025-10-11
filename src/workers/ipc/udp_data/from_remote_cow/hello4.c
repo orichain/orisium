@@ -124,6 +124,13 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
             LOG_DEVEL_DEBUG("%sHello4 Retry From Peer", worker_ctx->label);
             isretry = true;
         }
+    } else {
+        if (trycount <= session->hello4_ack.last_trycount) {
+            LOG_ERROR("%sHello4 Try Count Invalid.", worker_ctx->label);
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return FAILURE_IVLDTRY;
+        }
     }
     if (session->hello4_ack.rcvd && !isretry) {
         LOG_ERROR("%sHello4 Closed.", worker_ctx->label);

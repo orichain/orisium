@@ -128,6 +128,13 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
                 LOG_DEVEL_DEBUG("%sHeartbeat Retry From Peer", worker_ctx->label);
                 isretry = true;
             }
+        } else {
+            if (trycount <= session->heartbeat_ack.last_trycount) {
+                LOG_ERROR("%sHeartbeat Try Count Invalid.", worker_ctx->label);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                return FAILURE_IVLDTRY;
+            }
         }
         if (session->heartbeat_ack.rcvd && !isretry) {
             if (!session->heartbeat_openned) {

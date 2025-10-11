@@ -59,6 +59,13 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
             LOG_DEVEL_DEBUG("%sHello1 Retry From Peer", worker_ctx->label);
             isretry = true;
         }
+    } else {
+        if (trycount <= session->hello1_ack.last_trycount) {
+            LOG_ERROR("%sHello1 Try Count Invalid.", worker_ctx->label);
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return FAILURE_IVLDTRY;
+        }
     }
     if (session->hello1_ack.rcvd && !isretry) {
         LOG_ERROR("%sHello1 Closed.", worker_ctx->label);
