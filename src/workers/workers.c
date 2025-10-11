@@ -102,6 +102,9 @@ void cleanup_worker(worker_context_t *ctx) {
 }
 
 status_t retry_control_packet(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, control_packet_t *control_packet) {
+    if (sleep_ms(1) != SUCCESS) {
+        return FAILURE;
+    }
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
@@ -157,6 +160,9 @@ status_t retry_control_packet(worker_context_t *worker_ctx, orilink_identity_t *
 }
 
 status_t retry_control_packet_ack(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, control_packet_ack_t *control_packet_ack) {
+    if (sleep_ms(1) != SUCCESS) {
+        return FAILURE;
+    }
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------

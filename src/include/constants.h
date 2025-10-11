@@ -21,9 +21,7 @@
 //----------------------------------------------------------------------
 #define KALMAN_CALIBRATION_SAMPLES 50
 //----------------------------------------------------------------------
-// Test 5 Secs
-//----------------------------------------------------------------------
-#define NODE_HEARTBEAT_INTERVAL 5
+#define NODE_HEARTBEAT_INTERVAL 3
 #define NODE_CHECK_HEALTHY_X 3
 //----------------------------------------------------------------------
 // 2-Way Heartbeat (2 * NODE_HEARTBEAT_INTERVAL)
