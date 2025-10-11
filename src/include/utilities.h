@@ -94,6 +94,24 @@ static inline bool is_1greater_ctr(uint32_t *ctr1, uint32_t *ctr2, uint8_t *nonc
     return isgtr;
 }
 
+static inline bool is_1lower_equal_ctr(uint32_t *ctr1, uint32_t *ctr2, uint8_t *nonce2) {
+    if (*ctr1 == *ctr2) {
+        return true;
+    }
+    uint8_t *tmp_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
+    if (!tmp_nonce) {
+        false;
+        return FAILURE_NOMEM;
+    }
+    memcpy(tmp_nonce, nonce2, AES_NONCE_BYTES);
+    uint32_t tmp_ctr = *ctr2;
+    decrement_ctr(&tmp_ctr, tmp_nonce);
+    bool islwr = (*ctr1 == tmp_ctr);
+    memset(tmp_nonce, 0, AES_NONCE_BYTES);
+    free(tmp_nonce);
+    return islwr;
+}
+
 static inline bool is_1lower_ctr(uint32_t *ctr1, uint32_t *ctr2, uint8_t *nonce2) {
     uint8_t *tmp_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
     if (!tmp_nonce) {

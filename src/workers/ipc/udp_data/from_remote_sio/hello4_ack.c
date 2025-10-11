@@ -25,6 +25,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
 //======================================================================
 // + Security
 //======================================================================
+    print_hex("COW Receiving Hello4 Ack ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
     if (!session->hello4.sent) {
         LOG_ERROR("%sReceive Hello4_Ack But This Worker Session Is Never Sending Hello4.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -248,8 +249,6 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     uint64_t remote_id_be;
     memcpy(&remote_id_be, decrypted_remote_identity + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t), sizeof(uint64_t));
     uint64_t remote_id = be64toh(remote_id_be);
-//======================================================================
-// Initalize Or FAILURE Now
 //----------------------------------------------------------------------
     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
@@ -262,8 +261,6 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     }
     session->heartbeat.sent_try_count++;
     session->heartbeat.sent_time = current_time.r_uint64_t;
-//======================================================================
-// Acumulate Different RTT Between Peers
 //======================================================================
     double hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
     hb_interval += session->rtt.value_prediction / (double)1e9;
@@ -331,7 +328,6 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
 //----------------------------------------------------------------------
     memcpy(&identity->remote_addr, remote_addr, sizeof(struct sockaddr_in6));
     memcpy(security->aes_key, aes_key, HASHES_BYTES);
-    security->remote_ctr = remote_ctr;
     memset(aes_key, 0, HASHES_BYTES);
     identity->remote_id = remote_id;
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);

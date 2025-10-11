@@ -78,6 +78,7 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
         CLOSE_IPC_PROTOCOL(&received_protocol);
         return FAILURE;
     }
+    print_hex("COW Sending Hello1 ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
     if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, identity->local_session_index, &identity->remote_addr, &udp_data, &session->hello1) != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         return FAILURE;

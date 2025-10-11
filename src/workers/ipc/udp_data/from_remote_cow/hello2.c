@@ -1,7 +1,7 @@
-#include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 #include <netinet/in.h>
+#include <inttypes.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -16,25 +16,33 @@
 #include "utilities.h"
 #include "constants.h"
 
-static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_session_t *session, orilink_identity_t *identity, uint64_t_status_t *current_time, uint8_t *trycount) {
+static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_session_t *session, orilink_identity_t *identity, uint8_t *trycount) {
 //======================================================================
-// 
-//----------------------------------------------------------------------
-    if (session->hello1_ack.ack_sent_try_count > (uint8_t)0) {
-        double try_count = (double)session->hello1_ack.ack_sent_try_count-(double)1;
+    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
+    if (current_time.status != SUCCESS) {
+        return FAILURE;
+    }
+    session->hello2_ack.rcvd_time = current_time.r_uint64_t;
+    uint64_t interval_ull;
+    uint8_t strycount;
+    if (!session->hello2_ack.rcvd) {
+        session->hello2_ack.rcvd = true;
+        interval_ull = session->hello2_ack.rcvd_time - session->hello1_ack.ack_sent_time;
+        session->hello2_ack.ack_sent_time = session->hello1_ack.ack_sent_time;
+        strycount = session->hello1_ack.ack_sent_try_count;
+        cleanup_control_packet_ack(&session->hello1_ack, false, CDT_RESET);
+    } else {
+        interval_ull = session->hello2_ack.rcvd_time - session->hello2_ack.ack_sent_time;
+        strycount = session->hello2_ack.ack_sent_try_count;
+    }
+    if (strycount > (uint8_t)0) {
+        double try_count = (double)strycount-(double)1;
         calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
     }
-//======================================================================
-    session->hello1_ack.rcvd = true;
-    session->hello1_ack.rcvd_time = current_time->r_uint64_t;
-    if (*trycount == (uint8_t)1) {
-        uint64_t interval_ull = session->hello1_ack.rcvd_time - session->hello1_ack.ack_sent_time;
-        double rtt_value = (double)interval_ull;
-        calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-        cleanup_control_packet_ack(&session->hello1_ack, false, CDT_RESET);
-        
-        printf("%sRTT Hello-1 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
-    }
+    double rtt_value = (double)interval_ull;
+    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    
+    printf("%sRTT Hello-1 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
 //======================================================================
     session->hello2_ack.ack_sent = true;
 //======================================================================
@@ -45,51 +53,61 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
     uint8_t inc_ctr = oudp_datao->inc_ctr;
     uint8_t l_inc_ctr = 0xFF;
     uint8_t trycount = oudp_datao->trycount;
+    uint32_t oudp_datao_ctr = oudp_datao->ctr;
+    bool isretry = false;
 //======================================================================
 // + Security
 //======================================================================
+    print_hex("SIO Receiving Hello2 ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
     if (!session->hello1_ack.ack_sent) {
         LOG_ERROR("%sReceive Hello2 But This Worker Session Is Never Sending Hello1_Ack.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
-    if (session->hello1_ack.rcvd) {
-        if (trycount != (uint8_t)1) {
-            if (trycount > (uint8_t)MAX_RETRY) {
-                LOG_ERROR("%sHello2 Max retry.", worker_ctx->label);
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-                return FAILURE_MAXTRY;
-            }
-            if (trycount <= session->heartbeat_ack.last_trycount) {
-                LOG_ERROR("%sHello2 Try Count Invalid.", worker_ctx->label);
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-                return FAILURE_IVLDTRY;
-            }
-        } else {
+    if (trycount != (uint8_t)1) {
+        if (trycount > (uint8_t)MAX_RETRY) {
+            LOG_ERROR("%sHello2 Max Retry.", worker_ctx->label);
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return FAILURE_MAXTRY;
+        }
+        if (trycount <= session->hello2_ack.last_trycount) {
+            LOG_ERROR("%sHello2 Try Count Invalid.", worker_ctx->label);
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return FAILURE_IVLDTRY;
+        }
+        status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
+        if (cmac != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return FAILURE;
+        }
+        bool _1le_ = is_1lower_equal_ctr(&oudp_datao_ctr, &security->remote_ctr, security->remote_nonce);
+        if (!_1le_) {
             LOG_ERROR("%sHello2 Received Already.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return FAILURE;
         }
-    }
-    session->hello1_ack.last_trycount = trycount;
-//======================================================================
-    if (
-        trycount != (uint8_t)1 &&
-        inc_ctr != 0xFF
-    )
-    {
-        status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
-        if (cmac != SUCCESS) {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return cmac;
+        if (oudp_datao_ctr != (uint32_t)0 && oudp_datao_ctr == security->remote_ctr) {
+            LOG_DEVEL_DEBUG("%sHello2 From Peer's Retry Timer", worker_ctx->label);
+            isretry = false;
+        } else {
+            LOG_DEVEL_DEBUG("%sHello2 Retry From Peer", worker_ctx->label);
+            isretry = true;
         }
-        printf("%sRetry Detected\n", worker_ctx->label);
-    } else {
+    }
+    if (session->hello2_ack.rcvd && !isretry) {
+        LOG_ERROR("%sHello2 Closed.", worker_ctx->label);
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
+    session->hello2_ack.last_trycount = trycount;
+//======================================================================
+    if (!isretry) {
         status_t cmac = orilink_check_mac_ctr(
             worker_ctx->label, 
             security->aes_key, 
@@ -104,22 +122,9 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
             return cmac;
         }
     }
-//======================================================================
-// Initalize Or FAILURE Now
-//----------------------------------------------------------------------
-    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
-    if (current_time.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        return FAILURE;
-    }
-//======================================================================
-    if (
-        trycount != (uint8_t)1 &&
-        inc_ctr != 0xFF
-    )
-    {
+    if (isretry) {
         if (session->hello2_ack.data != NULL) {
+            print_hex("SIO Sending Hello2 Ack Retry Response ", session->hello2_ack.data, session->hello2_ack.len, 1);
             if (retry_control_packet_ack(worker_ctx, identity, security, &session->hello2_ack) != SUCCESS) {
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
@@ -132,7 +137,6 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
             worker_ctx, 
             session, 
             identity, 
-            &current_time, 
             &trycount
         );
     }
@@ -198,6 +202,13 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
         return FAILURE;
     }
 //======================================================================
+    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
+    if (current_time.status != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
+//----------------------------------------------------------------------
     session->hello2_ack.ack_sent_try_count++;
     session->hello2_ack.ack_sent_time = current_time.r_uint64_t;
 //======================================================================
@@ -259,6 +270,7 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
         }
         return FAILURE;
     }
+    print_hex("SIO Sending Hello2 Ack ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
 //======================================================================
 // Test Packet Dropped
 //======================================================================
@@ -330,7 +342,6 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
         worker_ctx, 
         session, 
         identity, 
-        &current_time, 
         &trycount
     );
 }

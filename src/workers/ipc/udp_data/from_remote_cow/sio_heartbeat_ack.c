@@ -13,10 +13,10 @@ struct sockaddr_in6;
 
 status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     uint8_t inc_ctr = oudp_datao->inc_ctr;
-    uint32_t oudp_datao_ctr = oudp_datao->ctr;
 //======================================================================
 // + Security
 //======================================================================
+    print_hex("SIO Receiving Heartbeat Ack ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
     if (!session->heartbeat.sent) {
         LOG_ERROR("%sReceive Heartbeat_Ack But This Worker Session Is Never Sending Heartbeat.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -24,20 +24,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
         return FAILURE;
     }
     if (session->heartbeat.ack_rcvd) {
-        status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
-        if (cmac != SUCCESS) {
-            LOG_ERROR("%sHeartbeat_Ack Received Already(1). Protocol %d, data_ctr: %u, *ctr: %u", worker_ctx->label, oudp_datao->type, oudp_datao->ctr, security->remote_ctr);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE;
-        }
-        if (!is_1lower_ctr(&oudp_datao_ctr, &security->remote_ctr, security->remote_nonce)) {
-            LOG_ERROR("%sHeartbeat_Ack Received Already(2). Protocol %d, data_ctr: %u, *ctr: %u", worker_ctx->label, oudp_datao->type, oudp_datao->ctr, security->remote_ctr);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE;
-        }
-        LOG_ERROR("%sHeartbeat_Ack Received Already(3). Protocol %d, data_ctr: %u, *ctr: %u", worker_ctx->label, oudp_datao->type, oudp_datao->ctr, security->remote_ctr);
+        LOG_ERROR("%sHeartbeat_Ack Received Already.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
