@@ -352,8 +352,6 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 //======================================================================
                     session->heartbeat_ack.rcvd = false;
 //======================================================================
-                    session->heartbeat_adaptive_interval_done = false;
-//======================================================================
                     async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                     CLOSE_FD(&session->heartbeat_sender_timer_fd);
                     return SUCCESS;
@@ -518,8 +516,6 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 // Heartbeat Security 2 Open
 //======================================================================
                     session->heartbeat_ack.rcvd = false;
-//======================================================================
-                    session->heartbeat_adaptive_interval_done = false;
 //======================================================================
                     async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
                     CLOSE_FD(&session->heartbeat_sender_timer_fd);

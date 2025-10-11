@@ -13,7 +13,6 @@ struct sockaddr_in6;
 
 status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     uint8_t inc_ctr = oudp_datao->inc_ctr;
-    uint8_t trycount = oudp_datao->trycount;
 //======================================================================
 // + Security
 //======================================================================
@@ -26,9 +25,8 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
     }
     if (session->heartbeat.ack_rcvd) {
         LOG_ERROR("%sHeartbeat_Ack Received Already.", worker_ctx->label);
-        if (trycount != (uint8_t)1) {
-            cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
-        }
+        session->heartbeat.sent = false;
+        session->heartbeat.ack_rcvd = true;
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
@@ -78,8 +76,6 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
         }
         return FAILURE;
     }
-//======================================================================
-// Initalize Or FAILURE Now
 //----------------------------------------------------------------------
     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
@@ -107,12 +103,16 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
 //======================================================================
     session->heartbeat.ack_rcvd = true;
     session->heartbeat.ack_rcvd_time = current_time.r_uint64_t;
-    uint64_t interval_ull = session->heartbeat.ack_rcvd_time - session->heartbeat.sent_time;
-    double rtt_value = (double)interval_ull;
-    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-    //cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
+    if (session->heartbeat.sent_time < session->heartbeat.ack_rcvd_time) {
+        uint64_t interval_ull = session->heartbeat.ack_rcvd_time - session->heartbeat.sent_time;
+        double rtt_value = (double)interval_ull;
+        calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+        //cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
 
-    LOG_DEVEL_DEBUG("%sRTT Heartbeat = %f", worker_ctx->label, session->rtt.value_prediction);
+        LOG_DEVEL_DEBUG("%sRTT Heartbeat = %f", worker_ctx->label, session->rtt.value_prediction);
+    } else {
+        LOG_DEVEL_DEBUG("%sRTT Heartbeat = ??????????", worker_ctx->label);
+    }
 //======================================================================
 // Heartbeat Security 2 Open
 //======================================================================
