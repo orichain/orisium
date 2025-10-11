@@ -26,14 +26,6 @@ typedef struct {
 } node_metrics_t;
 
 typedef struct {
-//======================================================================
-// For Validating Retry
-//======================================================================
-    uint8_t *last_rcvd_nonce;
-    uint32_t last_rcvd_ctr;
-} control_packet_anchor_t;
-
-typedef struct {
     bool sent;
     int sent_try_count;
     uint64_t sent_time;
@@ -54,7 +46,7 @@ typedef struct {
     uint16_t len;
     uint8_t *data;
     uint8_t last_trycount;
-    control_packet_anchor_t anchor;
+    uint64_t last_receive;
 } control_packet_ack_t;
 
 typedef struct {
@@ -173,13 +165,6 @@ void run_dbw_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
 status_t retry_control_packet(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, control_packet_t *control_packet);
 status_t retry_control_packet_ack(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, control_packet_ack_t *control_packet_ack);
 
-static inline bool ctr_is_in_anchor(control_packet_anchor_t *h, uint32_t *ctr) {
-    if (*ctr == h->last_rcvd_ctr) {
-        return true;
-    }
-    return false;
-}
-
 static inline void initialize_node_metrics(const char *label, node_metrics_t* metrics) {
     uint64_t_status_t rt = get_monotonic_time_ns(label);
     metrics->sum_hb_interval = (double)0;
@@ -293,15 +278,11 @@ static inline void cleanup_control_packet_ack(control_packet_ack_t *h, bool clea
     //----------------------------------------------------------------------
     switch (clean_data) {
         case CDT_RESET: {
-            memset(h->anchor.last_rcvd_nonce, 0, AES_NONCE_BYTES);
             memset(h->data, 0, h->len);
             h->len = (uint16_t)0;
             break;
         }
         case CDT_FREE: {
-            memset(h->anchor.last_rcvd_nonce, 0, AES_NONCE_BYTES);
-            free(h->anchor.last_rcvd_nonce);
-            h->anchor.last_rcvd_ctr = (uint32_t)0;
             if (h->data) {
                 memset(h->data, 0, h->len);
                 free(h->data);
@@ -314,13 +295,10 @@ static inline void cleanup_control_packet_ack(control_packet_ack_t *h, bool clea
     }
     h->ack_sent_try_count = 0x00;
     h->last_trycount = (uint8_t)0;
+    h->last_receive = (uint64_t)0;
 }
 
 static inline void setup_control_packet_ack(control_packet_ack_t *h) {
-//----------------------------------------------------------------------
-    h->anchor.last_rcvd_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-    h->anchor.last_rcvd_ctr = (uint32_t)0;
-//----------------------------------------------------------------------
     h->rcvd = false;
     h->rcvd_time = (uint64_t)0;
     h->ack_sent_time = (uint64_t)0;
@@ -329,6 +307,7 @@ static inline void setup_control_packet_ack(control_packet_ack_t *h) {
     h->data = NULL;
     h->len = (uint16_t)0;
     h->last_trycount = (uint8_t)0;
+    h->last_receive = (uint64_t)0;
 }
 
 static inline status_t setup_cow_session(const char *label, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {

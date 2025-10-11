@@ -77,7 +77,6 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
             if (iudp_data_acki->trycount == (uint8_t)1) {
 //======================================================================
                 double retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
-                printf("%s===Initial Retry Interva %f ===\n", worker_ctx->label, retry_timer_interval);
                 session->heartbeat.interval_timer_fd = retry_timer_interval;
                 session->test_double_heartbeat++;
                 if (
@@ -93,6 +92,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
                         session->test_double_heartbeat = 0;
                     }
                 }
+                printf("%s===Initial Retry Interva %f ===\n", worker_ctx->label, retry_timer_interval);
                 if (create_timer(worker_ctx, &session->heartbeat.timer_fd, retry_timer_interval) != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
                     return FAILURE;

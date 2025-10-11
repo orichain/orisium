@@ -113,6 +113,21 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
         return FAILURE;
     }
     session->hello2_ack.last_trycount = trycount;
+    uint64_t_status_t current_time_rcvd = get_monotonic_time_ns(worker_ctx->label);
+    if (current_time_rcvd.status != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
+    uint64_t intv_rcvd = current_time_rcvd.r_uint64_t - session->hello2_ack.last_receive;
+    double intv_rcvd_value = (double)intv_rcvd;
+    if (intv_rcvd_value < (double)1) {
+        LOG_ERROR("%sHello2 Burst Detected. Ignoring.", worker_ctx->label);
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
+    session->hello2_ack.last_receive = current_time_rcvd.r_uint64_t;
 //======================================================================
     if (!isretry) {
         status_t cmac = orilink_check_mac_ctr(
