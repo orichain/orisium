@@ -30,6 +30,8 @@ typedef struct {
 
 typedef struct {
     uint8_t session_index;
+    uint8_t orilink_protocol;
+    uint8_t trycount;
     struct sockaddr_in6 remote_addr;
     uint16_t len;
 //----------------------------------------------------------------------

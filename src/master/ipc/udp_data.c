@@ -9,7 +9,6 @@
 #include "master/ipc/handlers.h"
 #include "master/ipc/worker_ipc_cmds.h"
 #include "orilink/protocol.h"
-#include "constants.h"
 
 status_t handle_master_ipc_udp_data(const char *label, master_context_t *master_ctx, worker_security_t *security, ipc_raw_protocol_t_status_t *ircvdi) {
     worker_type_t rcvd_wot = ircvdi->r_ipc_raw_protocol_t->wot;
@@ -39,32 +38,8 @@ status_t handle_master_ipc_udp_data(const char *label, master_context_t *master_
     }
     memcpy(orpp.r_puint8_t, iudpi->data, iudpi->len);
     uint8_t session_index = iudpi->session_index;
-    uint8_t orilink_protocol;
-    memcpy(
-        &orilink_protocol,
-        iudpi->data +
-            AES_TAG_BYTES +
-            sizeof(uint32_t) +
-            sizeof(uint8_t) +
-            ORILINK_VERSION_BYTES +
-            sizeof(uint8_t) +
-            sizeof(uint8_t) +
-            sizeof(uint8_t) +
-            sizeof(uint8_t) +
-            sizeof(uint8_t) +
-            sizeof(uint8_t) +
-            sizeof(uint8_t) +
-            sizeof(uint64_t),
-        sizeof(uint8_t)
-    );
-    uint8_t trycount;
-    memcpy(
-        &trycount,
-        iudpi->data +
-            AES_TAG_BYTES +
-            sizeof(uint32_t),
-        sizeof(uint8_t)
-    );
+    uint8_t orilink_protocol = iudpi->orilink_protocol;
+    uint8_t trycount = iudpi->trycount;
     ssize_t_status_t send_result = send_orilink_raw_protocol_packet(
         label,
         &orpp,

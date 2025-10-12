@@ -225,6 +225,8 @@ status_t master_worker_udp_data(
     worker_type_t wot, 
     uint8_t index,
     uint8_t session_index,
+    uint8_t orilink_protocol, 
+    uint8_t trycount,
     struct sockaddr_in6 *addr,
     orilink_raw_protocol_t *r
 ) 
@@ -254,6 +256,8 @@ status_t master_worker_udp_data(
         r->local_wot,
         r->local_index,
         session_index,
+        orilink_protocol,
+        trycount,
         addr,
         r->n,
         r->recv_buffer

@@ -127,6 +127,8 @@ status_t worker_master_udp_data(
     worker_type_t wot, 
     uint8_t index,
     uint8_t session_index,
+    uint8_t orilink_protocol, 
+    uint8_t trycount,
     struct sockaddr_in6 *addr,
     puint8_t_size_t_status_t *r,
     control_packet_t *h
@@ -137,6 +139,8 @@ status_t worker_master_udp_data(
         wot,
         index,
         session_index,
+        orilink_protocol,
+        trycount,
         addr,
         r->r_size_t,
         r->r_puint8_t
@@ -173,18 +177,18 @@ status_t worker_master_udp_data(
             h->data = NULL;
             h->len = (uint16_t)0;
         }
-        //h->len = r->r_size_t;
-        //h->data = r->r_puint8_t;
-        //r->r_puint8_t = NULL;
-        //r->r_size_t = 0;
-//======================================================================
         h->len = r->r_size_t;
-        h->data = (uint8_t *)calloc(1, r->r_size_t);
-        memcpy(h->data, r->r_puint8_t, h->len);
-        memset(r->r_puint8_t, 0, r->r_size_t);
-        free(r->r_puint8_t);
+        h->data = r->r_puint8_t;
         r->r_puint8_t = NULL;
         r->r_size_t = 0;
+//======================================================================
+        //h->len = r->r_size_t;
+        //h->data = (uint8_t *)calloc(1, r->r_size_t);
+        //memcpy(h->data, r->r_puint8_t, h->len);
+        //memset(r->r_puint8_t, 0, r->r_size_t);
+        //free(r->r_puint8_t);
+        //r->r_puint8_t = NULL;
+        //r->r_size_t = 0;
     } else {
         ssize_t_status_t send_result = send_ipc_protocol_message(
             worker_ctx->label,
@@ -212,18 +216,18 @@ status_t worker_master_udp_data(
             h->data = NULL;
             h->len = (uint16_t)0;
         }
-        //h->len = r->r_size_t;
-        //h->data = r->r_puint8_t;
-        //r->r_puint8_t = NULL;
-        //r->r_size_t = 0;
-//======================================================================
         h->len = r->r_size_t;
-        h->data = (uint8_t *)calloc(1, r->r_size_t);
-        memcpy(h->data, r->r_puint8_t, h->len);
-        memset(r->r_puint8_t, 0, r->r_size_t);
-        free(r->r_puint8_t);
+        h->data = r->r_puint8_t;
         r->r_puint8_t = NULL;
         r->r_size_t = 0;
+//======================================================================
+        //h->len = r->r_size_t;
+        //h->data = (uint8_t *)calloc(1, r->r_size_t);
+        //memcpy(h->data, r->r_puint8_t, h->len);
+        //memset(r->r_puint8_t, 0, r->r_size_t);
+        //free(r->r_puint8_t);
+        //r->r_puint8_t = NULL;
+        //r->r_size_t = 0;
         CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
     }
     return SUCCESS;
@@ -235,6 +239,8 @@ status_t worker_master_udp_data_ack(
     worker_type_t wot, 
     uint8_t index,
     uint8_t session_index,
+    uint8_t orilink_protocol, 
+    uint8_t trycount,
     struct sockaddr_in6 *addr,
     puint8_t_size_t_status_t *r,
     control_packet_ack_t *h
@@ -245,6 +251,8 @@ status_t worker_master_udp_data_ack(
         wot,
         index,
         session_index,
+        orilink_protocol,
+        trycount,
         addr,
         r->r_size_t,
         r->r_puint8_t
@@ -281,18 +289,18 @@ status_t worker_master_udp_data_ack(
             h->data = NULL;
             h->len = (uint16_t)0;
         }
-        //h->len = r->r_size_t;
-        //h->data = r->r_puint8_t;
-        //r->r_puint8_t = NULL;
-        //r->r_size_t = 0;
-//======================================================================
         h->len = r->r_size_t;
-        h->data = (uint8_t *)calloc(1, r->r_size_t);
-        memcpy(h->data, r->r_puint8_t, h->len);
-        memset(r->r_puint8_t, 0, r->r_size_t);
-        free(r->r_puint8_t);
+        h->data = r->r_puint8_t;
         r->r_puint8_t = NULL;
         r->r_size_t = 0;
+//======================================================================
+        //h->len = r->r_size_t;
+        //h->data = (uint8_t *)calloc(1, r->r_size_t);
+        //memcpy(h->data, r->r_puint8_t, h->len);
+        //memset(r->r_puint8_t, 0, r->r_size_t);
+        //free(r->r_puint8_t);
+        //r->r_puint8_t = NULL;
+        //r->r_size_t = 0;
     } else {
         ssize_t_status_t send_result = send_ipc_protocol_message(
             worker_ctx->label,
@@ -321,18 +329,18 @@ status_t worker_master_udp_data_ack(
             h->data = NULL;
             h->len = (uint16_t)0;
         }
-        //h->len = r->r_size_t;
-        //h->data = r->r_puint8_t;
-        //r->r_puint8_t = NULL;
-        //r->r_size_t = 0;
-//======================================================================
         h->len = r->r_size_t;
-        h->data = (uint8_t *)calloc(1, r->r_size_t);
-        memcpy(h->data, r->r_puint8_t, h->len);
-        memset(r->r_puint8_t, 0, r->r_size_t);
-        free(r->r_puint8_t);
+        h->data = r->r_puint8_t;
         r->r_puint8_t = NULL;
         r->r_size_t = 0;
+//======================================================================
+        //h->len = r->r_size_t;
+        //h->data = (uint8_t *)calloc(1, r->r_size_t);
+        //memcpy(h->data, r->r_puint8_t, h->len);
+        //memset(r->r_puint8_t, 0, r->r_size_t);
+        //free(r->r_puint8_t);
+        //r->r_puint8_t = NULL;
+        //r->r_size_t = 0;
         CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
     }
     return SUCCESS;

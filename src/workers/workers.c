@@ -101,7 +101,14 @@ void cleanup_worker(worker_context_t *ctx) {
     free(ctx->label);
 }
 
-status_t retry_control_packet(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, control_packet_t *control_packet) {
+status_t retry_control_packet(
+    worker_context_t *worker_ctx, 
+    orilink_identity_t *identity, 
+    orilink_security_t *security, 
+    control_packet_t *control_packet,
+    orilink_protocol_type_t orilink_protocol
+)
+{
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
@@ -149,14 +156,34 @@ status_t retry_control_packet(worker_context_t *worker_ctx, orilink_identity_t *
     if (udp_data.status != SUCCESS) {
         return FAILURE;
     }
-    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, identity->local_session_index, &identity->remote_addr, &udp_data, control_packet) != SUCCESS) {
+    if (worker_master_udp_data(
+            worker_ctx->label, 
+            worker_ctx, 
+            identity->local_wot, 
+            identity->local_index, 
+            identity->local_session_index, 
+            (uint8_t)orilink_protocol,
+            control_packet->sent_try_count,
+            &identity->remote_addr, 
+            &udp_data, 
+            control_packet
+        ) != SUCCESS
+    )
+    {
         return FAILURE;
     }
 //======================================================================
     return SUCCESS;
 }
 
-status_t retry_control_packet_ack(worker_context_t *worker_ctx, orilink_identity_t *identity, orilink_security_t *security, control_packet_ack_t *control_packet_ack) {
+status_t retry_control_packet_ack(
+    worker_context_t *worker_ctx, 
+    orilink_identity_t *identity, 
+    orilink_security_t *security, 
+    control_packet_ack_t *control_packet_ack,
+    orilink_protocol_type_t orilink_protocol
+)
+{
 //======================================================================
 // Initalize Or FAILURE Now
 //----------------------------------------------------------------------
@@ -194,7 +221,20 @@ status_t retry_control_packet_ack(worker_context_t *worker_ctx, orilink_identity
     if (udp_data.status != SUCCESS) {
         return FAILURE;
     }
-    if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, identity->local_session_index, &identity->remote_addr, &udp_data, control_packet_ack) != SUCCESS) {
+    if (worker_master_udp_data_ack(
+            worker_ctx->label, 
+            worker_ctx, 
+            identity->local_wot, 
+            identity->local_index, 
+            identity->local_session_index, 
+            (uint8_t)orilink_protocol,
+            control_packet_ack->ack_sent_try_count,
+            &identity->remote_addr, 
+            &udp_data, 
+            control_packet_ack
+        ) != SUCCESS
+    )
+    {
         return FAILURE;
     }
 //======================================================================

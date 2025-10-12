@@ -23,6 +23,12 @@ status_t ipc_serialize_udp_data(const char *label, const ipc_udp_data_t* payload
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
     memcpy(current_buffer + current_offset_local, &payload->session_index, sizeof(uint8_t));
     current_offset_local += sizeof(uint8_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(current_buffer + current_offset_local, &payload->orilink_protocol, sizeof(uint8_t));
+    current_offset_local += sizeof(uint8_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(current_buffer + current_offset_local, &payload->trycount, sizeof(uint8_t));
+    current_offset_local += sizeof(uint8_t);
     if (CHECK_BUFFER_BOUNDS(current_offset_local, SOCKADDR_IN6_SIZE, buffer_size) != SUCCESS) return FAILURE_OOBUF;
     uint8_t remote_addr_be[SOCKADDR_IN6_SIZE];
     serialize_sockaddr_in6(&payload->remote_addr, remote_addr_be);    
@@ -54,6 +60,20 @@ status_t ipc_deserialize_udp_data(const char *label, ipc_protocol_t *p, const ui
     memcpy(&payload->session_index, cursor, sizeof(uint8_t));
     cursor += sizeof(uint8_t);
     current_offset += sizeof(uint8_t);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading orilink_protocol.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&payload->orilink_protocol, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading trycount.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&payload->trycount, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
     if (current_offset + SOCKADDR_IN6_SIZE > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading remote_addr.", label);
         return FAILURE_OOBUF;
@@ -83,7 +103,18 @@ status_t ipc_deserialize_udp_data(const char *label, ipc_protocol_t *p, const ui
     return SUCCESS;
 }
 
-ipc_protocol_t_status_t ipc_prepare_cmd_udp_data(const char *label, worker_type_t wot, uint8_t index, uint8_t session_index, struct sockaddr_in6 *remote_addr, uint16_t len, uint8_t *data) {
+ipc_protocol_t_status_t ipc_prepare_cmd_udp_data(
+    const char *label, 
+    worker_type_t wot, 
+    uint8_t index, 
+    uint8_t session_index, 
+    uint8_t orilink_protocol, 
+    uint8_t trycount,
+    struct sockaddr_in6 *remote_addr, 
+    uint16_t len, 
+    uint8_t *data
+)
+{
 	ipc_protocol_t_status_t result;
 	result.r_ipc_protocol_t = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
 	result.status = FAILURE;
@@ -104,6 +135,8 @@ ipc_protocol_t_status_t ipc_prepare_cmd_udp_data(const char *label, worker_type_
 		return result;
 	}
     payload->session_index = session_index;
+    payload->orilink_protocol = orilink_protocol;
+    payload->trycount = trycount;
     memcpy(&payload->remote_addr, remote_addr, SOCKADDR_IN6_SIZE);
     payload->len = len;
     memcpy(&payload->data, data, len);

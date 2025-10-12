@@ -92,7 +92,7 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
                     return result;
                 }
             }
-            payload_fixed_size = sizeof(uint8_t) + SOCKADDR_IN6_SIZE + sizeof(uint16_t);
+            payload_fixed_size = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + SOCKADDR_IN6_SIZE + sizeof(uint16_t);
             payload_dynamic_size = p->payload.ipc_udp_data->len;
             break;
         }

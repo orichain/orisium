@@ -119,7 +119,15 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
     if (isretry) {
         if (session->heartbeat_ack.data != NULL) {
             //print_hex("COW Sending Heartbeat Ack Retry Response ", session->heartbeat_ack.data, session->heartbeat_ack.len, 1);
-            if (retry_control_packet_ack(worker_ctx, identity, security, &session->heartbeat_ack) != SUCCESS) {
+            if (retry_control_packet_ack(
+                    worker_ctx, 
+                    identity, 
+                    security, 
+                    &session->heartbeat_ack,
+                    ORILINK_HEARTBEAT_ACK
+                ) != SUCCESS
+            )
+            {
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
                 return FAILURE;
@@ -258,7 +266,20 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
         LOG_DEVEL_DEBUG("[Debug Here Helper]: Heartbeat Ack Packet Number %d. Sending To Fake Addr To Force Retry", session->test_drop_heartbeat_ack);
         struct sockaddr_in6 fake_addr;
         memset(&fake_addr, 0, sizeof(struct sockaddr_in6));
-        if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, identity->local_session_index, &fake_addr, &udp_data, &session->heartbeat_ack) != SUCCESS) {
+        if (worker_master_udp_data_ack(
+                worker_ctx->label, 
+                worker_ctx, 
+                identity->local_wot, 
+                identity->local_index, 
+                identity->local_session_index, 
+                (uint8_t)ORILINK_HEARTBEAT_ACK,
+                session->heartbeat_ack.ack_sent_try_count,
+                &fake_addr, 
+                &udp_data, 
+                &session->heartbeat_ack
+            ) != SUCCESS
+        )
+        {
 //----------------------------------------------------------------------
 // No Error Here
 // This Is A Test Drop Packet
@@ -277,7 +298,20 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
 //----------------------------------------------------------------------
         }
     } else {
-        if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, identity->local_session_index, remote_addr, &udp_data, &session->heartbeat_ack) != SUCCESS) {
+        if (worker_master_udp_data_ack(
+                worker_ctx->label, 
+                worker_ctx, 
+                identity->local_wot, 
+                identity->local_index, 
+                identity->local_session_index, 
+                (uint8_t)ORILINK_HEARTBEAT_ACK,
+                session->heartbeat_ack.ack_sent_try_count,
+                remote_addr, 
+                &udp_data, 
+                &session->heartbeat_ack
+            ) != SUCCESS
+        )
+        {
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
             if (inc_ctr != 0xFF) {

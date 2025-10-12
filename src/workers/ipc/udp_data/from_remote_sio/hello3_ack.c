@@ -252,7 +252,20 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
         }
         return FAILURE;
     }
-    if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, identity->local_session_index, remote_addr, &udp_data, &session->hello4) != SUCCESS) {
+    if (worker_master_udp_data(
+            worker_ctx->label, 
+            worker_ctx, 
+            identity->local_wot, 
+            identity->local_index, 
+            identity->local_session_index, 
+            (uint8_t)ORILINK_HELLO4,
+            session->hello4.sent_try_count,
+            remote_addr, 
+            &udp_data, 
+            &session->hello4
+        ) != SUCCESS
+    )
+    {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {

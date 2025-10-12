@@ -13,6 +13,8 @@ status_t worker_master_udp_data(
     worker_type_t wot, 
     uint8_t index,
     uint8_t session_index,
+    uint8_t orilink_protocol, 
+    uint8_t trycount,
     struct sockaddr_in6 *addr,
     puint8_t_size_t_status_t *r,
     control_packet_t *h
@@ -23,17 +25,11 @@ status_t worker_master_udp_data_ack(
     worker_type_t wot, 
     uint8_t index,
     uint8_t session_index,
+    uint8_t orilink_protocol, 
+    uint8_t trycount,
     struct sockaddr_in6 *addr,
     puint8_t_size_t_status_t *r,
     control_packet_ack_t *h
-);
-status_t worker_master_udp_data_finalize(
-    const char *label, 
-    worker_context_t *worker_ctx, 
-    worker_type_t wot, 
-    uint8_t index,
-    struct sockaddr_in6 *addr,
-    puint8_t_size_t_status_t *r
 );
 status_t worker_master_task_info(worker_context_t *ctx, uint8_t session_index, task_info_type_t flag);
 

@@ -51,7 +51,8 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
         CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
         return FAILURE_IVLDPORT;
     }
-    switch (orcvdo.r_orilink_raw_protocol_t->type) {
+    orilink_protocol_type_t orilink_protocol = orcvdo.r_orilink_raw_protocol_t->type;
+    switch (orilink_protocol) {
         case ORILINK_HELLO1: {
             master_sio_c_session_t *c_session = NULL;
 //======================================================================
@@ -75,7 +76,8 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
 //======================================================================
             uint8_t worker_index = 0xff;
             uint8_t session_index = 0xff;
-            if (orcvdo.r_orilink_raw_protocol_t->trycount == 0x01) {
+            uint8_t trycount = orcvdo.r_orilink_raw_protocol_t->trycount;
+            if (trycount == 0x01) {
                 worker_index = select_best_worker(label, master_ctx, SIO);
                 if (worker_index == 0xff) {
                     LOG_ERROR("%sFailed to select an SIO worker for new task.", label);
@@ -119,7 +121,19 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                     return FAILURE;
                 }
             }
-            if (master_worker_udp_data(label, master_ctx, SIO, worker_index, session_index, &remote_addr, orcvdo.r_orilink_raw_protocol_t) != SUCCESS) {
+            if (master_worker_udp_data(
+                    label, 
+                    master_ctx, 
+                    SIO, 
+                    worker_index, 
+                    session_index, 
+                    (uint8_t)orilink_protocol,
+                    trycount,
+                    &remote_addr, 
+                    orcvdo.r_orilink_raw_protocol_t
+                ) != SUCCESS
+            )
+            {
                 CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 return FAILURE;
             }
@@ -140,6 +154,7 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
             worker_type_t wot = orcvdo.r_orilink_raw_protocol_t->remote_wot;
             uint8_t worker_index = orcvdo.r_orilink_raw_protocol_t->remote_index;
             uint8_t session_index = orcvdo.r_orilink_raw_protocol_t->remote_session_index;
+            uint8_t trycount = orcvdo.r_orilink_raw_protocol_t->trycount;
 //======================================================================
 // + Security
 //======================================================================
@@ -209,7 +224,19 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                     return FAILURE;
             }
 //======================================================================
-            if (master_worker_udp_data(label, master_ctx, wot, worker_index, session_index, &remote_addr, orcvdo.r_orilink_raw_protocol_t) != SUCCESS) {
+            if (master_worker_udp_data(
+                    label, 
+                    master_ctx, 
+                    wot, 
+                    worker_index, 
+                    session_index, 
+                    (uint8_t)orilink_protocol,
+                    trycount,
+                    &remote_addr, 
+                    orcvdo.r_orilink_raw_protocol_t
+                ) != SUCCESS
+            )
+            {
                 CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                 return FAILURE;
             }
@@ -217,7 +244,7 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
 			break;
 		}
         default:
-            LOG_ERROR("%sUnknown ORILINK protocol type %d from %s:%s. Ignoring.", label, orcvdo.r_orilink_raw_protocol_t->type, host_str, port_str);
+            LOG_ERROR("%sUnknown ORILINK protocol type %d from %s:%s. Ignoring.", label, orilink_protocol, host_str, port_str);
             CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
     }
 	return SUCCESS;

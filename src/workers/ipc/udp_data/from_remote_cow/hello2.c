@@ -132,7 +132,15 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
     if (isretry) {
         if (session->hello2_ack.data != NULL) {
             //print_hex("SIO Sending Hello2 Ack Retry Response ", session->hello2_ack.data, session->hello2_ack.len, 1);
-            if (retry_control_packet_ack(worker_ctx, identity, security, &session->hello2_ack) != SUCCESS) {
+            if (retry_control_packet_ack(
+                    worker_ctx, 
+                    identity, 
+                    security, 
+                    &session->hello2_ack,
+                    ORILINK_HELLO2_ACK
+                ) != SUCCESS
+            )
+            {
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
                 return FAILURE;
@@ -289,7 +297,20 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
         printf("[Debug Here Helper]: Hello2 Ack Packet Number %d. Sending To Fake Addr To Force Retry\n", session->test_drop_hello2_ack);
         struct sockaddr_in6 fake_addr;
         memset(&fake_addr, 0, sizeof(struct sockaddr_in6));
-        if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, identity->local_session_index, &fake_addr, &udp_data, &session->hello2_ack) != SUCCESS) {
+        if (worker_master_udp_data_ack(
+                worker_ctx->label, 
+                worker_ctx, 
+                identity->local_wot, 
+                identity->local_index, 
+                identity->local_session_index, 
+                (uint8_t)ORILINK_HELLO2_ACK,
+                session->hello2_ack.ack_sent_try_count,
+                &fake_addr, 
+                &udp_data, 
+                &session->hello2_ack
+            ) != SUCCESS
+        )
+        {
 //----------------------------------------------------------------------
 // No Error Here
 // This Is A Test Drop Packet
@@ -313,7 +334,20 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
             */
         }
     } else {
-        if (worker_master_udp_data_ack(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, identity->local_session_index, remote_addr, &udp_data, &session->hello2_ack) != SUCCESS) {
+        if (worker_master_udp_data_ack(
+                worker_ctx->label, 
+                worker_ctx, 
+                identity->local_wot, 
+                identity->local_index, 
+                identity->local_session_index, 
+                (uint8_t)ORILINK_HELLO2_ACK,
+                session->hello2_ack.ack_sent_try_count,
+                remote_addr,
+                &udp_data, 
+                &session->hello2_ack
+            ) != SUCCESS
+        )
+        {
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
             if (inc_ctr != 0xFF) {
