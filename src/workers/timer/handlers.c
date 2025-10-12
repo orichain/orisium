@@ -2,7 +2,6 @@
 #include <unistd.h>
 #include <inttypes.h>
 #include <stddef.h>
-#include <stdio.h>
 
 #include "types.h"
 #include "workers/workers.h"
@@ -45,14 +44,14 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 // Let The Timer Dies By Itself
 //======================================================================
                         cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello1, false);
-                        LOG_DEVEL_DEBUG("%sTimer Retry Hello1 Closed", worker_ctx->label);
+                        LOG_DEBUG("%sTimer Retry Hello1 Closed", worker_ctx->label);
                         return SUCCESS;
                     }
                     worker_type_t c_wot = session->identity.local_wot;
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
                     if (session->hello1.sent_try_count > MAX_RETRY) {
-                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello1.interval_timer_fd, session->hello1.sent_try_count);
+                        LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello1.interval_timer_fd, session->hello1.sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -77,7 +76,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
                     session->hello1.interval_timer_fd = retry_timer_interval;
-                    print_hex("COW Sending Hello1 Retry ", session->hello1.data, session->hello1.len, 1);
+                    //print_hex("COW Sending Hello1 Retry ", session->hello1.data, session->hello1.len, 1);
                     if (retry_control_packet(worker_ctx, identity, security, &session->hello1) != SUCCESS) {
                         return FAILURE;
                     }
@@ -102,14 +101,14 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 // do not disturb or be disturbed by other epoll events
 //======================================================================
                         cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello2, false);
-                        LOG_DEVEL_DEBUG("%sTimer Retry Hello2 Closed", worker_ctx->label);
+                        LOG_DEBUG("%sTimer Retry Hello2 Closed", worker_ctx->label);
                         return SUCCESS;
                     }
                     worker_type_t c_wot = session->identity.local_wot;
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
                     if (session->hello2.sent_try_count > MAX_RETRY) {
-                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello2.interval_timer_fd, session->hello2.sent_try_count);
+                        LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello2.interval_timer_fd, session->hello2.sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -134,7 +133,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
                     session->hello2.interval_timer_fd = retry_timer_interval;
-                    print_hex("COW Sending Hello2 Retry ", session->hello2.data, session->hello2.len, 1);
+                    //print_hex("COW Sending Hello2 Retry ", session->hello2.data, session->hello2.len, 1);
                     if (retry_control_packet(worker_ctx, identity, security, &session->hello2) != SUCCESS) {
                         return FAILURE;
                     }
@@ -159,14 +158,14 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 // do not disturb or be disturbed by other epoll events
 //======================================================================
                         cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello3, false);
-                        LOG_DEVEL_DEBUG("%sTimer Retry Hello3 Closed", worker_ctx->label);
+                        LOG_DEBUG("%sTimer Retry Hello3 Closed", worker_ctx->label);
                         return SUCCESS;
                     }
                     worker_type_t c_wot = session->identity.local_wot;
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
                     if (session->hello3.sent_try_count > MAX_RETRY) {
-                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello3.interval_timer_fd, session->hello3.sent_try_count);
+                        LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello3.interval_timer_fd, session->hello3.sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -190,7 +189,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     double try_count = (double)session->hello3.sent_try_count;
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
-                    print_hex("COW Sending Hello3 Retry ", session->hello3.data, session->hello3.len, 1);
+                    //print_hex("COW Sending Hello3 Retry ", session->hello3.data, session->hello3.len, 1);
                     session->hello3.interval_timer_fd = retry_timer_interval;
                     if (retry_control_packet(worker_ctx, identity, security, &session->hello3) != SUCCESS) {
                         return FAILURE;
@@ -216,14 +215,14 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 // do not disturb or be disturbed by other epoll events
 //======================================================================
                         cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello4, false);
-                        LOG_DEVEL_DEBUG("%sTimer Retry Hello4 Closed", worker_ctx->label);
+                        LOG_DEBUG("%sTimer Retry Hello4 Closed", worker_ctx->label);
                         return SUCCESS;
                     }
                     worker_type_t c_wot = session->identity.local_wot;
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
                     if (session->hello4.sent_try_count > MAX_RETRY) {
-                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello4.interval_timer_fd, session->hello4.sent_try_count);
+                        LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->hello4.interval_timer_fd, session->hello4.sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -248,7 +247,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
                     session->hello4.interval_timer_fd = retry_timer_interval;
-                    print_hex("COW Sending Hello4 Retry ", session->hello4.data, session->hello4.len, 1);
+                    //print_hex("COW Sending Hello4 Retry ", session->hello4.data, session->hello4.len, 1);
                     if (retry_control_packet(worker_ctx, identity, security, &session->hello4) != SUCCESS) {
                         return FAILURE;
                     }
@@ -264,14 +263,14 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         session->test_double_heartbeat == 11
                     )
                     {
-                        LOG_DEVEL_DEBUG("[Debug Here Helper]: Heartbeat Packet Number %d. Test Burst/Double. Retry Interval To 0.000001", session->test_drop_heartbeat_ack);
+                        LOG_DEBUG("[Debug Here Helper]: Heartbeat Packet Number %d. Test Burst/Double. Retry Interval To 0.000001", session->test_drop_heartbeat_ack);
                         retry_timer_interval = (double)0.000001;
                     } else {
                         if (session->test_double_heartbeat >= 1000000) {
                             session->test_double_heartbeat = 0;
                         }
                     }
-                    printf("%s===Initial Retry Interva %f ===\n", worker_ctx->label, retry_timer_interval);
+                    //printf("%s===Initial Retry Interva %f ===\n", worker_ctx->label, retry_timer_interval);
                     if (create_timer(worker_ctx, &session->heartbeat.timer_fd, retry_timer_interval) != SUCCESS) {
                         double create_interval = (double)RETRY_TIMER_CREATE_DELAY_NS / (double)1e9;
                         update_timer(worker_ctx, &session->heartbeat.creator_timer_fd, create_interval);
@@ -289,14 +288,14 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 // do not disturb or be disturbed by other epoll events
 //======================================================================
                         cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
-                        LOG_DEVEL_DEBUG("%sTimer Retry Heartbeat Closed", worker_ctx->label);
+                        LOG_DEBUG("%sTimer Retry Heartbeat Closed", worker_ctx->label);
                         return SUCCESS;
                     }
                     worker_type_t c_wot = session->identity.local_wot;
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
                     if (session->heartbeat.sent_try_count > MAX_RETRY) {
-                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->heartbeat.interval_timer_fd, session->heartbeat.sent_try_count);
+                        LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->heartbeat.interval_timer_fd, session->heartbeat.sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -321,7 +320,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
                     session->heartbeat.interval_timer_fd = retry_timer_interval;
-                    print_hex("COW Sending Heartbeat Retry ", session->heartbeat.data, session->heartbeat.len, 1);
+                    //print_hex("COW Sending Heartbeat Retry ", session->heartbeat.data, session->heartbeat.len, 1);
                     if (retry_control_packet(worker_ctx, identity, security, &session->heartbeat) != SUCCESS) {
                         return FAILURE;
                     }
@@ -408,7 +407,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         }
                         return FAILURE;
                     }
-                    print_hex("COW Sending Heartbeat ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
+                    //print_hex("COW Sending Heartbeat ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
                     if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, identity->local_session_index, &session->identity.remote_addr, &udp_data, &session->heartbeat) != SUCCESS) {
                         if (l_inc_ctr != 0xFF) {
                             decrement_ctr(&security->local_ctr, security->local_nonce);
@@ -460,14 +459,14 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         session->test_double_heartbeat == 11
                     )
                     {
-                        LOG_DEVEL_DEBUG("[Debug Here Helper]: Heartbeat Packet Number %d. Test Burst/Double. Retry Interval To 0.000001", session->test_drop_heartbeat_ack);
+                        LOG_DEBUG("[Debug Here Helper]: Heartbeat Packet Number %d. Test Burst/Double. Retry Interval To 0.000001", session->test_drop_heartbeat_ack);
                         retry_timer_interval = (double)0.000001;
                     } else {
                         if (session->test_double_heartbeat >= 1000000) {
                             session->test_double_heartbeat = 0;
                         }
                     }
-                    printf("%s===Initial Retry Interva %f ===\n", worker_ctx->label, retry_timer_interval);
+                    //printf("%s===Initial Retry Interva %f ===\n", worker_ctx->label, retry_timer_interval);
                     if (create_timer(worker_ctx, &session->heartbeat.timer_fd, retry_timer_interval) != SUCCESS) {
                         double create_interval = (double)RETRY_TIMER_CREATE_DELAY_NS / (double)1e9;
                         update_timer(worker_ctx, &session->heartbeat.creator_timer_fd, create_interval);
@@ -485,14 +484,14 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
 // do not disturb or be disturbed by other epoll events
 //======================================================================
                         cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
-                        LOG_DEVEL_DEBUG("%sTimer Retry Heartbeat Closed", worker_ctx->label);
+                        LOG_DEBUG("%sTimer Retry Heartbeat Closed", worker_ctx->label);
                         return SUCCESS;
                     }
                     worker_type_t c_wot = session->identity.local_wot;
                     uint8_t c_index = session->identity.local_index;
                     uint8_t c_session_index = session->identity.local_session_index;
                     if (session->heartbeat.sent_try_count > MAX_RETRY) {
-                        LOG_DEVEL_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->heartbeat.interval_timer_fd, session->heartbeat.sent_try_count);
+                        LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, session->heartbeat.interval_timer_fd, session->heartbeat.sent_try_count);
 //----------------------------------------------------------------------
 // Disconnected => 1. Reset Session
 //                 2. Send Info To Master
@@ -517,7 +516,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     calculate_retry(worker_ctx->label, session, c_wot, try_count);
                     retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
                     session->heartbeat.interval_timer_fd = retry_timer_interval;
-                    print_hex("SIO Sending Heartbeat Retry ", session->heartbeat.data, session->heartbeat.len, 1);
+                    //print_hex("SIO Sending Heartbeat Retry ", session->heartbeat.data, session->heartbeat.len, 1);
                     if (retry_control_packet(worker_ctx, identity, security, &session->heartbeat) != SUCCESS) {
                         return FAILURE;
                     }
@@ -604,7 +603,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         }
                         return FAILURE;
                     }
-                    print_hex("SIO Sending Heartbeat ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
+                    //print_hex("SIO Sending Heartbeat ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
                     if (worker_master_udp_data(worker_ctx->label, worker_ctx, identity->local_wot, identity->local_index, identity->local_session_index, &session->identity.remote_addr, &udp_data, &session->heartbeat) != SUCCESS) {
                         if (l_inc_ctr != 0xFF) {
                             decrement_ctr(&security->local_ctr, security->local_nonce);

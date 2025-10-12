@@ -16,7 +16,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
 //======================================================================
 // + Security
 //======================================================================
-    print_hex("COW Receiving Heartbeat Ack ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
+    //print_hex("COW Receiving Heartbeat Ack ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
     if (!session->heartbeat.sent) {
         LOG_ERROR("%sReceive Heartbeat_Ack But This Worker Session Is Never Sending Heartbeat.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);

@@ -163,7 +163,7 @@ static inline status_t generate_uint64_t_id(const char* label, uint64_t *out_id)
     return SUCCESS;
 }
 
-static inline void print_hex(const char* label, const uint8_t* data, size_t len, int uppercase) {
+static inline void print_hexx(const char* label, const uint8_t* data, size_t len, int uppercase) {
     if (label)
         printf("%s", label);
 
