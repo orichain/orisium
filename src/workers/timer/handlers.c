@@ -263,7 +263,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         session->test_double_heartbeat == 11
                     )
                     {
-                        LOG_DEBUG("[Debug Here Helper]: Heartbeat Packet Number %d. Test Burst/Double. Retry Interval To 0.000001", session->test_drop_heartbeat_ack);
+                        LOG_DEVEL_DEBUG("[Debug Here Helper]: Heartbeat Packet Number %d. Test Burst/Double. Retry Interval To 0.000001", session->test_drop_heartbeat_ack);
                         retry_timer_interval = (double)0.000001;
                     } else {
                         if (session->test_double_heartbeat >= 1000000) {
@@ -459,7 +459,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                         session->test_double_heartbeat == 11
                     )
                     {
-                        LOG_DEBUG("[Debug Here Helper]: Heartbeat Packet Number %d. Test Burst/Double. Retry Interval To 0.000001", session->test_drop_heartbeat_ack);
+                        LOG_DEVEL_DEBUG("[Debug Here Helper]: Heartbeat Packet Number %d. Test Burst/Double. Retry Interval To 0.000001", session->test_drop_heartbeat_ack);
                         retry_timer_interval = (double)0.000001;
                     } else {
                         if (session->test_double_heartbeat >= 1000000) {
