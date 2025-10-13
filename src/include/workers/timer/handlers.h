@@ -27,7 +27,7 @@ static inline status_t create_timer_retry(worker_context_t *worker_ctx, int *cre
     if (async_create_timerfd(worker_ctx->label, creator_file_descriptor) != SUCCESS) {
         return FAILURE;
     }
-    double create_interval = (double)RETRY_TIMER_CREATE_DELAY_NS / (double)1e9;
+    double create_interval = (double)1000000 / (double)1e9;
     if (async_set_timerfd_time(worker_ctx->label, creator_file_descriptor,
         (time_t)create_interval,
         (long)((create_interval - (time_t)create_interval) * 1e9),

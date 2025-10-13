@@ -27,7 +27,8 @@ typedef struct {
 
 typedef struct {
     bool sent;
-    int sent_try_count;
+    uint8_t sent_try_count;
+    uint16_t margin_cnt;
     uint64_t sent_time;
     int timer_fd;
     int creator_timer_fd;
@@ -42,7 +43,7 @@ typedef struct {
     bool rcvd;
     uint64_t rcvd_time;
     bool ack_sent;
-    int ack_sent_try_count;
+    uint8_t ack_sent_try_count;
     uint64_t ack_sent_time;
     uint16_t len;
     uint8_t *data;
@@ -257,6 +258,7 @@ static inline void cleanup_control_packet(const char *label, async_type_t *async
     }
     h->interval_timer_fd = (double)1;
     h->sent_try_count = 0x00;
+    h->margin_cnt = (uint16_t)0;
     if (h->data) {
         free(h->data);
         h->data = NULL;
@@ -275,6 +277,7 @@ static inline void setup_control_packet(control_packet_t *h, double interval_tim
     h->ack_rcvd = false;
     h->interval_timer_fd = interval_timer;
     h->sent_try_count = 0x00;
+    h->margin_cnt = (uint16_t)0;
     h->data = NULL;
     h->len = (uint16_t)0;
     h->creator_timer_fd = -1;

@@ -17,16 +17,30 @@
 
 static inline status_t timer_handle_event_create(worker_context_t *worker_ctx, control_packet_t *h) {
     if (!h->ack_rcvd) {
-        if (create_timer(worker_ctx, &h->timer_fd, h->interval_timer_fd) != SUCCESS) {
-            double create_interval = (double)RETRY_TIMER_CREATE_DELAY_NS / (double)1e9;
-            update_timer(worker_ctx, &h->creator_timer_fd, create_interval);
-            return FAILURE;
+        h->margin_cnt++;
+        if (h->margin_cnt >= (uint16_t)X_RETRY_TIMER_CREATE) {
+            if (create_timer(worker_ctx, &h->timer_fd, h->interval_timer_fd) != SUCCESS) {
+                double create_interval = (double)1000000 / (double)1e9;
+                update_timer(worker_ctx, &h->creator_timer_fd, create_interval);
+                h->margin_cnt = (uint16_t)0;
+                return FAILURE;
+            }
+            async_delete_event(worker_ctx->label, &worker_ctx->async, &h->creator_timer_fd);
+            CLOSE_FD(&h->creator_timer_fd);
+            h->margin_cnt = (uint16_t)0;
+        } else {
+            double create_interval = (double)1000000 / (double)1e9;
+            if (update_timer(worker_ctx, &h->creator_timer_fd, create_interval) != SUCCESS) {
+                update_timer(worker_ctx, &h->creator_timer_fd, create_interval);
+                return FAILURE;
+            }
         }
     } else {
         cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false);
+        async_delete_event(worker_ctx->label, &worker_ctx->async, &h->creator_timer_fd);
+        CLOSE_FD(&h->creator_timer_fd);
+        h->margin_cnt = (uint16_t)0;
     }
-    async_delete_event(worker_ctx->label, &worker_ctx->async, &h->creator_timer_fd);
-    CLOSE_FD(&h->creator_timer_fd);
     return SUCCESS;
 }
 
