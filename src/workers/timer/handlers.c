@@ -16,10 +16,14 @@
 #include "orilink/protocol.h"
 
 static inline status_t timer_handle_event_create(worker_context_t *worker_ctx, control_packet_t *h) {
-    if (create_timer(worker_ctx, &h->timer_fd, h->interval_timer_fd) != SUCCESS) {
-        double create_interval = (double)RETRY_TIMER_CREATE_DELAY_NS / (double)1e9;
-        update_timer(worker_ctx, &h->creator_timer_fd, create_interval);
-        return FAILURE;
+    if (!h->ack_rcvd) {
+        if (create_timer(worker_ctx, &h->timer_fd, h->interval_timer_fd) != SUCCESS) {
+            double create_interval = (double)RETRY_TIMER_CREATE_DELAY_NS / (double)1e9;
+            update_timer(worker_ctx, &h->creator_timer_fd, create_interval);
+            return FAILURE;
+        }
+    } else {
+        cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false);
     }
     async_delete_event(worker_ctx->label, &worker_ctx->async, &h->creator_timer_fd);
     CLOSE_FD(&h->creator_timer_fd);
