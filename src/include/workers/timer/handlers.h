@@ -24,6 +24,7 @@ static inline status_t create_timer(worker_context_t *worker_ctx, int *file_desc
 }
 
 static inline status_t create_polling_1ms(worker_context_t *worker_ctx, control_packet_t *h, double total_polling_interval) {
+    h->polling = true;
     if (async_create_timerfd(worker_ctx->label, &h->polling_timer_fd) != SUCCESS) {
         return FAILURE;
     }

@@ -32,6 +32,7 @@ typedef struct {
     int polling_timer_fd;
     uint16_t polling_1ms_cnt;
     uint16_t polling_1ms_max_cnt;
+    bool polling;
     bool ack_rcvd;
     uint64_t ack_rcvd_time;
     uint16_t len;
@@ -258,6 +259,7 @@ static inline void cleanup_control_packet(const char *label, async_type_t *async
     h->sent_try_count = 0x00;
     h->polling_1ms_cnt = (uint16_t)0;
     h->polling_1ms_max_cnt = (uint16_t)0;
+    h->polling = false;
     if (h->data) {
         free(h->data);
         h->data = NULL;
@@ -275,6 +277,7 @@ static inline void setup_control_packet(control_packet_t *h) {
     h->sent_try_count = 0x00;
     h->polling_1ms_cnt = (uint16_t)0;
     h->polling_1ms_max_cnt = (uint16_t)0;
+    h->polling = false;
     h->data = NULL;
     h->len = (uint16_t)0;
     h->polling_timer_fd = -1;

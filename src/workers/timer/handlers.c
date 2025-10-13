@@ -155,10 +155,7 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
             orilink_security_t *security = &session->security;
             double timer_interval = session->heartbeat_interval * pow((double)2, (double)session->retry.value_prediction);
             timer_interval += session->rtt.value_prediction / (double)1e9;
-            if (
-                session->heartbeat.polling_timer_fd != -1
-            )
-            {
+            if (session->heartbeat.polling) {
 //======================================================================
 // Let The Retry Timer Finish The Retry Job
 //======================================================================
@@ -267,10 +264,7 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
             orilink_security_t *security = &session->security;
             double timer_interval = session->heartbeat_interval * pow((double)2, (double)session->retry.value_prediction);
             timer_interval += session->rtt.value_prediction / (double)1e9;
-            if (
-                session->heartbeat.polling_timer_fd != -1
-            )
-            {
+            if (session->heartbeat.polling) {
 //======================================================================
 // Let The Retry Timer Finish The Retry Job
 //======================================================================
