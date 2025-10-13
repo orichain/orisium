@@ -15,44 +15,13 @@
 #include "orilink/heartbeat.h"
 #include "orilink/protocol.h"
 
-static inline status_t timer_handle_event_create(worker_context_t *worker_ctx, control_packet_t *h) {
-    if (!h->ack_rcvd) {
-        h->margin_cnt++;
-        if (h->margin_cnt >= (uint16_t)X_RETRY_TIMER_CREATE) {
-            if (create_timer(worker_ctx, &h->timer_fd, h->interval_timer_fd) != SUCCESS) {
-                double create_interval = (double)1000000 / (double)1e9;
-                update_timer(worker_ctx, &h->creator_timer_fd, create_interval);
-                h->margin_cnt = (uint16_t)0;
-                return FAILURE;
-            }
-            async_delete_event(worker_ctx->label, &worker_ctx->async, &h->creator_timer_fd);
-            CLOSE_FD(&h->creator_timer_fd);
-            h->margin_cnt = (uint16_t)0;
-        } else {
-            double create_interval = (double)1000000 / (double)1e9;
-            if (update_timer(worker_ctx, &h->creator_timer_fd, create_interval) != SUCCESS) {
-                update_timer(worker_ctx, &h->creator_timer_fd, create_interval);
-                return FAILURE;
-            }
-        }
-    } else {
-        cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false);
-        async_delete_event(worker_ctx->label, &worker_ctx->async, &h->creator_timer_fd);
-        CLOSE_FD(&h->creator_timer_fd);
-        h->margin_cnt = (uint16_t)0;
-    }
-    return SUCCESS;
-}
-
-static inline status_t timer_handle_event(worker_context_t *worker_ctx, void *xsession, control_packet_t *h, orilink_protocol_type_t orilink_protocol) {
-    if (h->ack_rcvd) {
-//======================================================================
-// Let The Timer Dies By Itself
-//======================================================================
-        cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false);
-        LOG_DEBUG("%sTimer Retry Hello1 Closed", worker_ctx->label);
-        return SUCCESS;
-    }
+static inline status_t retry_transmit(
+    worker_context_t *worker_ctx, 
+    void *xsession, 
+    control_packet_t *h, 
+    orilink_protocol_type_t orilink_protocol
+)
+{
     worker_type_t wot = *worker_ctx->wot;
     switch (wot) {
         case COW: {
@@ -63,12 +32,8 @@ static inline status_t timer_handle_event(worker_context_t *worker_ctx, void *xs
             worker_type_t c_wot = identity->local_wot;
             uint8_t c_index = identity->local_index;
             uint8_t c_session_index = identity->local_session_index;
-            if (h->sent_try_count > MAX_RETRY) {
-                LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, h->interval_timer_fd, h->sent_try_count);
-//----------------------------------------------------------------------
-// Disconnected => 1. Reset Session
-//                 2. Send Info To Master
-//----------------------------------------------------------------------
+            if (h->sent_try_count > (uint8_t)MAX_RETRY) {
+                LOG_DEBUG("%sDisconnected => session_index %d, trycount %d.", worker_ctx->label, c_session_index, h->sent_try_count);
                 cleanup_cow_session(worker_ctx->label, &worker_ctx->async, session);
                 if (setup_cow_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
                     return FAILURE;
@@ -76,17 +41,14 @@ static inline status_t timer_handle_event(worker_context_t *worker_ctx, void *xs
                 if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
                     return FAILURE;
                 }
-//----------------------------------------------------------------------
-                return SUCCESS;
+                return FAILURE_MAXTRY;
             }
             if (h->data == NULL) {
-                update_timer(worker_ctx, &h->timer_fd, retry_timer_interval);
                 return FAILURE;
             }
             double try_count = (double)h->sent_try_count;
             calculate_retry(worker_ctx->label, session, c_wot, try_count);
             retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
-            h->interval_timer_fd = retry_timer_interval;
             if (retry_control_packet(
                     worker_ctx, 
                     identity, 
@@ -96,6 +58,10 @@ static inline status_t timer_handle_event(worker_context_t *worker_ctx, void *xs
                 ) != SUCCESS
             )
             {
+                return FAILURE;
+            }
+            h->polling_1ms_cnt = (uint16_t)0;
+            if (create_polling_1ms(worker_ctx, h, retry_timer_interval) != SUCCESS) {
                 return FAILURE;
             }
             break;
@@ -108,12 +74,8 @@ static inline status_t timer_handle_event(worker_context_t *worker_ctx, void *xs
             worker_type_t c_wot = identity->local_wot;
             uint8_t c_index = identity->local_index;
             uint8_t c_session_index = identity->local_session_index;
-            if (h->sent_try_count > MAX_RETRY) {
-                LOG_DEBUG("%sSession %d: interval = %lf. Disconnect => try count %d.", worker_ctx->label, c_session_index, h->interval_timer_fd, h->sent_try_count);
-//----------------------------------------------------------------------
-// Disconnected => 1. Reset Session
-//                 2. Send Info To Master
-//----------------------------------------------------------------------
+            if (h->sent_try_count > (uint8_t)MAX_RETRY) {
+                LOG_DEBUG("%sDisconnected => session_index %d, trycount %d.", worker_ctx->label, c_session_index, h->sent_try_count);
                 cleanup_sio_session(worker_ctx->label, &worker_ctx->async, session);
                 if (setup_sio_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
                     return FAILURE;
@@ -121,17 +83,14 @@ static inline status_t timer_handle_event(worker_context_t *worker_ctx, void *xs
                 if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
                     return FAILURE;
                 }
-//----------------------------------------------------------------------
-                return SUCCESS;
+                return FAILURE_MAXTRY;
             }
             if (h->data == NULL) {
-                update_timer(worker_ctx, &h->timer_fd, retry_timer_interval);
                 return FAILURE;
             }
             double try_count = (double)h->sent_try_count;
             calculate_retry(worker_ctx->label, session, c_wot, try_count);
             retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
-            h->interval_timer_fd = retry_timer_interval;
             if (retry_control_packet(
                     worker_ctx, 
                     identity, 
@@ -143,10 +102,46 @@ static inline status_t timer_handle_event(worker_context_t *worker_ctx, void *xs
             {
                 return FAILURE;
             }
+            h->polling_1ms_cnt = (uint16_t)0;
+            if (create_polling_1ms(worker_ctx, h, retry_timer_interval) != SUCCESS) {
+                return FAILURE;
+            }
             break;
         }
         default:
             return FAILURE;
+    }
+    return SUCCESS;
+}
+
+static inline status_t polling_1ms(
+    worker_context_t *worker_ctx, 
+    void *xsession, 
+    control_packet_t *h, 
+    orilink_protocol_type_t orilink_protocol
+)
+{
+    double polling_interval = (double)1000000 / (double)1e9;
+    if (!h->ack_rcvd) {
+        h->polling_1ms_cnt++;
+        uint16_t polling_1ms_max_cnt = h->polling_1ms_max_cnt;
+        if (h->polling_1ms_cnt >= polling_1ms_max_cnt) {
+            async_delete_event(worker_ctx->label, &worker_ctx->async, &h->polling_timer_fd);
+            CLOSE_FD(&h->polling_timer_fd);
+            retry_transmit(
+                worker_ctx,
+                xsession,
+                h,
+                orilink_protocol
+            );
+        } else {
+            if (update_timer(worker_ctx, &h->polling_timer_fd, polling_interval) != SUCCESS) {
+                update_timer(worker_ctx, &h->polling_timer_fd, polling_interval);
+                return FAILURE;
+            }
+        }
+    } else {
+        cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false);
     }
     return SUCCESS;
 }
@@ -161,8 +156,7 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
             double timer_interval = session->heartbeat_interval * pow((double)2, (double)session->retry.value_prediction);
             timer_interval += session->rtt.value_prediction / (double)1e9;
             if (
-                session->heartbeat.timer_fd != -1 ||
-                session->heartbeat.creator_timer_fd != -1
+                session->heartbeat.polling_timer_fd != -1
             )
             {
 //======================================================================
@@ -274,8 +268,7 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
             double timer_interval = session->heartbeat_interval * pow((double)2, (double)session->retry.value_prediction);
             timer_interval += session->rtt.value_prediction / (double)1e9;
             if (
-                session->heartbeat.timer_fd != -1 ||
-                session->heartbeat.creator_timer_fd != -1
+                session->heartbeat.polling_timer_fd != -1
             )
             {
 //======================================================================
@@ -394,46 +387,26 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
             for (uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
                 cow_c_session_t *session;
                 session = &c_sessions[i];
-                if (*current_fd == session->hello1.creator_timer_fd) {
+                if (*current_fd == session->hello1.polling_timer_fd) {
                     uint64_t u;
-                    read(session->hello1.creator_timer_fd, &u, sizeof(u));
-                    return timer_handle_event_create(worker_ctx, &session->hello1);
-                } else if (*current_fd == session->hello1.timer_fd) {
+                    read(session->hello1.polling_timer_fd, &u, sizeof(u));
+                    return polling_1ms(worker_ctx, session, &session->hello1, ORILINK_HELLO1);
+                } else if (*current_fd == session->hello2.polling_timer_fd) {
                     uint64_t u;
-                    read(session->hello1.timer_fd, &u, sizeof(u));
-                    return timer_handle_event(worker_ctx, session, &session->hello1, ORILINK_HELLO1);
-                } else if (*current_fd == session->hello2.creator_timer_fd) {
+                    read(session->hello2.polling_timer_fd, &u, sizeof(u));
+                    return polling_1ms(worker_ctx, session, &session->hello2, ORILINK_HELLO2);
+                } else if (*current_fd == session->hello3.polling_timer_fd) {
                     uint64_t u;
-                    read(session->hello2.creator_timer_fd, &u, sizeof(u));
-                    return timer_handle_event_create(worker_ctx, &session->hello2);
-                } else if (*current_fd == session->hello2.timer_fd) {
+                    read(session->hello3.polling_timer_fd, &u, sizeof(u));
+                    return polling_1ms(worker_ctx, session, &session->hello3, ORILINK_HELLO3);
+                } else if (*current_fd == session->hello4.polling_timer_fd) {
                     uint64_t u;
-                    read(session->hello2.timer_fd, &u, sizeof(u));
-                    return timer_handle_event(worker_ctx, session, &session->hello2, ORILINK_HELLO2);
-                } else if (*current_fd == session->hello3.creator_timer_fd) {
+                    read(session->hello4.polling_timer_fd, &u, sizeof(u));
+                    return polling_1ms(worker_ctx, session, &session->hello4, ORILINK_HELLO4);
+                } else if (*current_fd == session->heartbeat.polling_timer_fd) {
                     uint64_t u;
-                    read(session->hello3.creator_timer_fd, &u, sizeof(u));
-                    return timer_handle_event_create(worker_ctx, &session->hello3);
-                } else if (*current_fd == session->hello3.timer_fd) {
-                    uint64_t u;
-                    read(session->hello3.timer_fd, &u, sizeof(u));
-                    return timer_handle_event(worker_ctx, session, &session->hello3, ORILINK_HELLO3);
-                } else if (*current_fd == session->hello4.creator_timer_fd) {
-                    uint64_t u;
-                    read(session->hello4.creator_timer_fd, &u, sizeof(u));
-                    return timer_handle_event_create(worker_ctx, &session->hello4);
-                } else if (*current_fd == session->hello4.timer_fd) {
-                    uint64_t u;
-                    read(session->hello4.timer_fd, &u, sizeof(u));
-                    return timer_handle_event(worker_ctx, session, &session->hello4, ORILINK_HELLO4);
-                } else if (*current_fd == session->heartbeat.creator_timer_fd) {
-                    uint64_t u;
-                    read(session->heartbeat.creator_timer_fd, &u, sizeof(u));
-                    return timer_handle_event_create(worker_ctx, &session->heartbeat);
-                } else if (*current_fd == session->heartbeat.timer_fd) {
-                    uint64_t u;
-                    read(session->heartbeat.timer_fd, &u, sizeof(u));
-                    return timer_handle_event(worker_ctx, session, &session->heartbeat, ORILINK_HEARTBEAT);
+                    read(session->heartbeat.polling_timer_fd, &u, sizeof(u));
+                    return polling_1ms(worker_ctx, session, &session->heartbeat, ORILINK_HEARTBEAT);
                 } else if (*current_fd == session->heartbeat_sender_timer_fd) {
                     uint64_t u;
                     read(session->heartbeat_sender_timer_fd, &u, sizeof(u));
@@ -454,14 +427,10 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
             for (uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
                 sio_c_session_t *session;
                 session = &c_sessions[i];
-                if (*current_fd == session->heartbeat.creator_timer_fd) {
+                if (*current_fd == session->heartbeat.polling_timer_fd) {
                     uint64_t u;
-                    read(session->heartbeat.creator_timer_fd, &u, sizeof(u));
-                    return timer_handle_event_create(worker_ctx, &session->heartbeat);
-                } else if (*current_fd == session->heartbeat.timer_fd) {
-                    uint64_t u;
-                    read(session->heartbeat.timer_fd, &u, sizeof(u));
-                    return timer_handle_event(worker_ctx, session, &session->heartbeat, ORILINK_HEARTBEAT);
+                    read(session->heartbeat.polling_timer_fd, &u, sizeof(u));
+                    return polling_1ms(worker_ctx, session, &session->heartbeat, ORILINK_HEARTBEAT);
                 } else if (*current_fd == session->heartbeat_sender_timer_fd) {
                     uint64_t u;
                     read(session->heartbeat_sender_timer_fd, &u, sizeof(u));

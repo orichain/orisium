@@ -143,8 +143,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
         );
     }
     if (
-        session->heartbeat.timer_fd != -1 ||
-        session->heartbeat.creator_timer_fd != -1 ||
+        session->heartbeat.polling_timer_fd != -1 ||
         session->heartbeat_sender_timer_fd != -1
     )
     {

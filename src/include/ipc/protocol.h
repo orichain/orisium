@@ -32,6 +32,7 @@ typedef struct {
     uint8_t session_index;
     uint8_t orilink_protocol;
     uint8_t trycount;
+    uint8_t inc_ctr;
     struct sockaddr_in6 remote_addr;
     uint16_t len;
 //----------------------------------------------------------------------
@@ -45,6 +46,7 @@ typedef struct {
     uint8_t session_index;
     uint8_t orilink_protocol;
     uint8_t trycount;
+    uint8_t inc_ctr;
     status_t status;
 } ipc_udp_data_ack_t;
 

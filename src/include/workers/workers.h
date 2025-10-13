@@ -28,11 +28,10 @@ typedef struct {
 typedef struct {
     bool sent;
     uint8_t sent_try_count;
-    uint16_t margin_cnt;
     uint64_t sent_time;
-    int timer_fd;
-    int creator_timer_fd;
-    double interval_timer_fd;
+    int polling_timer_fd;
+    uint16_t polling_1ms_cnt;
+    uint16_t polling_1ms_max_cnt;
     bool ack_rcvd;
     uint64_t ack_rcvd_time;
     uint16_t len;
@@ -256,32 +255,29 @@ static inline void cleanup_control_packet(const char *label, async_type_t *async
         h->ack_rcvd_time = (uint64_t)0;
         h->ack_rcvd = false;
     }
-    h->interval_timer_fd = (double)1;
     h->sent_try_count = 0x00;
-    h->margin_cnt = (uint16_t)0;
+    h->polling_1ms_cnt = (uint16_t)0;
+    h->polling_1ms_max_cnt = (uint16_t)0;
     if (h->data) {
         free(h->data);
         h->data = NULL;
     }
     h->len = (uint16_t)0;
-    async_delete_event(label, async, &h->timer_fd);
-    CLOSE_FD(&h->timer_fd);
-    async_delete_event(label, async, &h->creator_timer_fd);
-    CLOSE_FD(&h->creator_timer_fd);
+    async_delete_event(label, async, &h->polling_timer_fd);
+    CLOSE_FD(&h->polling_timer_fd);
 }
 
-static inline void setup_control_packet(control_packet_t *h, double interval_timer) {
+static inline void setup_control_packet(control_packet_t *h) {
     h->sent = false;
     h->sent_time = (uint64_t)0;
     h->ack_rcvd_time = (uint64_t)0;
     h->ack_rcvd = false;
-    h->interval_timer_fd = interval_timer;
     h->sent_try_count = 0x00;
-    h->margin_cnt = (uint16_t)0;
+    h->polling_1ms_cnt = (uint16_t)0;
+    h->polling_1ms_max_cnt = (uint16_t)0;
     h->data = NULL;
     h->len = (uint16_t)0;
-    h->creator_timer_fd = -1;
-    h->timer_fd = -1;
+    h->polling_timer_fd = -1;
 }
 
 static inline void cleanup_control_packet_ack(control_packet_ack_t *h, bool clean_state, clean_data_type_t clean_data) {
@@ -330,11 +326,11 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
     single_session->test_drop_heartbeat_ack = 0;
     single_session->test_double_heartbeat = 0;
 //----------------------------------------------------------------------
-    setup_control_packet(&single_session->hello1, (double)1);
-    setup_control_packet(&single_session->hello2, (double)1);
-    setup_control_packet(&single_session->hello3, (double)1);
-    setup_control_packet(&single_session->hello4, (double)1);
-    setup_control_packet(&single_session->heartbeat, (double)1);
+    setup_control_packet(&single_session->hello1);
+    setup_control_packet(&single_session->hello2);
+    setup_control_packet(&single_session->hello3);
+    setup_control_packet(&single_session->hello4);
+    setup_control_packet(&single_session->heartbeat);
     setup_control_packet_ack(&single_session->heartbeat_ack);
     single_session->heartbeat_interval = (double)1;
     single_session->heartbeat_sender_timer_fd = -1;
@@ -436,7 +432,7 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     setup_control_packet_ack(&single_session->hello2_ack);
     setup_control_packet_ack(&single_session->hello3_ack);
     setup_control_packet_ack(&single_session->hello4_ack);
-    setup_control_packet(&single_session->heartbeat, (double)1);
+    setup_control_packet(&single_session->heartbeat);
     setup_control_packet_ack(&single_session->heartbeat_ack);
     single_session->heartbeat_interval = (double)1;
     single_session->is_first_heartbeat = false;

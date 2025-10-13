@@ -8,6 +8,7 @@
 #include "workers/ipc/handlers.h"
 #include "orilink/protocol.h"
 #include "workers/timer/handlers.h"
+#include "utilities.h"
 
 status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void *worker_sessions, ipc_protocol_t* received_protocol) {
     ipc_udp_data_ack_t *iudp_data_acki = received_protocol->payload.ipc_udp_data_ack;
@@ -15,13 +16,13 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
     uint8_t session_index = iudp_data_acki->session_index;
     cow_c_session_t *cow_c_session = (cow_c_session_t *)worker_sessions;
     cow_c_session_t *session = &cow_c_session[session_index];
+    orilink_security_t *security = &session->security;
     switch ((orilink_protocol_type_t)iudp_data_acki->orilink_protocol) {
         case ORILINK_HELLO1: {
             if (iudp_data_acki->trycount == (uint8_t)1) {
 //======================================================================
                 double retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
-                session->hello1.interval_timer_fd = retry_timer_interval;
-                if (create_timer_retry(worker_ctx, &session->hello1.creator_timer_fd) != SUCCESS) {
+                if (create_polling_1ms(worker_ctx, &session->hello1, retry_timer_interval) != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
                     return FAILURE;
                 }
@@ -34,8 +35,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
             if (iudp_data_acki->trycount == (uint8_t)1) {
 //======================================================================
                 double retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
-                session->hello2.interval_timer_fd = retry_timer_interval;
-                if (create_timer_retry(worker_ctx, &session->hello2.creator_timer_fd) != SUCCESS) {
+                if (create_polling_1ms(worker_ctx, &session->hello2, retry_timer_interval) != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
                     return FAILURE;
                 }
@@ -48,8 +48,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
             if (iudp_data_acki->trycount == (uint8_t)1) {
 //======================================================================
                 double retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
-                session->hello3.interval_timer_fd = retry_timer_interval;
-                if (create_timer_retry(worker_ctx, &session->hello3.creator_timer_fd) != SUCCESS) {
+                if (create_polling_1ms(worker_ctx, &session->hello3, retry_timer_interval) != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
                     return FAILURE;
                 }
@@ -62,8 +61,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
             if (iudp_data_acki->trycount == (uint8_t)1) {
 //======================================================================
                 double retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
-                session->hello4.interval_timer_fd = retry_timer_interval;
-                if (create_timer_retry(worker_ctx, &session->hello4.creator_timer_fd) != SUCCESS) {
+                if (create_polling_1ms(worker_ctx, &session->hello4, retry_timer_interval) != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
                     return FAILURE;
                 }
@@ -73,11 +71,14 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
             break;
         }
         case ORILINK_HEARTBEAT: {
+            if (iudp_data_acki->status != SUCCESS) {
+                decrement_ctr(&security->local_ctr, security->local_nonce);
+                return SUCCESS;
+            }
             if (iudp_data_acki->trycount == (uint8_t)1) {
 //======================================================================
                 double retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
-                session->heartbeat.interval_timer_fd = retry_timer_interval;
-                if (create_timer_retry(worker_ctx, &session->heartbeat.creator_timer_fd) != SUCCESS) {
+                if (create_polling_1ms(worker_ctx, &session->heartbeat, retry_timer_interval) != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
                     return FAILURE;
                 }

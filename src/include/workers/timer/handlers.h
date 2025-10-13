@@ -23,20 +23,21 @@ static inline status_t create_timer(worker_context_t *worker_ctx, int *file_desc
     return SUCCESS;
 }
 
-static inline status_t create_timer_retry(worker_context_t *worker_ctx, int *creator_file_descriptor) {
-    if (async_create_timerfd(worker_ctx->label, creator_file_descriptor) != SUCCESS) {
+static inline status_t create_polling_1ms(worker_context_t *worker_ctx, control_packet_t *h, double total_polling_interval) {
+    if (async_create_timerfd(worker_ctx->label, &h->polling_timer_fd) != SUCCESS) {
         return FAILURE;
     }
-    double create_interval = (double)1000000 / (double)1e9;
-    if (async_set_timerfd_time(worker_ctx->label, creator_file_descriptor,
-        (time_t)create_interval,
-        (long)((create_interval - (time_t)create_interval) * 1e9),
-        (time_t)create_interval,
-        (long)((create_interval - (time_t)create_interval) * 1e9)) != SUCCESS)
+    double polling_interval = (double)1000000 / (double)1e9;
+    h->polling_1ms_max_cnt = (uint16_t)((total_polling_interval * (double)1e9) / (double)1000000);
+    if (async_set_timerfd_time(worker_ctx->label, &h->polling_timer_fd,
+        (time_t)polling_interval,
+        (long)((polling_interval - (time_t)polling_interval) * 1e9),
+        (time_t)polling_interval,
+        (long)((polling_interval - (time_t)polling_interval) * 1e9)) != SUCCESS)
     {
         return FAILURE;
     }
-    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, creator_file_descriptor) != SUCCESS) {
+    if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &h->polling_timer_fd) != SUCCESS) {
         return FAILURE;
     }
     return SUCCESS;

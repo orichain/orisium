@@ -35,7 +35,7 @@
 * attempt before scheduling the next retry. This prevents 'Heartbeat Received Already' 
 * errors caused by I/O timing ambiguities.
 */
-#define X_RETRY_TIMER_CREATE 600
+#define POLLING_1MS_MAX_CNT 600
 //----------------------------------------------------------------------
 #define NODE_HEARTBEAT_INTERVAL 10
 #define NODE_CHECK_HEALTHY_X 3
