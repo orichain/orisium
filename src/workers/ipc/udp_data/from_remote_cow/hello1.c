@@ -27,7 +27,7 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
 //======================================================================
     //print_hex("SIO Receiving Hello1 ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
     if (trycount != (uint8_t)1) {
-        if (trycount > (uint8_t)MAX_RETRY) {
+        if (trycount > (uint8_t)MAX_RETRY_CNT) {
             LOG_ERROR("%sHello1 Max Retry.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);

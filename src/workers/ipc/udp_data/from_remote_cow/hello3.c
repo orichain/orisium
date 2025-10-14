@@ -67,7 +67,7 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
         return FAILURE;
     }
     if (trycount != (uint8_t)1) {
-        if (trycount > (uint8_t)MAX_RETRY) {
+        if (trycount > (uint8_t)MAX_RETRY_CNT) {
             LOG_ERROR("%sHello3 Max Retry.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);

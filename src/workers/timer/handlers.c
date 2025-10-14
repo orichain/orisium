@@ -28,11 +28,10 @@ static inline status_t retry_transmit(
             cow_c_session_t *session = (cow_c_session_t *)xsession;
             orilink_identity_t *identity = &session->identity;
             orilink_security_t *security = &session->security;
-            double retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
             worker_type_t c_wot = identity->local_wot;
             uint8_t c_index = identity->local_index;
             uint8_t c_session_index = identity->local_session_index;
-            if (h->sent_try_count > (uint8_t)MAX_RETRY) {
+            if (h->sent_try_count > (uint8_t)MAX_RETRY_CNT) {
                 LOG_DEBUG("%sDisconnected => session_index %d, trycount %d.", worker_ctx->label, c_session_index, h->sent_try_count);
                 cleanup_cow_session(worker_ctx->label, &worker_ctx->async, session);
                 if (setup_cow_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
@@ -48,7 +47,11 @@ static inline status_t retry_transmit(
             }
             double try_count = (double)h->sent_try_count;
             calculate_retry(worker_ctx->label, session, c_wot, try_count);
-            retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
+//----------------------------------------------------------------------            
+            double retry_timer_interval = (double)MAX_RETRY_SEC;
+            retry_timer_interval /= pow((double)2, (double)session->retry.value_prediction);
+            if (retry_timer_interval < (double)MIN_RETRY_SEC) retry_timer_interval = (double)MIN_RETRY_SEC;
+//----------------------------------------------------------------------
             if (retry_control_packet(
                     worker_ctx, 
                     identity, 
@@ -70,11 +73,10 @@ static inline status_t retry_transmit(
             sio_c_session_t *session = (sio_c_session_t *)xsession;
             orilink_identity_t *identity = &session->identity;
             orilink_security_t *security = &session->security;
-            double retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
             worker_type_t c_wot = identity->local_wot;
             uint8_t c_index = identity->local_index;
             uint8_t c_session_index = identity->local_session_index;
-            if (h->sent_try_count > (uint8_t)MAX_RETRY) {
+            if (h->sent_try_count > (uint8_t)MAX_RETRY_CNT) {
                 LOG_DEBUG("%sDisconnected => session_index %d, trycount %d.", worker_ctx->label, c_session_index, h->sent_try_count);
                 cleanup_sio_session(worker_ctx->label, &worker_ctx->async, session);
                 if (setup_sio_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
@@ -90,7 +92,11 @@ static inline status_t retry_transmit(
             }
             double try_count = (double)h->sent_try_count;
             calculate_retry(worker_ctx->label, session, c_wot, try_count);
-            retry_timer_interval = pow((double)2, (double)session->retry.value_prediction);
+//----------------------------------------------------------------------            
+            double retry_timer_interval = (double)MAX_RETRY_SEC;
+            retry_timer_interval /= pow((double)2, (double)session->retry.value_prediction);
+            if (retry_timer_interval < (double)MIN_RETRY_SEC) retry_timer_interval = (double)MIN_RETRY_SEC;
+//----------------------------------------------------------------------
             if (retry_control_packet(
                     worker_ctx, 
                     identity, 

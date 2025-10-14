@@ -30,6 +30,7 @@ static inline status_t create_polling_1ms(worker_context_t *worker_ctx, control_
     }
     double polling_interval = (double)1000000 / (double)1e9;
     h->polling_1ms_max_cnt = (uint16_t)((total_polling_interval * (double)1e9) / (double)1000000);
+    printf("%sRetransmit In %d Polling 1ms\n", worker_ctx->label, h->polling_1ms_max_cnt);
     if (async_set_timerfd_time(worker_ctx->label, &h->polling_timer_fd,
         (time_t)polling_interval,
         (long)((polling_interval - (time_t)polling_interval) * 1e9),

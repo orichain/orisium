@@ -199,7 +199,7 @@ static inline void calculate_retry(const char *label, void *void_session, worker
             int needed = snprintf(NULL, 0, "[RETRY %d]: ", session->identity.local_session_index);
             desc = malloc(needed + 1);
             snprintf(desc, needed + 1, "[RETRY %d]: ", session->identity.local_session_index);
-            calculate_oricle_double(label, desc, &session->retry, try_count, ((double)MAX_RETRY * (double)2));
+            calculate_oricle_double(label, desc, &session->retry, try_count, ((double)MAX_RETRY_CNT * (double)2));
             //printf("%s%s Value Prediction: %f\n", label, desc, session->retry.value_prediction);
             free(desc);
             break;
@@ -210,7 +210,7 @@ static inline void calculate_retry(const char *label, void *void_session, worker
             int needed = snprintf(NULL, 0, "[RETRY %d]: ", session->identity.local_session_index);
             desc = malloc(needed + 1);
             snprintf(desc, needed + 1, "[RETRY %d]: ", session->identity.local_session_index);
-            calculate_oricle_double(label, desc, &session->retry, try_count, ((double)MAX_RETRY * (double)2));
+            calculate_oricle_double(label, desc, &session->retry, try_count, ((double)MAX_RETRY_CNT * (double)2));
             //printf("%s%s Value Prediction: %f\n", label, desc, session->retry.value_prediction);
             free(desc);
             break;

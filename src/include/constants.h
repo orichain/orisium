@@ -21,21 +21,9 @@
 //----------------------------------------------------------------------
 #define KALMAN_CALIBRATION_SAMPLES 50
 //----------------------------------------------------------------------
-/**
-* @def RETRY_TIMER_CREATE_DELAY_NS
-* @brief Forced I/O delay interval for the creator timer during Heartbeat failure.
-*
-* This value serves as a critical I/O safety margin against kernel race conditions.
-* The observed worst-case RTT to the remote peer (VPS) is ~300ms. After factoring 
-* in kernel processing time for I/O cleanup (file descriptor closing, event loop flush), 
-* the total critical time is approx. 350ms.
-*
-* We use 600ms (0.6 seconds) to provide a generous 250ms margin, ensuring the kernel 
-* fully completes all asynchronous operations related to the previous Heartbeat 
-* attempt before scheduling the next retry. This prevents 'Heartbeat Received Already' 
-* errors caused by I/O timing ambiguities.
-*/
-#define POLLING_1MS_MAX_CNT 600
+#define MAX_RETRY_CNT 5
+#define MAX_RETRY_SEC 5
+#define MIN_RETRY_SEC 1
 //----------------------------------------------------------------------
 #define NODE_HEARTBEAT_INTERVAL 10
 #define NODE_CHECK_HEALTHY_X 3
@@ -76,7 +64,6 @@
 #define AES_IV_BYTES 16
 #define AES_TAG_BYTES 16
 
-#define MAX_RETRY 5
 #define MAX_RTT_SEC 1
 //======================================================================
 // OriLink
