@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <inttypes.h>
 #include <stddef.h>
+#include <stdio.h>
 
 #include "types.h"
 #include "workers/workers.h"
@@ -140,6 +141,7 @@ static inline status_t polling_1ms(
                 h,
                 orilink_protocol
             );
+            printf("%sRetransmit Done. Reset Polling Counter.\n", worker_ctx->label);
         } else {
             if (update_timer(worker_ctx, &h->polling_timer_fd, polling_interval) != SUCCESS) {
                 update_timer(worker_ctx, &h->polling_timer_fd, polling_interval);
@@ -147,6 +149,7 @@ static inline status_t polling_1ms(
             }
         }
     } else {
+        printf("%sRetransmit Cancelled In %d Polling 1ms\n", worker_ctx->label, h->polling_1ms_cnt);
         cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false);
     }
     return SUCCESS;
