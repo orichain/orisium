@@ -2,6 +2,6 @@
 	"node_name": "Node1",
 	"listen_port": 40000,
 	"bootstrap_nodes": [
-		{ "ip": "127.0.0.1", "port": 40010 }
+		{ "ip": "127.0.0.1", "port": 40000 }
 	]
 }
