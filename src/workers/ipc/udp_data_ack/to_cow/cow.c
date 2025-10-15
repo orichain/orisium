@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <math.h>
+#include <stdlib.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -23,6 +24,8 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
                 double retry_timer_interval = (double)MAX_RETRY_SEC;
                 retry_timer_interval /= pow((double)2, (double)session->retry.value_prediction);
                 if (retry_timer_interval < (double)MIN_RETRY_SEC) retry_timer_interval = (double)MIN_RETRY_SEC;
+                double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+                retry_timer_interval += jitter_amount;
 //----------------------------------------------------------------------
                 if (create_polling_1ms(worker_ctx, &session->hello1, retry_timer_interval) != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -39,6 +42,8 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
                 double retry_timer_interval = (double)MAX_RETRY_SEC;
                 retry_timer_interval /= pow((double)2, (double)session->retry.value_prediction);
                 if (retry_timer_interval < (double)MIN_RETRY_SEC) retry_timer_interval = (double)MIN_RETRY_SEC;
+                double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+                retry_timer_interval += jitter_amount;
 //----------------------------------------------------------------------
                 if (create_polling_1ms(worker_ctx, &session->hello2, retry_timer_interval) != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -55,6 +60,8 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
                 double retry_timer_interval = (double)MAX_RETRY_SEC;
                 retry_timer_interval /= pow((double)2, (double)session->retry.value_prediction);
                 if (retry_timer_interval < (double)MIN_RETRY_SEC) retry_timer_interval = (double)MIN_RETRY_SEC;
+                double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+                retry_timer_interval += jitter_amount;
 //----------------------------------------------------------------------
                 if (create_polling_1ms(worker_ctx, &session->hello3, retry_timer_interval) != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -71,6 +78,8 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
                 double retry_timer_interval = (double)MAX_RETRY_SEC;
                 retry_timer_interval /= pow((double)2, (double)session->retry.value_prediction);
                 if (retry_timer_interval < (double)MIN_RETRY_SEC) retry_timer_interval = (double)MIN_RETRY_SEC;
+                double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+                retry_timer_interval += jitter_amount;
 //----------------------------------------------------------------------
                 if (create_polling_1ms(worker_ctx, &session->hello4, retry_timer_interval) != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -87,6 +96,8 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
                 double retry_timer_interval = (double)MAX_RETRY_SEC;
                 retry_timer_interval /= pow((double)2, (double)session->retry.value_prediction);
                 if (retry_timer_interval < (double)MIN_RETRY_SEC) retry_timer_interval = (double)MIN_RETRY_SEC;
+                double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+                retry_timer_interval += jitter_amount;
 //----------------------------------------------------------------------
                 if (create_polling_1ms(worker_ctx, &session->heartbeat, retry_timer_interval) != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);

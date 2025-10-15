@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "types.h"
 #include "workers/workers.h"
@@ -52,6 +53,8 @@ static inline status_t retry_transmit(
             double retry_timer_interval = (double)MAX_RETRY_SEC;
             retry_timer_interval /= pow((double)2, (double)session->retry.value_prediction);
             if (retry_timer_interval < (double)MIN_RETRY_SEC) retry_timer_interval = (double)MIN_RETRY_SEC;
+            double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+            retry_timer_interval += jitter_amount;
 //----------------------------------------------------------------------
             if (retry_control_packet(
                     worker_ctx, 
@@ -97,6 +100,8 @@ static inline status_t retry_transmit(
             double retry_timer_interval = (double)MAX_RETRY_SEC;
             retry_timer_interval /= pow((double)2, (double)session->retry.value_prediction);
             if (retry_timer_interval < (double)MIN_RETRY_SEC) retry_timer_interval = (double)MIN_RETRY_SEC;
+            double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+            retry_timer_interval += jitter_amount;
 //----------------------------------------------------------------------
             if (retry_control_packet(
                     worker_ctx, 

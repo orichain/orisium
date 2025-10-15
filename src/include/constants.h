@@ -23,7 +23,7 @@
 //----------------------------------------------------------------------
 #define MAX_RETRY_CNT 5
 #define MAX_RETRY_SEC 5
-#define MIN_RETRY_SEC 1
+#define MIN_RETRY_SEC 2
 //----------------------------------------------------------------------
 #define NODE_HEARTBEAT_INTERVAL 10
 #define NODE_CHECK_HEALTHY_X 3
@@ -34,7 +34,7 @@
 #define WORKER_CHECK_HEALTHY_X 3
 #define WORKER_CHECK_HEALTHY WORKER_CHECK_HEALTHY_X * WORKER_HEARTBEAT_INTERVAL
 //----------------------------------------------------------------------
-#define HEARTBEAT_JITTER_PERCENTAGE 0.2
+#define JITTER_PERCENTAGE 0.2
 #define RAND_MAX_DOUBLE ((double)RAND_MAX)
 #define INITIAL_MILISECONDS_PER_UNIT 5
 //----------------------------------------------------------------------
