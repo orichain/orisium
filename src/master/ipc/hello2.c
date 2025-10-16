@@ -13,6 +13,7 @@
 #include "master/ipc/handlers.h"
 #include "master/ipc/worker_ipc_cmds.h"
 #include "poly1305-donna.h"
+#include "aes_custom.h"
 #include "aes.h"
 
 status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ctx, worker_type_t rcvd_wot, uint8_t rcvd_index, worker_security_t *security, worker_rekeying_t *rekeying, const char *worker_name, int *worker_uds_fd, ipc_raw_protocol_t_status_t *ircvdi) {
@@ -88,7 +89,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
     uint32_t remote_ctr_be = htobe32(security->remote_ctr);
     memcpy(iv0 + AES_NONCE_BYTES, &remote_ctr_be, sizeof(uint32_t));
 //=========================================IV===========================    
-    aes256_ctr(keystream_buffer0, sizeof(uint8_t) + sizeof(uint8_t), iv0, &aes_ctx0);
+    aes256_ctr_custom(keystream_buffer0, sizeof(uint8_t) + sizeof(uint8_t), iv0, &aes_ctx0);
     for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t); i++) {
         decrypted_wot_index_rcvd[i] = encrypted_wot_index_rcvd[i] ^ keystream_buffer0[i];
     }
@@ -126,7 +127,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
     uint32_t local_ctr_be = htobe32(security->local_ctr);
     memcpy(iv1 + AES_NONCE_BYTES, &local_ctr_be, sizeof(uint32_t));
 //=========================================IV===========================    
-    aes256_ctr(keystream_buffer1, sizeof(uint8_t) + sizeof(uint8_t), iv1, &aes_ctx1);
+    aes256_ctr_custom(keystream_buffer1, sizeof(uint8_t) + sizeof(uint8_t), iv1, &aes_ctx1);
     for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t); i++) {
         encrypted_wot_index[i] = wot_index[i] ^ keystream_buffer1[i];
     }

@@ -14,10 +14,11 @@
 #include "workers/ipc/master_ipc_cmds.h"
 #include "pqc.h"
 #include "poly1305-donna.h"
-#include "aes.h"
 #include "orilink/hello4.h"
 #include "orilink/protocol.h"
 #include "stdbool.h"
+#include "aes_custom.h"
+#include "aes.h"
 
 status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     uint8_t inc_ctr = oudp_datao->inc_ctr;
@@ -171,7 +172,7 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     uint32_t local_ctr_be = htobe32(local_ctr);
     memcpy(iv + AES_NONCE_BYTES, &local_ctr_be, sizeof(uint32_t));
 //=========================================IV===========================    
-    aes256_ctr(
+    aes256_ctr_custom(
         keystream_buffer, 
         sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), 
         iv, 

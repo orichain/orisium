@@ -13,11 +13,12 @@
 #include "workers/workers.h"
 #include "workers/ipc/handlers.h"
 #include "poly1305-donna.h"
-#include "aes.h"
 #include "orilink/protocol.h"
 #include "stdbool.h"
 #include "orilink/heartbeat.h"
 #include "workers/ipc/master_ipc_cmds.h"
+#include "aes_custom.h"
+#include "aes.h"
 
 status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     uint8_t inc_ctr = oudp_datao->inc_ctr;
@@ -118,7 +119,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     uint32_t remote_ctr_be0 = htobe32(remote_ctr);
     memcpy(iv0 + AES_NONCE_BYTES, &remote_ctr_be0, sizeof(uint32_t));
 //=========================================IV===========================    
-    aes256_ctr(keystream_buffer0, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), iv0, &aes_ctx0);
+    aes256_ctr_custom(keystream_buffer0, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), iv0, &aes_ctx0);
     for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t); i++) {
         decrypted_local_identity[i] = encrypted_local_identity[i] ^ keystream_buffer0[i];
     }
@@ -205,7 +206,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     uint32_t remote_ctr_be1 = htobe32(remote_ctr);
     memcpy(iv1 + AES_NONCE_BYTES, &remote_ctr_be1, sizeof(uint32_t));
 //=========================================IV===========================    
-    aes256_ctr(keystream_buffer1, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), iv1, &aes_ctx1);
+    aes256_ctr_custom(keystream_buffer1, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), iv1, &aes_ctx1);
     for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t); i++) {
         decrypted_remote_identity[i] = encrypted_remote_identity[i] ^ keystream_buffer1[i];
     }

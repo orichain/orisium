@@ -13,6 +13,7 @@
 #include "workers/workers.h"
 #include "workers/ipc/handlers.h"
 #include "poly1305-donna.h"
+#include "aes_custom.h"
 #include "aes.h"
 
 status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_protocol_t_status_t *ircvdi) {
@@ -83,7 +84,7 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
     uint32_t remote_ctr_be = htobe32(worker_ctx->remote_ctr);
     memcpy(iv + AES_NONCE_BYTES, &remote_ctr_be, sizeof(uint32_t));
 //=========================================IV===========================    
-    aes256_ctr(keystream_buffer, sizeof(uint8_t) + sizeof(uint8_t), iv, &aes_ctx);
+    aes256_ctr_custom(keystream_buffer, sizeof(uint8_t) + sizeof(uint8_t), iv, &aes_ctx);
     for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t); i++) {
         decrypted_wot_index[i] = encrypted_wot_index[i] ^ keystream_buffer[i];
     }

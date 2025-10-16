@@ -13,10 +13,11 @@
 #include "workers/ipc/handlers.h"
 #include "workers/ipc/master_ipc_cmds.h"
 #include "poly1305-donna.h"
-#include "aes.h"
 #include "orilink/hello4_ack.h"
 #include "orilink/protocol.h"
 #include "stdbool.h"
+#include "aes_custom.h"
+#include "aes.h"
 
 static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, uint8_t *trycount) {
 //======================================================================
@@ -276,7 +277,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     uint32_t remote_ctr_be = htobe32(remote_ctr);
     memcpy(iv0 + AES_NONCE_BYTES, &remote_ctr_be, sizeof(uint32_t));
 //=========================================IV===========================    
-    aes256_ctr(keystream_buffer0, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), iv0, &aes_ctx0);
+    aes256_ctr_custom(keystream_buffer0, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), iv0, &aes_ctx0);
     for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t); i++) {
         decrypted_remote_identity_rcvd[i] = encrypted_remote_identity_rcvd[i] ^ keystream_buffer0[i];
     }
@@ -376,7 +377,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     uint32_t local_ctr_be1 = htobe32(local_ctr);
     memcpy(iv1 + AES_NONCE_BYTES, &local_ctr_be1, sizeof(uint32_t));
 //=========================================IV===========================    
-    aes256_ctr(keystream_buffer1, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), iv1, &aes_ctx1);
+    aes256_ctr_custom(keystream_buffer1, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), iv1, &aes_ctx1);
     for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t); i++) {
         encrypted_remote_identity[i] = remote_identity[i] ^ keystream_buffer1[i];
     }
@@ -425,7 +426,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     uint32_t local_ctr_be2 = htobe32(security->local_ctr);
     memcpy(iv2 + AES_NONCE_BYTES, &local_ctr_be2, sizeof(uint32_t));
 //=========================================IV===========================    
-    aes256_ctr(keystream_buffer2, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), iv2, &aes_ctx2);
+    aes256_ctr_custom(keystream_buffer2, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), iv2, &aes_ctx2);
     for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t); i++) {
         encrypted_local_identity[i] = local_identity[i] ^ keystream_buffer2[i];
     }

@@ -26,6 +26,7 @@
 #include "constants.h"
 #include "pqc.h"
 #include "poly1305-donna.h"
+#include "aes_custom.h"
 #include "aes.h"
 
 static inline size_t_status_t calculate_ipc_payload_size(const char *label, const ipc_protocol_t* p, bool checkfixheader) {
@@ -356,7 +357,7 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes, uint8_t* key
         memcpy(iv, nonce, AES_NONCE_BYTES);
         uint32_t local_ctr_be = htobe32(*(uint32_t *)ctr);
         memcpy(iv + AES_NONCE_BYTES, &local_ctr_be, sizeof(uint32_t));
-        aes256_ctr(keystream_buffer, data_len, iv, &aes_ctx);
+        aes256_ctr_custom(keystream_buffer, data_len, iv, &aes_ctx);
         for (size_t i = 0; i < data_len; i++) {
             encrypted_data[i] = data[i] ^ keystream_buffer[i];
         }
@@ -502,7 +503,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
         memcpy(iv, nonce, AES_NONCE_BYTES);
         uint32_t local_ctr_be = htobe32(*(uint32_t *)ctr);
         memcpy(iv + AES_NONCE_BYTES, &local_ctr_be, sizeof(uint32_t));
-        aes256_ctr(keystream_buffer, data_len, iv, &aes_ctx);
+        aes256_ctr_custom(keystream_buffer, data_len, iv, &aes_ctx);
         for (size_t i = 0; i < data_len; i++) {
             decrypted_data[i] = data[i] ^ keystream_buffer[i];
         }

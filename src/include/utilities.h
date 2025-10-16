@@ -22,12 +22,25 @@
 #include <arpa/inet.h>
 #include <inttypes.h>
 #include <endian.h>
-#include <common/randombytes.h>
-#include <common/fips202.h>
+#include <randombytes.h>
+#include <fips202.h>
 #include "log.h"
 #include "types.h"
 #include "constants.h"
 #include "pqc.h"
+#include "poly1305-donna.h"
+
+static inline void print_hex(const char* label, const uint8_t* data, size_t len, int uppercase) {
+    if (label)
+        printf("%s", label);
+
+    const char* fmt = uppercase ? "%02X" : "%02x";
+
+    for (size_t i = 0; i < len; ++i) {
+        printf(fmt, data[i]);
+    }
+    printf("\n");
+}
 
 static inline bool is_same_ctr(uint32_t *ctr1, uint8_t *nonce1, uint32_t *ctr2, uint8_t *nonce2) {
     if (*ctr1 != *ctr2) {
@@ -161,18 +174,6 @@ static inline status_t generate_uint64_t_id(const char* label, uint64_t *out_id)
     memcpy(&output_be, output, 8);
     *out_id = be64toh(output_be);
     return SUCCESS;
-}
-
-static inline void print_hexx(const char* label, const uint8_t* data, size_t len, int uppercase) {
-    if (label)
-        printf("%s", label);
-
-    const char* fmt = uppercase ? "%02X" : "%02x";
-
-    for (size_t i = 0; i < len; ++i) {
-        printf(fmt, data[i]);
-    }
-    printf("\n");
 }
 
 static inline status_t set_nonblocking(const char* label, int fd) {

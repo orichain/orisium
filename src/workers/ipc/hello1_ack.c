@@ -12,8 +12,9 @@
 #include "workers/ipc/master_ipc_cmds.h"
 #include "pqc.h"
 #include "poly1305-donna.h"
-#include "aes.h"
 #include "utilities.h"
+#include "aes_custom.h"
+#include "aes.h"
 
 status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_protocol_t_status_t *ircvdi) {
     if (!worker_ctx->hello1_sent) {
@@ -81,7 +82,7 @@ status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_pro
     uint32_t local_ctr_be = htobe32(worker_ctx->local_ctr);
     memcpy(iv + AES_NONCE_BYTES, &local_ctr_be, sizeof(uint32_t));
 //=========================================IV===========================    
-    aes256_ctr(keystream_buffer, sizeof(uint8_t) + sizeof(uint8_t), iv, &aes_ctx);
+    aes256_ctr_custom(keystream_buffer, sizeof(uint8_t) + sizeof(uint8_t), iv, &aes_ctx);
     for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t); i++) {
         encrypted_wot_index[i] = wot_index[i] ^ keystream_buffer[i];
     }
