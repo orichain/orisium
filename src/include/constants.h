@@ -22,9 +22,9 @@
 #define KALMAN_CALIBRATION_SAMPLES 50
 //----------------------------------------------------------------------
 #define SRTT_THRESHOLD_TO2X_RCNT_MS 3000000
+#define MIN_POLLING_1MS_CNT 1
 #define MAX_RETRY_CNT 5
-#define MAX_RETRY_SEC 5
-#define MIN_RETRY_SEC 2
+#define MIN_RETRY_SEC 1
 //----------------------------------------------------------------------
 #define NODE_HEARTBEAT_INTERVAL 10
 #define NODE_CHECK_HEALTHY_X 3

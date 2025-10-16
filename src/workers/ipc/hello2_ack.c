@@ -5,7 +5,6 @@
 
 #include "log.h"
 #include "ipc/protocol.h"
-#include "async.h"
 #include "utilities.h"
 #include "types.h"
 #include "constants.h"
@@ -110,21 +109,9 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
 //----------------------------------------------------------------------
 // Aktifkan Heartbeat Karna security/Enkripsi Sudah Ready
 //---------------------------------------------------------------------- 
-        if (async_create_timerfd(worker_ctx->label, &worker_ctx->heartbeat_timer_fd) != SUCCESS) {
+        status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &worker_ctx->heartbeat_timer_fd, (double)WORKER_HEARTBEAT_INTERVAL);
+        if (chst != SUCCESS) {
             LOG_ERROR("%sWorker error async_create_timerfd...", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            return FAILURE;
-        }
-        if (async_set_timerfd_time(worker_ctx->label, &worker_ctx->heartbeat_timer_fd,
-            WORKER_HEARTBEAT_INTERVAL, 0,
-            WORKER_HEARTBEAT_INTERVAL, 0) != SUCCESS)
-        {
-            LOG_ERROR("%sWorker error async_set_timerfd_time...", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            return FAILURE;
-        }
-        if (async_create_incoming_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->heartbeat_timer_fd) != SUCCESS) {
-            LOG_ERROR("%sWorker error async_create_incoming_event...", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
             return FAILURE;
         }

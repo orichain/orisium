@@ -1,6 +1,5 @@
 #include <stdint.h>
 #include <stdlib.h>
-#include <time.h>
 #include <unistd.h>
 
 #include "log.h"
@@ -10,6 +9,7 @@
 #include "workers/workers.h"
 #include "workers/ipc/handlers.h"
 #include "workers/ipc/master_ipc_cmds.h"
+#include "utilities.h"
 
 void cleanup_dbr_worker(worker_context_t *worker_ctx) {
 	cleanup_worker(worker_ctx);
@@ -53,12 +53,8 @@ void run_dbr_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
                 if (new_heartbeat_interval_double < 0.1) {
                     new_heartbeat_interval_double = 0.1;
                 }
-                if (async_set_timerfd_time(worker_ctx->label, &worker_ctx->heartbeat_timer_fd,
-					(time_t)new_heartbeat_interval_double,
-                    (long)((new_heartbeat_interval_double - (time_t)new_heartbeat_interval_double) * 1e9),
-                    (time_t)new_heartbeat_interval_double,
-                    (long)((new_heartbeat_interval_double - (time_t)new_heartbeat_interval_double) * 1e9)) != SUCCESS)
-                {
+                status_t uhst = update_timer_oneshot(worker_ctx->label, &worker_ctx->heartbeat_timer_fd, new_heartbeat_interval_double);
+                if (uhst != SUCCESS) {
                     worker_ctx->shutdown_requested = 1;
 					LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", worker_ctx->label);
 					continue;

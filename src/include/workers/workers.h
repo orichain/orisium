@@ -265,8 +265,10 @@ static inline void cleanup_control_packet(const char *label, async_type_t *async
         h->data = NULL;
     }
     h->len = (uint16_t)0;
-    async_delete_event(label, async, &h->polling_timer_fd);
-    CLOSE_FD(&h->polling_timer_fd);
+    if (clean_state) {
+        async_delete_event(label, async, &h->polling_timer_fd);
+        CLOSE_FD(&h->polling_timer_fd);
+    }
 }
 
 static inline void setup_control_packet(control_packet_t *h) {

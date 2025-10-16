@@ -9,7 +9,6 @@
 #include "types.h"
 #include "workers/workers.h"
 #include "orilink/protocol.h"
-#include "workers/timer/handlers.h"
 #include "stdbool.h"
 #include "orilink/heartbeat_ack.h"
 #include "workers/ipc/master_ipc_cmds.h"
@@ -142,8 +141,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
         );
     }
     if (
-        session->heartbeat.polling ||
-        session->heartbeat_sender_timer_fd != -1
+        session->heartbeat.polling
     )
     {
 //======================================================================
@@ -256,7 +254,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
 //======================================================================
     session->test_drop_heartbeat_ack++;
     if (
-        session->test_drop_heartbeat_ack == 199
+        session->test_drop_heartbeat_ack == 3
     )
     {
         LOG_DEVEL_DEBUG("[Debug Here Helper]: Heartbeat Ack Packet Number %d. Sending To Fake Addr To Force Retry", session->test_drop_heartbeat_ack);
@@ -339,7 +337,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
 //======================================================================
     double timer_interval = session->heartbeat_interval;
 //======================================================================
-    status_t chst = create_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval);
+    status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, timer_interval);
     if (chst != SUCCESS) {
         return FAILURE;
     }

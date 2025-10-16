@@ -11,7 +11,6 @@
 #include "workers/ipc/master_ipc_cmds.h"
 #include "constants.h"
 #include "log.h"
-#include "async.h"
 #include "stdbool.h"
 #include "utilities.h"
 #include "orilink/heartbeat.h"
@@ -50,8 +49,8 @@ static inline status_t retry_transmit(
             double try_count = (double)h->sent_try_count;
             calculate_retry(worker_ctx->label, session, c_wot, try_count);
 //----------------------------------------------------------------------            
-            double retry_timer_interval = get_max_retry_sec((double)session->rtt.value_prediction);
-            retry_timer_interval /= pow((double)2, (double)session->retry.value_prediction);
+            double retry_timer_interval = (double)session->retry.value_prediction;
+            retry_timer_interval = pow((double)2, retry_timer_interval);
             if (retry_timer_interval < (double)MIN_RETRY_SEC) retry_timer_interval = (double)MIN_RETRY_SEC;
             double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
             retry_timer_interval *= (1.0 + jitter_amount);
@@ -97,8 +96,8 @@ static inline status_t retry_transmit(
             double try_count = (double)h->sent_try_count;
             calculate_retry(worker_ctx->label, session, c_wot, try_count);
 //----------------------------------------------------------------------   
-            double retry_timer_interval = get_max_retry_sec((double)session->rtt.value_prediction);
-            retry_timer_interval /= pow((double)2, (double)session->retry.value_prediction);
+            double retry_timer_interval = (double)session->retry.value_prediction;
+            retry_timer_interval = pow((double)2, retry_timer_interval);
             if (retry_timer_interval < (double)MIN_RETRY_SEC) retry_timer_interval = (double)MIN_RETRY_SEC;
             double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
             retry_timer_interval *= (1.0 + jitter_amount);
@@ -138,8 +137,6 @@ static inline status_t polling_1ms(
         h->polling_1ms_cnt++;
         uint16_t polling_1ms_max_cnt = h->polling_1ms_max_cnt;
         if (h->polling_1ms_cnt >= polling_1ms_max_cnt) {
-            async_delete_event(worker_ctx->label, &worker_ctx->async, &h->polling_timer_fd);
-            CLOSE_FD(&h->polling_timer_fd);
             retry_transmit(
                 worker_ctx,
                 xsession,
@@ -148,14 +145,26 @@ static inline status_t polling_1ms(
             );
             printf("%sRetransmit Done. Reset Polling Counter.\n", worker_ctx->label);
         } else {
-            if (update_timer(worker_ctx, &h->polling_timer_fd, polling_interval) != SUCCESS) {
-                update_timer(worker_ctx, &h->polling_timer_fd, polling_interval);
+            if (update_timer_oneshot(worker_ctx->label, &h->polling_timer_fd, polling_interval) != SUCCESS) {
+                update_timer_oneshot(worker_ctx->label, &h->polling_timer_fd, polling_interval);
                 return FAILURE;
             }
         }
     } else {
-        printf("%sRetransmit Cancelled In %d Polling 1ms\n", worker_ctx->label, h->polling_1ms_cnt);
-        cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false);
+//----------------------------------------------------------------------
+// Delay
+//----------------------------------------------------------------------
+        if (h->polling_1ms_cnt > (double)MIN_POLLING_1MS_CNT) {
+//----------------------------------------------------------------------
+            printf("%sRetransmit Cancelled In %d Polling 1ms\n", worker_ctx->label, h->polling_1ms_cnt);
+            cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false);
+        } else {
+            h->polling_1ms_cnt++;
+            if (update_timer_oneshot(worker_ctx->label, &h->polling_timer_fd, polling_interval) != SUCCESS) {
+                update_timer_oneshot(worker_ctx->label, &h->polling_timer_fd, polling_interval);
+                return FAILURE;
+            }
+        }
     }
     return SUCCESS;
 }
@@ -173,14 +182,14 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
 //======================================================================
 // Let The Retry Timer Finish The Retry Job
 //======================================================================
-                if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
+                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                     return FAILURE;
                 }
                 return SUCCESS;
             }
             uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
             if (current_time.status != SUCCESS) {
-                if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
+                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                     return FAILURE;
                 }
                 return FAILURE;
@@ -214,7 +223,7 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
                 if (l_inc_ctr != 0xFF) {
                     decrement_ctr(&security->local_ctr, security->local_nonce);
                 }
-                if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
+                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                     return FAILURE;
                 }
                 return FAILURE;
@@ -232,7 +241,7 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
                 if (l_inc_ctr != 0xFF) {
                     decrement_ctr(&security->local_ctr, security->local_nonce);
                 }
-                if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
+                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                     return FAILURE;
                 }
                 return FAILURE;
@@ -255,7 +264,7 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
                 if (l_inc_ctr != 0xFF) {
                     decrement_ctr(&security->local_ctr, security->local_nonce);
                 }
-                if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
+                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                     return FAILURE;
                 }
                 return FAILURE;
@@ -270,8 +279,6 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
 //======================================================================
             session->heartbeat_ack.rcvd = false;
 //======================================================================
-            async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
-            CLOSE_FD(&session->heartbeat_sender_timer_fd);
             break;
         }
         case SIO: {
@@ -284,7 +291,7 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
 //======================================================================
 // Let The Retry Timer Finish The Retry Job
 //======================================================================
-                if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
+                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                     return FAILURE;
                 }
                 return SUCCESS;
@@ -292,7 +299,7 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
 //----------------------------------------------------------------------
             uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
             if (current_time.status != SUCCESS) {
-                if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
+                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                     return FAILURE;
                 }
                 return FAILURE;
@@ -325,7 +332,7 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
                 if (l_inc_ctr != 0xFF) {
                     decrement_ctr(&security->local_ctr, security->local_nonce);
                 }
-                if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
+                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                     return FAILURE;
                 }
                 return FAILURE;
@@ -343,7 +350,7 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
                 if (l_inc_ctr != 0xFF) {
                     decrement_ctr(&security->local_ctr, security->local_nonce);
                 }
-                if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
+                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                     return FAILURE;
                 }
                 return FAILURE;
@@ -366,7 +373,7 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
                 if (l_inc_ctr != 0xFF) {
                     decrement_ctr(&security->local_ctr, security->local_nonce);
                 }
-                if (update_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
+                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
                     return FAILURE;
                 }
                 return FAILURE;
@@ -381,8 +388,6 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
 //======================================================================
             session->heartbeat_ack.rcvd = false;
 //======================================================================
-            async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
-            CLOSE_FD(&session->heartbeat_sender_timer_fd);
             break;
         }
         default:
@@ -427,8 +432,6 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint64_t u;
                     read(session->heartbeat_openner_timer_fd, &u, sizeof(u));
                     session->heartbeat_openned = true;
-                    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd);
-                    CLOSE_FD(&session->heartbeat_openner_timer_fd);
                     return SUCCESS;
                 }
             }
@@ -451,8 +454,6 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint64_t u;
                     read(session->heartbeat_openner_timer_fd, &u, sizeof(u));
                     session->heartbeat_openned = true;
-                    async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd);
-                    CLOSE_FD(&session->heartbeat_openner_timer_fd);
                     return SUCCESS;
                 }
             }

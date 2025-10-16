@@ -151,12 +151,8 @@ void run_master(const char *label, master_context_t *master_ctx) {
 			if (current_fd == master_ctx->check_healthy_timer_fd) {
 				uint64_t u;
 				read(master_ctx->check_healthy_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                if (async_set_timerfd_time(label, &master_ctx->check_healthy_timer_fd,
-                    WORKER_CHECK_HEALTHY,
-                    0,
-                    WORKER_CHECK_HEALTHY,
-                    0) != SUCCESS)
-                {
+                status_t uhst = update_timer_oneshot(label, &master_ctx->check_healthy_timer_fd, (double)WORKER_CHECK_HEALTHY);
+                if (uhst != SUCCESS) {
                     LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
                     master_ctx->shutdown_requested = 1;
                     master_workers_info(label, master_ctx, IT_SHUTDOWN);
@@ -320,23 +316,9 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                     metrics->hb_interval = (double)0;
                                     metrics->sum_hb_interval = metrics->hb_interval;
                                 }
-                                if (async_create_timerfd(label, &master_ctx->check_healthy_timer_fd) != SUCCESS) {
+                                status_t chst = create_timer_oneshot(label, &master_ctx->master_async, &master_ctx->check_healthy_timer_fd, (double)WORKER_CHECK_HEALTHY);
+                                if (chst != SUCCESS) {
                                     LOG_INFO("%sGagal async_create_timerfd hb checker. Initiating graceful shutdown...", label);
-                                    master_ctx->shutdown_requested = 1;
-                                    master_workers_info(label, master_ctx, IT_SHUTDOWN);
-                                    continue;
-                                }
-                                if (async_set_timerfd_time(label, &master_ctx->check_healthy_timer_fd,
-                                    WORKER_CHECK_HEALTHY, 0,
-                                    WORKER_CHECK_HEALTHY, 0) != SUCCESS)
-                                {
-                                    LOG_INFO("%sGagal async_set_timerfd_time hb checker. Initiating graceful shutdown...", label);
-                                    master_ctx->shutdown_requested = 1;
-                                    master_workers_info(label, master_ctx, IT_SHUTDOWN);
-                                    continue;
-                                }
-                                if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->check_healthy_timer_fd) != SUCCESS) {
-                                    LOG_INFO("%sGagal async_create_incoming_event hb checker. Initiating graceful shutdown...", label);
                                     master_ctx->shutdown_requested = 1;
                                     master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                     continue;

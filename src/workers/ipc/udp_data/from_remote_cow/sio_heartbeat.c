@@ -13,7 +13,6 @@
 #include "orilink/heartbeat_ack.h"
 #include "workers/ipc/master_ipc_cmds.h"
 #include "constants.h"
-#include "workers/timer/handlers.h"
 
 static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_session_t *session, orilink_identity_t *identity, uint8_t *trycount) {
 //======================================================================
@@ -238,8 +237,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         );
     }
     if (
-        session->heartbeat.polling ||
-        session->heartbeat_sender_timer_fd != -1
+        session->heartbeat.polling
     )
     {
 //======================================================================
@@ -352,7 +350,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
 //======================================================================
     session->test_drop_heartbeat_ack++;
     if (
-        session->test_drop_heartbeat_ack == 122
+        session->test_drop_heartbeat_ack == 1
     )
     {
         LOG_DEVEL_DEBUG("[Debug Here Helper]: Heartbeat Ack Packet Number %d. Sending To Fake Addr To Force Retry", session->test_drop_heartbeat_ack);
@@ -435,7 +433,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
 //======================================================================
     double timer_interval = session->heartbeat_interval;
 //======================================================================
-    status_t chst = create_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval);
+    status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, timer_interval);
     if (chst != SUCCESS) {
         return FAILURE;
     }

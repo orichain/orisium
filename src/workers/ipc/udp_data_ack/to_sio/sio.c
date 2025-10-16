@@ -38,8 +38,10 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
         case ORILINK_HEARTBEAT: {
             if (iudp_data_acki->trycount == (uint8_t)1) {
 //======================================================================
-                double retry_timer_interval = get_max_retry_sec((double)session->rtt.value_prediction);
-                retry_timer_interval /= pow((double)2, (double)session->retry.value_prediction);
+                //double retry_timer_interval = get_max_retry_sec((double)session->rtt.value_prediction);
+                //retry_timer_interval /= pow((double)2, (double)session->retry.value_prediction);
+                double retry_timer_interval = (double)session->retry.value_prediction;
+                retry_timer_interval = pow((double)2, retry_timer_interval);
                 if (retry_timer_interval < (double)MIN_RETRY_SEC) retry_timer_interval = (double)MIN_RETRY_SEC;
                 double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
                 retry_timer_interval *= (1.0 + jitter_amount);
@@ -49,7 +51,7 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
                     return FAILURE;
                 }
                 double timer_interval = session->heartbeat_interval;
-                if (create_timer(worker_ctx, &session->heartbeat_openner_timer_fd, timer_interval) != SUCCESS) {
+                if (create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd, timer_interval) != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
                     return FAILURE;
                 }
