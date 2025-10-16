@@ -1152,6 +1152,106 @@ status_t orilink_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key
     return SUCCESS;
 }
 
+static inline status_t read_header(const char *label, orilink_raw_protocol_t *r, uint8_t *data, uint32_t len) {
+    size_t current_offset = 0;
+    size_t total_buffer_len = (size_t)len;
+    const uint8_t *cursor = data + current_offset;
+    if (current_offset + AES_TAG_BYTES > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading mac.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(r->mac, cursor, AES_TAG_BYTES);
+    cursor += AES_TAG_BYTES;
+    current_offset += AES_TAG_BYTES;
+    if (current_offset + sizeof(uint32_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading ctr.", label);
+        return FAILURE_OOBUF;
+    }
+    uint32_t ctr_be;
+    memcpy(&ctr_be, cursor, sizeof(uint32_t));
+    r->ctr = be32toh(ctr_be);
+    cursor += sizeof(uint32_t);
+    current_offset += sizeof(uint32_t);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading trycount.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->trycount, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+    if (current_offset + ORILINK_VERSION_BYTES > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading version.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(r->version, cursor, ORILINK_VERSION_BYTES);
+    cursor += ORILINK_VERSION_BYTES;
+    current_offset += ORILINK_VERSION_BYTES;
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading inc_ctr.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->inc_ctr, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading remote_wot.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy((uint8_t *)&r->remote_wot, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading remote_index.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->remote_index, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading remote_session_index.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->remote_session_index, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading local_wot.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy((uint8_t *)&r->local_wot, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading local_index.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->local_index, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading local_session_index.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->local_session_index, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading id_connection.", label);
+        return FAILURE_OOBUF;
+    }
+    uint64_t id_connection_be;
+    memcpy(&id_connection_be, cursor, sizeof(uint64_t));
+    r->id_connection = be64toh(id_connection_be);
+    cursor += sizeof(uint64_t);
+    current_offset += sizeof(uint64_t);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading type.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy((uint8_t *)&r->type, cursor, sizeof(uint8_t));
+    return SUCCESS;
+}
+
 orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *label, int *sock_fd, struct sockaddr_in6 *source_addr) {
     orilink_raw_protocol_t_status_t result;
     result.status = FAILURE;
@@ -1177,7 +1277,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         result.status = FAILURE_OOBUF;
         return result;
     }
-    orilink_raw_protocol_t* r = (orilink_raw_protocol_t*)calloc(1, sizeof(orilink_raw_protocol_t));
+    orilink_raw_protocol_t *r = (orilink_raw_protocol_t*)calloc(1, sizeof(orilink_raw_protocol_t));
     if (!r) {
         LOG_ERROR("%sFailed to allocate orilink_raw_protocol_t. %s", label, strerror(errno));
         free(full_orilink_payload_buffer);
@@ -1196,137 +1296,11 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
     free(full_orilink_payload_buffer);
     r->recv_buffer = b;
     r->n = (uint32_t)bytes_read_payload;
-    memcpy(r->mac, b, AES_TAG_BYTES);
-    uint32_t ctr_be;
-    memcpy(&ctr_be,
-        b + 
-        AES_TAG_BYTES,
-        sizeof(uint32_t)
-    );
-    r->ctr = be32toh(ctr_be);
-    memcpy(&r->trycount,
-        b +
-        AES_TAG_BYTES +
-        sizeof(uint32_t),
-        sizeof(uint8_t)
-    );
-    memcpy(r->version,
-        b + 
-        AES_TAG_BYTES + 
-        sizeof(uint32_t) +
-        sizeof(uint8_t), 
-        ORILINK_VERSION_BYTES
-    );
-    memcpy(&r->inc_ctr,
-        b +
-        AES_TAG_BYTES +
-        sizeof(uint32_t) +
-        sizeof(uint8_t) +
-        ORILINK_VERSION_BYTES,
-        sizeof(uint8_t)
-    );
-    memcpy((uint8_t *)&r->remote_wot,
-        b +
-        AES_TAG_BYTES +
-        sizeof(uint32_t) +
-        sizeof(uint8_t) +
-        ORILINK_VERSION_BYTES +
-        sizeof(uint8_t),
-        sizeof(uint8_t)
-    );
-    memcpy(&r->remote_index,
-        b +
-        AES_TAG_BYTES +
-        sizeof(uint32_t) +
-        sizeof(uint8_t) +
-        ORILINK_VERSION_BYTES +
-        sizeof(uint8_t) +
-        sizeof(uint8_t),
-        sizeof(uint8_t)
-    );
-    memcpy(&r->remote_session_index,
-        b +
-        AES_TAG_BYTES +
-        sizeof(uint32_t) +
-        sizeof(uint8_t) +
-        ORILINK_VERSION_BYTES +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t),
-        sizeof(uint8_t)
-    );
-    memcpy((uint8_t *)&r->local_wot,
-        b +
-        AES_TAG_BYTES +
-        sizeof(uint32_t) +
-        sizeof(uint8_t) +
-        ORILINK_VERSION_BYTES +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t),
-        sizeof(uint8_t)
-    );
-    memcpy(&r->local_index,
-        b +
-        AES_TAG_BYTES +
-        sizeof(uint32_t) +
-        sizeof(uint8_t) +
-        ORILINK_VERSION_BYTES +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t),
-        sizeof(uint8_t)
-    );
-    memcpy(&r->local_session_index,
-        b +
-        AES_TAG_BYTES +
-        sizeof(uint32_t) +
-        sizeof(uint8_t) +
-        ORILINK_VERSION_BYTES +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t),
-        sizeof(uint8_t)
-    );
-    uint64_t id_connection_be;
-    memcpy(&id_connection_be,
-        b +
-        AES_TAG_BYTES +
-        sizeof(uint32_t) +
-        sizeof(uint8_t) +
-        ORILINK_VERSION_BYTES +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t),
-        sizeof(uint64_t)
-    );
-    r->id_connection = be64toh(id_connection_be);
-    memcpy((uint8_t *)&r->type,
-        b +
-        AES_TAG_BYTES +
-        sizeof(uint32_t) +
-        sizeof(uint8_t) +
-        ORILINK_VERSION_BYTES +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint64_t),
-        sizeof(uint8_t)
-    );
+    if (read_header(label, r, r->recv_buffer, r->n) != SUCCESS) {
+        CLOSE_ORILINK_RAW_PROTOCOL(&r);
+        result.status = FAILURE_NOMEM;
+        return result;
+    }
     result.r_orilink_raw_protocol_t = r;
     result.status = SUCCESS;
     return result;
@@ -1340,137 +1314,5 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
     }
     memcpy(oudp_datao->recv_buffer, iudp_datai->data, iudp_datai->len);
     oudp_datao->n = iudp_datai->len;
-    memcpy(oudp_datao->mac, oudp_datao->recv_buffer, AES_TAG_BYTES);
-    uint32_t ctr_be;
-    memcpy(&ctr_be,
-        oudp_datao->recv_buffer + 
-        AES_TAG_BYTES,
-        sizeof(uint32_t)
-    );
-    oudp_datao->ctr = be32toh(ctr_be);
-    memcpy(&oudp_datao->trycount,
-        oudp_datao->recv_buffer + 
-        AES_TAG_BYTES +
-        sizeof(uint32_t),
-        sizeof(uint8_t)
-    );
-    memcpy(oudp_datao->version,
-        oudp_datao->recv_buffer + 
-        AES_TAG_BYTES + 
-        sizeof(uint32_t) +
-        sizeof(uint8_t), 
-        ORILINK_VERSION_BYTES
-    );
-    memcpy(&oudp_datao->inc_ctr,
-        oudp_datao->recv_buffer +
-        AES_TAG_BYTES +
-        sizeof(uint32_t) +
-        sizeof(uint8_t) +
-        ORILINK_VERSION_BYTES,
-        sizeof(uint8_t)
-    );
-    memcpy((uint8_t *)&oudp_datao->remote_wot,
-        oudp_datao->recv_buffer +
-        AES_TAG_BYTES +
-        sizeof(uint32_t) +
-        sizeof(uint8_t) +
-        ORILINK_VERSION_BYTES +
-        sizeof(uint8_t),
-        sizeof(uint8_t)
-    );
-    memcpy(&oudp_datao->remote_index,
-        oudp_datao->recv_buffer +
-        AES_TAG_BYTES +
-        sizeof(uint32_t) +
-        sizeof(uint8_t) +
-        ORILINK_VERSION_BYTES +
-        sizeof(uint8_t) +
-        sizeof(uint8_t),
-        sizeof(uint8_t)
-    );
-    memcpy(&oudp_datao->remote_session_index,
-        oudp_datao->recv_buffer +
-        AES_TAG_BYTES +
-        sizeof(uint32_t) +
-        sizeof(uint8_t) +
-        ORILINK_VERSION_BYTES +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t),
-        sizeof(uint8_t)
-    );
-    memcpy((uint8_t *)&oudp_datao->local_wot,
-        oudp_datao->recv_buffer +
-        AES_TAG_BYTES +
-        sizeof(uint32_t) +
-        sizeof(uint8_t) +
-        ORILINK_VERSION_BYTES +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t),
-        sizeof(uint8_t)
-    );
-    memcpy(&oudp_datao->local_index,
-        oudp_datao->recv_buffer +
-        AES_TAG_BYTES +
-        sizeof(uint32_t) +
-        sizeof(uint8_t) +
-        ORILINK_VERSION_BYTES +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t),
-        sizeof(uint8_t)
-    );
-    memcpy(&oudp_datao->local_session_index,
-        oudp_datao->recv_buffer +
-        AES_TAG_BYTES +
-        sizeof(uint32_t) +
-        sizeof(uint8_t) +
-        ORILINK_VERSION_BYTES +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t),
-        sizeof(uint8_t)
-    );
-    
-    uint64_t id_connection_be;
-    memcpy(&id_connection_be,
-        oudp_datao->recv_buffer +
-        AES_TAG_BYTES +
-        sizeof(uint32_t) +
-        sizeof(uint8_t) +
-        ORILINK_VERSION_BYTES +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t),
-        sizeof(uint64_t)
-    );
-    oudp_datao->id_connection = be64toh(id_connection_be);
-    memcpy((uint8_t *)&oudp_datao->type,
-        oudp_datao->recv_buffer +
-        AES_TAG_BYTES +
-        sizeof(uint32_t) +
-        sizeof(uint8_t) +
-        ORILINK_VERSION_BYTES +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint64_t),
-        sizeof(uint8_t)
-    );
-    return SUCCESS;
+    return read_header(label, oudp_datao, oudp_datao->recv_buffer, oudp_datao->n);
 }
