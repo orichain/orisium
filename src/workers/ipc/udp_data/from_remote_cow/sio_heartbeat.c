@@ -2,7 +2,6 @@
 #include <inttypes.h>
 #include <netinet/in.h>
 #include <string.h>
-#include <math.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -436,8 +435,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         return FAILURE;
     }
 //======================================================================
-    double timer_interval = session->heartbeat_interval * pow((double)2, (double)session->retry.value_prediction);
-    timer_interval += session->rtt.value_prediction / (double)1e9;
+    double timer_interval = session->heartbeat_interval;
 //======================================================================
     status_t chst = create_timer(worker_ctx, &session->heartbeat_sender_timer_fd, timer_interval);
     if (chst != SUCCESS) {

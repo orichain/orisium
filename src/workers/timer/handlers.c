@@ -54,7 +54,7 @@ static inline status_t retry_transmit(
             retry_timer_interval /= pow((double)2, (double)session->retry.value_prediction);
             if (retry_timer_interval < (double)MIN_RETRY_SEC) retry_timer_interval = (double)MIN_RETRY_SEC;
             double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
-            retry_timer_interval += jitter_amount;
+            retry_timer_interval *= (1.0 + jitter_amount);
 //----------------------------------------------------------------------
             if (retry_control_packet(
                     worker_ctx, 
@@ -96,12 +96,12 @@ static inline status_t retry_transmit(
             }
             double try_count = (double)h->sent_try_count;
             calculate_retry(worker_ctx->label, session, c_wot, try_count);
-//----------------------------------------------------------------------            
+//----------------------------------------------------------------------   
             double retry_timer_interval = (double)MAX_RETRY_SEC;
             retry_timer_interval /= pow((double)2, (double)session->retry.value_prediction);
             if (retry_timer_interval < (double)MIN_RETRY_SEC) retry_timer_interval = (double)MIN_RETRY_SEC;
             double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
-            retry_timer_interval += jitter_amount;
+            retry_timer_interval *= (1.0 + jitter_amount);
 //----------------------------------------------------------------------
             if (retry_control_packet(
                     worker_ctx, 
@@ -190,6 +190,8 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
             session->heartbeat.sent_time = current_time.r_uint64_t;
 //======================================================================
             double hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
+            double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+            hb_interval *= (1.0 + jitter_amount);
             hb_interval += session->rtt.value_prediction / (double)1e9;
 //======================================================================
             uint8_t l_inc_ctr = 0x01;
@@ -299,6 +301,8 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
             session->heartbeat.sent_time = current_time.r_uint64_t;
 //======================================================================
             double hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
+            double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+            hb_interval *= (1.0 + jitter_amount);
             hb_interval += session->rtt.value_prediction / (double)1e9;
 //======================================================================
             uint8_t l_inc_ctr = 0x01;
