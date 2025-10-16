@@ -879,6 +879,55 @@ status_t ipc_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac
     return SUCCESS;
 }
 
+static inline status_t read_header(const char *label, ipc_raw_protocol_t *r, uint8_t *data, uint32_t len) {
+    size_t current_offset = 0;
+    size_t total_buffer_len = (size_t)len;
+    const uint8_t *cursor = data + current_offset;
+    if (current_offset + AES_TAG_BYTES > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading mac.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(r->mac, cursor, AES_TAG_BYTES);
+    cursor += AES_TAG_BYTES;
+    current_offset += AES_TAG_BYTES;
+    if (current_offset + sizeof(uint32_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading ctr.", label);
+        return FAILURE_OOBUF;
+    }
+    uint32_t ctr_be;
+    memcpy(&ctr_be, cursor, sizeof(uint32_t));
+    r->ctr = be32toh(ctr_be);
+    cursor += sizeof(uint32_t);
+    current_offset += sizeof(uint32_t);
+    if (current_offset + IPC_VERSION_BYTES > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading version.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(r->version, cursor, IPC_VERSION_BYTES);
+    cursor += IPC_VERSION_BYTES;
+    current_offset += IPC_VERSION_BYTES;
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading wot.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy((uint8_t *)&r->wot, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading index.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->index, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading type.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy((uint8_t *)&r->type, cursor, sizeof(uint8_t));
+    return SUCCESS;
+}
+
 ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, int *uds_fd) {
     ipc_raw_protocol_t_status_t result;
     result.status = FAILURE;
@@ -962,6 +1011,7 @@ ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, 
         result.status = FAILURE_NOMEM;
         return result;
     }
+    /*
     uint8_t *b = (uint8_t*) calloc(1, bytes_read_payload);
     if (!b) {
         LOG_ERROR("%sFailed to allocate ipc_raw_protocol_t buffer. %s", label, strerror(errno));
@@ -972,16 +1022,16 @@ ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, 
     }
     memcpy(b, full_ipc_payload_buffer, bytes_read_payload);
     free(full_ipc_payload_buffer);
-    r->recv_buffer = b;
+    */
+    r->recv_buffer = full_ipc_payload_buffer;
     r->n = (uint32_t)bytes_read_payload;
-    memcpy(r->mac, b, AES_TAG_BYTES);
-    uint32_t ctr_be;
-    memcpy(&ctr_be, b + AES_TAG_BYTES, sizeof(uint32_t));
-    r->ctr = be32toh(ctr_be);
-    memcpy(r->version, b + AES_TAG_BYTES + sizeof(uint32_t), IPC_VERSION_BYTES);
-    memcpy((uint8_t *)&r->wot, b + AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES, sizeof(uint8_t));
-    memcpy(&r->index, b + AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES + sizeof(uint8_t), sizeof(uint8_t));
-    memcpy((uint8_t *)&r->type, b + AES_TAG_BYTES + sizeof(uint32_t) + IPC_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t), sizeof(uint8_t));
+    full_ipc_payload_buffer = NULL;
+    bytes_read_payload = 0;
+    if (read_header(label, r, r->recv_buffer, r->n) != SUCCESS) {
+        CLOSE_IPC_RAW_PROTOCOL(&r);
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
     result.r_ipc_raw_protocol_t = r;
     result.status = SUCCESS;
     return result;

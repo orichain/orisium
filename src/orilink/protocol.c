@@ -1272,7 +1272,12 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
             return result;
         }
     } else if (bytes_read_payload < (ssize_t)(AES_TAG_BYTES + sizeof(uint32_t) + ORILINK_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t))) {
-        LOG_ERROR("%sreceive_orilink_raw_protocol_packet received 0 bytes (unexpected for UDP).", label);
+        LOG_ERROR("%sreceive_orilink_raw_protocol_packet received invalid size(min size) orilink packet.", label);
+        free(full_orilink_payload_buffer);
+        result.status = FAILURE_OOBUF;
+        return result;
+    } else if (bytes_read_payload > (ssize_t)ORILINK_MAX_PACKET_SIZE) {
+        LOG_ERROR("%sreceive_orilink_raw_protocol_packet received invalid size(max size) orilink packet.", label);
         free(full_orilink_payload_buffer);
         result.status = FAILURE_OOBUF;
         return result;
@@ -1284,6 +1289,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         result.status = FAILURE_NOMEM;
         return result;
     }
+    /*
     uint8_t *b = (uint8_t*) calloc(1, bytes_read_payload);
     if (!b) {
         LOG_ERROR("%sFailed to allocate orilink_raw_protocol_t buffer. %s", label, strerror(errno));
@@ -1294,11 +1300,14 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
     }
     memcpy(b, full_orilink_payload_buffer, bytes_read_payload);
     free(full_orilink_payload_buffer);
-    r->recv_buffer = b;
+    */
+    r->recv_buffer = full_orilink_payload_buffer;
     r->n = (uint32_t)bytes_read_payload;
+    full_orilink_payload_buffer = NULL;
+    bytes_read_payload = 0;
     if (read_header(label, r, r->recv_buffer, r->n) != SUCCESS) {
         CLOSE_ORILINK_RAW_PROTOCOL(&r);
-        result.status = FAILURE_NOMEM;
+        result.status = FAILURE_OOBUF;
         return result;
     }
     result.r_orilink_raw_protocol_t = r;
