@@ -12,13 +12,10 @@
 #include "constants.h"
 #include "workers/workers.h"
 #include "workers/ipc/handlers.h"
-#include "poly1305-donna.h"
 #include "orilink/protocol.h"
 #include "stdbool.h"
 #include "orilink/heartbeat.h"
 #include "workers/ipc/master_ipc_cmds.h"
-#include "aes_custom.h"
-#include "aes.h"
 
 status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     uint8_t inc_ctr = oudp_datao->inc_ctr;
@@ -63,7 +60,10 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         return FAILURE;
     } else {
@@ -93,37 +93,52 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
 //----------------------------------------------------------------------
 // cek Mac
 //----------------------------------------------------------------------  
-    uint8_t mac0[AES_TAG_BYTES];
-    poly1305_context mac_ctx0;
-    poly1305_init(&mac_ctx0, security->mac_key);
-    poly1305_update(&mac_ctx0, encrypted_local_identity, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t));
-    poly1305_finish(&mac_ctx0, mac0);
-    if (!poly1305_verify(mac0, data_mac0)) {
-        LOG_ERROR("%sFailed to Mac Tidak Sesuai. Worker error...", worker_ctx->label);
+    const size_t data_len_0 = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t);
+    if (compare_mac(
+            security->mac_key,
+            encrypted_local_identity,
+            data_len_0,
+            data_mac0
+        ) != SUCCESS
+    )
+    {
+        LOG_ERROR("%sORILINK Hello4 Ack Mac mismatch!", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         return FAILURE;
-    }            
+    }
 //----------------------------------------------------------------------
 // Decrypt
 //---------------------------------------------------------------------- 
     uint8_t decrypted_local_identity[sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t)];
-    aes256ctx aes_ctx0;
-    aes256_ctr_keyexp(&aes_ctx0, aes_key);
-//=========================================IV===========================    
-    uint8_t keystream_buffer0[sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t)];
-    uint8_t iv0[AES_IV_BYTES];
-    memcpy(iv0, security->remote_nonce, AES_NONCE_BYTES);
-    uint32_t remote_ctr_be0 = htobe32(remote_ctr);
-    memcpy(iv0 + AES_NONCE_BYTES, &remote_ctr_be0, sizeof(uint32_t));
-//=========================================IV===========================    
-    aes256_ctr_custom(keystream_buffer0, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), iv0, &aes_ctx0);
-    for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t); i++) {
-        decrypted_local_identity[i] = encrypted_local_identity[i] ^ keystream_buffer0[i];
+    const size_t data_len = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t);
+    if (encrypt_decrypt(
+            worker_ctx->label,
+            aes_key,
+            security->remote_nonce,
+            &remote_ctr,
+            encrypted_local_identity,
+            decrypted_local_identity,
+            data_len
+        ) != SUCCESS
+    )
+    {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
+        return FAILURE;
     }
-    aes256_ctx_release(&aes_ctx0);
 //======================================================================
 // + Security
 //======================================================================
@@ -134,7 +149,10 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         return FAILURE;
     }
@@ -145,7 +163,10 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         return FAILURE;
     }
@@ -156,7 +177,10 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         return FAILURE;
     }      
@@ -168,7 +192,10 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         return FAILURE;
     }
@@ -180,37 +207,50 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
 //----------------------------------------------------------------------
 // cek Mac
 //----------------------------------------------------------------------  
-    uint8_t mac1[AES_TAG_BYTES];
-    poly1305_context mac_ctx1;
-    poly1305_init(&mac_ctx1, security->mac_key);
-    poly1305_update(&mac_ctx1, encrypted_remote_identity, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t));
-    poly1305_finish(&mac_ctx1, mac1);
-    if (!poly1305_verify(mac1, data_mac1)) {
-        LOG_ERROR("%sFailed to Mac Tidak Sesuai. Worker error...", worker_ctx->label);
+    if (compare_mac(
+            security->mac_key,
+            encrypted_remote_identity,
+            data_len_0,
+            data_mac1
+        ) != SUCCESS
+    )
+    {
+        LOG_ERROR("%sORILINK Hello4 Ack Mac mismatch!", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         return FAILURE;
-    }            
+    }
 //----------------------------------------------------------------------
 // Decrypt
 //---------------------------------------------------------------------- 
     uint8_t decrypted_remote_identity[sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t)];
-    aes256ctx aes_ctx1;
-    aes256_ctr_keyexp(&aes_ctx1, aes_key);
-//=========================================IV===========================    
-    uint8_t keystream_buffer1[sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t)];
-    uint8_t iv1[AES_IV_BYTES];
-    memcpy(iv1, security->remote_nonce, AES_NONCE_BYTES);
-    uint32_t remote_ctr_be1 = htobe32(remote_ctr);
-    memcpy(iv1 + AES_NONCE_BYTES, &remote_ctr_be1, sizeof(uint32_t));
-//=========================================IV===========================    
-    aes256_ctr_custom(keystream_buffer1, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), iv1, &aes_ctx1);
-    for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t); i++) {
-        decrypted_remote_identity[i] = encrypted_remote_identity[i] ^ keystream_buffer1[i];
+    if (encrypt_decrypt(
+            worker_ctx->label,
+            aes_key,
+            security->remote_nonce,
+            &remote_ctr,
+            encrypted_remote_identity,
+            decrypted_remote_identity,
+            data_len
+        ) != SUCCESS
+    )
+    {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
+        return FAILURE;
     }
-    aes256_ctx_release(&aes_ctx1);
 //----------------------------------------------------------------------
 // Mencocokkan wot index
 //----------------------------------------------------------------------
@@ -221,7 +261,10 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         return FAILURE;
     }
@@ -232,7 +275,10 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         return FAILURE;
     }
@@ -243,7 +289,10 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         return FAILURE;
     }
@@ -256,7 +305,10 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         return FAILURE;
     }
@@ -286,10 +338,16 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         if (l_inc_ctr != 0xFF) {
-            decrement_ctr(&security->local_ctr, security->local_nonce);
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->local_ctr, security->local_nonce);
         }
         return FAILURE;
     }
@@ -306,7 +364,10 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         if (l_inc_ctr != 0xFF) {
             decrement_ctr(&security->local_ctr, security->local_nonce);
@@ -330,7 +391,10 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         if (l_inc_ctr != 0xFF) {
             decrement_ctr(&security->local_ctr, security->local_nonce);

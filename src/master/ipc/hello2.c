@@ -1,7 +1,6 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdint.h>
-#include <endian.h>
 #include <stdlib.h>
 
 #include "log.h"
@@ -12,9 +11,6 @@
 #include "master/master.h"
 #include "master/ipc/handlers.h"
 #include "master/ipc/worker_ipc_cmds.h"
-#include "poly1305-donna.h"
-#include "aes_custom.h"
-#include "aes.h"
 
 status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ctx, worker_type_t rcvd_wot, uint8_t rcvd_index, worker_security_t *security, worker_rekeying_t *rekeying, const char *worker_name, int *worker_uds_fd, ipc_raw_protocol_t_status_t *ircvdi) {
     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
@@ -66,34 +62,38 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
 //----------------------------------------------------------------------  
     uint8_t encrypted_wot_index_rcvd1[AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t)];
     memcpy(encrypted_wot_index_rcvd1, ihello2i->encrypted_wot_index, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t));
-    uint8_t mac0[AES_TAG_BYTES];
-    poly1305_context mac_ctx0;
-    poly1305_init(&mac_ctx0, security->mac_key);
-    poly1305_update(&mac_ctx0, encrypted_wot_index_rcvd1, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t));
-    poly1305_finish(&mac_ctx0, mac0);
-    if (!poly1305_verify(mac0, data_mac)) {
-        LOG_ERROR("%sFailed to Mac Tidak Sesuai.", label);
+    const size_t data_len_0 = AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t);
+    if (compare_mac(
+            security->mac_key,
+            encrypted_wot_index_rcvd1,
+            data_len_0,
+            data_mac
+        ) != SUCCESS
+    )
+    {
+        LOG_ERROR("%sIPC Hello2 Mac mismatch!", label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        return FAILURE;
+        return FAILURE_MACMSMTCH;
     }
 //----------------------------------------------------------------------
 // Decrypt
 //---------------------------------------------------------------------- 
     uint8_t decrypted_wot_index_rcvd[sizeof(uint8_t) + sizeof(uint8_t)];
-    aes256ctx aes_ctx0;
-    aes256_ctr_keyexp(&aes_ctx0, aes_key);
-//=========================================IV===========================    
-    uint8_t keystream_buffer0[sizeof(uint8_t) + sizeof(uint8_t)];
-    uint8_t iv0[AES_IV_BYTES];
-    memcpy(iv0, remote_nonce, AES_NONCE_BYTES);
-    uint32_t remote_ctr_be = htobe32(security->remote_ctr);
-    memcpy(iv0 + AES_NONCE_BYTES, &remote_ctr_be, sizeof(uint32_t));
-//=========================================IV===========================    
-    aes256_ctr_custom(keystream_buffer0, sizeof(uint8_t) + sizeof(uint8_t), iv0, &aes_ctx0);
-    for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t); i++) {
-        decrypted_wot_index_rcvd[i] = encrypted_wot_index_rcvd[i] ^ keystream_buffer0[i];
+    const size_t data_len = sizeof(uint8_t) + sizeof(uint8_t);
+    if (encrypt_decrypt(
+            label,
+            aes_key,
+            remote_nonce,
+            &security->remote_ctr,
+            encrypted_wot_index_rcvd,
+            decrypted_wot_index_rcvd,
+            data_len
+        ) != SUCCESS
+    )
+    {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        return FAILURE;
     }
-    aes256_ctx_release(&aes_ctx0);
 //----------------------------------------------------------------------
 // Mencocokkan wot index
 //----------------------------------------------------------------------
@@ -118,26 +118,24 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
     memcpy(wot_index, (uint8_t *)&rcvd_wot, sizeof(uint8_t));
     memcpy(wot_index + sizeof(uint8_t), &rcvd_index, sizeof(uint8_t));
 //======================================================================    
-    aes256ctx aes_ctx1;
-    aes256_ctr_keyexp(&aes_ctx1, aes_key);
-//=========================================IV===========================    
-    uint8_t keystream_buffer1[sizeof(uint8_t) + sizeof(uint8_t)];
-    uint8_t iv1[AES_IV_BYTES];
-    memcpy(iv1, security->local_nonce, AES_NONCE_BYTES);
-    uint32_t local_ctr_be = htobe32(security->local_ctr);
-    memcpy(iv1 + AES_NONCE_BYTES, &local_ctr_be, sizeof(uint32_t));
-//=========================================IV===========================    
-    aes256_ctr_custom(keystream_buffer1, sizeof(uint8_t) + sizeof(uint8_t), iv1, &aes_ctx1);
-    for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t); i++) {
-        encrypted_wot_index[i] = wot_index[i] ^ keystream_buffer1[i];
+    if (encrypt_decrypt(
+            label,
+            aes_key,
+            security->local_nonce,
+            &security->local_ctr,
+            wot_index,
+            encrypted_wot_index,
+            data_len
+        ) != SUCCESS
+    )
+    {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        return FAILURE;
     }
-    aes256_ctx_release(&aes_ctx1);
 //======================================================================    
     uint8_t mac1[AES_TAG_BYTES];
-    poly1305_context mac_ctx;
-    poly1305_init(&mac_ctx, security->mac_key);
-    poly1305_update(&mac_ctx, encrypted_wot_index, sizeof(uint8_t) + sizeof(uint8_t));
-    poly1305_finish(&mac_ctx, mac1);
+    const size_t data_4mac_len = sizeof(uint8_t) + sizeof(uint8_t);
+    calculate_mac(security->mac_key, encrypted_wot_index, mac1, data_4mac_len);
 //====================================================================== 
     memcpy(encrypted_wot_index1, encrypted_wot_index, sizeof(uint8_t) + sizeof(uint8_t));
     memcpy(encrypted_wot_index1 + sizeof(uint8_t) + sizeof(uint8_t), mac1, AES_TAG_BYTES);

@@ -12,12 +12,9 @@
 #include "workers/workers.h"
 #include "workers/ipc/handlers.h"
 #include "workers/ipc/master_ipc_cmds.h"
-#include "poly1305-donna.h"
 #include "orilink/hello4_ack.h"
 #include "orilink/protocol.h"
 #include "stdbool.h"
-#include "aes_custom.h"
-#include "aes.h"
 
 static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, uint8_t *trycount) {
 //======================================================================
@@ -243,13 +240,16 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t)
     ];
     memcpy(encrypted_remote_identity_rcvd1, ohello4->encrypted_local_identity, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t));
-    uint8_t mac0[AES_TAG_BYTES];
-    poly1305_context mac_ctx0;
-    poly1305_init(&mac_ctx0, security->mac_key);
-    poly1305_update(&mac_ctx0, encrypted_remote_identity_rcvd1, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t));
-    poly1305_finish(&mac_ctx0, mac0);
-    if (!poly1305_verify(mac0, data_mac)) {
-        LOG_ERROR("%sFailed to Mac Tidak Sesuai.", worker_ctx->label);
+    const size_t data_len_0 = AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t);
+    if (compare_mac(
+            security->mac_key,
+            encrypted_remote_identity_rcvd1,
+            data_len_0,
+            data_mac
+        ) != SUCCESS
+    )
+    {
+        LOG_ERROR("%sORILINK Hello4 Mac mismatch!", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         if (inc_ctr != 0xFF) {
@@ -266,22 +266,28 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     uint8_t decrypted_remote_identity_rcvd[
         sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t)
     ];
-    aes256ctx aes_ctx0;
-    aes256_ctr_keyexp(&aes_ctx0, aes_key);
-//=========================================IV===========================    
-    uint8_t keystream_buffer0[
-        sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t)
-    ];
-    uint8_t iv0[AES_IV_BYTES];
-    memcpy(iv0, remote_nonce, AES_NONCE_BYTES);
-    uint32_t remote_ctr_be = htobe32(remote_ctr);
-    memcpy(iv0 + AES_NONCE_BYTES, &remote_ctr_be, sizeof(uint32_t));
-//=========================================IV===========================    
-    aes256_ctr_custom(keystream_buffer0, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), iv0, &aes_ctx0);
-    for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t); i++) {
-        decrypted_remote_identity_rcvd[i] = encrypted_remote_identity_rcvd[i] ^ keystream_buffer0[i];
+    const size_t data_len = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t);
+    if (encrypt_decrypt(
+            worker_ctx->label,
+            aes_key,
+            remote_nonce,
+            &remote_ctr,
+            encrypted_remote_identity_rcvd,
+            decrypted_remote_identity_rcvd,
+            data_len
+        ) != SUCCESS
+    )
+    {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
+        return FAILURE;
     }
-    aes256_ctx_release(&aes_ctx0);
 //======================================================================
 // + Security
 //======================================================================
@@ -368,26 +374,31 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         sizeof(uint64_t)
     );
 //======================================================================    
-    aes256ctx aes_ctx1;
-    aes256_ctr_keyexp(&aes_ctx1, aes_key);
-//=========================================IV===========================    
-    uint8_t keystream_buffer1[sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t)];
-    uint8_t iv1[AES_IV_BYTES];
-    memcpy(iv1, security->local_nonce, AES_NONCE_BYTES);
-    uint32_t local_ctr_be1 = htobe32(local_ctr);
-    memcpy(iv1 + AES_NONCE_BYTES, &local_ctr_be1, sizeof(uint32_t));
-//=========================================IV===========================    
-    aes256_ctr_custom(keystream_buffer1, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), iv1, &aes_ctx1);
-    for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t); i++) {
-        encrypted_remote_identity[i] = remote_identity[i] ^ keystream_buffer1[i];
+    if (encrypt_decrypt(
+            worker_ctx->label,
+            aes_key,
+            security->local_nonce,
+            &local_ctr,
+            remote_identity,
+            encrypted_remote_identity,
+            data_len
+        ) != SUCCESS
+    )
+    {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
+        return FAILURE;
     }
-    aes256_ctx_release(&aes_ctx1);
 //======================================================================    
     uint8_t mac1[AES_TAG_BYTES];
-    poly1305_context mac_ctx1;
-    poly1305_init(&mac_ctx1, security->mac_key);
-    poly1305_update(&mac_ctx1, encrypted_remote_identity, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t));
-    poly1305_finish(&mac_ctx1, mac1);
+    const size_t data_4mac_len = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t);
+    calculate_mac(security->mac_key, encrypted_remote_identity, mac1, data_4mac_len);
 //====================================================================== 
     memcpy(encrypted_remote_identity1, encrypted_remote_identity, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t));
     memcpy(encrypted_remote_identity1 + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), mac1, AES_TAG_BYTES);
@@ -417,26 +428,30 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         sizeof(uint64_t)
     );
 //======================================================================    
-    aes256ctx aes_ctx2;
-    aes256_ctr_keyexp(&aes_ctx2, aes_key);
-//=========================================IV===========================    
-    uint8_t keystream_buffer2[sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t)];
-    uint8_t iv2[AES_IV_BYTES];
-    memcpy(iv2, security->local_nonce, AES_NONCE_BYTES);
-    uint32_t local_ctr_be2 = htobe32(security->local_ctr);
-    memcpy(iv2 + AES_NONCE_BYTES, &local_ctr_be2, sizeof(uint32_t));
-//=========================================IV===========================    
-    aes256_ctr_custom(keystream_buffer2, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), iv2, &aes_ctx2);
-    for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t); i++) {
-        encrypted_local_identity[i] = local_identity[i] ^ keystream_buffer2[i];
+    if (encrypt_decrypt(
+            worker_ctx->label,
+            aes_key,
+            security->local_nonce,
+            &security->local_ctr,
+            local_identity,
+            encrypted_local_identity,
+            data_len
+        ) != SUCCESS
+    )
+    {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
+        return FAILURE;
     }
-    aes256_ctx_release(&aes_ctx2);
 //======================================================================    
     uint8_t mac2[AES_TAG_BYTES];
-    poly1305_context mac_ctx2;
-    poly1305_init(&mac_ctx2, security->mac_key);
-    poly1305_update(&mac_ctx2, encrypted_local_identity, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t));
-    poly1305_finish(&mac_ctx2, mac2);
+    calculate_mac(security->mac_key, encrypted_local_identity, mac2, data_4mac_len);
 //====================================================================== 
     memcpy(encrypted_local_identity1, encrypted_local_identity, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t));
     memcpy(encrypted_local_identity1 + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), mac2, AES_TAG_BYTES);
@@ -444,7 +459,13 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        if (inc_ctr != 0xFF) {
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
+        }
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -515,7 +536,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
 //======================================================================
     session->test_drop_hello4_ack++;
     if (
-        session->test_drop_hello4_ack == 1
+        session->test_drop_hello4_ack == 2
     )
     {
         printf("[Debug Here Helper]: Hello4 Ack Packet Number %d. Sending To Fake Addr To Force Retry\n", session->test_drop_hello4_ack);

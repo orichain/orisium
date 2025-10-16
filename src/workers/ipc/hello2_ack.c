@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
-#include <endian.h>
 #include <stdlib.h>
 
 #include "log.h"
@@ -12,9 +11,6 @@
 #include "constants.h"
 #include "workers/workers.h"
 #include "workers/ipc/handlers.h"
-#include "poly1305-donna.h"
-#include "aes_custom.h"
-#include "aes.h"
 
 status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_protocol_t_status_t *ircvdi) {
     if (!worker_ctx->hello2_sent) {
@@ -61,34 +57,38 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
 //----------------------------------------------------------------------
 // cek Mac
 //----------------------------------------------------------------------  
-    uint8_t mac[AES_TAG_BYTES];
-    poly1305_context mac_ctx;
-    poly1305_init(&mac_ctx, worker_ctx->mac_key);
-    poly1305_update(&mac_ctx, encrypted_wot_index, sizeof(uint8_t) + sizeof(uint8_t));
-    poly1305_finish(&mac_ctx, mac);
-    if (!poly1305_verify(mac, data_mac)) {
-        LOG_ERROR("%sFailed to Mac Tidak Sesuai. Worker error...", worker_ctx->label);
+    const size_t data_len_0 = sizeof(uint8_t) + sizeof(uint8_t);
+    if (compare_mac(
+            worker_ctx->mac_key,
+            encrypted_wot_index,
+            data_len_0,
+            data_mac
+        ) != SUCCESS
+    )
+    {
+        LOG_ERROR("%sIPC Hello2 Ack Mac mismatch!", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        return FAILURE;
-    }            
+        return FAILURE_MACMSMTCH;
+    }
 //----------------------------------------------------------------------
 // Decrypt
 //---------------------------------------------------------------------- 
     uint8_t decrypted_wot_index[sizeof(uint8_t) + sizeof(uint8_t)];
-    aes256ctx aes_ctx;
-    aes256_ctr_keyexp(&aes_ctx, aes_key);
-//=========================================IV===========================    
-    uint8_t keystream_buffer[sizeof(uint8_t) + sizeof(uint8_t)];
-    uint8_t iv[AES_IV_BYTES];
-    memcpy(iv, worker_ctx->remote_nonce, AES_NONCE_BYTES);
-    uint32_t remote_ctr_be = htobe32(worker_ctx->remote_ctr);
-    memcpy(iv + AES_NONCE_BYTES, &remote_ctr_be, sizeof(uint32_t));
-//=========================================IV===========================    
-    aes256_ctr_custom(keystream_buffer, sizeof(uint8_t) + sizeof(uint8_t), iv, &aes_ctx);
-    for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t); i++) {
-        decrypted_wot_index[i] = encrypted_wot_index[i] ^ keystream_buffer[i];
+    const size_t data_len = sizeof(uint8_t) + sizeof(uint8_t);
+    if (encrypt_decrypt(
+            worker_ctx->label,
+            aes_key,
+            worker_ctx->remote_nonce,
+            &worker_ctx->remote_ctr,
+            encrypted_wot_index,
+            decrypted_wot_index,
+            data_len
+        ) != SUCCESS
+    )
+    {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        return FAILURE;
     }
-    aes256_ctx_release(&aes_ctx);
 //----------------------------------------------------------------------
 // Mencocokkan wot index
 //----------------------------------------------------------------------

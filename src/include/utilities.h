@@ -24,6 +24,7 @@
 #include <endian.h>
 #include <randombytes.h>
 #include <fips202.h>
+#include <aes.h>
 #include "log.h"
 #include "types.h"
 #include "constants.h"
@@ -42,6 +43,85 @@ static inline void print_hex(const char* label, const uint8_t* data, size_t len,
     printf("\n");
 }
 
+static inline double get_max_retry_sec(double srtt) {
+    double max_retry_sec = (double)MAX_RETRY_SEC;
+    if (srtt < (double)SRTT_THRESHOLD_TO2X_RCNT_MS) {
+        max_retry_sec *= 2;
+    }
+    return max_retry_sec;
+}
+
+static inline status_t encrypt_decrypt(
+    const char* label, 
+    uint8_t* key_aes, 
+    uint8_t* nonce, 
+    uint32_t *ctr, 
+    uint8_t *data, 
+    uint8_t *encrypted_decrypted_data, 
+    const size_t data_len
+)
+{
+    uint8_t *keystream_buffer = (uint8_t *)calloc(1, data_len);
+    if (!keystream_buffer) {
+        LOG_ERROR("%sError calloc keystream_buffer for encryption/decryption: %s", label, strerror(errno));
+        return FAILURE;
+    }
+    aes256ctx aes_ctx;
+    aes256_ctr_keyexp(&aes_ctx, key_aes);
+    uint8_t iv[AES_IV_BYTES];
+    memcpy(iv, nonce, AES_NONCE_BYTES);
+/*
+ * CRITICAL: Convert the 4-byte Counter to Little-Endian (LE).
+ * The underlying PQClean/BearSSL implementation relies on the LE convention
+ * (using internal functions like 'br_dec32le') to correctly interpret the
+ * 4-byte counter field within the 12-byte IV prefix.
+ *  
+ * This use of htole32 ensures cryptographic portability and guarantees that 
+ * the counter is processed logically (1, 2, 3, etc.), preventing byte-ordering 
+ * confusion regardless of the Host system's native endianness (e.g., big-endian systems).
+*/
+    uint32_t ctr_le = htole32(*(uint32_t *)ctr);
+    memcpy(iv + AES_NONCE_BYTES, &ctr_le, sizeof(uint32_t));
+    aes256_ctr(keystream_buffer, data_len, iv, &aes_ctx);
+    for (size_t i = 0; i < data_len; i++) {
+        encrypted_decrypted_data[i] = data[i] ^ keystream_buffer[i];
+    }
+    free(keystream_buffer);
+    aes256_ctx_release(&aes_ctx);
+    return SUCCESS;
+}
+
+static inline void calculate_mac(
+    uint8_t* key_mac, 
+    uint8_t *data_4mac, 
+    uint8_t *mac, 
+    const size_t data_4mac_len
+)
+{
+    poly1305_context ctx;
+    poly1305_init(&ctx, key_mac);
+    poly1305_update(&ctx, data_4mac, data_4mac_len);
+    poly1305_finish(&ctx, mac);
+}
+
+static inline status_t compare_mac(
+    uint8_t* key_mac, 
+    uint8_t *data, 
+    const size_t data_len,
+    uint8_t *data_4mac
+)
+{
+    uint8_t mac[AES_TAG_BYTES];
+    poly1305_context ctx;
+    poly1305_init(&ctx, key_mac);
+    poly1305_update(&ctx, data, data_len);
+    poly1305_finish(&ctx, mac);
+    if (!poly1305_verify(mac, data_4mac)) {
+        return FAILURE_MACMSMTCH;
+    }
+    return SUCCESS;
+}
+
 static inline bool is_same_ctr(uint32_t *ctr1, uint8_t *nonce1, uint32_t *ctr2, uint8_t *nonce2) {
     if (*ctr1 != *ctr2) {
         return false;
@@ -56,7 +136,7 @@ static inline void increment_ctr(uint32_t *ctr, uint8_t *nonce) {
     if (*ctr == 0xFFFFFFFFUL) {
         *ctr = 0;
         uint8_t carry = 1;
-        for (int i = 11; i >= 0; i--) {
+        for (int i = ((int)AES_NONCE_BYTES-(int)1); i >= 0; i--) {
             uint16_t temp_sum = nonce[i] + carry;
             if (temp_sum > 255) {
                 nonce[i] = 0;
@@ -76,7 +156,7 @@ static inline void decrement_ctr(uint32_t *ctr, uint8_t *nonce) {
     if (*ctr == 0) {
         *ctr = 0xFFFFFFFFUL;
         uint8_t borrow = 1;
-        for (int i = 11; i >= 0; i--) {
+        for (int i = ((int)AES_NONCE_BYTES-(int)1); i >= 0; i--) {
             int16_t temp_diff = nonce[i] - borrow;
             if (temp_diff < 0) {
                 nonce[i] = 255;
@@ -153,7 +233,7 @@ static inline status_t generate_nonce(const char* label, uint8_t *out_nonce) {
         LOG_ERROR("%sError: out_nonce cannot be NULL.", label);
         return FAILURE;
     }
-    if (randombytes(out_nonce, 12) != 0) {
+    if (randombytes(out_nonce, AES_NONCE_BYTES) != 0) {
         LOG_ERROR("%sError: randombytes.", label);
         return FAILURE;
     }

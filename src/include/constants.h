@@ -21,6 +21,7 @@
 //----------------------------------------------------------------------
 #define KALMAN_CALIBRATION_SAMPLES 50
 //----------------------------------------------------------------------
+#define SRTT_THRESHOLD_TO2X_RCNT_MS 3000000
 #define MAX_RETRY_CNT 5
 #define MAX_RETRY_SEC 5
 #define MIN_RETRY_SEC 2
@@ -60,8 +61,11 @@
 #define HEALTHY_THRESHOLD 75
 
 #define HASHES_BYTES 32
-#define AES_NONCE_BYTES 12
-#define AES_IV_BYTES 16
+//#define AES_NONCE_BYTES 12
+//#define AES_IV_BYTES 16
+//#define AES_TAG_BYTES 16
+#define AES_NONCE_BYTES 8
+#define AES_IV_BYTES 12
 #define AES_TAG_BYTES 16
 
 #define MAX_RTT_SEC 1

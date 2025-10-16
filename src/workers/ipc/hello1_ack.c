@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
-#include <endian.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -11,10 +10,7 @@
 #include "workers/ipc/handlers.h"
 #include "workers/ipc/master_ipc_cmds.h"
 #include "pqc.h"
-#include "poly1305-donna.h"
 #include "utilities.h"
-#include "aes_custom.h"
-#include "aes.h"
 
 status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_protocol_t_status_t *ircvdi) {
     if (!worker_ctx->hello1_sent) {
@@ -73,28 +69,28 @@ status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_pro
     memcpy(wot_index, (uint8_t *)worker_ctx->wot, sizeof(uint8_t));
     memcpy(wot_index + sizeof(uint8_t), worker_ctx->index, sizeof(uint8_t));
 //======================================================================    
-    aes256ctx aes_ctx;
-    aes256_ctr_keyexp(&aes_ctx, aes_key);
-//=========================================IV===========================    
-    uint8_t keystream_buffer[sizeof(uint8_t) + sizeof(uint8_t)];
-    uint8_t iv[AES_IV_BYTES];
-    memcpy(iv, local_nonce, AES_NONCE_BYTES);
-    uint32_t local_ctr_be = htobe32(worker_ctx->local_ctr);
-    memcpy(iv + AES_NONCE_BYTES, &local_ctr_be, sizeof(uint32_t));
-//=========================================IV===========================    
-    aes256_ctr_custom(keystream_buffer, sizeof(uint8_t) + sizeof(uint8_t), iv, &aes_ctx);
-    for (size_t i = 0; i < sizeof(uint8_t) + sizeof(uint8_t); i++) {
-        encrypted_wot_index[i] = wot_index[i] ^ keystream_buffer[i];
+    const size_t data_len = sizeof(uint8_t) + sizeof(uint8_t);
+    if (encrypt_decrypt(
+            worker_ctx->label,
+            aes_key,
+            local_nonce,
+            &worker_ctx->local_ctr,
+            wot_index,
+            encrypted_wot_index,
+            data_len
+        ) != SUCCESS
+    )
+    {
+        worker_ctx->shutdown_requested = 1;
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        return FAILURE;
     }
-    aes256_ctx_release(&aes_ctx);
 //======================================================================    
     memcpy(encrypted_wot_index1 + AES_NONCE_BYTES, encrypted_wot_index, sizeof(uint8_t) + sizeof(uint8_t));
 //======================================================================    
     uint8_t mac[AES_TAG_BYTES];
-    poly1305_context mac_ctx;
-    poly1305_init(&mac_ctx, worker_ctx->mac_key);
-    poly1305_update(&mac_ctx, encrypted_wot_index1, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t));
-    poly1305_finish(&mac_ctx, mac);
+    const size_t data_4mac_len = AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t);
+    calculate_mac(worker_ctx->mac_key, encrypted_wot_index1, mac, data_4mac_len);
 //====================================================================== 
     memcpy(encrypted_wot_index2, encrypted_wot_index1, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t));
     memcpy(encrypted_wot_index2 + AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t), mac, AES_TAG_BYTES);
