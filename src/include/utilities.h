@@ -46,7 +46,7 @@ static inline void print_hex(const char* label, const uint8_t* data, size_t len,
 static inline double get_max_retry_sec(double srtt) {
     double max_retry_sec = (double)MAX_RETRY_SEC;
     if (srtt < (double)SRTT_THRESHOLD_TO2X_RCNT_MS) {
-        max_retry_sec *= 2;
+        max_retry_sec /= 2;
     }
     return max_retry_sec;
 }
