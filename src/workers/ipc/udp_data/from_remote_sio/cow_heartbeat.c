@@ -23,6 +23,13 @@ static inline status_t last_execution(worker_context_t *worker_ctx, cow_c_sessio
     session->heartbeat_ack.ack_sent = true;
     session->heartbeat_openned = false;
 //======================================================================
+    double timer_interval = session->heartbeat_interval;
+//======================================================================
+    status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, timer_interval);
+    if (chst != SUCCESS) {
+        return FAILURE;
+    }
+//======================================================================
 //session->metrics.last_ack = current_time->r_uint64_t;
 //session->metrics.count_ack += (double)1;
 //session->metrics.sum_hb_interval += session->heartbeat_interval;
@@ -325,21 +332,10 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
 //----------------------------------------------------------------------                            
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
 //======================================================================
-    status_t le = last_execution(
+    return last_execution(
         worker_ctx, 
         session, 
         identity, 
         &trycount
     );
-    if (le != SUCCESS) {
-        return FAILURE;
-    }
-//======================================================================
-    double timer_interval = session->heartbeat_interval;
-//======================================================================
-    status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, timer_interval);
-    if (chst != SUCCESS) {
-        return FAILURE;
-    }
-    return SUCCESS;
 }
