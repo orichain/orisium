@@ -22,6 +22,7 @@ static inline status_t last_execution(worker_context_t *worker_ctx, cow_c_sessio
     cleanup_control_packet_ack(&session->heartbeat_ack, false, CDT_NOACTION);
     session->heartbeat_ack.ack_sent = true;
     session->heartbeat_openned = false;
+    LOG_DEVEL_DEBUG("%s==============Closed", worker_ctx->label);
 //======================================================================
 //session->metrics.last_ack = current_time->r_uint64_t;
 //session->metrics.count_ack += (double)1;
@@ -185,11 +186,11 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
     }
 //======================================================================
     session->heartbeat_interval = oheartbeat->hb_interval;
-    if (session->heartbeat_interval < (double)NODE_HEARTBEAT_INTERVAL) {
-        session->heartbeat_interval = (double)NODE_HEARTBEAT_INTERVAL;
+    if (session->heartbeat_interval < (double)1) {
+        session->heartbeat_interval = (double)1;
     }
-    if (session->heartbeat_interval > (double)NODE_CHECK_HEALTHY) {
-        session->heartbeat_interval = (double)NODE_CHECK_HEALTHY;
+    if (session->heartbeat_interval > (double)100) {
+        session->heartbeat_interval = (double)100;
     }
 //======================================================================
     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);

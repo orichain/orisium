@@ -9,7 +9,6 @@ static inline status_t create_polling_1ms(worker_context_t *worker_ctx, control_
     h->polling = true;
     double polling_interval = (double)1000000 / (double)1e9;
     h->polling_1ms_max_cnt = (uint16_t)ceil((total_polling_interval * (double)1e9) / (double)1000000);
-    printf("%sRetransmit Scheduled In %d Polling 1ms\n", worker_ctx->label, h->polling_1ms_max_cnt);
     status_t ctmr = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &h->polling_timer_fd, polling_interval);
     if (ctmr != SUCCESS) {
         return FAILURE;

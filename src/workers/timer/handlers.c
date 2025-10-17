@@ -2,7 +2,6 @@
 #include <unistd.h>
 #include <inttypes.h>
 #include <stddef.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 #include "types.h"
@@ -33,7 +32,7 @@ static inline status_t retry_transmit(
             uint8_t c_index = identity->local_index;
             uint8_t c_session_index = identity->local_session_index;
             if (h->sent_try_count > (uint8_t)MAX_RETRY_CNT) {
-                LOG_DEBUG("%sDisconnected => session_index %d, trycount %d.", worker_ctx->label, c_session_index, h->sent_try_count);
+                LOG_DEVEL_DEBUG("%sDisconnected => session_index %d, trycount %d.", worker_ctx->label, c_session_index, h->sent_try_count);
                 cleanup_cow_session(worker_ctx->label, &worker_ctx->async, session);
                 if (setup_cow_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
                     return FAILURE;
@@ -80,7 +79,7 @@ static inline status_t retry_transmit(
             uint8_t c_index = identity->local_index;
             uint8_t c_session_index = identity->local_session_index;
             if (h->sent_try_count > (uint8_t)MAX_RETRY_CNT) {
-                LOG_DEBUG("%sDisconnected => session_index %d, trycount %d.", worker_ctx->label, c_session_index, h->sent_try_count);
+                LOG_DEVEL_DEBUG("%sDisconnected => session_index %d, trycount %d.", worker_ctx->label, c_session_index, h->sent_try_count);
                 cleanup_sio_session(worker_ctx->label, &worker_ctx->async, session);
                 if (setup_sio_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
                     return FAILURE;
@@ -143,7 +142,6 @@ static inline status_t polling_1ms(
                 h,
                 orilink_protocol
             );
-            printf("%sRetransmit Done. Reset Polling Counter.\n", worker_ctx->label);
         } else {
             if (update_timer_oneshot(worker_ctx->label, &h->polling_timer_fd, polling_interval) != SUCCESS) {
                 update_timer_oneshot(worker_ctx->label, &h->polling_timer_fd, polling_interval);
@@ -151,20 +149,7 @@ static inline status_t polling_1ms(
             }
         }
     } else {
-//----------------------------------------------------------------------
-// Delay
-//----------------------------------------------------------------------
-        if (h->polling_1ms_cnt > (double)MIN_POLLING_1MS_CNT) {
-//----------------------------------------------------------------------
-            printf("%sRetransmit Cancelled In %d Polling 1ms\n", worker_ctx->label, h->polling_1ms_cnt);
-            cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false);
-        } else {
-            h->polling_1ms_cnt++;
-            if (update_timer_oneshot(worker_ctx->label, &h->polling_timer_fd, polling_interval) != SUCCESS) {
-                update_timer_oneshot(worker_ctx->label, &h->polling_timer_fd, polling_interval);
-                return FAILURE;
-            }
-        }
+        cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false);
     }
     return SUCCESS;
 }
@@ -432,6 +417,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint64_t u;
                     read(session->heartbeat_openner_timer_fd, &u, sizeof(u));
                     session->heartbeat_openned = true;
+                    LOG_DEVEL_DEBUG("%s==============Openned", worker_ctx->label);
                     return SUCCESS;
                 }
             }
@@ -454,6 +440,7 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint64_t u;
                     read(session->heartbeat_openner_timer_fd, &u, sizeof(u));
                     session->heartbeat_openned = true;
+                    LOG_DEVEL_DEBUG("%s==============Openned", worker_ctx->label);
                     return SUCCESS;
                 }
             }

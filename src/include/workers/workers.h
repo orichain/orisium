@@ -68,7 +68,7 @@ typedef struct {
 //======================================================================
     control_packet_t heartbeat;
     control_packet_ack_t heartbeat_ack;
-    uint64_t heartbeat_interval;
+    double heartbeat_interval;
     bool is_first_heartbeat;
     bool heartbeat_openned;
     int heartbeat_sender_timer_fd;
@@ -109,7 +109,7 @@ typedef struct {
 //======================================================================
     control_packet_t heartbeat;
     control_packet_ack_t heartbeat_ack;
-    uint64_t heartbeat_interval;
+    double heartbeat_interval;
     bool heartbeat_openned;
     int heartbeat_sender_timer_fd;
     int heartbeat_openner_timer_fd;
@@ -337,7 +337,7 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
     setup_control_packet(&single_session->hello4);
     setup_control_packet(&single_session->heartbeat);
     setup_control_packet_ack(&single_session->heartbeat_ack);
-    single_session->heartbeat_interval = (double)1;
+    single_session->heartbeat_interval = (double)NODE_HEARTBEAT_INTERVAL;
     single_session->heartbeat_sender_timer_fd = -1;
     single_session->heartbeat_openner_timer_fd = -1;
     single_session->heartbeat_openned = true;
@@ -381,7 +381,7 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
     cleanup_control_packet(label, cow_async, &single_session->hello4, true);
     cleanup_control_packet(label, cow_async, &single_session->heartbeat, true);
     cleanup_control_packet_ack(&single_session->heartbeat_ack, true, CDT_FREE);
-    single_session->heartbeat_interval = (double)1;
+    single_session->heartbeat_interval = (double)NODE_HEARTBEAT_INTERVAL;
     async_delete_event(label, cow_async, &single_session->heartbeat_sender_timer_fd);
     CLOSE_FD(&single_session->heartbeat_sender_timer_fd);
     async_delete_event(label, cow_async, &single_session->heartbeat_openner_timer_fd);
