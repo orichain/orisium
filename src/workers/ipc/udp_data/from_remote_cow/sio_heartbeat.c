@@ -2,6 +2,7 @@
 #include <inttypes.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -59,13 +60,6 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
         cleanup_control_packet_ack(&session->heartbeat_ack, false, CDT_NOACTION);
         session->heartbeat_ack.ack_sent = true;
         session->heartbeat_openned = false;
-    }
-//======================================================================
-    double timer_interval = session->heartbeat_interval;
-//======================================================================
-    status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, timer_interval);
-    if (chst != SUCCESS) {
-        return FAILURE;
     }
 //======================================================================
 //session->metrics.last_ack = current_time->r_uint64_t;
@@ -236,12 +230,25 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         }
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        return last_execution(
+        status_t le = last_execution(
             worker_ctx, 
             session, 
             identity, 
             &trycount
         );
+        if (le != SUCCESS) {
+            return le;
+        }
+//======================================================================
+        double timer_interval = session->heartbeat_interval;
+        double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+        timer_interval *= (1.0 + jitter_amount);
+//======================================================================
+        status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, timer_interval);
+        if (chst != SUCCESS) {
+            return FAILURE;
+        }
+        return SUCCESS;
     }
     if (
         session->heartbeat.polling
@@ -428,10 +435,21 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
 //----------------------------------------------------------------------                            
     CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
 //======================================================================
-    return last_execution(
+    status_t le = last_execution(
         worker_ctx, 
         session, 
         identity, 
         &trycount
     );
+    if (le != SUCCESS) {
+        return le;
+    }
+//======================================================================
+    double timer_interval = session->heartbeat_interval;
+//======================================================================
+    status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, timer_interval);
+    if (chst != SUCCESS) {
+        return FAILURE;
+    }
+    return SUCCESS;
 }
