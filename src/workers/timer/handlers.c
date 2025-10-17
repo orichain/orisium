@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <inttypes.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "types.h"
@@ -417,7 +418,6 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint64_t u;
                     read(session->heartbeat_openner_timer_fd, &u, sizeof(u));
                     session->heartbeat_openned = true;
-                    LOG_DEVEL_DEBUG("%s==============Openned", worker_ctx->label);
                     return SUCCESS;
                 }
             }
@@ -440,7 +440,6 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
                     uint64_t u;
                     read(session->heartbeat_openner_timer_fd, &u, sizeof(u));
                     session->heartbeat_openned = true;
-                    LOG_DEVEL_DEBUG("%s==============Openned", worker_ctx->label);
                     return SUCCESS;
                 }
             }

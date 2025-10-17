@@ -22,7 +22,6 @@ static inline status_t last_execution(worker_context_t *worker_ctx, cow_c_sessio
     cleanup_control_packet_ack(&session->heartbeat_ack, false, CDT_NOACTION);
     session->heartbeat_ack.ack_sent = true;
     session->heartbeat_openned = false;
-    LOG_DEVEL_DEBUG("%s==============Closed", worker_ctx->label);
 //======================================================================
 //session->metrics.last_ack = current_time->r_uint64_t;
 //session->metrics.count_ack += (double)1;
