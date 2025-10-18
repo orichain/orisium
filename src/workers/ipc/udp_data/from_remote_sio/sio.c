@@ -33,6 +33,11 @@ status_t handle_workers_ipc_udp_data_sio(worker_context_t *worker_ctx, void *wor
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
+    if (orilink_read_cleartext_header(worker_ctx->label, oudp_datao) != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
     switch (oudp_datao->type) {
         case ORILINK_HELLO1_ACK: {
             if (handle_workers_ipc_udp_data_sio_hello1_ack(worker_ctx, received_protocol, session, identity, security, &remote_addr, oudp_datao) != SUCCESS) {

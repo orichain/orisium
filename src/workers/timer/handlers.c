@@ -231,7 +231,7 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
                 }
                 return FAILURE;
             }
-            //print_hex("COW Sending Heartbeat ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
+            print_hex("COW Sending Heartbeat ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
             if (worker_master_udp_data(
                     worker_ctx->label, 
                     worker_ctx, 
@@ -340,7 +340,7 @@ static inline status_t timer_handle_event_send_heartbeat(worker_context_t *worke
                 }
                 return FAILURE;
             }
-            //print_hex("SIO Sending Heartbeat ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
+            print_hex("SIO Sending Heartbeat ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
             if (worker_master_udp_data(
                     worker_ctx->label, 
                     worker_ctx, 

@@ -85,9 +85,13 @@ typedef struct {
     uint8_t mac[AES_TAG_BYTES];
     uint32_t ctr;
 	uint8_t version[IPC_VERSION_BYTES];
+    ipc_protocol_type_t type;
+    uint8_t salt1;
     worker_type_t wot;
+    uint8_t salt2;
     uint8_t index;
-	ipc_protocol_type_t type;
+    uint8_t salt3;
+    uint8_t salt4;
 	union {
         ipc_worker_master_task_info_t *ipc_worker_master_task_info;
 		ipc_master_worker_info_t *ipc_master_worker_info;
@@ -158,9 +162,13 @@ typedef struct {
     uint8_t mac[AES_TAG_BYTES];
     uint32_t ctr;
     uint8_t version[IPC_VERSION_BYTES];
+    ipc_protocol_type_t type;
+    uint8_t salt1;
     worker_type_t wot;
+    uint8_t salt2;
     uint8_t index;
-	ipc_protocol_type_t type;
+    uint8_t salt3;
+    uint8_t salt4;
 } ipc_raw_protocol_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan
 static inline void CLOSE_IPC_RAW_PAYLOAD(void **ptr) {
@@ -191,7 +199,10 @@ typedef struct {
 
 ssize_t_status_t send_ipc_protocol_message(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, int *uds_fd, const ipc_protocol_t* p);
 ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, int *uds_fd);
-status_t ipc_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint32_t* ctr, ipc_raw_protocol_t *r);
+status_t ipc_read_cleartext_header(const char *label, ipc_raw_protocol_t *r);
+status_t ipc_read_header(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, ipc_raw_protocol_t *r);
+status_t ipc_check_mac(const char *label, uint8_t* key_mac, ipc_raw_protocol_t *r);
+status_t ipc_check_ctr(const char *label, uint8_t* key_aes, uint32_t* ctr, ipc_raw_protocol_t *r);
 ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t *key_aes, uint8_t *nonce, uint32_t *ctr, uint8_t *buffer, size_t len);
 status_t ipc_add_protocol_queue(const char *label, uint64_t queue_id, worker_type_t wot, uint8_t index, int *uds_fd, ipc_protocol_t *p, ipc_protocol_queue_t **head);
 void ipc_remove_protocol_queue(uint64_t queue_id, ipc_protocol_queue_t **head);

@@ -80,7 +80,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
 //---------------------------------------------------------------------- 
     uint8_t decrypted_wot_index_rcvd[sizeof(uint8_t) + sizeof(uint8_t)];
     const size_t data_len = sizeof(uint8_t) + sizeof(uint8_t);
-    if (encrypt_decrypt(
+    if (encrypt_decrypt_256(
             label,
             aes_key,
             remote_nonce,
@@ -118,7 +118,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
     memcpy(wot_index, (uint8_t *)&rcvd_wot, sizeof(uint8_t));
     memcpy(wot_index + sizeof(uint8_t), &rcvd_index, sizeof(uint8_t));
 //======================================================================    
-    if (encrypt_decrypt(
+    if (encrypt_decrypt_256(
             label,
             aes_key,
             security->local_nonce,

@@ -74,7 +74,7 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
 //---------------------------------------------------------------------- 
     uint8_t decrypted_wot_index[sizeof(uint8_t) + sizeof(uint8_t)];
     const size_t data_len = sizeof(uint8_t) + sizeof(uint8_t);
-    if (encrypt_decrypt(
+    if (encrypt_decrypt_256(
             worker_ctx->label,
             aes_key,
             worker_ctx->remote_nonce,

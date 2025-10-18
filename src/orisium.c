@@ -20,7 +20,6 @@ int main() {
 	printf("[Orisium]: ==========================================================\n");
     printf("[Orisium]: Orisium dijalankan.\n");
     printf("[Orisium]: ==========================================================\n");
-    
 #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
     log_init();
     pthread_t cleaner_thread;

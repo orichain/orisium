@@ -101,7 +101,16 @@ orilink_protocol_t_status_t orilink_prepare_cmd_hello3_ack(
     result.r_orilink_protocol_t->local_wot = local_wot;
     result.r_orilink_protocol_t->local_index = local_index;
     result.r_orilink_protocol_t->local_session_index = local_session_index;
-    result.r_orilink_protocol_t->id_connection = id_connection;
+    uint64_t id_connection_be = htobe64(id_connection);
+    uint8_t *id_connection_ptr = (uint8_t *)&id_connection_be;
+    memcpy(&result.r_orilink_protocol_t->id_connection1, id_connection_ptr, 1);
+    memcpy(&result.r_orilink_protocol_t->id_connection2, id_connection_ptr+1, 1);
+    memcpy(&result.r_orilink_protocol_t->id_connection3, id_connection_ptr+2, 1);
+    memcpy(&result.r_orilink_protocol_t->id_connection4, id_connection_ptr+3, 1);
+    memcpy(&result.r_orilink_protocol_t->id_connection5, id_connection_ptr+4, 1);
+    memcpy(&result.r_orilink_protocol_t->id_connection6, id_connection_ptr+5, 1);
+    memcpy(&result.r_orilink_protocol_t->id_connection7, id_connection_ptr+6, 1);
+    memcpy(&result.r_orilink_protocol_t->id_connection8, id_connection_ptr+7, 1);
     result.r_orilink_protocol_t->trycount = trycount;
 	result.r_orilink_protocol_t->type = ORILINK_HELLO3_ACK;
 	orilink_hello3_ack_t *payload = (orilink_hello3_ack_t *)calloc(1, sizeof(orilink_hello3_ack_t));

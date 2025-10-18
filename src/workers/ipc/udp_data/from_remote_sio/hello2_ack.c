@@ -35,18 +35,26 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
         return FAILURE;
     }
 //======================================================================
-    status_t cmac = orilink_check_mac_ctr(
-        worker_ctx->label, 
-        security->aes_key, 
-        security->mac_key, 
-        security->remote_nonce,
-        &security->remote_ctr, 
-        oudp_datao
-    );
+    status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        return cmac;
+        return FAILURE;
+    }
+    status_t rhd = orilink_read_header(worker_ctx->label, security->aes_key, security->mac_key, security->remote_nonce, oudp_datao);
+    if (rhd != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
+//----------------------------------------------------------------------
+    inc_ctr = oudp_datao->inc_ctr;
+//----------------------------------------------------------------------
+    status_t cctr = orilink_check_ctr(worker_ctx->label, security->aes_key, &security->remote_ctr, oudp_datao);
+    if (cctr != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
     }
 //======================================================================
     orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,

@@ -28,6 +28,7 @@
 #include "constants.h"
 #include "pqc.h"
 #include "ipc/protocol.h"
+#include "xorshiro128plus.h"
 
 static inline size_t_status_t calculate_orilink_payload_size(const char *label, const orilink_protocol_t* p, bool checkfixheader) {
 	size_t_status_t result;
@@ -210,8 +211,10 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
     } else {
         result.r_size_t = AES_TAG_BYTES + 
                           sizeof(uint32_t) + 
-                          sizeof(uint8_t) + 
                           ORILINK_VERSION_BYTES + 
+                          
+                          sizeof(uint8_t) + 
+                          
                           sizeof(uint8_t) + 
                           sizeof(uint8_t) + 
                           sizeof(uint8_t) + 
@@ -219,8 +222,32 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                           sizeof(uint8_t) + 
                           sizeof(uint8_t) + 
                           sizeof(uint8_t) + 
-                          sizeof(uint64_t) + 
                           sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          sizeof(uint8_t) + 
+                          
                           payload_fixed_size + 
                           payload_dynamic_size;
     }
@@ -267,7 +294,16 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
     } else {
         LOG_DEBUG("%sBuffer size %zu is sufficient for %zu bytes. No reallocation needed.", label, *buffer_size, total_required_size);
     }
+    uint8_t salt14[ORILINK_SALT_LEN];
+    generate_fast_salt(salt14, ORILINK_SALT_LEN);
+    uint8_t salt[SALT_LEN];
+    for (uint8_t ilup=0x00;ilup<SALT_LEN;++ilup) {
+        salt[ilup] = salt14[ilup];
+    }
     size_t offset = 0;
+//----------------------------------------------------------------------
+// Mac
+//---------------------------------------------------------------------- 
     if (CHECK_BUFFER_BOUNDS(offset, AES_TAG_BYTES, *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
@@ -283,6 +319,285 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
     }
     memset(current_buffer + offset, 0, sizeof(uint32_t));
     offset += sizeof(uint32_t);
+//----------------------------------------------------------------------
+// Version
+//----------------------------------------------------------------------
+    if (CHECK_BUFFER_BOUNDS(offset, ORILINK_VERSION_BYTES, *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, p->version, ORILINK_VERSION_BYTES);
+    offset += ORILINK_VERSION_BYTES;
+//----------------------------------------------------------------------
+// Inc Ctr
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, &p->inc_ctr, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Local Index
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, &p->local_index, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Local Session Index
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, &p->local_session_index, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Salt1
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, salt14, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Local Wot
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, (uint8_t *)&p->local_wot, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Salt2
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, salt14 + 1, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Id Connection 1
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, &p->id_connection1, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Salt3
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, salt14 + 2, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Id Connection 2
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, &p->id_connection2, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Salt4
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, salt14 + 3, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Id Connection 3
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, &p->id_connection3, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Salt5
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, salt14 + 4, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Id Connection 4
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, &p->id_connection4, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Salt6
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, salt14 + 5, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Id Connection 5
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, &p->id_connection5, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Salt7
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, salt14 + 6, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Id Connection 6
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, &p->id_connection6, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Salt8
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, salt14 + 7, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Id Connection 7
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, &p->id_connection7, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Salt9
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, salt14 + 8, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Id Connection 8
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, &p->id_connection8, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Salt10
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, salt14 + 9, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Remote Wot
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, (uint8_t *)&p->remote_wot, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Salt11
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, salt14 + 10, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Remote Index
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, &p->remote_index, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Salt12
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, salt14 + 11, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Remote Session Index
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, &p->remote_session_index, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Salt13
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, salt14 + 12, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Type
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, (uint8_t *)&p->type, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
+// Salt14
+//---------------------------------------------------------------------- 
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+        result.status = FAILURE_OOBUF;
+        return result;
+    }
+    memcpy(current_buffer + offset, salt14 + 13, sizeof(uint8_t));
+    offset += sizeof(uint8_t);
 //----------------------------------------------------------------------    
 // Try Count
 //----------------------------------------------------------------------    
@@ -293,67 +608,6 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
     memcpy(current_buffer + offset, &p->trycount, sizeof(uint8_t));
     offset += sizeof(uint8_t);
 //----------------------------------------------------------------------    
-    if (CHECK_BUFFER_BOUNDS(offset, ORILINK_VERSION_BYTES, *buffer_size) != SUCCESS) {
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-    memcpy(current_buffer + offset, p->version, ORILINK_VERSION_BYTES);
-    offset += ORILINK_VERSION_BYTES;
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-    memcpy(current_buffer + offset, &p->inc_ctr, sizeof(uint8_t));
-    offset += sizeof(uint8_t);
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-    memcpy(current_buffer + offset, (uint8_t *)&p->remote_wot, sizeof(uint8_t));
-    offset += sizeof(uint8_t);
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-    memcpy(current_buffer + offset, &p->remote_index, sizeof(uint8_t));
-    offset += sizeof(uint8_t);
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-    memcpy(current_buffer + offset, &p->remote_session_index, sizeof(uint8_t));
-    offset += sizeof(uint8_t);
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-    memcpy(current_buffer + offset, (uint8_t *)&p->local_wot, sizeof(uint8_t));
-    offset += sizeof(uint8_t);
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-    memcpy(current_buffer + offset, &p->local_index, sizeof(uint8_t));
-    offset += sizeof(uint8_t);
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-    memcpy(current_buffer + offset, &p->local_session_index, sizeof(uint8_t));
-    offset += sizeof(uint8_t);
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint64_t), *buffer_size) != SUCCESS) {
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-    uint64_t id_connection_be = htobe64(p->id_connection);
-    memcpy(current_buffer + offset, &id_connection_be, sizeof(uint64_t));
-    offset += sizeof(uint64_t);
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-    memcpy(current_buffer + offset, (uint8_t *)&p->type, sizeof(uint8_t));
-    offset += sizeof(uint8_t);
     status_t result_pyld = FAILURE;
     switch (p->type) {
         case ORILINK_HELLO1:
@@ -414,8 +668,10 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
         memcpy(current_buffer + AES_TAG_BYTES, &ctr_be, sizeof(uint32_t));
         const size_t data_offset = AES_TAG_BYTES + 
                                    sizeof(uint32_t) + 
-                                   sizeof(uint8_t) + 
                                    ORILINK_VERSION_BYTES + 
+                                   
+                                   sizeof(uint8_t) + 
+                                   
                                    sizeof(uint8_t) + 
                                    sizeof(uint8_t) + 
                                    sizeof(uint8_t) + 
@@ -423,25 +679,36 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
                                    sizeof(uint8_t) + 
                                    sizeof(uint8_t) + 
                                    sizeof(uint8_t) + 
-                                   sizeof(uint64_t) +
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
+                                  
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
+                                  
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t) + 
                                    sizeof(uint8_t);
-        const size_t data_len = offset - 
-                                AES_TAG_BYTES -
-                                sizeof(uint32_t) -
-                                sizeof(uint8_t) -
-                                ORILINK_VERSION_BYTES -
-                                sizeof(uint8_t) -
-                                sizeof(uint8_t) - 
-                                sizeof(uint8_t) - 
-                                sizeof(uint8_t) - 
-                                sizeof(uint8_t) - 
-                                sizeof(uint8_t) - 
-                                sizeof(uint8_t) - 
-                                sizeof(uint64_t) - 
-                                sizeof(uint8_t);
+                                   
+        const size_t data_len = offset - data_offset;
         uint8_t *data = current_buffer + data_offset;
         uint8_t *encrypted_data = current_buffer + data_offset;
-        if (encrypt_decrypt(
+        if (encrypt_decrypt_256(
                 label,
                 key_aes,
                 nonce,
@@ -449,6 +716,29 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
                 data,
                 encrypted_data,
                 data_len
+            ) != SUCCESS
+        )
+        {
+            free(key0);
+            result.status = FAILURE;
+            return result;
+        }
+        const size_t header_offset = AES_TAG_BYTES;
+        const size_t header_len = sizeof(uint32_t) +
+                                  ORILINK_VERSION_BYTES +
+                                  sizeof(uint8_t) +
+                                  sizeof(uint8_t) +
+                                  sizeof(uint8_t);
+        uint8_t *header = current_buffer + header_offset;
+        uint8_t *encrypted_header = current_buffer + header_offset;
+        if (encrypt_decrypt_128(
+                label,
+                key_mac,
+                nonce,
+                (uint32_t *)salt,
+                header,
+                encrypted_header,
+                header_len
             ) != SUCCESS
         )
         {
@@ -485,9 +775,11 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
     result.r_orilink_protocol_t = NULL;
     result.status = FAILURE;
     const size_t data_offset = AES_TAG_BYTES + 
-                               sizeof(uint32_t) + 
-                               sizeof(uint8_t) + 
+                               sizeof(uint32_t) +  
                                ORILINK_VERSION_BYTES + 
+                               
+                               sizeof(uint8_t) + 
+                               
                                sizeof(uint8_t) + 
                                sizeof(uint8_t) + 
                                sizeof(uint8_t) + 
@@ -495,8 +787,32 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
                                sizeof(uint8_t) + 
                                sizeof(uint8_t) + 
                                sizeof(uint8_t) + 
-                               sizeof(uint64_t) +
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
+                              
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
+                              
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
+                               sizeof(uint8_t) + 
                                sizeof(uint8_t);
+                               
     if (!buffer || len < data_offset) {
         LOG_ERROR("%sBuffer terlalu kecil untuk Mac, Version dan Type Etc. Len: %zu", label, len);
         result.status = FAILURE_OOBUF;
@@ -515,36 +831,179 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
     }
     LOG_DEBUG("%sAllocating orilink_protocol_t struct: %zu bytes.", label, sizeof(orilink_protocol_t));
     size_t current_buffer_offset = 0;
+//----------------------------------------------------------------------    
+// Mac
+//----------------------------------------------------------------------    
     memcpy(p->mac, buffer + current_buffer_offset, AES_TAG_BYTES);
     current_buffer_offset += AES_TAG_BYTES;
+//----------------------------------------------------------------------    
+// Ctr
+//----------------------------------------------------------------------    
     uint32_t data_ctr_be;
     memcpy(&data_ctr_be, buffer + current_buffer_offset, sizeof(uint32_t));
     p->ctr = be32toh(data_ctr_be);
     current_buffer_offset += sizeof(uint32_t);
-    memcpy(&p->trycount, buffer + current_buffer_offset, sizeof(uint8_t));
-    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Version
+//----------------------------------------------------------------------    
     memcpy(p->version, buffer, ORILINK_VERSION_BYTES);
     current_buffer_offset += ORILINK_VERSION_BYTES;
+//----------------------------------------------------------------------    
+// Inc Ctr
+//----------------------------------------------------------------------    
     memcpy(&p->inc_ctr, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
-    memcpy((uint8_t *)&p->remote_wot, buffer + current_buffer_offset, sizeof(uint8_t));
-    current_buffer_offset += sizeof(uint8_t);
-    memcpy(&p->remote_index, buffer + current_buffer_offset, sizeof(uint8_t));
-    current_buffer_offset += sizeof(uint8_t);
-    memcpy(&p->remote_session_index, buffer + current_buffer_offset, sizeof(uint8_t));
-    current_buffer_offset += sizeof(uint8_t);
-    memcpy((uint8_t *)&p->local_wot, buffer + current_buffer_offset, sizeof(uint8_t));
-    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Local Index
+//----------------------------------------------------------------------    
     memcpy(&p->local_index, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Local Session Index
+//----------------------------------------------------------------------    
     memcpy(&p->local_session_index, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
-    uint64_t id_connection_be;
-    memcpy(&id_connection_be, buffer + current_buffer_offset, sizeof(uint64_t));
-    p->id_connection = be64toh(id_connection_be);
-    current_buffer_offset += sizeof(uint64_t);
+//----------------------------------------------------------------------    
+// Salt 1
+//----------------------------------------------------------------------    
+    memcpy(&p->salt1, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Local Wot
+//----------------------------------------------------------------------    
+    memcpy((uint8_t *)&p->local_wot, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 2
+//----------------------------------------------------------------------    
+    memcpy(&p->salt2, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 1
+//----------------------------------------------------------------------    
+    memcpy(&p->id_connection1, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 3
+//----------------------------------------------------------------------    
+    memcpy(&p->salt3, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 2
+//----------------------------------------------------------------------    
+    memcpy(&p->id_connection2, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 4
+//----------------------------------------------------------------------    
+    memcpy(&p->salt4, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 3
+//----------------------------------------------------------------------    
+    memcpy(&p->id_connection3, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 5
+//----------------------------------------------------------------------    
+    memcpy(&p->salt5, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 4
+//----------------------------------------------------------------------    
+    memcpy(&p->id_connection4, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 6
+//----------------------------------------------------------------------    
+    memcpy(&p->salt6, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 5
+//----------------------------------------------------------------------    
+    memcpy(&p->id_connection5, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 7
+//----------------------------------------------------------------------    
+    memcpy(&p->salt7, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 6
+//----------------------------------------------------------------------    
+    memcpy(&p->id_connection6, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 8
+//----------------------------------------------------------------------    
+    memcpy(&p->salt8, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 7
+//----------------------------------------------------------------------    
+    memcpy(&p->id_connection7, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 9
+//----------------------------------------------------------------------    
+    memcpy(&p->salt9, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 8
+//----------------------------------------------------------------------    
+    memcpy(&p->id_connection8, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 10
+//----------------------------------------------------------------------    
+    memcpy(&p->salt10, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Remote Wot
+//----------------------------------------------------------------------    
+    memcpy((uint8_t *)&p->remote_wot, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 11
+//----------------------------------------------------------------------    
+    memcpy(&p->salt11, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Remote Index
+//----------------------------------------------------------------------    
+    memcpy(&p->remote_index, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 12
+//----------------------------------------------------------------------    
+    memcpy(&p->salt12, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Remote Session Index
+//----------------------------------------------------------------------    
+    memcpy(&p->remote_session_index, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 13
+//----------------------------------------------------------------------    
+    memcpy(&p->salt13, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Type
+//----------------------------------------------------------------------    
     memcpy((uint8_t *)&p->type, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 14
+//----------------------------------------------------------------------    
+    memcpy(&p->salt14, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Trycount
+//----------------------------------------------------------------------    
+    memcpy(&p->trycount, buffer + current_buffer_offset, sizeof(uint8_t));
+    current_buffer_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------
     uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
     if (memcmp(
             key_aes, 
@@ -553,23 +1012,10 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
         ) != 0
     )
     {
-        const size_t data_len = len -
-                                AES_TAG_BYTES -
-                                sizeof(uint32_t) -
-                                sizeof(uint8_t) -
-                                ORILINK_VERSION_BYTES -
-                                sizeof(uint8_t) -
-                                sizeof(uint8_t) - 
-                                sizeof(uint8_t) - 
-                                sizeof(uint8_t) - 
-                                sizeof(uint8_t) - 
-                                sizeof(uint8_t) - 
-                                sizeof(uint8_t) - 
-                                sizeof(uint64_t) -
-                                sizeof(uint8_t);
+        const size_t data_len = len - data_offset;
         uint8_t *data = buffer + data_offset;
         uint8_t *decrypted_data = buffer + data_offset;
-        if (encrypt_decrypt(
+        if (encrypt_decrypt_256(
                 label,
                 key_aes,
                 nonce,
@@ -961,7 +1407,17 @@ status_t orilink_check_ctr(const char *label, uint8_t* key_aes, uint32_t* ctr, o
     return SUCCESS;
 }
 
-status_t orilink_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t* ctr, orilink_raw_protocol_t *r) {
+status_t orilink_read_header(
+    const char *label,
+    uint8_t* key_aes, 
+    uint8_t* key_mac, 
+    uint8_t* nonce,
+    orilink_raw_protocol_t *r
+)
+{
+    size_t current_offset = 0;
+    size_t total_buffer_len = (size_t)r->n;
+    uint8_t *cursor = r->recv_buffer + current_offset;
     uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
     if (memcmp(
             key_aes, 
@@ -970,35 +1426,57 @@ status_t orilink_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key
         ) != 0
     )
     {
-        if (r->ctr != *(uint32_t *)ctr) {
-            LOG_ERROR("%sOrilink Counter not match. Protocol %d, data_ctr: %u, *ctr: %u", label, r->type, r->ctr, *(uint32_t *)ctr);
+        const size_t salt1_offset = AES_TAG_BYTES +
+                                    sizeof(uint32_t) +
+                                    ORILINK_VERSION_BYTES +
+                                    sizeof(uint8_t) +
+                                    sizeof(uint8_t) +
+                                    sizeof(uint8_t);
+        const size_t salt2_offset = salt1_offset +
+                                    sizeof(uint8_t) +
+                                    sizeof(uint8_t);
+        const size_t salt3_offset = salt2_offset +
+                                    sizeof(uint8_t) +
+                                    sizeof(uint8_t);
+        const size_t salt4_offset = salt3_offset +
+                                    sizeof(uint8_t) +
+                                    sizeof(uint8_t);
+        if (current_offset + salt4_offset + sizeof(uint8_t) > total_buffer_len) {
+            LOG_ERROR("%sOut of bounds reading salt.", label);
+            return FAILURE_OOBUF;
+        }
+        uint8_t salt[SALT_LEN];
+        memcpy(salt, cursor + salt1_offset, sizeof(uint8_t)); 
+        memcpy(salt + 1, cursor + salt2_offset, sizeof(uint8_t));
+        memcpy(salt + 2, cursor + salt3_offset, sizeof(uint8_t));
+        memcpy(salt + 3, cursor + salt4_offset, sizeof(uint8_t));
+        const size_t header_offset = AES_TAG_BYTES;
+        const size_t header_len = sizeof(uint32_t) +
+                                  ORILINK_VERSION_BYTES +
+                                  sizeof(uint8_t) +
+                                  sizeof(uint8_t) +
+                                  sizeof(uint8_t);
+        uint8_t *header = cursor + header_offset;
+        uint8_t *decripted_header = cursor + header_offset;
+        if (encrypt_decrypt_128(
+                label,
+                key_mac,
+                nonce,
+                (uint32_t *)salt,
+                header,
+                decripted_header,
+                header_len
+            ) != SUCCESS
+        )
+        {
             free(key0);
-            return FAILURE_CTRMSMTCH;
+            return FAILURE;
         }
     }
     free(key0);
-    uint8_t *data_4mac = r->recv_buffer;
-    const size_t data_offset = AES_TAG_BYTES;
-    const size_t data_len = r->n - AES_TAG_BYTES;
-    uint8_t *data = r->recv_buffer + data_offset;
-    if (compare_mac(
-            key_mac,
-            data,
-            data_len,
-            data_4mac
-        ) != SUCCESS
-    )
-    {
-        LOG_ERROR("%sOrilink Mac mismatch!", label);
-        return FAILURE_MACMSMTCH;
-    }
-    return SUCCESS;
-}
-
-static inline status_t read_header(const char *label, orilink_raw_protocol_t *r, uint8_t *data, uint32_t len) {
-    size_t current_offset = 0;
-    size_t total_buffer_len = (size_t)len;
-    const uint8_t *cursor = data + current_offset;
+//----------------------------------------------------------------------    
+// Mac
+//----------------------------------------------------------------------    
     if (current_offset + AES_TAG_BYTES > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading mac.", label);
         return FAILURE_OOBUF;
@@ -1006,6 +1484,9 @@ static inline status_t read_header(const char *label, orilink_raw_protocol_t *r,
     memcpy(r->mac, cursor, AES_TAG_BYTES);
     cursor += AES_TAG_BYTES;
     current_offset += AES_TAG_BYTES;
+//----------------------------------------------------------------------    
+// Ctr
+//----------------------------------------------------------------------    
     if (current_offset + sizeof(uint32_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading ctr.", label);
         return FAILURE_OOBUF;
@@ -1015,13 +1496,9 @@ static inline status_t read_header(const char *label, orilink_raw_protocol_t *r,
     r->ctr = be32toh(ctr_be);
     cursor += sizeof(uint32_t);
     current_offset += sizeof(uint32_t);
-    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading trycount.", label);
-        return FAILURE_OOBUF;
-    }
-    memcpy(&r->trycount, cursor, sizeof(uint8_t));
-    cursor += sizeof(uint8_t);
-    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Version
+//----------------------------------------------------------------------    
     if (current_offset + ORILINK_VERSION_BYTES > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading version.", label);
         return FAILURE_OOBUF;
@@ -1029,6 +1506,9 @@ static inline status_t read_header(const char *label, orilink_raw_protocol_t *r,
     memcpy(r->version, cursor, ORILINK_VERSION_BYTES);
     cursor += ORILINK_VERSION_BYTES;
     current_offset += ORILINK_VERSION_BYTES;
+//----------------------------------------------------------------------    
+// Inc Ctr
+//----------------------------------------------------------------------    
     if (current_offset + sizeof(uint8_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading inc_ctr.", label);
         return FAILURE_OOBUF;
@@ -1036,34 +1516,9 @@ static inline status_t read_header(const char *label, orilink_raw_protocol_t *r,
     memcpy(&r->inc_ctr, cursor, sizeof(uint8_t));
     cursor += sizeof(uint8_t);
     current_offset += sizeof(uint8_t);
-    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading remote_wot.", label);
-        return FAILURE_OOBUF;
-    }
-    memcpy((uint8_t *)&r->remote_wot, cursor, sizeof(uint8_t));
-    cursor += sizeof(uint8_t);
-    current_offset += sizeof(uint8_t);
-    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading remote_index.", label);
-        return FAILURE_OOBUF;
-    }
-    memcpy(&r->remote_index, cursor, sizeof(uint8_t));
-    cursor += sizeof(uint8_t);
-    current_offset += sizeof(uint8_t);
-    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading remote_session_index.", label);
-        return FAILURE_OOBUF;
-    }
-    memcpy(&r->remote_session_index, cursor, sizeof(uint8_t));
-    cursor += sizeof(uint8_t);
-    current_offset += sizeof(uint8_t);
-    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading local_wot.", label);
-        return FAILURE_OOBUF;
-    }
-    memcpy((uint8_t *)&r->local_wot, cursor, sizeof(uint8_t));
-    cursor += sizeof(uint8_t);
-    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Local Index
+//----------------------------------------------------------------------    
     if (current_offset + sizeof(uint8_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading local_index.", label);
         return FAILURE_OOBUF;
@@ -1071,6 +1526,9 @@ static inline status_t read_header(const char *label, orilink_raw_protocol_t *r,
     memcpy(&r->local_index, cursor, sizeof(uint8_t));
     cursor += sizeof(uint8_t);
     current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Local Session Index
+//----------------------------------------------------------------------    
     if (current_offset + sizeof(uint8_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading local_session_index.", label);
         return FAILURE_OOBUF;
@@ -1078,20 +1536,629 @@ static inline status_t read_header(const char *label, orilink_raw_protocol_t *r,
     memcpy(&r->local_session_index, cursor, sizeof(uint8_t));
     cursor += sizeof(uint8_t);
     current_offset += sizeof(uint8_t);
-    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading id_connection.", label);
+//----------------------------------------------------------------------    
+// Salt 1
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt1.", label);
         return FAILURE_OOBUF;
     }
-    uint64_t id_connection_be;
-    memcpy(&id_connection_be, cursor, sizeof(uint64_t));
-    r->id_connection = be64toh(id_connection_be);
-    cursor += sizeof(uint64_t);
-    current_offset += sizeof(uint64_t);
+    memcpy(&r->salt1, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Local Wot
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading local_wot.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy((uint8_t *)&r->local_wot, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 2
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt2.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt2, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 1
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading id_connection1.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->id_connection1, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 3
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt3.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt3, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 2
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading id_connection2.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->id_connection2, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 4
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt4.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt4, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 3
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading id_connection3.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->id_connection3, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 5
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt5.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt5, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 4
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading id_connection4.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->id_connection4, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 6
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt6.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt6, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 5
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading id_connection5.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->id_connection5, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 7
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt7.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt7, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 6
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading id_connection6.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->id_connection6, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 8
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt8.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt8, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 7
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading id_connection7.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->id_connection7, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 9
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt9.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt9, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 8
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading id_connection8.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->id_connection8, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 10
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt10.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt10, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Remote Wot
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading remote_wot.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy((uint8_t *)&r->remote_wot, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 11
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt11.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt11, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Remote Index
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading remote_index.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->remote_index, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 12
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt12.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt12, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Remote Session Index
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading remote_session_index.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->remote_session_index, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 13
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt13.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt13, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Type
+//----------------------------------------------------------------------    
     if (current_offset + sizeof(uint8_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading type.", label);
         return FAILURE_OOBUF;
     }
     memcpy((uint8_t *)&r->type, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 14
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt14.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt14, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Trycount
+//---------------------------------------------------------------------- 
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading trycount.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->trycount, cursor, sizeof(uint8_t));
+//---------------------------------------------------------------------- 
+    return SUCCESS;
+}
+
+status_t orilink_read_cleartext_header(
+    const char *label, 
+    orilink_raw_protocol_t *r
+)
+{
+    size_t current_offset = 0;
+    size_t total_buffer_len = (size_t)r->n;
+    uint8_t *cursor = r->recv_buffer + current_offset;
+//----------------------------------------------------------------------    
+// Mac
+//----------------------------------------------------------------------    
+    if (current_offset + AES_TAG_BYTES > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading mac.", label);
+        return FAILURE_OOBUF;
+    }
+    cursor += AES_TAG_BYTES;
+    current_offset += AES_TAG_BYTES;
+//----------------------------------------------------------------------    
+// Ctr
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint32_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading ctr.", label);
+        return FAILURE_OOBUF;
+    }
+    cursor += sizeof(uint32_t);
+    current_offset += sizeof(uint32_t);
+//----------------------------------------------------------------------    
+// Version
+//----------------------------------------------------------------------    
+    if (current_offset + ORILINK_VERSION_BYTES > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading version.", label);
+        return FAILURE_OOBUF;
+    }
+    cursor += ORILINK_VERSION_BYTES;
+    current_offset += ORILINK_VERSION_BYTES;
+//----------------------------------------------------------------------    
+// Inc Ctr
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading inc_ctr.", label);
+        return FAILURE_OOBUF;
+    }
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Local Index
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading local_index.", label);
+        return FAILURE_OOBUF;
+    }
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Local Session Index
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading local_session_index.", label);
+        return FAILURE_OOBUF;
+    }
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 1
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt1.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt1, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Local Wot
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading local_wot.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy((uint8_t *)&r->local_wot, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 2
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt2.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt2, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 1
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading id_connection1.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->id_connection1, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 3
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt3.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt3, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 2
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading id_connection2.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->id_connection2, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 4
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt4.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt4, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 3
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading id_connection3.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->id_connection3, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 5
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt5.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt5, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 4
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading id_connection4.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->id_connection4, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 6
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt6.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt6, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 5
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading id_connection5.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->id_connection5, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 7
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt7.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt7, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 6
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading id_connection6.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->id_connection6, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 8
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt8.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt8, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 7
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading id_connection7.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->id_connection7, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 9
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt9.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt9, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Id Connection 8
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading id_connection8.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->id_connection8, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 10
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt10.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt10, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Remote Wot
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading remote_wot.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy((uint8_t *)&r->remote_wot, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 11
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt11.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt11, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Remote Index
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading remote_index.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->remote_index, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 12
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt12.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt12, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Remote Session Index
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading remote_session_index.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->remote_session_index, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 13
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt13.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt13, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Type
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading type.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy((uint8_t *)&r->type, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Salt 14
+//----------------------------------------------------------------------    
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading salt14.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->salt14, cursor, sizeof(uint8_t));
+    cursor += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+//----------------------------------------------------------------------    
+// Trycount
+//---------------------------------------------------------------------- 
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading trycount.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&r->trycount, cursor, sizeof(uint8_t));
+//---------------------------------------------------------------------- 
     return SUCCESS;
 }
 
@@ -1102,6 +2169,44 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
     uint8_t *full_orilink_payload_buffer = (uint8_t *)calloc(1, ORILINK_MAX_PACKET_SIZE * sizeof(uint8_t));
     socklen_t source_addr_len = sizeof(struct sockaddr_in6);
     ssize_t bytes_read_payload = recvfrom(*sock_fd, full_orilink_payload_buffer, ORILINK_MAX_PACKET_SIZE, 0, (struct sockaddr * restrict)source_addr, &source_addr_len);
+    const size_t min_size = AES_TAG_BYTES + 
+                            sizeof(uint32_t) + 
+                            ORILINK_VERSION_BYTES + 
+                            
+                            sizeof(uint8_t) + 
+                           
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                          
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                          
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t) + 
+                            sizeof(uint8_t);
     if (bytes_read_payload < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
 			LOG_ERROR("%sreceive_orilink_raw_protocol_packet failed: %s", label, strerror(errno));
@@ -1114,7 +2219,7 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
             result.status = FAILURE;
             return result;
         }
-    } else if (bytes_read_payload < (ssize_t)(AES_TAG_BYTES + sizeof(uint32_t) + ORILINK_VERSION_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t))) {
+    } else if (bytes_read_payload < (ssize_t)min_size) {
         LOG_ERROR("%sreceive_orilink_raw_protocol_packet received invalid size(min size) orilink packet.", label);
         free(full_orilink_payload_buffer);
         result.status = FAILURE_OOBUF;
@@ -1132,27 +2237,10 @@ orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *
         result.status = FAILURE_NOMEM;
         return result;
     }
-    /*
-    uint8_t *b = (uint8_t*) calloc(1, bytes_read_payload);
-    if (!b) {
-        LOG_ERROR("%sFailed to allocate orilink_raw_protocol_t buffer. %s", label, strerror(errno));
-        free(full_orilink_payload_buffer);
-        CLOSE_ORILINK_RAW_PROTOCOL(&r);
-        result.status = FAILURE_NOMEM;
-        return result;
-    }
-    memcpy(b, full_orilink_payload_buffer, bytes_read_payload);
-    free(full_orilink_payload_buffer);
-    */
     r->recv_buffer = full_orilink_payload_buffer;
     r->n = (uint32_t)bytes_read_payload;
     full_orilink_payload_buffer = NULL;
     bytes_read_payload = 0;
-    if (read_header(label, r, r->recv_buffer, r->n) != SUCCESS) {
-        CLOSE_ORILINK_RAW_PROTOCOL(&r);
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
     result.r_orilink_raw_protocol_t = r;
     result.status = SUCCESS;
     return result;
@@ -1166,5 +2254,5 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
     }
     memcpy(oudp_datao->recv_buffer, iudp_datai->data, iudp_datai->len);
     oudp_datao->n = iudp_datai->len;
-    return read_header(label, oudp_datao, oudp_datao->recv_buffer, oudp_datao->n);
+    return SUCCESS;
 }

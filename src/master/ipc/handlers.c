@@ -21,6 +21,9 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
 		LOG_ERROR("%srecv_ipc_message from worker. %s", label, strerror(errno));
 		return ircvdi.status;
 	}
+    if (ipc_read_cleartext_header(label, ircvdi.r_ipc_raw_protocol_t) != SUCCESS) {
+        return FAILURE;
+    }
     worker_type_t rcvd_wot = ircvdi.r_ipc_raw_protocol_t->wot;
     uint8_t rcvd_index = ircvdi.r_ipc_raw_protocol_t->index;
     master_worker_session_t *session = get_master_worker_session(master_ctx, rcvd_wot, rcvd_index);
@@ -36,10 +39,31 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
         CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
         return FAILURE;
     }
-    if (ipc_check_mac_ctr(
+    if (ipc_check_mac(
+            label, 
+            security->mac_key, 
+            ircvdi.r_ipc_raw_protocol_t
+        ) != SUCCESS
+    )
+    {
+        CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+        return FAILURE;
+    }
+    if (ipc_read_header(
             label, 
             security->aes_key, 
             security->mac_key, 
+            security->remote_nonce, 
+            ircvdi.r_ipc_raw_protocol_t
+        ) != SUCCESS
+    )
+    {
+        CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+        return FAILURE;
+    }
+    if (ipc_check_ctr(
+            label, 
+            security->aes_key, 
             &security->remote_ctr, 
             ircvdi.r_ipc_raw_protocol_t
         ) != SUCCESS

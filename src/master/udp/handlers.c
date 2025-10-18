@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <endian.h>
 
 #include "log.h"
 #include "orilink/protocol.h"
@@ -28,6 +29,7 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
         &remote_addr
     );
     if (orcvdo.status != SUCCESS) return orcvdo.status;
+    if (orilink_read_cleartext_header(label, orcvdo.r_orilink_raw_protocol_t) != SUCCESS) return FAILURE;
     int getname_res = getnameinfo((struct sockaddr *)&remote_addr, sizeof(struct sockaddr_in6),
 						host_str, NI_MAXHOST,
 					  	port_str, NI_MAXSERV,
@@ -52,6 +54,17 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
         return FAILURE_IVLDPORT;
     }
     orilink_protocol_type_t orilink_protocol = orcvdo.r_orilink_raw_protocol_t->type;
+    uint8_t id_connection_be[8];
+    id_connection_be[0] = orcvdo.r_orilink_raw_protocol_t->id_connection1;
+    id_connection_be[1] = orcvdo.r_orilink_raw_protocol_t->id_connection2;
+    id_connection_be[2] = orcvdo.r_orilink_raw_protocol_t->id_connection3;
+    id_connection_be[3] = orcvdo.r_orilink_raw_protocol_t->id_connection4;
+    id_connection_be[4] = orcvdo.r_orilink_raw_protocol_t->id_connection5;
+    id_connection_be[5] = orcvdo.r_orilink_raw_protocol_t->id_connection6;
+    id_connection_be[6] = orcvdo.r_orilink_raw_protocol_t->id_connection7;
+    id_connection_be[7] = orcvdo.r_orilink_raw_protocol_t->id_connection8;
+    uint64_t *id_connection_ptr = (uint64_t *)&id_connection_be;
+    uint64_t id_connection = be64toh(*id_connection_ptr);
     switch (orilink_protocol) {
         case ORILINK_HELLO1: {
             master_sio_c_session_t *c_session = NULL;
@@ -66,7 +79,7 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                         CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                         return FAILURE;
                     }
-                    if (c_session->id_connection == orcvdo.r_orilink_raw_protocol_t->id_connection) {
+                    if (c_session->id_connection == id_connection) {
                         LOG_ERROR("%sId Connection %" PRIu64 " Already Exist.", label, c_session->id_connection);
                         CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                         return FAILURE;
@@ -104,18 +117,18 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                     return FAILURE;
                 }
                 c_session = &master_ctx->sio_c_session[(worker_index * MAX_CONNECTION_PER_SIO_WORKER) + session_index];
-                c_session->id_connection = orcvdo.r_orilink_raw_protocol_t->id_connection;
+                c_session->id_connection = id_connection;
                 memcpy(&c_session->remote_addr, &remote_addr, sizeof(struct sockaddr_in6));
             } else {
-                worker_index = orcvdo.r_orilink_raw_protocol_t->local_index;
-                session_index = orcvdo.r_orilink_raw_protocol_t->local_session_index;
+                worker_index = orcvdo.r_orilink_raw_protocol_t->remote_index;
+                session_index = orcvdo.r_orilink_raw_protocol_t->remote_session_index;
                 c_session = &master_ctx->sio_c_session[worker_index];
                 if (!sockaddr_equal((const struct sockaddr *)&remote_addr, (const struct sockaddr *)&c_session->remote_addr)) {
                     LOG_ERROR("%sDiferent Connection From Ip Address %s Port %s.", label, host_str, port_str);
                     CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                     return FAILURE;
                 }
-                if (c_session->id_connection != orcvdo.r_orilink_raw_protocol_t->id_connection) {
+                if (c_session->id_connection != id_connection) {
                     LOG_ERROR("%sDiferent Id Connection %" PRIu64 ".", label, c_session->id_connection);
                     CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                     return FAILURE;
@@ -174,7 +187,7 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                         if(c_session->in_use) {
                             if (
                                 sockaddr_equal((const struct sockaddr *)&remote_addr, (const struct sockaddr *)&c_session->remote_addr) &&
-                                c_session->id_connection == orcvdo.r_orilink_raw_protocol_t->id_connection
+                                c_session->id_connection == id_connection
                             )
                             {
                                 not_exist = false;
@@ -183,7 +196,7 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                         }
                     }
                     if (not_exist) {
-                        LOG_ERROR("%sNo Connection Exist From Ip Address %s Port %s Id Connection %" PRIu64 ".", label, host_str, port_str, orcvdo.r_orilink_raw_protocol_t->id_connection);
+                        LOG_ERROR("%sNo Connection Exist From Ip Address %s Port %s Id Connection %" PRIu64 ".", label, host_str, port_str, id_connection);
                         CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                         return FAILURE;
                     }
@@ -204,7 +217,7 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                         if(c_session->in_use) {
                             if (
                                 sockaddr_equal((const struct sockaddr *)&remote_addr, (const struct sockaddr *)&c_session->remote_addr) &&
-                                c_session->id_connection == orcvdo.r_orilink_raw_protocol_t->id_connection
+                                c_session->id_connection == id_connection
                             )
                             {
                                 not_exist = false;
@@ -213,7 +226,7 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                         }
                     }
                     if (not_exist) {
-                        LOG_ERROR("%sNo Connection Exist From Ip Address %s Port %s Id Connection %" PRIu64 ".", label, host_str, port_str, orcvdo.r_orilink_raw_protocol_t->id_connection);
+                        LOG_ERROR("%sNo Connection Exist From Ip Address %s Port %s Id Connection %" PRIu64 ".", label, host_str, port_str, id_connection);
                         CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
                         return FAILURE;
                     }

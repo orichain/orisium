@@ -108,6 +108,16 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return FAILURE;
         }
+        status_t rhd = orilink_read_header(worker_ctx->label, security->aes_key, security->mac_key, security->remote_nonce, oudp_datao);
+        if (rhd != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return FAILURE;
+        }
+//----------------------------------------------------------------------
+        inc_ctr = oudp_datao->inc_ctr;
+        oudp_datao_ctr = oudp_datao->ctr;
+//----------------------------------------------------------------------
         bool _1le_ = is_1lower_equal_ctr(&oudp_datao_ctr, &security->remote_ctr, security->remote_nonce);
         if (!_1le_) {
             LOG_ERROR("%sHello4 Received Already.", worker_ctx->label);
@@ -139,18 +149,27 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     session->hello4_ack.last_trycount = trycount;
 //======================================================================
     if (!isretry) {
-        status_t cmac = orilink_check_mac_ctr(
-            worker_ctx->label, 
-            security->aes_key, 
-            security->mac_key, 
-            security->remote_nonce,
-            &security->remote_ctr, 
-            oudp_datao
-        );
+        status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
         if (cmac != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return cmac;
+            return FAILURE;
+        }
+        status_t rhd = orilink_read_header(worker_ctx->label, security->aes_key, security->mac_key, security->remote_nonce, oudp_datao);
+        if (rhd != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return FAILURE;
+        }
+//----------------------------------------------------------------------
+        inc_ctr = oudp_datao->inc_ctr;
+        oudp_datao_ctr = oudp_datao->ctr;
+//----------------------------------------------------------------------
+        status_t cctr = orilink_check_ctr(worker_ctx->label, security->aes_key, &security->remote_ctr, oudp_datao);
+        if (cctr != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return FAILURE;
         }
     }
 //----------------------------------------------------------------------
@@ -267,7 +286,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t)
     ];
     const size_t data_len = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t);
-    if (encrypt_decrypt(
+    if (encrypt_decrypt_256(
             worker_ctx->label,
             aes_key,
             remote_nonce,
@@ -374,7 +393,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         sizeof(uint64_t)
     );
 //======================================================================    
-    if (encrypt_decrypt(
+    if (encrypt_decrypt_256(
             worker_ctx->label,
             aes_key,
             security->local_nonce,
@@ -428,7 +447,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         sizeof(uint64_t)
     );
 //======================================================================    
-    if (encrypt_decrypt(
+    if (encrypt_decrypt_256(
             worker_ctx->label,
             aes_key,
             security->local_nonce,

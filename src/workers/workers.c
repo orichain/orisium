@@ -4,7 +4,6 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <errno.h>
 
 #include "async.h"
 #include "utilities.h"
@@ -14,9 +13,7 @@
 #include "pqc.h"
 #include "stdbool.h"
 #include "ipc/protocol.h"
-#include "log.h"
 #include "orilink/protocol.h"
-#include "poly1305-donna.h"
 #include "workers/ipc/master_ipc_cmds.h"
 
 status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
@@ -60,7 +57,7 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
 //----------------------------------------------------------------------
     ctx->is_rekeying = false;
     ctx->rekeying_queue = NULL;
-//----------------------------------------------------------------------	
+//----------------------------------------------------------------------
 	if (async_create(ctx->label, &ctx->async) != SUCCESS) return FAILURE;
 	if (async_create_incoming_event_with_disconnect(ctx->label, &ctx->async, ctx->master_uds_fd) != SUCCESS) return FAILURE;
 //----------------------------------------------------------------------
@@ -126,24 +123,50 @@ status_t retry_control_packet(
 //----------------------------------------------------------------------
 // Update trycount
 //----------------------------------------------------------------------
-    memcpy(udp_data.r_puint8_t + AES_TAG_BYTES + sizeof(uint32_t), &control_packet->sent_try_count, sizeof(uint8_t));
-    size_t data_4mac_len = control_packet->len - AES_TAG_BYTES;
-    uint8_t *data_4mac = (uint8_t *)calloc(1, data_4mac_len);
-    if (!data_4mac) {
-        LOG_ERROR("%sError calloc data_4mac for mac: %s", worker_ctx->label, strerror(errno));
-        free(control_packet->data);
-        control_packet->data = NULL;
-        control_packet->len = 0;
-        return FAILURE_NOMEM;
-    }
-    memcpy(data_4mac, udp_data.r_puint8_t + AES_TAG_BYTES, data_4mac_len);
+    const size_t trycount_offset = AES_TAG_BYTES +
+                                   sizeof(uint32_t) +
+                                   ORILINK_VERSION_BYTES +
+                                   
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t);
+                                   
+    memcpy(udp_data.r_puint8_t + trycount_offset, &control_packet->sent_try_count, sizeof(uint8_t));
+    const size_t data_4mac_offset = AES_TAG_BYTES;
+    const size_t data_4mac_len = control_packet->len - AES_TAG_BYTES;
+    uint8_t *data_4mac = udp_data.r_puint8_t + data_4mac_offset;
     uint8_t mac[AES_TAG_BYTES];
-    poly1305_context ctx;
-    poly1305_init(&ctx, security->mac_key);
-    poly1305_update(&ctx, data_4mac, data_4mac_len);
-    poly1305_finish(&ctx, mac);
+    calculate_mac(security->mac_key, data_4mac, mac, data_4mac_len);
     memcpy(udp_data.r_puint8_t, mac, AES_TAG_BYTES);
-    free(data_4mac);
 //----------------------------------------------------------------------    
     free(control_packet->data);
     control_packet->data = NULL;
@@ -197,21 +220,50 @@ status_t retry_control_packet_ack(
 //----------------------------------------------------------------------
 // Update trycount
 //----------------------------------------------------------------------
-    memcpy(udp_data.r_puint8_t + AES_TAG_BYTES + sizeof(uint32_t), &control_packet_ack->ack_sent_try_count, sizeof(uint8_t));
-    size_t data_4mac_len = control_packet_ack->len - AES_TAG_BYTES;
-    uint8_t *data_4mac = (uint8_t *)calloc(1, data_4mac_len);
-    if (!data_4mac) {
-        LOG_ERROR("%sError calloc data_4mac for mac: %s", worker_ctx->label, strerror(errno));
-        return FAILURE_NOMEM;
-    }
-    memcpy(data_4mac, udp_data.r_puint8_t + AES_TAG_BYTES, data_4mac_len);
+    const size_t trycount_offset = AES_TAG_BYTES +
+                                   sizeof(uint32_t) +
+                                   ORILINK_VERSION_BYTES +
+                                   
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) + 
+                                   sizeof(uint8_t);
+                                   
+    memcpy(udp_data.r_puint8_t + trycount_offset, &control_packet_ack->ack_sent_try_count, sizeof(uint8_t));
+    const size_t data_4mac_offset = AES_TAG_BYTES;
+    const size_t data_4mac_len = control_packet_ack->len - AES_TAG_BYTES;
+    uint8_t *data_4mac = udp_data.r_puint8_t + data_4mac_offset;
     uint8_t mac[AES_TAG_BYTES];
-    poly1305_context ctx;
-    poly1305_init(&ctx, security->mac_key);
-    poly1305_update(&ctx, data_4mac, data_4mac_len);
-    poly1305_finish(&ctx, mac);
+    calculate_mac(security->mac_key, data_4mac, mac, data_4mac_len);
     memcpy(udp_data.r_puint8_t, mac, AES_TAG_BYTES);
-    free(data_4mac);
 //----------------------------------------------------------------------
     if (udp_data.status != SUCCESS) {
         return FAILURE;

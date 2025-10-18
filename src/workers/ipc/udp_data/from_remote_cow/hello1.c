@@ -2,6 +2,7 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <endian.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -45,6 +46,16 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return FAILURE;
         }
+        status_t rhd = orilink_read_header(worker_ctx->label, security->aes_key, security->mac_key, security->remote_nonce, oudp_datao);
+        if (rhd != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return FAILURE;
+        }
+//----------------------------------------------------------------------
+        inc_ctr = oudp_datao->inc_ctr;
+        oudp_datao_ctr = oudp_datao->ctr;
+//----------------------------------------------------------------------
         bool _1le_ = is_1lower_equal_ctr(&oudp_datao_ctr, &security->remote_ctr, security->remote_nonce);
         if (!_1le_) {
             LOG_ERROR("%sHello1 Received Already.", worker_ctx->label);
@@ -75,13 +86,30 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
     }
     session->hello1_ack.last_trycount = trycount;
 //======================================================================
-    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
-    if (current_time.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        return FAILURE;
-    }
+    if (!isretry) {
+        status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
+        if (cmac != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return FAILURE;
+        }
+        status_t rhd = orilink_read_header(worker_ctx->label, security->aes_key, security->mac_key, security->remote_nonce, oudp_datao);
+        if (rhd != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return FAILURE;
+        }
 //----------------------------------------------------------------------
+        inc_ctr = oudp_datao->inc_ctr;
+        oudp_datao_ctr = oudp_datao->ctr;
+//----------------------------------------------------------------------
+        status_t cctr = orilink_check_ctr(worker_ctx->label, security->aes_key, &security->remote_ctr, oudp_datao);
+        if (cctr != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+            return FAILURE;
+        }
+    }
     if (isretry) {
         if (session->hello1_ack.data != NULL) {
             //print_hex("SIO Sending Hello1 Ack Retry Response ", session->hello1_ack.data, session->hello1_ack.len, 1);
@@ -130,7 +158,17 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
         remote_wot = oudp_datao->local_wot;
         remote_index = oudp_datao->local_index;
         remote_session_index = oudp_datao->local_session_index;
-        rcvd_id_connection = oudp_datao->id_connection;
+        uint8_t id_connection_be[8];
+        id_connection_be[0] = oudp_datao->id_connection1;
+        id_connection_be[1] = oudp_datao->id_connection2;
+        id_connection_be[2] = oudp_datao->id_connection3;
+        id_connection_be[3] = oudp_datao->id_connection4;
+        id_connection_be[4] = oudp_datao->id_connection5;
+        id_connection_be[5] = oudp_datao->id_connection6;
+        id_connection_be[6] = oudp_datao->id_connection7;
+        id_connection_be[7] = oudp_datao->id_connection8;
+        uint64_t *id_connection_ptr = (uint64_t *)&id_connection_be;
+        rcvd_id_connection = be64toh(*id_connection_ptr);
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
     }
@@ -140,6 +178,13 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
     uint8_t kem_publickey[KEM_PUBLICKEY_BYTES / 2];
     memcpy(kem_publickey, ohello1->publickey1, KEM_PUBLICKEY_BYTES / 2);
 //======================================================================
+    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
+    if (current_time.status != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
+//----------------------------------------------------------------------
     session->hello1_ack.ack_sent_try_count++;
     session->hello1_ack.ack_sent_time = current_time.r_uint64_t;
 //======================================================================

@@ -15,10 +15,31 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
         LOG_ERROR("%sError receiving or deserializing IPC message from Master: %d", worker_ctx->label, ircvdi.status);
         return ircvdi.status;
     }
-    if (ipc_check_mac_ctr(
+    if (ipc_check_mac(
+            worker_ctx->label,
+            worker_ctx->mac_key, 
+            ircvdi.r_ipc_raw_protocol_t
+        ) != SUCCESS
+    )
+    {
+        CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+        return FAILURE;
+    }
+    if (ipc_read_header(
             worker_ctx->label, 
             worker_ctx->aes_key, 
             worker_ctx->mac_key, 
+            worker_ctx->remote_nonce, 
+            ircvdi.r_ipc_raw_protocol_t
+        ) != SUCCESS
+    )
+    {
+        CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+        return FAILURE;
+    }
+    if (ipc_check_ctr(
+            worker_ctx->label,
+            worker_ctx->aes_key, 
             &worker_ctx->remote_ctr, 
             ircvdi.r_ipc_raw_protocol_t
         ) != SUCCESS

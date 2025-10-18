@@ -133,17 +133,43 @@ typedef struct {
 typedef struct {
     uint8_t mac[AES_TAG_BYTES];
     uint32_t ctr;
-    uint8_t trycount;
 	uint8_t version[ORILINK_VERSION_BYTES];
+    
     uint8_t inc_ctr;
-    worker_type_t remote_wot;
-    uint8_t remote_index;
-    uint8_t remote_session_index;
-    worker_type_t local_wot;
+    
     uint8_t local_index;
     uint8_t local_session_index;
-    uint64_t id_connection;
-	orilink_protocol_type_t type;
+    uint8_t salt1;
+    worker_type_t local_wot;
+    uint8_t salt2;
+    uint8_t id_connection1;
+    uint8_t salt3;
+    uint8_t id_connection2;
+    uint8_t salt4;
+    uint8_t id_connection3;
+    
+    uint8_t salt5;
+    uint8_t id_connection4;
+    uint8_t salt6;
+    uint8_t id_connection5;
+    uint8_t salt7;
+    uint8_t id_connection6;
+    uint8_t salt8;
+    uint8_t id_connection7;
+    uint8_t salt9;
+    uint8_t id_connection8;
+    
+    uint8_t salt10;
+    worker_type_t remote_wot;
+    uint8_t salt11;
+    uint8_t remote_index;
+    uint8_t salt12;
+    uint8_t remote_session_index;
+    uint8_t salt13;
+    orilink_protocol_type_t type;
+    uint8_t salt14;
+    uint8_t trycount;
+    
 	union {
         orilink_hello1_t *orilink_hello1;
         orilink_hello1_ack_t *orilink_hello1_ack;
@@ -232,17 +258,43 @@ typedef struct {
     uint16_t n;
     uint8_t mac[AES_TAG_BYTES];
     uint32_t ctr;
-    uint8_t trycount;
     uint8_t version[ORILINK_VERSION_BYTES];
+    
     uint8_t inc_ctr;
-    worker_type_t remote_wot;
-    uint8_t remote_index;
-    uint8_t remote_session_index;
-    worker_type_t local_wot;
+    
     uint8_t local_index;
     uint8_t local_session_index;
-    uint64_t id_connection;
-	orilink_protocol_type_t type;
+    uint8_t salt1;
+    worker_type_t local_wot;
+    uint8_t salt2;
+    uint8_t id_connection1;
+    uint8_t salt3;
+    uint8_t id_connection2;
+    uint8_t salt4;
+    uint8_t id_connection3;
+    
+    uint8_t salt5;
+    uint8_t id_connection4;
+    uint8_t salt6;
+    uint8_t id_connection5;
+    uint8_t salt7;
+    uint8_t id_connection6;
+    uint8_t salt8;
+    uint8_t id_connection7;
+    uint8_t salt9;
+    uint8_t id_connection8;
+    
+    uint8_t salt10;
+    worker_type_t remote_wot;
+    uint8_t salt11;
+    uint8_t remote_index;
+    uint8_t salt12;
+    uint8_t remote_session_index;
+    uint8_t salt13;
+    orilink_protocol_type_t type;
+    uint8_t salt14;
+    uint8_t trycount;
+    
 } orilink_raw_protocol_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan
 static inline void CLOSE_ORILINK_RAW_PAYLOAD(void **ptr) {
@@ -274,8 +326,18 @@ typedef struct {
 puint8_t_size_t_status_t create_orilink_raw_protocol_packet(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, const orilink_protocol_t* p);
 ssize_t_status_t send_orilink_raw_protocol_packet(const char *label, puint8_t_size_t_status_t *r, int *sock_fd, const struct sockaddr_in6 *dest_addr);
 orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(const char *label, int *sock_fd, struct sockaddr_in6 *source_addr);
+status_t orilink_read_cleartext_header(
+    const char *label,
+    orilink_raw_protocol_t *r
+);
+status_t orilink_read_header(
+    const char *label,
+    uint8_t* key_aes, 
+    uint8_t* key_mac, 
+    uint8_t* nonce,
+    orilink_raw_protocol_t *r
+);
 status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data_t *iudp_datai, orilink_raw_protocol_t *oudp_datao);
-status_t orilink_check_mac_ctr(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t* ctr, orilink_raw_protocol_t *r);
 status_t orilink_check_mac(const char *label, uint8_t* key_mac, orilink_raw_protocol_t *r);
 status_t orilink_check_ctr(const char *label, uint8_t* key_aes, uint32_t* ctr, orilink_raw_protocol_t *r);
 orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t *key_aes, uint8_t *nonce, uint32_t *ctr, uint8_t* buffer, size_t len);

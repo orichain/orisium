@@ -70,7 +70,7 @@ status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_pro
     memcpy(wot_index + sizeof(uint8_t), worker_ctx->index, sizeof(uint8_t));
 //======================================================================    
     const size_t data_len = sizeof(uint8_t) + sizeof(uint8_t);
-    if (encrypt_decrypt(
+    if (encrypt_decrypt_256(
             worker_ctx->label,
             aes_key,
             local_nonce,
