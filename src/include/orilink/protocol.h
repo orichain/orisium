@@ -332,7 +332,6 @@ status_t orilink_read_cleartext_header(
 );
 status_t orilink_read_header(
     const char *label,
-    uint8_t* key_aes, 
     uint8_t* key_mac, 
     uint8_t* nonce,
     orilink_raw_protocol_t *r

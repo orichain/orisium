@@ -48,6 +48,8 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
 //======================================================================
     uint8_t remote_nonce[AES_NONCE_BYTES];
     memcpy(remote_nonce, ihello2i->encrypted_wot_index, AES_NONCE_BYTES);
+    uint32_t remote_ctr = (uint32_t)0;
+    uint32_t local_ctr = (uint32_t)0;
     uint8_t encrypted_wot_index_rcvd[sizeof(uint8_t) + sizeof(uint8_t)];   
     memcpy(encrypted_wot_index_rcvd, ihello2i->encrypted_wot_index + AES_NONCE_BYTES, sizeof(uint8_t) + sizeof(uint8_t));
     uint8_t data_mac[AES_TAG_BYTES];
@@ -84,7 +86,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
             label,
             aes_key,
             remote_nonce,
-            &security->remote_ctr,
+            &remote_ctr,
             encrypted_wot_index_rcvd,
             decrypted_wot_index_rcvd,
             data_len
@@ -122,7 +124,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
             label,
             aes_key,
             security->local_nonce,
-            &security->local_ctr,
+            &local_ctr,
             wot_index,
             encrypted_wot_index,
             data_len
@@ -147,10 +149,10 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
     }
     memcpy(security->aes_key, aes_key, HASHES_BYTES);
     memset (aes_key, 0, HASHES_BYTES);
-    security->local_ctr = (uint32_t)0;
+    security->local_ctr = local_ctr;
     memcpy(security->remote_nonce, remote_nonce, AES_NONCE_BYTES);
     memset(remote_nonce, 0, AES_NONCE_BYTES);
-    security->remote_ctr = (uint32_t)0;
+    security->remote_ctr = remote_ctr;
 //----------------------------------------------------------------------
     master_worker_session_t *session = get_master_worker_session(master_ctx, rcvd_wot, rcvd_index);
     if (session == NULL) {

@@ -50,8 +50,7 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
         return FAILURE;
     }
     if (ipc_read_header(
-            label, 
-            security->aes_key, 
+            label,  
             security->mac_key, 
             security->remote_nonce, 
             ircvdi.r_ipc_raw_protocol_t

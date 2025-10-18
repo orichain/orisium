@@ -27,7 +27,6 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
     }
     if (ipc_read_header(
             worker_ctx->label, 
-            worker_ctx->aes_key, 
             worker_ctx->mac_key, 
             worker_ctx->remote_nonce, 
             ircvdi.r_ipc_raw_protocol_t

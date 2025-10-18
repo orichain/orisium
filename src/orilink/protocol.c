@@ -723,6 +723,14 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
             result.status = FAILURE;
             return result;
         }
+    }
+    if (memcmp(
+            key_mac, 
+            key0, 
+            HASHES_BYTES
+        ) != 0
+    )
+    {
         const size_t header_offset = AES_TAG_BYTES;
         const size_t header_len = sizeof(uint32_t) +
                                   ORILINK_VERSION_BYTES +
@@ -752,17 +760,21 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
         uint8_t mac[AES_TAG_BYTES];
         calculate_mac(key_mac, data_4mac, mac, data_4mac_len);
         memcpy(current_buffer, mac, AES_TAG_BYTES);
+    } else {
+        uint8_t rendom_mac[AES_TAG_BYTES];
+        generate_fast_salt(rendom_mac, AES_TAG_BYTES);
+        memcpy(current_buffer, rendom_mac, AES_TAG_BYTES);
+    }
+    if (memcmp(
+            key_aes, 
+            key0, 
+            HASHES_BYTES
+        ) != 0
+    )
+    {
         if (p->inc_ctr != 0xFF) {
             increment_ctr(ctr, nonce);
         }
-    } else {
-        const size_t data_4mac_offset = AES_TAG_BYTES;
-        const size_t data_4mac_len = offset - AES_TAG_BYTES;
-        uint8_t *data_4mac = current_buffer + data_4mac_offset;
-        uint8_t mac[AES_TAG_BYTES];
-        memcpy(data_4mac, current_buffer + AES_TAG_BYTES, data_4mac_len);
-        calculate_mac(key_mac, data_4mac, mac, data_4mac_len);
-        memcpy(current_buffer, mac, AES_TAG_BYTES);
     }
     free(key0);
     result.r_ssize_t = (ssize_t)offset;
@@ -1370,21 +1382,32 @@ ssize_t_status_t send_orilink_raw_protocol_packet(const char *label, puint8_t_si
 }
 
 status_t orilink_check_mac(const char *label, uint8_t* key_mac, orilink_raw_protocol_t *r) {
-    uint8_t *data_4mac = r->recv_buffer;
-    const size_t data_offset = AES_TAG_BYTES;
-    const size_t data_len = r->n - AES_TAG_BYTES;
-    uint8_t *data = r->recv_buffer + data_offset;
-    if (compare_mac(
-            key_mac,
-            data,
-            data_len,
-            data_4mac
-        ) != SUCCESS
+    uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
+    if (memcmp(
+            key_mac, 
+            key0, 
+            HASHES_BYTES
+        ) != 0
     )
     {
-        LOG_ERROR("%sOrilink Mac mismatch!", label);
-        return FAILURE_MACMSMTCH;
+        uint8_t *data_4mac = r->recv_buffer;
+        const size_t data_offset = AES_TAG_BYTES;
+        const size_t data_len = r->n - AES_TAG_BYTES;
+        uint8_t *data = r->recv_buffer + data_offset;
+        if (compare_mac(
+                key_mac,
+                data,
+                data_len,
+                data_4mac
+            ) != SUCCESS
+        )
+        {
+            LOG_ERROR("%sOrilink Mac mismatch!", label);
+            free(key0);
+            return FAILURE_MACMSMTCH;
+        }
     }
+    free(key0);
     return SUCCESS;
 }
 
@@ -1409,7 +1432,6 @@ status_t orilink_check_ctr(const char *label, uint8_t* key_aes, uint32_t* ctr, o
 
 status_t orilink_read_header(
     const char *label,
-    uint8_t* key_aes, 
     uint8_t* key_mac, 
     uint8_t* nonce,
     orilink_raw_protocol_t *r
@@ -1420,7 +1442,7 @@ status_t orilink_read_header(
     uint8_t *cursor = r->recv_buffer + current_offset;
     uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
     if (memcmp(
-            key_aes, 
+            key_mac, 
             key0, 
             HASHES_BYTES
         ) != 0

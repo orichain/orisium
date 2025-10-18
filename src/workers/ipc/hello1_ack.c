@@ -56,6 +56,7 @@ status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_pro
         CLOSE_IPC_PROTOCOL(&received_protocol);
         return FAILURE;
     }
+    uint32_t local_ctr = (uint32_t)0;
 //----------------------------------------------------------------------
 // HELLO2 Memakai mac_key baru
 //----------------------------------------------------------------------
@@ -74,7 +75,7 @@ status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_pro
             worker_ctx->label,
             aes_key,
             local_nonce,
-            &worker_ctx->local_ctr,
+            &local_ctr,
             wot_index,
             encrypted_wot_index,
             data_len
@@ -104,7 +105,7 @@ status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_pro
     memset(aes_key, 0, HASHES_BYTES);
     memcpy(worker_ctx->local_nonce, local_nonce, AES_NONCE_BYTES);
     memset(local_nonce, 0, AES_NONCE_BYTES);
-    worker_ctx->local_ctr = (uint32_t)0;
+    worker_ctx->local_ctr = local_ctr;
     memcpy(worker_ctx->remote_nonce, ihello1_acki->nonce, AES_NONCE_BYTES);
     worker_ctx->hello1_ack_rcvd = true;
     CLOSE_IPC_PROTOCOL(&received_protocol);

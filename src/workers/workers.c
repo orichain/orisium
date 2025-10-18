@@ -15,6 +15,7 @@
 #include "ipc/protocol.h"
 #include "orilink/protocol.h"
 #include "workers/ipc/master_ipc_cmds.h"
+#include "xorshiro128plus.h"
 
 status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
     ctx->pid = getpid();
@@ -159,14 +160,27 @@ status_t retry_control_packet(
                                    sizeof(uint8_t) +
                                    sizeof(uint8_t) + 
                                    sizeof(uint8_t);
-                                   
     memcpy(udp_data.r_puint8_t + trycount_offset, &control_packet->sent_try_count, sizeof(uint8_t));
-    const size_t data_4mac_offset = AES_TAG_BYTES;
-    const size_t data_4mac_len = control_packet->len - AES_TAG_BYTES;
-    uint8_t *data_4mac = udp_data.r_puint8_t + data_4mac_offset;
-    uint8_t mac[AES_TAG_BYTES];
-    calculate_mac(security->mac_key, data_4mac, mac, data_4mac_len);
-    memcpy(udp_data.r_puint8_t, mac, AES_TAG_BYTES);
+    uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
+    if (memcmp(
+            security->mac_key, 
+            key0, 
+            HASHES_BYTES
+        ) != 0
+    )
+    {
+        const size_t data_4mac_offset = AES_TAG_BYTES;
+        const size_t data_4mac_len = control_packet->len - AES_TAG_BYTES;
+        uint8_t *data_4mac = udp_data.r_puint8_t + data_4mac_offset;
+        uint8_t mac[AES_TAG_BYTES];
+        calculate_mac(security->mac_key, data_4mac, mac, data_4mac_len);
+        memcpy(udp_data.r_puint8_t, mac, AES_TAG_BYTES);
+    } else {
+        uint8_t rendom_mac[AES_TAG_BYTES];
+        generate_fast_salt(rendom_mac, AES_TAG_BYTES);
+        memcpy(udp_data.r_puint8_t, rendom_mac, AES_TAG_BYTES);
+    }
+    free(key0);
 //----------------------------------------------------------------------    
     free(control_packet->data);
     control_packet->data = NULL;
@@ -258,12 +272,26 @@ status_t retry_control_packet_ack(
                                    sizeof(uint8_t);
                                    
     memcpy(udp_data.r_puint8_t + trycount_offset, &control_packet_ack->ack_sent_try_count, sizeof(uint8_t));
-    const size_t data_4mac_offset = AES_TAG_BYTES;
-    const size_t data_4mac_len = control_packet_ack->len - AES_TAG_BYTES;
-    uint8_t *data_4mac = udp_data.r_puint8_t + data_4mac_offset;
-    uint8_t mac[AES_TAG_BYTES];
-    calculate_mac(security->mac_key, data_4mac, mac, data_4mac_len);
-    memcpy(udp_data.r_puint8_t, mac, AES_TAG_BYTES);
+    uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
+    if (memcmp(
+            security->mac_key, 
+            key0, 
+            HASHES_BYTES
+        ) != 0
+    )
+    {
+        const size_t data_4mac_offset = AES_TAG_BYTES;
+        const size_t data_4mac_len = control_packet_ack->len - AES_TAG_BYTES;
+        uint8_t *data_4mac = udp_data.r_puint8_t + data_4mac_offset;
+        uint8_t mac[AES_TAG_BYTES];
+        calculate_mac(security->mac_key, data_4mac, mac, data_4mac_len);
+        memcpy(udp_data.r_puint8_t, mac, AES_TAG_BYTES);
+    } else {
+        uint8_t rendom_mac[AES_TAG_BYTES];
+        generate_fast_salt(rendom_mac, AES_TAG_BYTES);
+        memcpy(udp_data.r_puint8_t, rendom_mac, AES_TAG_BYTES);
+    }
+    free(key0);
 //----------------------------------------------------------------------
     if (udp_data.status != SUCCESS) {
         return FAILURE;

@@ -44,6 +44,7 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
 // Cocokkan MAc
 // Decrypt wot dan index
 //======================================================================
+    uint32_t remote_ctr = (uint32_t)0;
     uint8_t encrypted_wot_index[sizeof(uint8_t) + sizeof(uint8_t)];   
     memcpy(encrypted_wot_index, ihello2_acki->encrypted_wot_index, sizeof(uint8_t) + sizeof(uint8_t));
     uint8_t data_mac[AES_TAG_BYTES];
@@ -78,7 +79,7 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
             worker_ctx->label,
             aes_key,
             worker_ctx->remote_nonce,
-            &worker_ctx->remote_ctr,
+            &remote_ctr,
             encrypted_wot_index,
             decrypted_wot_index,
             data_len
@@ -88,6 +89,7 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
         CLOSE_IPC_PROTOCOL(&received_protocol);
         return FAILURE;
     }
+//======================================================================    
 //----------------------------------------------------------------------
 // Mencocokkan wot index
 //----------------------------------------------------------------------
@@ -146,7 +148,7 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
 //---------------------------------------------------------------------- 
     memcpy(worker_ctx->aes_key, aes_key, HASHES_BYTES);
     memset(aes_key, 0, HASHES_BYTES);
-    worker_ctx->remote_ctr = (uint32_t)0;
+    worker_ctx->remote_ctr = remote_ctr;
     worker_ctx->hello2_ack_rcvd = true;
 //---------------------------------------------------------------------- 
     CLOSE_IPC_PROTOCOL(&received_protocol);

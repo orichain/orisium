@@ -20,7 +20,7 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
 //======================================================================
 // + Security
 //======================================================================
-    //print_hex("COW Receiving Hello1 Ack ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
+    print_hex("COW Receiving Hello1 Ack ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
     if (!session->hello1.sent) {
         LOG_ERROR("%sReceive Hello1_Ack But This Worker Session Is Never Sending Hello1.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -40,7 +40,7 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
-    status_t rhd = orilink_read_header(worker_ctx->label, security->aes_key, security->mac_key, security->remote_nonce, oudp_datao);
+    status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, oudp_datao);
     if (rhd != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
