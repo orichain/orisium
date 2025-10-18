@@ -173,7 +173,7 @@ static inline void calculate_mac(
 }
 
 static inline status_t compare_mac(
-    uint8_t* key_mac, 
+    uint8_t *key_mac, 
     uint8_t *data, 
     const size_t data_len,
     uint8_t *data_4mac

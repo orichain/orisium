@@ -30,116 +30,70 @@
 #include "ipc/protocol.h"
 #include "xorshiro128plus.h"
 
-static inline size_t_status_t calculate_orilink_payload_size(const char *label, const orilink_protocol_t* p, bool checkfixheader) {
-	size_t_status_t result;
-    result.r_size_t = 0;
-    result.status = FAILURE;
-    size_t payload_fixed_size = 0;
-    size_t payload_dynamic_size = 0;
-    
-    switch (p->type) {
+bool is_orilink_control_packet(orilink_protocol_type_t type) {
+    switch (type) {
+        case ORILINK_HELLO1: 
+        case ORILINK_HELLO1_ACK:
+        case ORILINK_HELLO2:
+        case ORILINK_HELLO2_ACK:
+        case ORILINK_HELLO3:
+        case ORILINK_HELLO3_ACK:
+        case ORILINK_HELLO4:
+        case ORILINK_HELLO4_ACK:
+        case ORILINK_HEARTBEAT:
+        case ORILINK_HEARTBEAT_ACK:
+        case ORILINK_INFO:
+        case ORILINK_INFO_ACK: {
+            return true;
+            break;
+        }
+        default:
+            return false;
+    }
+}
+
+static inline size_t calculate_orilink_payload_fixed_size(const char *label, orilink_protocol_type_t type, bool plus_header) {
+	size_t payload_fixed_size = 0;
+    switch (type) {
         case ORILINK_HELLO1: {
-            if (!checkfixheader) {
-                if (!p->payload.orilink_hello1) {
-                    LOG_ERROR("%sORILINK_HELLO1 payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = sizeof(uint64_t) + 
                                  (KEM_PUBLICKEY_BYTES / 2);
-            payload_dynamic_size = 0;
             break;
         }
         case ORILINK_HELLO1_ACK: {
-            if (!checkfixheader) {
-                if (!p->payload.orilink_hello1_ack) {
-                    LOG_ERROR("%sORILINK_HELLO1_ACK payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = sizeof(uint64_t);
-            payload_dynamic_size = 0;
             break;
         }
         case ORILINK_HELLO2: {
-            if (!checkfixheader) {
-                if (!p->payload.orilink_hello2) {
-                    LOG_ERROR("%sORILINK_HELLO2 payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = sizeof(uint64_t) + 
                                  (KEM_PUBLICKEY_BYTES / 2);
-            payload_dynamic_size = 0;
             break;
         }
         case ORILINK_HELLO2_ACK: {
-            if (!checkfixheader) {
-                if (!p->payload.orilink_hello2_ack) {
-                    LOG_ERROR("%sORILINK_HELLO2_ACK payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = sizeof(uint64_t) + 
                                  (KEM_CIPHERTEXT_BYTES / 2);
-            payload_dynamic_size = 0;
             break;
         }
         case ORILINK_HELLO3: {
-            if (!checkfixheader) {
-                if (!p->payload.orilink_hello3) {
-                    LOG_ERROR("%sORILINK_HELLO3 payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = sizeof(uint64_t);
-            payload_dynamic_size = 0;
             break;
         }
         case ORILINK_HELLO3_ACK: {
-            if (!checkfixheader) {
-                if (!p->payload.orilink_hello3_ack) {
-                    LOG_ERROR("%sORILINK_HELLO3_ACK payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = sizeof(uint64_t) + 
                                  AES_NONCE_BYTES + 
                                  (KEM_CIPHERTEXT_BYTES / 2);
-            payload_dynamic_size = 0;
             break;
         }
         case ORILINK_HELLO4: {
-            if (!checkfixheader) {
-                if (!p->payload.orilink_hello4) {
-                    LOG_ERROR("%sORILINK_HELLO4 payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = AES_NONCE_BYTES +
                                  sizeof(uint8_t) +
                                  sizeof(uint8_t) +
                                  sizeof(uint8_t) +
                                  sizeof(uint64_t) +
                                  AES_TAG_BYTES;
-            payload_dynamic_size = 0;
             break;
         }
         case ORILINK_HELLO4_ACK: {
-            if (!checkfixheader) {
-                if (!p->payload.orilink_hello4_ack) {
-                    LOG_ERROR("%sORILINK_HELLO4_ACK payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = sizeof(uint8_t) +
                                  sizeof(uint8_t) +
                                  sizeof(uint8_t) +
@@ -150,107 +104,94 @@ static inline size_t_status_t calculate_orilink_payload_size(const char *label, 
                                  sizeof(uint8_t) +
                                  sizeof(uint64_t) +
                                  AES_TAG_BYTES;
-            payload_dynamic_size = 0;
             break;
         }
         case ORILINK_HEARTBEAT: {
-            if (!checkfixheader) {
-                if (!p->payload.orilink_heartbeat) {
-                    LOG_ERROR("%sORILINK_HEARTBEAT payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = sizeof(uint64_t) + sizeof(uint64_t) + DOUBLE_ARRAY_SIZE;
-            payload_dynamic_size = 0;
             break;
         }
         case ORILINK_HEARTBEAT_ACK: {
-            if (!checkfixheader) {
-                if (!p->payload.orilink_heartbeat_ack) {
-                    LOG_ERROR("%sORILINK_HEARTBEAT_ACK payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = sizeof(uint64_t) + sizeof(uint64_t);
-            payload_dynamic_size = 0;
             break;
         }
         case ORILINK_INFO: {
-            if (!checkfixheader) {
-                if (!p->payload.orilink_info) {
-                    LOG_ERROR("%sORILINK_INFO payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint8_t);
-            payload_dynamic_size = 0;
             break;
         }
         case ORILINK_INFO_ACK: {
-            if (!checkfixheader) {
-                if (!p->payload.orilink_heartbeat_ack) {
-                    LOG_ERROR("%sORILINK_INFO_ACK payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = sizeof(uint64_t) + sizeof(uint64_t);
-            payload_dynamic_size = 0;
             break;
         }
         default:
-            LOG_ERROR("%sUnknown protocol type for serialization: 0x%02x", label, p->type);
-            result.status = FAILURE_OPYLD;
-            return result;
+            LOG_ERROR("%sUnknown protocol type: %d", label, type);
+            return 0;
     }
-    if (checkfixheader) {
-        result.r_size_t = payload_fixed_size;
+    if (!plus_header) {
+        return payload_fixed_size;
+    }
+    return AES_TAG_BYTES + 
+           sizeof(uint32_t) + 
+           ORILINK_VERSION_BYTES + 
+          
+           sizeof(uint8_t) + 
+          
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+          
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+          
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + 
+          
+           payload_fixed_size;
+}
+
+size_t orilink_control_packet_data_len(const char *label, orilink_protocol_type_t type) {
+    if (is_orilink_control_packet(type)) {
+        return calculate_orilink_payload_fixed_size(label, type, true);
     } else {
-        result.r_size_t = AES_TAG_BYTES + 
-                          sizeof(uint32_t) + 
-                          ORILINK_VERSION_BYTES + 
-                          
-                          sizeof(uint8_t) + 
-                          
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          sizeof(uint8_t) + 
-                          
-                          payload_fixed_size + 
-                          payload_dynamic_size;
+        LOG_ERROR("%sUnknown protocol type: %d", label, type);
+        return 0;
     }
+}
+
+static inline size_t_status_t calculate_orilink_payload_size(const char *label, const orilink_protocol_t *p) {
+	size_t_status_t result;
+    result.r_size_t = 0;
+    result.status = FAILURE;
+    size_t payload_fixed_size = calculate_orilink_payload_fixed_size(label, p->type, true);
+    if (payload_fixed_size == 0) {
+        LOG_ERROR("%sInvalid Orilink Payload Size.", label);
+        result.status = FAILURE;
+        return result;
+    }
+    size_t payload_dynamic_size = 0;
+    result.r_size_t = payload_fixed_size + payload_dynamic_size;
     result.status = SUCCESS;
     return result;
 }
@@ -263,7 +204,7 @@ ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, uint8_t*
     if (!p || !ptr_buffer || !buffer_size) {
         return result;
     }
-    size_t_status_t psize = calculate_orilink_payload_size(label, p, false);
+    size_t_status_t psize = calculate_orilink_payload_size(label, p);
     if (psize.status != SUCCESS) {
 		result.status = psize.status;
 		return result;
@@ -1044,19 +985,12 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
             return result;
         }
     }
-    size_t_status_t psize = calculate_orilink_payload_size(label, p, true);
-    if (psize.status != SUCCESS) {
-        CLOSE_ORILINK_PROTOCOL(&p);
-        free(key0);
-		result.status = psize.status;
-		return result;
-	}
-    size_t fixed_header_size = psize.r_size_t;
+    size_t fixed_payload_size = calculate_orilink_payload_fixed_size(label, p->type, false);
     LOG_DEBUG("%sDeserializing type 0x%02x. Current offset: %zu", label, p->type, current_buffer_offset);
     status_t result_pyld = FAILURE;
     switch (p->type) {
         case ORILINK_HELLO1: {
-			if (current_buffer_offset + fixed_header_size > len) {
+			if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HELLO1 fixed header.", label);
                 CLOSE_ORILINK_PROTOCOL(&p);
                 free(key0);
@@ -1076,7 +1010,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
             break;
 		}
         case ORILINK_HELLO1_ACK: {
-			if (current_buffer_offset + fixed_header_size > len) {
+			if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HELLO1_ACK fixed header.", label);
                 CLOSE_ORILINK_PROTOCOL(&p);
                 free(key0);
@@ -1096,7 +1030,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
             break;
 		}
         case ORILINK_HELLO2: {
-			if (current_buffer_offset + fixed_header_size > len) {
+			if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HELLO2 fixed header.", label);
                 CLOSE_ORILINK_PROTOCOL(&p);
                 free(key0);
@@ -1116,7 +1050,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
             break;
 		}
         case ORILINK_HELLO2_ACK: {
-			if (current_buffer_offset + fixed_header_size > len) {
+			if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HELLO2_ACK fixed header.", label);
                 CLOSE_ORILINK_PROTOCOL(&p);
                 free(key0);
@@ -1136,7 +1070,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
             break;
 		}
         case ORILINK_HELLO3: {
-			if (current_buffer_offset + fixed_header_size > len) {
+			if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HELLO3 fixed header.", label);
                 CLOSE_ORILINK_PROTOCOL(&p);
                 free(key0);
@@ -1156,7 +1090,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
             break;
 		}
         case ORILINK_HELLO3_ACK: {
-			if (current_buffer_offset + fixed_header_size > len) {
+			if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HELLO3_ACK fixed header.", label);
                 CLOSE_ORILINK_PROTOCOL(&p);
                 free(key0);
@@ -1176,7 +1110,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
             break;
 		}
         case ORILINK_HELLO4: {
-			if (current_buffer_offset + fixed_header_size > len) {
+			if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HELLO4 fixed header.", label);
                 CLOSE_ORILINK_PROTOCOL(&p);
                 free(key0);
@@ -1196,7 +1130,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
             break;
 		}
         case ORILINK_HELLO4_ACK: {
-			if (current_buffer_offset + fixed_header_size > len) {
+			if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HELLO4_ACK fixed header.", label);
                 CLOSE_ORILINK_PROTOCOL(&p);
                 free(key0);
@@ -1216,7 +1150,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
             break;
 		}
         case ORILINK_HEARTBEAT: {
-			if (current_buffer_offset + fixed_header_size > len) {
+			if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HEARTBEAT fixed header.", label);
                 CLOSE_ORILINK_PROTOCOL(&p);
                 free(key0);
@@ -1236,7 +1170,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
             break;
 		}
         case ORILINK_HEARTBEAT_ACK: {
-			if (current_buffer_offset + fixed_header_size > len) {
+			if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_HEARTBEAT_ACK fixed header.", label);
                 CLOSE_ORILINK_PROTOCOL(&p);
                 free(key0);
@@ -1256,7 +1190,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
             break;
 		}
         case ORILINK_INFO: {
-			if (current_buffer_offset + fixed_header_size > len) {
+			if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_INFO fixed header.", label);
                 CLOSE_ORILINK_PROTOCOL(&p);
                 free(key0);
@@ -1276,7 +1210,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
             break;
 		}
         case ORILINK_INFO_ACK: {
-			if (current_buffer_offset + fixed_header_size > len) {
+			if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk ORILINK_INFO_ACK fixed header.", label);
                 CLOSE_ORILINK_PROTOCOL(&p);
                 free(key0);
@@ -1351,6 +1285,27 @@ puint8_t_size_t_status_t create_orilink_raw_protocol_packet(const char *label, u
         }
         return result;
     }
+    if (is_orilink_control_packet(p->type)) {
+        uint16_t max_padding_length = (uint16_t)ORILINK_MAX_PACKET_SIZE - result.r_size_t;
+        if (max_padding_length > 32) {
+            max_padding_length = 32;
+        }
+        if (max_padding_length != (uint16_t)0) {
+            uint8_t random_padding_length = (_next_xoroshiro128plus_uint8() % (uint8_t)max_padding_length) + 1;
+            uint8_t *new_r_puint8_t = realloc(result.r_puint8_t, result.r_size_t + (uint16_t)random_padding_length);
+            if (!new_r_puint8_t) {
+                if (result.r_puint8_t) {
+                    free(result.r_puint8_t);
+                    result.r_puint8_t = NULL;
+                    result.r_size_t = 0;
+                }
+                return result;
+            }
+            result.r_puint8_t = new_r_puint8_t;
+            generate_fast_salt(result.r_puint8_t + result.r_size_t, random_padding_length);
+            result.r_size_t += (uint16_t)random_padding_length;
+        }
+    }
     LOG_DEBUG("%sTotal pesan untuk dikirim: %zu byte.", label, result.r_size_t);
     result.status = SUCCESS;
     return result;
@@ -1392,7 +1347,11 @@ status_t orilink_check_mac(const char *label, uint8_t* key_mac, orilink_raw_prot
     {
         uint8_t *data_4mac = r->recv_buffer;
         const size_t data_offset = AES_TAG_BYTES;
-        const size_t data_len = r->n - AES_TAG_BYTES;
+        size_t data_len = r->n - AES_TAG_BYTES;
+        if (is_orilink_control_packet(r->type)) {
+            data_len = orilink_control_packet_data_len(label, r->type);
+            data_len -= AES_TAG_BYTES;
+        }
         uint8_t *data = r->recv_buffer + data_offset;
         if (compare_mac(
                 key_mac,
@@ -2180,7 +2139,7 @@ status_t orilink_read_cleartext_header(
         return FAILURE_OOBUF;
     }
     memcpy(&r->trycount, cursor, sizeof(uint8_t));
-//---------------------------------------------------------------------- 
+//----------------------------------------------------------------------
     return SUCCESS;
 }
 

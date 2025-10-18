@@ -14,6 +14,8 @@
 
 static uint64_t s[2];
 static bool is_seeded = false;
+static uint64_t current_rand_64bit = 0;
+static uint8_t byte_counter = 8; 
 
 static inline uint64_t rotl(const uint64_t x, int k) {
     return (x << k) | (x >> (64 - k));
@@ -42,6 +44,16 @@ static inline uint64_t _next_xoroshiro128plus(void) {
     s[0] = rotl(s0, 24) ^ s1 ^ (s1 << 16);
     s[1] = rotl(s1, 37);
     return result;
+}
+
+static inline uint8_t _next_xoroshiro128plus_uint8(void) {
+    if (byte_counter >= 8) {
+        current_rand_64bit = _next_xoroshiro128plus(); 
+        byte_counter = 0;
+    }
+    uint8_t result_byte = (uint8_t)(current_rand_64bit >> (byte_counter * 8)) & 0xFF;
+    byte_counter++;
+    return result_byte;
 }
 
 static inline void generate_fast_salt(uint8_t *buffer, size_t len) {

@@ -27,155 +27,94 @@
 #include "pqc.h"
 #include "xorshiro128plus.h"
 
-static inline size_t_status_t calculate_ipc_payload_size(const char *label, const ipc_protocol_t* p, bool checkfixheader) {
-	size_t_status_t result;
-    result.r_size_t = 0;
-    result.status = FAILURE;
-    size_t payload_fixed_size = 0;
-    size_t payload_dynamic_size = 0;
-    
-    switch (p->type) {
-		case IPC_MASTER_WORKER_INFO: {
-            if (!checkfixheader) {
-                if (!p->payload.ipc_master_worker_info) {
-                    LOG_ERROR("%sIPC_MASTER_WORKER_INFO payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
+static inline size_t calculate_ipc_payload_fixed_size(const char *label, ipc_protocol_type_t type, bool plus_header) {
+	size_t payload_fixed_size = 0;
+    switch (type) {
+        case IPC_MASTER_WORKER_INFO: {
             payload_fixed_size = sizeof(uint8_t);
-            payload_dynamic_size = 0;
             break;
         }
         case IPC_WORKER_MASTER_TASK_INFO: {
-            if (!checkfixheader) {
-                if (!p->payload.ipc_worker_master_task_info) {
-                    LOG_ERROR("%sIPC_WORKER_MASTER_TASK_INFO payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = sizeof(uint8_t) + sizeof(uint8_t);
-            payload_dynamic_size = 0;
             break;
         }
         case IPC_WORKER_MASTER_HEARTBEAT: {
-            if (!checkfixheader) {
-                if (!p->payload.ipc_worker_master_heartbeat) {
-                    LOG_ERROR("%sIPC_WORKER_MASTER_HEARTBEAT payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = DOUBLE_ARRAY_SIZE;
-            payload_dynamic_size = 0;
             break;
         }
         case IPC_MASTER_COW_CONNECT: {
-            if (!checkfixheader) {
-                if (!p->payload.ipc_master_cow_connect) {
-                    LOG_ERROR("%sIPC_MASTER_COW_CONNECT payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = sizeof(uint8_t) + sizeof(uint64_t) + SOCKADDR_IN6_SIZE;
-            payload_dynamic_size = 0;
             break;
         }
         case IPC_UDP_DATA: {
-            if (!checkfixheader) {
-                if (!p->payload.ipc_udp_data) {
-                    LOG_ERROR("%sIPC_UDP_DATA payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + SOCKADDR_IN6_SIZE + sizeof(uint16_t);
-            payload_dynamic_size = p->payload.ipc_udp_data->len;
             break;
         }
         case IPC_UDP_DATA_ACK: {
-            if (!checkfixheader) {
-                if (!p->payload.ipc_udp_data_ack) {
-                    LOG_ERROR("%sIPC_UDP_DATA_ACK payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t);
-            payload_dynamic_size = 0;
             break;
         }
         case IPC_WORKER_MASTER_HELLO1: {
-            if (!checkfixheader) {
-                if (!p->payload.ipc_worker_master_hello1) {
-                    LOG_ERROR("%sIPC_WORKER_MASTER_HELLO1 payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = KEM_PUBLICKEY_BYTES;
-            payload_dynamic_size = 0;
             break;
         }
         case IPC_WORKER_MASTER_HELLO2: {
-            if (!checkfixheader) {
-                if (!p->payload.ipc_worker_master_hello2) {
-                    LOG_ERROR("%sIPC_WORKER_MASTER_HELLO2 payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES;
-            payload_dynamic_size = 0;
             break;
         }
         case IPC_MASTER_WORKER_HELLO1_ACK: {
-            if (!checkfixheader) {
-                if (!p->payload.ipc_master_worker_hello1_ack) {
-                    LOG_ERROR("%sIPC_MASTER_WORKER_HELLO1_ACK payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = AES_NONCE_BYTES + KEM_CIPHERTEXT_BYTES;
-            payload_dynamic_size = 0;
             break;
         }
         case IPC_MASTER_WORKER_HELLO2_ACK: {
-            if (!checkfixheader) {
-                if (!p->payload.ipc_master_worker_hello2_ack) {
-                    LOG_ERROR("%sIPC_MASTER_WORKER_HELLO2_ACK payload is NULL.", label);
-                    result.status = FAILURE;
-                    return result;
-                }
-            }
             payload_fixed_size = sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES;
-            payload_dynamic_size = 0;
             break;
         }
         default:
-            LOG_ERROR("%sUnknown protocol type for serialization: 0x%02x", label, p->type);
-            result.status = FAILURE_IPYLD;
-            return result;
+            LOG_ERROR("%sUnknown protocol type: %d", label, type);
+            return 0;
     }
-    if (checkfixheader) {
-        result.r_size_t = payload_fixed_size;
-    } else {
-        result.r_size_t = AES_TAG_BYTES + 
-            sizeof(uint32_t) + 
-            IPC_VERSION_BYTES + 
-            sizeof(uint8_t) + 
-            sizeof(uint8_t) + //salt1
-            sizeof(uint8_t) + 
-            sizeof(uint8_t) + //salt2
-            sizeof(uint8_t) + //salt3
-            sizeof(uint8_t) + 
-            sizeof(uint8_t) + //salt4
-            payload_fixed_size + 
-            payload_dynamic_size;
+    if (!plus_header) {
+        return payload_fixed_size;
     }
+    return AES_TAG_BYTES + 
+           sizeof(uint32_t) + 
+           IPC_VERSION_BYTES + 
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + //salt1
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + //salt2
+           sizeof(uint8_t) + //salt3
+           sizeof(uint8_t) + 
+           sizeof(uint8_t) + //salt4
+           payload_fixed_size;
+}
+
+static inline size_t_status_t calculate_ipc_payload_size(const char *label, const ipc_protocol_t* p) {
+	size_t_status_t result;
+    result.r_size_t = 0;
+    result.status = FAILURE;
+    size_t payload_fixed_size = calculate_ipc_payload_fixed_size(label, p->type, true);
+    if (payload_fixed_size == 0) {
+        LOG_ERROR("%sInvalid Ipc Payload Size.", label);
+        result.status = FAILURE;
+        return result;
+    }
+    size_t payload_dynamic_size = 0;
+    switch (p->type) {
+		case IPC_UDP_DATA: {
+            if (!p->payload.ipc_udp_data) {
+                LOG_ERROR("%sIPC_UDP_DATA payload is NULL.", label);
+                result.status = FAILURE;
+                return result;
+            }
+            payload_dynamic_size = p->payload.ipc_udp_data->len;
+            break;
+        }
+        default:
+            payload_dynamic_size = 0;
+    }
+    result.r_size_t = payload_fixed_size + payload_dynamic_size;
     result.status = SUCCESS;
     return result;
 }
@@ -187,7 +126,7 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes, uint8_t* key
     if (!p || !ptr_buffer || !buffer_size) {
         return result;
     }
-    size_t_status_t psize = calculate_ipc_payload_size(label, p, false);
+    size_t_status_t psize = calculate_ipc_payload_size(label, p);
     if (psize.status != SUCCESS) {
 		result.status = psize.status;
 		return result;
@@ -494,19 +433,12 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
         }
     }
 //----------------------------------------------------------------------
-    size_t_status_t psize = calculate_ipc_payload_size(label, p, true);
-    if (psize.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&p);
-        free(key0);
-		result.status = psize.status;
-		return result;
-	}
-    size_t fixed_header_size = psize.r_size_t;
+    size_t fixed_payload_size = calculate_ipc_payload_fixed_size(label, p->type, false);
     LOG_DEBUG("%sDeserializing type 0x%02x. Current offset: %zu", label, p->type, current_buffer_offset);
     status_t result_pyld = FAILURE;
     switch (p->type) {
         case IPC_MASTER_WORKER_INFO: {
-            if (current_buffer_offset + fixed_header_size > len) {
+            if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_MASTER_WORKER_INFO fixed header.", label);
                 CLOSE_IPC_PROTOCOL(&p);
                 free(key0);
@@ -526,7 +458,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
             break;
 		}
         case IPC_WORKER_MASTER_TASK_INFO: {
-            if (current_buffer_offset + fixed_header_size > len) {
+            if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_WORKER_MASTER_TASK_INFO fixed header.", label);
                 CLOSE_IPC_PROTOCOL(&p);
                 free(key0);
@@ -546,7 +478,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
             break;
 		}
         case IPC_WORKER_MASTER_HEARTBEAT: {
-            if (current_buffer_offset + fixed_header_size > len) {
+            if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_WORKER_MASTER_HEARTBEAT fixed header.", label);
                 CLOSE_IPC_PROTOCOL(&p);
                 free(key0);
@@ -566,7 +498,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
             break;
 		}
         case IPC_MASTER_COW_CONNECT: {
-            if (current_buffer_offset + fixed_header_size > len) {
+            if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_MASTER_COW_CONNECT fixed header.", label);
                 CLOSE_IPC_PROTOCOL(&p);
                 free(key0);
@@ -586,14 +518,14 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
             break;
 		}
         case IPC_UDP_DATA: {
-            if (current_buffer_offset + fixed_header_size > len) {
+            if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_UDP_DATA fixed header.", label);
                 CLOSE_IPC_PROTOCOL(&p);
                 free(key0);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            size_t fixed_header_blen_size = fixed_header_size - sizeof(uint16_t);
+            size_t fixed_header_blen_size = fixed_payload_size - sizeof(uint16_t);
             uint16_t actual_data_len_be;
             memcpy(&actual_data_len_be, buffer + current_buffer_offset + fixed_header_blen_size, sizeof(uint16_t));
             uint16_t actual_data_len = be16toh(actual_data_len_be);
@@ -610,7 +542,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
             break;
 		}
         case IPC_UDP_DATA_ACK: {
-            if (current_buffer_offset + fixed_header_size > len) {
+            if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_UDP_DATA_ACK fixed header.", label);
                 CLOSE_IPC_PROTOCOL(&p);
                 free(key0);
@@ -630,7 +562,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
             break;
 		}
         case IPC_WORKER_MASTER_HELLO1: {
-            if (current_buffer_offset + fixed_header_size > len) {
+            if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_WORKER_MASTER_HELLO1 fixed header.", label);
                 CLOSE_IPC_PROTOCOL(&p);
                 free(key0);
@@ -650,7 +582,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
             break;
 		}
         case IPC_WORKER_MASTER_HELLO2: {
-            if (current_buffer_offset + fixed_header_size > len) {
+            if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_WORKER_MASTER_HELLO1 fixed header.", label);
                 CLOSE_IPC_PROTOCOL(&p);
                 free(key0);
@@ -670,7 +602,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
             break;
 		}
         case IPC_MASTER_WORKER_HELLO1_ACK: {
-            if (current_buffer_offset + fixed_header_size > len) {
+            if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_MASTER_WORKER_HELLO1_ACK fixed header.", label);
                 CLOSE_IPC_PROTOCOL(&p);
                 free(key0);
@@ -690,7 +622,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
             break;
 		}
         case IPC_MASTER_WORKER_HELLO2_ACK: {
-            if (current_buffer_offset + fixed_header_size > len) {
+            if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_MASTER_WORKER_HELLO2_ACK fixed header.", label);
                 CLOSE_IPC_PROTOCOL(&p);
                 free(key0);
