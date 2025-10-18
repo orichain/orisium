@@ -799,7 +799,7 @@ orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t* key_
 //----------------------------------------------------------------------    
 // Version
 //----------------------------------------------------------------------    
-    memcpy(p->version, buffer, ORILINK_VERSION_BYTES);
+    memcpy(p->version, buffer + current_buffer_offset, ORILINK_VERSION_BYTES);
     current_buffer_offset += ORILINK_VERSION_BYTES;
 //----------------------------------------------------------------------    
 // Inc Ctr
