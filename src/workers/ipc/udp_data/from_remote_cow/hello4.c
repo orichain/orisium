@@ -42,7 +42,7 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     
-    printf("%sRTT Hello-3 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
+    printf("%sRTT Hello-3 Ack = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
 //======================================================================
     session->hello4_ack.ack_sent = true;
     session->is_first_heartbeat = true;
@@ -63,7 +63,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
 //======================================================================
 // + Security
 //======================================================================
-    print_hex("SIO Receiving Hello4 ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
+    //print_hex("SIO Receiving Hello4 ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
     if (!session->hello3_ack.ack_sent) {
         LOG_ERROR("%sReceive Hello4 But This Worker Session Is Never Sending Hello3_Ack.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -175,7 +175,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
 //----------------------------------------------------------------------
     if (isretry) {
         if (session->hello4_ack.data != NULL) {
-            print_hex("SIO Sending Hello4 Ack Retry Response ", session->hello4_ack.data, session->hello4_ack.len, 1);
+            //print_hex("SIO Sending Hello4 Ack Retry Response ", session->hello4_ack.data, session->hello4_ack.len, 1);
             if (retry_control_packet_ack(
                     worker_ctx, 
                     identity, 
@@ -549,11 +549,11 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         }
         return FAILURE;
     }
-    print_hex("SIO Sending Hello4 Ack ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
+    //print_hex("SIO Sending Hello4 Ack ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
 //======================================================================
 // Test Packet Dropped
 //======================================================================
-    session->test_drop_hello4_ack++;
+    //session->test_drop_hello4_ack++;
     if (
         session->test_drop_hello4_ack == 1
     )

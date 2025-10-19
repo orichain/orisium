@@ -23,7 +23,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
 //======================================================================
 // + Security
 //======================================================================
-    print_hex("COW Receiving Hello4 Ack ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
+    //print_hex("COW Receiving Hello4 Ack ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
     if (!session->hello4.sent) {
         LOG_ERROR("%sReceive Hello4_Ack But This Worker Session Is Never Sending Hello4.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -433,7 +433,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     //cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello4, false);
     
-    printf("%sRTT Hello-4 = %f\n", worker_ctx->label, session->rtt.value_prediction);
+    printf("%sRTT Hello-4 = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
 //======================================================================
 // Heartbeat Ack Security 1 & Security 2 Open
 //======================================================================

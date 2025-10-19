@@ -41,7 +41,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
 //======================================================================
 // + Security
 //======================================================================
-    print_hex("COW Receiving Heartbeat ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
+    //print_hex("COW Receiving Heartbeat ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
     if (!session->heartbeat_ack.ack_sent) {
         LOG_ERROR("%sReceive Heartbeat But This Worker Session Is Never Sending Heartbeat_Ack.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -136,7 +136,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
 //----------------------------------------------------------------------
     if (isretry) {
         if (session->heartbeat_ack.data != NULL) {
-            print_hex("COW Sending Heartbeat Ack Retry Response ", session->heartbeat_ack.data, session->heartbeat_ack.len, 1);
+            //print_hex("COW Sending Heartbeat Ack Retry Response ", session->heartbeat_ack.data, session->heartbeat_ack.len, 1);
             if (retry_control_packet_ack(
                     worker_ctx, 
                     identity, 
@@ -281,11 +281,11 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
         }
         return FAILURE;
     }
-    print_hex("COW Sending Heartbeat Ack ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
+    //print_hex("COW Sending Heartbeat Ack ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
 //======================================================================
 // Test Packet Dropped
 //======================================================================
-    session->test_drop_heartbeat_ack++;
+    //session->test_drop_heartbeat_ack++;
     if (
         session->test_drop_heartbeat_ack == 3
     )

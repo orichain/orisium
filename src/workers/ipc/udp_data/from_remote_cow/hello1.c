@@ -26,7 +26,7 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
 //======================================================================
 // + Security
 //======================================================================
-    print_hex("SIO Receiving Hello1 ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
+    //print_hex("SIO Receiving Hello1 ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
     if (trycount != (uint8_t)1) {
         if (trycount > (uint8_t)MAX_RETRY_CNT) {
             LOG_ERROR("%sHello1 Max Retry.", worker_ctx->label);
@@ -112,7 +112,7 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
     }
     if (isretry) {
         if (session->hello1_ack.data != NULL) {
-            print_hex("SIO Sending Hello1 Ack Retry Response ", session->hello1_ack.data, session->hello1_ack.len, 1);
+            //print_hex("SIO Sending Hello1 Ack Retry Response ", session->hello1_ack.data, session->hello1_ack.len, 1);
             if (retry_control_packet_ack(
                     worker_ctx, 
                     identity, 
@@ -246,11 +246,11 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
         }
         return FAILURE;
     }
-    print_hex("SIO Sending Hello1 Ack ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
+    //print_hex("SIO Sending Hello1 Ack ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
 //======================================================================
 // Test Packet Dropped
 //======================================================================
-    session->test_drop_hello1_ack++;
+    //session->test_drop_hello1_ack++;
     if (
         session->test_drop_hello1_ack == 1
     )

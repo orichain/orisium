@@ -1,4 +1,5 @@
 #include <inttypes.h>
+#include <stdio.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -16,7 +17,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
 //======================================================================
 // + Security
 //======================================================================
-    print_hex("COW Receiving Heartbeat Ack ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
+    //print_hex("COW Receiving Heartbeat Ack ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
     if (!session->heartbeat.sent) {
         LOG_ERROR("%sReceive Heartbeat_Ack But This Worker Session Is Never Sending Heartbeat.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -116,7 +117,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     //cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
 
-    LOG_DEVEL_DEBUG("%sRTT Heartbeat = %f", worker_ctx->label, session->rtt.value_prediction);
+    printf("%sRTT Heartbeat = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
 //======================================================================
 // Heartbeat Security 2 Open
 //======================================================================

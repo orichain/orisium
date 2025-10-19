@@ -42,7 +42,7 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     
-    printf("%sRTT Hello-1 Ack = %f\n", worker_ctx->label, session->rtt.value_prediction);
+    printf("%sRTT Hello-1 Ack = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
 //======================================================================
     session->hello2_ack.ack_sent = true;
 //======================================================================
@@ -58,7 +58,7 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
 //======================================================================
 // + Security
 //======================================================================
-    print_hex("SIO Receiving Hello2 ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
+    //print_hex("SIO Receiving Hello2 ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
     if (!session->hello1_ack.ack_sent) {
         LOG_ERROR("%sReceive Hello2 But This Worker Session Is Never Sending Hello1_Ack.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -150,7 +150,7 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
     }
     if (isretry) {
         if (session->hello2_ack.data != NULL) {
-            print_hex("SIO Sending Hello2 Ack Retry Response ", session->hello2_ack.data, session->hello2_ack.len, 1);
+            //print_hex("SIO Sending Hello2 Ack Retry Response ", session->hello2_ack.data, session->hello2_ack.len, 1);
             if (retry_control_packet_ack(
                     worker_ctx, 
                     identity, 
@@ -304,11 +304,11 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
         }
         return FAILURE;
     }
-    print_hex("SIO Sending Hello2 Ack ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
+    //print_hex("SIO Sending Hello2 Ack ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
 //======================================================================
 // Test Packet Dropped
 //======================================================================
-    session->test_drop_hello2_ack++;
+    //session->test_drop_hello2_ack++;
     if (
         session->test_drop_hello2_ack == 1
     )
