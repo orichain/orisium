@@ -28,7 +28,6 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
         &remote_addr
     );
     if (orcvdo.status != SUCCESS) return orcvdo.status;
-    if (orilink_read_cleartext_header(label, orcvdo.r_orilink_raw_protocol_t) != SUCCESS) return FAILURE;
     int getname_res = getnameinfo((struct sockaddr *)&remote_addr, sizeof(struct sockaddr_in6),
 						host_str, NI_MAXHOST,
 					  	port_str, NI_MAXSERV,
