@@ -142,21 +142,6 @@ status_t retry_control_packet(
                                sizeof(uint8_t) +
                                sizeof(uint8_t) +
                                sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
                                sizeof(uint8_t);
                                
     const size_t trycount_offset = type_offset +
@@ -173,12 +158,6 @@ status_t retry_control_packet(
     {
         const size_t data_4mac_offset = AES_TAG_BYTES;
         size_t data_4mac_len = control_packet->len - AES_TAG_BYTES;
-        uint8_t type;
-        memcpy(&type, udp_data.r_puint8_t + type_offset, sizeof(uint8_t));
-        if (is_orilink_control_packet((orilink_protocol_type_t)type)) {
-            data_4mac_len = orilink_control_packet_data_len(worker_ctx->label, (orilink_protocol_type_t)type);
-            data_4mac_len -= AES_TAG_BYTES;
-        }
         uint8_t *data_4mac = udp_data.r_puint8_t + data_4mac_offset;
         uint8_t mac[AES_TAG_BYTES];
         calculate_mac(security->mac_key, data_4mac, mac, data_4mac_len);
@@ -260,21 +239,6 @@ status_t retry_control_packet_ack(
                                sizeof(uint8_t) +
                                sizeof(uint8_t) +
                                sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
                                sizeof(uint8_t);
                                
     const size_t trycount_offset = type_offset +
@@ -291,12 +255,6 @@ status_t retry_control_packet_ack(
     {
         const size_t data_4mac_offset = AES_TAG_BYTES;
         size_t data_4mac_len = control_packet_ack->len - AES_TAG_BYTES;
-        uint8_t type;
-        memcpy(&type, udp_data.r_puint8_t + type_offset, sizeof(uint8_t));
-        if (is_orilink_control_packet((orilink_protocol_type_t)type)) {
-            data_4mac_len = orilink_control_packet_data_len(worker_ctx->label, (orilink_protocol_type_t)type);
-            data_4mac_len -= AES_TAG_BYTES;
-        }
         uint8_t *data_4mac = udp_data.r_puint8_t + data_4mac_offset;
         uint8_t mac[AES_TAG_BYTES];
         calculate_mac(security->mac_key, data_4mac, mac, data_4mac_len);

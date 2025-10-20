@@ -102,13 +102,6 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
         inc_ctr = oudp_datao->inc_ctr;
         oudp_datao_ctr = oudp_datao->ctr;
 //----------------------------------------------------------------------
-        bool _1le_ = is_1lower_equal_ctr(&oudp_datao_ctr, &security->remote_ctr, security->remote_nonce);
-        if (!_1le_) {
-            LOG_ERROR("%sHello3 Received Already.", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE;
-        }
         if (oudp_datao_ctr != (uint32_t)0 && oudp_datao_ctr == security->remote_ctr) {
             LOG_DEVEL_DEBUG("%sHello3 From Peer's Retry Timer", worker_ctx->label);
             isretry = false;

@@ -81,12 +81,8 @@ static inline size_t calculate_ipc_payload_fixed_size(const char *label, ipc_pro
            sizeof(uint32_t) + 
            IPC_VERSION_BYTES + 
            sizeof(uint8_t) + 
-           sizeof(uint8_t) + //salt1
            sizeof(uint8_t) + 
-           sizeof(uint8_t) + //salt2
-           sizeof(uint8_t) + //salt3
            sizeof(uint8_t) + 
-           sizeof(uint8_t) + //salt4
            payload_fixed_size;
 }
 
@@ -152,8 +148,6 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes, uint8_t* key
     } else {
         LOG_DEBUG("%sBuffer size %zu is sufficient for %zu bytes. No reallocation needed.", label, *buffer_size, total_required_size);
     }
-    uint8_t salt[SALT_LEN];
-    generate_fast_salt(salt, SALT_LEN);
     size_t offset = 0;
     if (CHECK_BUFFER_BOUNDS(offset, AES_TAG_BYTES, *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
@@ -187,37 +181,13 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes, uint8_t* key
         result.status = FAILURE_OOBUF;
         return result;
     }
-    memcpy(current_buffer + offset, salt, sizeof(uint8_t));
-    offset += sizeof(uint8_t);
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
     memcpy(current_buffer + offset, (uint8_t *)&p->wot, sizeof(uint8_t));
     offset += sizeof(uint8_t);
     if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
     }
-    memcpy(current_buffer + offset, salt + 1, sizeof(uint8_t));
-    offset += sizeof(uint8_t);
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
     memcpy(current_buffer + offset, &p->index, sizeof(uint8_t));
-    offset += sizeof(uint8_t);
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-    memcpy(current_buffer + offset, salt + 2, sizeof(uint8_t));
-    offset += sizeof(uint8_t);
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-    memcpy(current_buffer + offset, salt + 3, sizeof(uint8_t));
     offset += sizeof(uint8_t);
     status_t result_pyld = FAILURE;
     switch (p->type) {
@@ -277,10 +247,6 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes, uint8_t* key
                                    IPC_VERSION_BYTES +
                                    sizeof(uint8_t) +
                                    sizeof(uint8_t) +
-                                   sizeof(uint8_t) +
-                                   sizeof(uint8_t) +
-                                   sizeof(uint8_t) +
-                                   sizeof(uint8_t) +
                                    sizeof(uint8_t);
         const size_t data_len = offset - data_offset;
         uint8_t *data = current_buffer + data_offset;
@@ -308,27 +274,6 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes, uint8_t* key
         ) != 0
     )
     {
-        const size_t header_offset = AES_TAG_BYTES;
-        const size_t header_len = sizeof(uint32_t) +
-                                  IPC_VERSION_BYTES +
-                                  sizeof(uint8_t);
-        uint8_t *header = current_buffer + header_offset;
-        uint8_t *encrypted_header = current_buffer + header_offset;
-        if (encrypt_decrypt_128(
-                label,
-                key_mac,
-                nonce,
-                (uint32_t *)salt,
-                header,
-                encrypted_header,
-                header_len
-            ) != SUCCESS
-        )
-        {
-            free(key0);
-            result.status = FAILURE;
-            return result;
-        }
         const size_t data_4mac_offset = AES_TAG_BYTES;
         const size_t data_4mac_len = offset - AES_TAG_BYTES;
         uint8_t *data_4mac = current_buffer + data_4mac_offset;
@@ -364,10 +309,6 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
                                IPC_VERSION_BYTES + 
                                sizeof(uint8_t) + 
                                sizeof(uint8_t) + 
-                               sizeof(uint8_t) + 
-                               sizeof(uint8_t) + 
-                               sizeof(uint8_t) + 
-                               sizeof(uint8_t) + 
                                sizeof(uint8_t);
     if (!buffer || len < data_offset) {
         LOG_ERROR("%sBuffer terlalu kecil untuk Version dan Type. Len: %zu", label, len);
@@ -392,17 +333,9 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
     current_buffer_offset += IPC_VERSION_BYTES;
     memcpy((uint8_t *)&p->type, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
-    memcpy(&p->salt1, buffer + current_buffer_offset, sizeof(uint8_t));
-    current_buffer_offset += sizeof(uint8_t);
     memcpy((uint8_t *)&p->wot, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
-    memcpy(&p->salt2, buffer + current_buffer_offset, sizeof(uint8_t));
-    current_buffer_offset += sizeof(uint8_t);
     memcpy(&p->index, buffer + current_buffer_offset, sizeof(uint8_t));
-    current_buffer_offset += sizeof(uint8_t);
-    memcpy(&p->salt3, buffer + current_buffer_offset, sizeof(uint8_t));
-    current_buffer_offset += sizeof(uint8_t);
-    memcpy(&p->salt4, buffer + current_buffer_offset, sizeof(uint8_t));
     current_buffer_offset += sizeof(uint8_t);
     uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
     if (memcmp(
@@ -798,47 +731,7 @@ status_t ipc_read_header(const char *label, uint8_t* key_mac, uint8_t* nonce, ip
         ) != 0
     )
     {
-        const size_t salt1_offset = AES_TAG_BYTES +
-                                    sizeof(uint32_t) +
-                                    IPC_VERSION_BYTES +
-                                    sizeof(uint8_t);
-        const size_t salt2_offset = salt1_offset +
-                                    sizeof(uint8_t) +
-                                    sizeof(uint8_t);
-        const size_t salt3_offset = salt2_offset +
-                                    sizeof(uint8_t) +
-                                    sizeof(uint8_t);
-        const size_t salt4_offset = salt3_offset +
-                                    sizeof(uint8_t);
-        if (current_offset + salt4_offset + sizeof(uint8_t) > total_buffer_len) {
-            LOG_ERROR("%sOut of bounds reading salt.", label);
-            return FAILURE_OOBUF;
-        }
-        uint8_t salt[SALT_LEN];
-        memcpy(salt, cursor + salt1_offset, sizeof(uint8_t)); 
-        memcpy(salt + 1, cursor + salt2_offset, sizeof(uint8_t));
-        memcpy(salt + 2, cursor + salt3_offset, sizeof(uint8_t));
-        memcpy(salt + 3, cursor + salt4_offset, sizeof(uint8_t));
-        const size_t header_offset = AES_TAG_BYTES;
-        const size_t header_len = sizeof(uint32_t) +
-                                  IPC_VERSION_BYTES +
-                                  sizeof(uint8_t);
-        uint8_t *header = cursor + header_offset;
-        uint8_t *decripted_header = cursor + header_offset;
-        if (encrypt_decrypt_128(
-                label,
-                key_mac,
-                nonce,
-                (uint32_t *)salt,
-                header,
-                decripted_header,
-                header_len
-            ) != SUCCESS
-        )
-        {
-            free(key0);
-            return FAILURE;
-        }
+        
     }
     free(key0);
     if (current_offset + AES_TAG_BYTES > total_buffer_len) {
@@ -872,13 +765,6 @@ status_t ipc_read_header(const char *label, uint8_t* key_mac, uint8_t* nonce, ip
     cursor += sizeof(uint8_t);
     current_offset += sizeof(uint8_t);
     if (current_offset + sizeof(uint8_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading salt1.", label);
-        return FAILURE_OOBUF;
-    }
-    memcpy((uint8_t *)&r->salt1, cursor, sizeof(uint8_t));
-    cursor += sizeof(uint8_t);
-    current_offset += sizeof(uint8_t);
-    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading wot.", label);
         return FAILURE_OOBUF;
     }
@@ -886,31 +772,10 @@ status_t ipc_read_header(const char *label, uint8_t* key_mac, uint8_t* nonce, ip
     cursor += sizeof(uint8_t);
     current_offset += sizeof(uint8_t);
     if (current_offset + sizeof(uint8_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading salt2.", label);
-        return FAILURE_OOBUF;
-    }
-    memcpy((uint8_t *)&r->salt2, cursor, sizeof(uint8_t));
-    cursor += sizeof(uint8_t);
-    current_offset += sizeof(uint8_t);
-    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading index.", label);
         return FAILURE_OOBUF;
     }
     memcpy(&r->index, cursor, sizeof(uint8_t));
-    cursor += sizeof(uint8_t);
-    current_offset += sizeof(uint8_t);
-    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading salt3.", label);
-        return FAILURE_OOBUF;
-    }
-    memcpy((uint8_t *)&r->salt3, cursor, sizeof(uint8_t));
-    cursor += sizeof(uint8_t);
-    current_offset += sizeof(uint8_t);
-    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading salt4.", label);
-        return FAILURE_OOBUF;
-    }
-    memcpy((uint8_t *)&r->salt4, cursor, sizeof(uint8_t));
     return SUCCESS;
 }
 
@@ -943,12 +808,6 @@ status_t ipc_read_cleartext_header(const char *label, ipc_raw_protocol_t *r) {
     cursor += sizeof(uint8_t);
     current_offset += sizeof(uint8_t);
     if (current_offset + sizeof(uint8_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading salt1.", label);
-        return FAILURE_OOBUF;
-    }
-    cursor += sizeof(uint8_t);
-    current_offset += sizeof(uint8_t);
-    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading wot.", label);
         return FAILURE_OOBUF;
     }
@@ -956,28 +815,10 @@ status_t ipc_read_cleartext_header(const char *label, ipc_raw_protocol_t *r) {
     cursor += sizeof(uint8_t);
     current_offset += sizeof(uint8_t);
     if (current_offset + sizeof(uint8_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading salt2.", label);
-        return FAILURE_OOBUF;
-    }
-    cursor += sizeof(uint8_t);
-    current_offset += sizeof(uint8_t);
-    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
         LOG_ERROR("%sOut of bounds reading index.", label);
         return FAILURE_OOBUF;
     }
     memcpy(&r->index, cursor, sizeof(uint8_t));
-    cursor += sizeof(uint8_t);
-    current_offset += sizeof(uint8_t);
-    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading salt3.", label);
-        return FAILURE_OOBUF;
-    }
-    cursor += sizeof(uint8_t);
-    current_offset += sizeof(uint8_t);
-    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading salt4.", label);
-        return FAILURE_OOBUF;
-    }
     return SUCCESS;
 }
 
@@ -1037,10 +878,6 @@ ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, 
     const size_t min_size = AES_TAG_BYTES +
                             sizeof(uint32_t) +
                             IPC_VERSION_BYTES +
-                            sizeof(uint8_t) +
-                            sizeof(uint8_t) +
-                            sizeof(uint8_t) +
-                            sizeof(uint8_t) +
                             sizeof(uint8_t) +
                             sizeof(uint8_t) +
                             sizeof(uint8_t);

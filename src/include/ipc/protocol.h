@@ -86,12 +86,8 @@ typedef struct {
     uint32_t ctr;
 	uint8_t version[IPC_VERSION_BYTES];
     ipc_protocol_type_t type;
-    uint8_t salt1;
     worker_type_t wot;
-    uint8_t salt2;
     uint8_t index;
-    uint8_t salt3;
-    uint8_t salt4;
 	union {
         ipc_worker_master_task_info_t *ipc_worker_master_task_info;
 		ipc_master_worker_info_t *ipc_master_worker_info;
@@ -163,12 +159,8 @@ typedef struct {
     uint32_t ctr;
     uint8_t version[IPC_VERSION_BYTES];
     ipc_protocol_type_t type;
-    uint8_t salt1;
     worker_type_t wot;
-    uint8_t salt2;
     uint8_t index;
-    uint8_t salt3;
-    uint8_t salt4;
 } ipc_raw_protocol_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan
 static inline void CLOSE_IPC_RAW_PAYLOAD(void **ptr) {

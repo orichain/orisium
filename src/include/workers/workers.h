@@ -32,7 +32,7 @@ typedef struct {
     int polling_timer_fd;
     uint16_t polling_1ms_cnt;
     uint16_t polling_1ms_max_cnt;
-    bool polling;
+    bool syinching;
     bool ack_rcvd;
     uint64_t ack_rcvd_time;
     uint16_t len;
@@ -70,8 +70,8 @@ typedef struct {
     control_packet_ack_t heartbeat_ack;
     double heartbeat_interval;
     bool is_first_heartbeat;
-    bool heartbeat_openned;
     int heartbeat_sender_timer_fd;
+    uint16_t heartbeat_sender_polling_1ms_cnt;
     int heartbeat_openner_timer_fd;
 //----------------------------------------------------------------------
     int test_drop_hello1_ack;
@@ -110,8 +110,8 @@ typedef struct {
     control_packet_t heartbeat;
     control_packet_ack_t heartbeat_ack;
     double heartbeat_interval;
-    bool heartbeat_openned;
     int heartbeat_sender_timer_fd;
+    uint16_t heartbeat_sender_polling_1ms_cnt;
     int heartbeat_openner_timer_fd;
 //----------------------------------------------------------------------
     int test_drop_heartbeat_ack;
@@ -259,7 +259,7 @@ static inline void cleanup_control_packet(const char *label, async_type_t *async
     h->sent_try_count = 0x00;
     h->polling_1ms_cnt = (uint16_t)0;
     h->polling_1ms_max_cnt = (uint16_t)0;
-    h->polling = false;
+    h->syinching = false;
     if (h->data) {
         free(h->data);
         h->data = NULL;
@@ -279,7 +279,7 @@ static inline void setup_control_packet(control_packet_t *h) {
     h->sent_try_count = 0x00;
     h->polling_1ms_cnt = (uint16_t)0;
     h->polling_1ms_max_cnt = (uint16_t)0;
-    h->polling = false;
+    h->syinching = false;
     h->data = NULL;
     h->len = (uint16_t)0;
     h->polling_timer_fd = -1;
@@ -326,6 +326,8 @@ static inline void setup_control_packet_ack(control_packet_ack_t *h) {
 }
 
 static inline status_t setup_cow_session(const char *label, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
+    single_session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
+//----------------------------------------------------------------------
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
     single_session->test_drop_heartbeat_ack = 0;
@@ -340,7 +342,6 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
     single_session->heartbeat_interval = (double)NODE_HEARTBEAT_INTERVAL;
     single_session->heartbeat_sender_timer_fd = -1;
     single_session->heartbeat_openner_timer_fd = -1;
-    single_session->heartbeat_openned = true;
     setup_oricle_double(&single_session->retry, (double)0);
     setup_oricle_double(&single_session->rtt, (double)0);
     setup_oricle_long_double(&single_session->avgtt, (long double)0);
@@ -375,6 +376,8 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
 }
 
 static inline void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session) {
+    single_session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
+//----------------------------------------------------------------------
     cleanup_control_packet(label, cow_async, &single_session->hello1, true);
     cleanup_control_packet(label, cow_async, &single_session->hello2, true);
     cleanup_control_packet(label, cow_async, &single_session->hello3, true);
@@ -386,7 +389,6 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
     CLOSE_FD(&single_session->heartbeat_sender_timer_fd);
     async_delete_event(label, cow_async, &single_session->heartbeat_openner_timer_fd);
     CLOSE_FD(&single_session->heartbeat_openner_timer_fd);
-    single_session->heartbeat_openned = false;
     cleanup_oricle_double(&single_session->retry);
     cleanup_oricle_double(&single_session->rtt);
     cleanup_oricle_long_double(&single_session->avgtt);
@@ -424,6 +426,8 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
 }
 
 static inline status_t setup_sio_session(const char *label, sio_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
+    single_session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
+//----------------------------------------------------------------------
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
     single_session->test_drop_hello1_ack = 0;
@@ -443,7 +447,6 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     single_session->is_first_heartbeat = false;
     single_session->heartbeat_sender_timer_fd = -1;
     single_session->heartbeat_openner_timer_fd = -1;
-    single_session->heartbeat_openned = true;
     setup_oricle_double(&single_session->retry, (double)0);
     setup_oricle_double(&single_session->rtt, (double)0);
     setup_oricle_double(&single_session->healthy, (double)100);
@@ -472,6 +475,8 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
 }
 
 static inline void cleanup_sio_session(const char *label, async_type_t *sio_async, sio_c_session_t *single_session) {
+    single_session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
+//----------------------------------------------------------------------
     cleanup_control_packet_ack(&single_session->hello1_ack, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->hello2_ack, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->hello3_ack, true, CDT_FREE);
@@ -484,7 +489,6 @@ static inline void cleanup_sio_session(const char *label, async_type_t *sio_asyn
     CLOSE_FD(&single_session->heartbeat_sender_timer_fd);
     async_delete_event(label, sio_async, &single_session->heartbeat_openner_timer_fd);
     CLOSE_FD(&single_session->heartbeat_openner_timer_fd);
-    single_session->heartbeat_openned = false;
     cleanup_oricle_double(&single_session->retry);
     cleanup_oricle_double(&single_session->rtt);
     cleanup_oricle_double(&single_session->healthy);

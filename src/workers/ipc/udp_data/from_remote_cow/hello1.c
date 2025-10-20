@@ -2,7 +2,6 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <stdio.h>
-#include <endian.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -56,13 +55,6 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
         inc_ctr = oudp_datao->inc_ctr;
         oudp_datao_ctr = oudp_datao->ctr;
 //----------------------------------------------------------------------
-        bool _1le_ = is_1lower_equal_ctr(&oudp_datao_ctr, &security->remote_ctr, security->remote_nonce);
-        if (!_1le_) {
-            LOG_ERROR("%sHello1 Received Already.", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE;
-        }
         if (oudp_datao_ctr != (uint32_t)0 && oudp_datao_ctr == security->remote_ctr) {
             LOG_DEVEL_DEBUG("%sHello1 From Peer's Retry Timer", worker_ctx->label);
             isretry = false;
@@ -158,17 +150,7 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
         remote_wot = oudp_datao->local_wot;
         remote_index = oudp_datao->local_index;
         remote_session_index = oudp_datao->local_session_index;
-        uint8_t id_connection_be[8];
-        id_connection_be[0] = oudp_datao->id_connection1;
-        id_connection_be[1] = oudp_datao->id_connection2;
-        id_connection_be[2] = oudp_datao->id_connection3;
-        id_connection_be[3] = oudp_datao->id_connection4;
-        id_connection_be[4] = oudp_datao->id_connection5;
-        id_connection_be[5] = oudp_datao->id_connection6;
-        id_connection_be[6] = oudp_datao->id_connection7;
-        id_connection_be[7] = oudp_datao->id_connection8;
-        uint64_t *id_connection_ptr = (uint64_t *)&id_connection_be;
-        rcvd_id_connection = be64toh(*id_connection_ptr);
+        rcvd_id_connection = oudp_datao->id_connection;
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
     }

@@ -134,40 +134,17 @@ typedef struct {
     uint8_t mac[AES_TAG_BYTES];
     uint32_t ctr;
 	uint8_t version[ORILINK_VERSION_BYTES];
-    
     uint8_t inc_ctr;
-    
     uint8_t local_index;
     uint8_t local_session_index;
-    uint8_t salt1;
     worker_type_t local_wot;
-    uint8_t salt2;
-    uint8_t id_connection1;
-    uint8_t salt3;
-    uint8_t id_connection2;
-    uint8_t salt4;
-    uint8_t id_connection3;
     
-    uint8_t salt5;
-    uint8_t id_connection4;
-    uint8_t salt6;
-    uint8_t id_connection5;
-    uint8_t salt7;
-    uint8_t id_connection6;
-    uint8_t salt8;
-    uint8_t id_connection7;
-    uint8_t salt9;
-    uint8_t id_connection8;
+    uint64_t id_connection;
     
-    uint8_t salt10;
     worker_type_t remote_wot;
-    uint8_t salt11;
     uint8_t remote_index;
-    uint8_t salt12;
     uint8_t remote_session_index;
-    uint8_t salt13;
     orilink_protocol_type_t type;
-    uint8_t salt14;
     uint8_t trycount;
     
 	union {
@@ -259,40 +236,17 @@ typedef struct {
     uint8_t mac[AES_TAG_BYTES];
     uint32_t ctr;
     uint8_t version[ORILINK_VERSION_BYTES];
-    
     uint8_t inc_ctr;
-    
     uint8_t local_index;
     uint8_t local_session_index;
-    uint8_t salt1;
     worker_type_t local_wot;
-    uint8_t salt2;
-    uint8_t id_connection1;
-    uint8_t salt3;
-    uint8_t id_connection2;
-    uint8_t salt4;
-    uint8_t id_connection3;
     
-    uint8_t salt5;
-    uint8_t id_connection4;
-    uint8_t salt6;
-    uint8_t id_connection5;
-    uint8_t salt7;
-    uint8_t id_connection6;
-    uint8_t salt8;
-    uint8_t id_connection7;
-    uint8_t salt9;
-    uint8_t id_connection8;
+    uint64_t id_connection;
     
-    uint8_t salt10;
     worker_type_t remote_wot;
-    uint8_t salt11;
     uint8_t remote_index;
-    uint8_t salt12;
     uint8_t remote_session_index;
-    uint8_t salt13;
     orilink_protocol_type_t type;
-    uint8_t salt14;
     uint8_t trycount;
     
 } orilink_raw_protocol_t;
@@ -340,7 +294,5 @@ status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data
 status_t orilink_check_mac(const char *label, uint8_t* key_mac, orilink_raw_protocol_t *r);
 status_t orilink_check_ctr(const char *label, uint8_t* key_aes, uint32_t* ctr, orilink_raw_protocol_t *r);
 orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t *key_aes, uint8_t *nonce, uint32_t *ctr, uint8_t* buffer, size_t len);
-bool is_orilink_control_packet(orilink_protocol_type_t type);
-size_t orilink_control_packet_data_len(const char *label, orilink_protocol_type_t type);
 
 #endif

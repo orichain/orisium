@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
-#include <endian.h>
 
 #include "log.h"
 #include "orilink/protocol.h"
@@ -54,17 +53,7 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
         return FAILURE_IVLDPORT;
     }
     orilink_protocol_type_t orilink_protocol = orcvdo.r_orilink_raw_protocol_t->type;
-    uint8_t id_connection_be[8];
-    id_connection_be[0] = orcvdo.r_orilink_raw_protocol_t->id_connection1;
-    id_connection_be[1] = orcvdo.r_orilink_raw_protocol_t->id_connection2;
-    id_connection_be[2] = orcvdo.r_orilink_raw_protocol_t->id_connection3;
-    id_connection_be[3] = orcvdo.r_orilink_raw_protocol_t->id_connection4;
-    id_connection_be[4] = orcvdo.r_orilink_raw_protocol_t->id_connection5;
-    id_connection_be[5] = orcvdo.r_orilink_raw_protocol_t->id_connection6;
-    id_connection_be[6] = orcvdo.r_orilink_raw_protocol_t->id_connection7;
-    id_connection_be[7] = orcvdo.r_orilink_raw_protocol_t->id_connection8;
-    uint64_t *id_connection_ptr = (uint64_t *)&id_connection_be;
-    uint64_t id_connection = be64toh(*id_connection_ptr);
+    uint64_t id_connection = orcvdo.r_orilink_raw_protocol_t->id_connection;
     switch (orilink_protocol) {
         case ORILINK_HELLO1: {
             master_sio_c_session_t *c_session = NULL;

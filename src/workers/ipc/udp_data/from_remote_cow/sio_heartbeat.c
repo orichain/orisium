@@ -44,9 +44,13 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
         
         printf("%sRTT Hello-4 Ack = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
 //----------------------------------------------------------------------
-        session->heartbeat_ack.ack_sent = true;
         session->heartbeat_ack.ack_sent_time = current_time.r_uint64_t;
         session->is_first_heartbeat = false;
+        session->heartbeat.ack_rcvd = true;
+//----------------------------------------------------------------------
+// Set session->hello4_ack.ack_sent = true in the heartbeat openner timer event
+//----------------------------------------------------------------------
+        session->hello4_ack.ack_sent = false;
 //----------------------------------------------------------------------
         if (worker_master_task_info(worker_ctx, identity->local_session_index, TIT_SECURE) != SUCCESS) {
             return FAILURE;
@@ -58,8 +62,11 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
             calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
         }
         cleanup_control_packet_ack(&session->heartbeat_ack, false, CDT_NOACTION);
-        session->heartbeat_ack.ack_sent = true;
-        session->heartbeat_openned = false;
+        session->heartbeat.sent = false;
+//----------------------------------------------------------------------
+// Set session->heartbeat_ack.ack_sent = true in the heartbeat openner timer event
+//----------------------------------------------------------------------
+        session->heartbeat_ack.ack_sent = false;
     }
 //======================================================================
 //session->metrics.last_ack = current_time->r_uint64_t;
@@ -87,7 +94,6 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return FAILURE;
         }
-        
         if (!session->hello4_ack.ack_sent) {
             LOG_ERROR("%sReceive Heartbeat But This Worker Session Is Never Sending Hello4_Ack.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -123,13 +129,6 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             inc_ctr = oudp_datao->inc_ctr;
             oudp_datao_ctr = oudp_datao->ctr;
 //----------------------------------------------------------------------
-            bool _1le_ = is_1lower_equal_ctr(&oudp_datao_ctr, &security->remote_ctr, security->remote_nonce);
-            if (!_1le_) {
-                LOG_ERROR("%sHeartbeat Received Already.", worker_ctx->label);
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-                return FAILURE;
-            }
             if (oudp_datao_ctr == security->remote_ctr) {
                 LOG_DEVEL_DEBUG("%sHeartbeat From Peer's Retry Timer", worker_ctx->label);
                 isretry = false;
@@ -145,21 +144,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
                 return FAILURE_IVLDTRY;
             }
         }
-        if (session->heartbeat_ack.rcvd && !isretry) {
-            if (!session->heartbeat_openned) {
-                LOG_ERROR("%sHeartbeat Closed.", worker_ctx->label);
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-                return FAILURE;
-            }
-        }
     } else {
-        if (!session->heartbeat_ack.ack_sent) {
-            LOG_ERROR("%sReceive Heartbeat But This Worker Session Is Never Sending Heartbeat_Ack.", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE;
-        }
         if (trycount != (uint8_t)1) {
             if (trycount > (uint8_t)MAX_RETRY_CNT) {
                 LOG_ERROR("%sHeartbeat Max Retry.", worker_ctx->label);
@@ -189,13 +174,6 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             inc_ctr = oudp_datao->inc_ctr;
             oudp_datao_ctr = oudp_datao->ctr;
 //----------------------------------------------------------------------
-            bool _1le_ = is_1lower_equal_ctr(&oudp_datao_ctr, &security->remote_ctr, security->remote_nonce);
-            if (!_1le_) {
-                LOG_ERROR("%sHeartbeat Received Already.", worker_ctx->label);
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-                return FAILURE;
-            }
             if (oudp_datao_ctr == security->remote_ctr) {
                 LOG_DEVEL_DEBUG("%sHeartbeat From Peer's Retry Timer", worker_ctx->label);
                 isretry = false;
@@ -205,8 +183,8 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             }
         }
         if (session->heartbeat_ack.rcvd && !isretry) {
-            if (!session->heartbeat_openned) {
-                LOG_ERROR("%sHeartbeat Closed.", worker_ctx->label);
+            if (!session->heartbeat_ack.ack_sent && trycount == (uint8_t)1) {
+                LOG_ERROR("%sReceive Heartbeat But This Worker Session Is Never Sending Heartbeat_Ack.", worker_ctx->label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
                 return FAILURE;
@@ -268,28 +246,18 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         if (le != SUCCESS) {
             return le;
         }
+        if (!session->heartbeat.sent) {
 //======================================================================
-        double timer_interval = session->heartbeat_interval;
-        double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
-        timer_interval *= (1.0 + jitter_amount);
+            double timer_interval = session->heartbeat_interval;
+            double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+            timer_interval *= (1.0 + jitter_amount);
 //======================================================================
-        status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, timer_interval);
-        if (chst != SUCCESS) {
-            return FAILURE;
+            status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, timer_interval);
+            if (chst != SUCCESS) {
+                return FAILURE;
+            }
         }
         return SUCCESS;
-    }
-    if (
-        session->heartbeat.polling
-    )
-    {
-//======================================================================
-// Let The Retry & Sender Timer Finish Their Jobs
-//======================================================================
-        LOG_ERROR("%sNot Ready To Receive New Heartbeat.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        return FAILURE;
     }
 //======================================================================
     orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
@@ -391,9 +359,12 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
 //======================================================================
 // Test Packet Dropped
 //======================================================================
-    //session->test_drop_heartbeat_ack++;
+    session->test_drop_heartbeat_ack++;
     if (
-        session->test_drop_heartbeat_ack == 1
+        session->test_drop_heartbeat_ack == 1 ||
+        session->test_drop_heartbeat_ack == 3 ||
+        session->test_drop_heartbeat_ack == 5 ||
+        session->test_drop_heartbeat_ack == 7
     )
     {
         LOG_DEVEL_DEBUG("[Debug Here Helper]: Heartbeat Ack Packet Number %d. Sending To Fake Addr To Force Retry", session->test_drop_heartbeat_ack);

@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <math.h>
+#include <stdlib.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -16,6 +17,16 @@
 #include "stdbool.h"
 #include "orilink/heartbeat.h"
 #include "workers/ipc/master_ipc_cmds.h"
+
+/*
+COW
+After rcv hello4_ack
+1. Set the hb interval
+2. Fill in session->hb_interval for use by the hb opener
+3. Send a heartbeat
+4. Set the heartbeat.sent flag = true
+5. Set the heartbeat_ack.rcvd flag = false
+*/
 
 status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     uint8_t inc_ctr = oudp_datao->inc_ctr;
@@ -323,8 +334,12 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     session->heartbeat.sent_try_count++;
     session->heartbeat.sent_time = current_time.r_uint64_t;
 //======================================================================
-    double hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
+    double hb_interval = false;
+    hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
+    double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+    hb_interval *= (1.0 + jitter_amount);
     hb_interval += session->rtt.value_prediction / (double)1e9;
+    session->heartbeat_interval = hb_interval;
 //======================================================================
     l_inc_ctr = 0x01;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_heartbeat(
