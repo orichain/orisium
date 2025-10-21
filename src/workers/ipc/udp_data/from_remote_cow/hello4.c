@@ -39,13 +39,16 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
         double try_count = (double)strycount-(double)1;
         calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
     }
-    double rtt_value = (double)interval_ull;
-    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    if (strycount == (uint8_t)1) {
+        double rtt_value = (double)interval_ull;
+        calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     
-    printf("%sRTT Hello-3 Ack = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
+        printf("%sRTT Hello-3 Ack = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
+    }
 //======================================================================
     session->hello4_ack.ack_sent = true;
-    session->is_first_heartbeat = true;
+    session->heartbeat_cnt = 0x00;
+    session->heartbeat.ack_rcvd = true;
 //======================================================================
     return SUCCESS;
 }

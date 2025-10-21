@@ -69,7 +69,7 @@ typedef struct {
     control_packet_t heartbeat;
     control_packet_ack_t heartbeat_ack;
     double heartbeat_interval;
-    bool is_first_heartbeat;
+    uint8_t heartbeat_cnt;
     int heartbeat_sender_timer_fd;
     uint16_t heartbeat_sender_polling_1ms_cnt;
     int heartbeat_openner_timer_fd;
@@ -444,7 +444,7 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     setup_control_packet(&single_session->heartbeat);
     setup_control_packet_ack(&single_session->heartbeat_ack);
     single_session->heartbeat_interval = (double)1;
-    single_session->is_first_heartbeat = false;
+    single_session->heartbeat_cnt = 0x00;
     single_session->heartbeat_sender_timer_fd = -1;
     single_session->heartbeat_openner_timer_fd = -1;
     setup_oricle_double(&single_session->retry, (double)0);
@@ -484,7 +484,7 @@ static inline void cleanup_sio_session(const char *label, async_type_t *sio_asyn
     cleanup_control_packet(label, sio_async, &single_session->heartbeat, true);
     cleanup_control_packet_ack(&single_session->heartbeat_ack, true, CDT_FREE);
     single_session->heartbeat_interval = (double)1;
-    single_session->is_first_heartbeat = false;
+    single_session->heartbeat_cnt = 0x00;
     async_delete_event(label, sio_async, &single_session->heartbeat_sender_timer_fd);
     CLOSE_FD(&single_session->heartbeat_sender_timer_fd);
     async_delete_event(label, sio_async, &single_session->heartbeat_openner_timer_fd);

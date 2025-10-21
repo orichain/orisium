@@ -38,10 +38,12 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
         double try_count = (double)strycount-(double)1;
         calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
     }
-    double rtt_value = (double)interval_ull;
-    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    if (strycount == (uint8_t)1) {
+        double rtt_value = (double)interval_ull;
+        calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     
-    printf("%sRTT Hello-2 Ack = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
+        printf("%sRTT Hello-2 Ack = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
+    }
 //======================================================================
     session->hello3_ack.ack_sent = true;
 //======================================================================

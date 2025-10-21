@@ -20,7 +20,7 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
     if (current_time.status != SUCCESS) {
         return FAILURE;
     }
-    if (session->is_first_heartbeat) {
+    if (session->heartbeat_cnt == 0x00) {
         session->heartbeat_ack.rcvd_time = current_time.r_uint64_t;
         uint64_t interval_ull;
         uint8_t strycount;
@@ -38,14 +38,15 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
             double try_count = (double)strycount-(double)1;
             calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
         }
-        double rtt_value = (double)interval_ull;
-        calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-        
-        printf("%sRTT Hello-4 Ack = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
+        if (strycount == (uint8_t)1) {
+            double rtt_value = (double)interval_ull;
+            calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+            
+            printf("%sRTT Hello-4 Ack = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
+        }
 //----------------------------------------------------------------------
         session->heartbeat_ack.ack_sent_time = current_time.r_uint64_t;
-        session->is_first_heartbeat = false;
-        session->heartbeat.ack_rcvd = true;
+        session->heartbeat_cnt += 0x01;
 //----------------------------------------------------------------------
 // Set session->hello4_ack.ack_sent = true in the heartbeat openner timer event
 //----------------------------------------------------------------------
@@ -62,6 +63,9 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
         }
         cleanup_control_packet_ack(&session->heartbeat_ack, false, CDT_NOACTION);
         session->heartbeat.sent = false;
+        if (session->heartbeat_cnt == 0x01) {
+            session->heartbeat_cnt += 0x01;
+        }
 //----------------------------------------------------------------------
 // Set session->heartbeat_ack.ack_sent = true in the heartbeat openner timer event
 //----------------------------------------------------------------------
@@ -87,7 +91,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
 // + Security
 //======================================================================
     //print_hex("SIO Receiving Heartbeat ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
-    if (session->is_first_heartbeat) {
+    if (session->heartbeat_cnt == 0x00) {
         if (!session->hello4_ack.ack_sent) {
             LOG_ERROR("%sReceive Heartbeat But This Worker Session Is Never Sending Hello4_Ack.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -174,6 +178,10 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
 //----------------------------------------------------------------------
             inc_ctr = oudp_datao->inc_ctr;
             oudp_datao_ctr = oudp_datao->ctr;
+//----------------------------------------------------------------------
+            if (session->heartbeat_cnt == 0x01) {
+                session->heartbeat_cnt = 0x00;
+            }
 //----------------------------------------------------------------------
             if (oudp_datao_ctr == security->remote_ctr) {
                 LOG_DEVEL_DEBUG("%sHeartbeat From Peer's Retry Timer", worker_ctx->label);
@@ -251,6 +259,13 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             return le;
         }
         return SUCCESS;
+    }
+//======================================================================
+    if (!session->heartbeat.ack_rcvd) {
+        LOG_ERROR("%sTry Again Until My Previous Heartbeat Ack Received.", worker_ctx->label);
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
     }
 //======================================================================
     orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
