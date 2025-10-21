@@ -2,6 +2,7 @@
 #include <inttypes.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -169,6 +170,15 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
             return le;
         }
         return SUCCESS;
+    }
+//======================================================================
+// only on the first initiator this is done
+//======================================================================
+    if (!session->heartbeat.ack_rcvd) {
+        LOG_ERROR("%sTry Again Until My Previous Heartbeat Ack Received.", worker_ctx->label);
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
     }
 //======================================================================
     orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
