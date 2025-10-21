@@ -118,7 +118,7 @@ static inline status_t compare_mac(
     poly1305_init(&ctx, key_mac);
     poly1305_update(&ctx, data, data_len);
     poly1305_finish(&ctx, mac);
-    if (!poly1305_verify(mac, data_4mac)) {
+    if (!poly1305_verify(mac, data_4mac)) {       
         return FAILURE_MACMSMTCH;
     }
     return SUCCESS;

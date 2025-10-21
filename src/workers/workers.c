@@ -124,22 +124,20 @@ status_t retry_control_packet(
 //----------------------------------------------------------------------
 // Update trycount
 //----------------------------------------------------------------------
-    const size_t type_offset = AES_TAG_BYTES +
-                               sizeof(uint32_t) +
-                               ORILINK_VERSION_BYTES +
-                               
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               
-                               sizeof(uint64_t) +
-                               
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t);
-                               
-    const size_t trycount_offset = type_offset +
+    const size_t trycount_offset = AES_TAG_BYTES +
+                                   sizeof(uint32_t) +
+                                   ORILINK_VERSION_BYTES +
+                                   
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   
+                                   sizeof(uint64_t) +
+                                   
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
                                    sizeof(uint8_t);
     memcpy(udp_data.r_puint8_t + trycount_offset, &control_packet->sent_try_count, sizeof(uint8_t));
     uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
@@ -215,22 +213,20 @@ status_t retry_control_packet_ack(
 //----------------------------------------------------------------------
 // Update trycount
 //----------------------------------------------------------------------
-    const size_t type_offset = AES_TAG_BYTES +
-                               sizeof(uint32_t) +
-                               ORILINK_VERSION_BYTES +
-                               
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               
-                               sizeof(uint64_t) +
-                               
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t) +
-                               sizeof(uint8_t);
-                               
-    const size_t trycount_offset = type_offset +
+    const size_t trycount_offset = AES_TAG_BYTES +
+                                   sizeof(uint32_t) +
+                                   ORILINK_VERSION_BYTES +
+                                   
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   
+                                   sizeof(uint64_t) +
+                                   
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
                                    sizeof(uint8_t);
     memcpy(udp_data.r_puint8_t + trycount_offset, &control_packet_ack->ack_sent_try_count, sizeof(uint8_t));
     uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));

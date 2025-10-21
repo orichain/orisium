@@ -400,7 +400,6 @@ inline ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, u
         ) != 0
     )
     {
-        /*
         const size_t header_offset = AES_TAG_BYTES;
         const size_t header_len = sizeof(uint32_t) +
                                   ORILINK_VERSION_BYTES +
@@ -424,7 +423,6 @@ inline ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, u
             result.status = FAILURE;
             return result;
         }
-        */
         const size_t data_4mac_offset = AES_TAG_BYTES;
         const size_t data_4mac_len = offset - AES_TAG_BYTES;
         uint8_t *data_4mac = current_buffer + data_4mac_offset;
@@ -987,7 +985,6 @@ inline status_t orilink_read_header(
         ) != 0
     )
     {
-        /*
         const size_t header_offset = AES_TAG_BYTES;
         const size_t header_len = sizeof(uint32_t) +
                                   ORILINK_VERSION_BYTES +
@@ -1010,7 +1007,6 @@ inline status_t orilink_read_header(
             free(key0);
             return FAILURE;
         }
-        */
     }
     free(key0);
 //----------------------------------------------------------------------    

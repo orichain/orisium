@@ -54,6 +54,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
     uint8_t trycount = oudp_datao->trycount;
     uint32_t oudp_datao_ctr = oudp_datao->ctr;
     bool isretry = false;
+    bool is_loss_1st_pkt = false;
 //======================================================================
 // + Security
 //======================================================================
@@ -90,6 +91,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
         if (oudp_datao_ctr == security->remote_ctr) {
             LOG_DEVEL_DEBUG("%sHeartbeat From Peer's Retry Timer", worker_ctx->label);
             isretry = false;
+            is_loss_1st_pkt = true;
         } else {
             LOG_DEVEL_DEBUG("%sHeartbeat Retry From Peer", worker_ctx->label);
             isretry = true;
@@ -113,22 +115,24 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
     session->heartbeat_ack.last_trycount = trycount;
 //======================================================================
     if (!isretry) {
-        status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
-        if (cmac != SUCCESS) {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE;
-        }
-        status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
-        if (rhd != SUCCESS) {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE;
-        }
+        if (!is_loss_1st_pkt) {
+            status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
+            if (cmac != SUCCESS) {
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                return FAILURE;
+            }
+            status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
+            if (rhd != SUCCESS) {
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                return FAILURE;
+            }
 //----------------------------------------------------------------------
-        inc_ctr = oudp_datao->inc_ctr;
-        oudp_datao_ctr = oudp_datao->ctr;
+            inc_ctr = oudp_datao->inc_ctr;
+            oudp_datao_ctr = oudp_datao->ctr;
 //----------------------------------------------------------------------
+        }
         status_t cctr = orilink_check_ctr(worker_ctx->label, security->aes_key, &security->remote_ctr, oudp_datao);
         if (cctr != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&received_protocol);
