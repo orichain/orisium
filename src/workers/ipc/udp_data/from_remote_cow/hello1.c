@@ -46,6 +46,26 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return FAILURE;
         }
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+        /*
+        bool _1le_ = is_1lower_equal_ctr(worker_ctx->label, (uint8_t*)oudp_datao->recv_buffer, security->mac_key, security->remote_nonce, &security->remote_ctr);
+        if (!_1le_) {
+            bool _1g_ = is_1greater_ctr(worker_ctx->label, (uint8_t*)oudp_datao->recv_buffer, security->mac_key, security->remote_nonce, &security->remote_ctr);
+            if (!_1g_) {
+                LOG_ERROR("%sCounter Invalid.", worker_ctx->label);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                return FAILURE;
+            } else {
+                LOG_ERROR("%sCounter Is Greater.", worker_ctx->label);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                return FAILURE;
+            }
+        }
+        */
         status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
         if (rhd != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -65,12 +85,21 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
             isretry = true;
         }
     } else {
-        if (trycount <= session->hello1_ack.last_trycount) {
-            LOG_ERROR("%sHello1 Try Count Invalid.", worker_ctx->label);
+//----------------------------------------------------------------------
+// No Counter Yet
+//----------------------------------------------------------------------
+        /*
+        status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
+        if (cmac != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE_IVLDTRY;
+            return FAILURE;
         }
+        bool _1l_ = is_1lower_ctr(worker_ctx->label, (uint8_t*)oudp_datao->recv_buffer, security->mac_key, security->remote_nonce, &security->remote_ctr);
+        if (_1l_) {
+            isretry = true;
+        }
+        */
     }
     if (session->hello1_ack.rcvd && !isretry) {
         LOG_ERROR("%sHello1 Closed.", worker_ctx->label);
@@ -82,12 +111,6 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
 //======================================================================
     if (!isretry) {
         if (!is_loss_1st_pkt) {
-            status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
-            if (cmac != SUCCESS) {
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-                return FAILURE;
-            }
             status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
             if (rhd != SUCCESS) {
                 CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -167,7 +190,7 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
         return FAILURE;
     }
 //----------------------------------------------------------------------

@@ -403,7 +403,7 @@ static inline status_t turns_to_polling_1ms(
                     return FAILURE;
                 }
             } else {
-                if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)10 + (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
+                if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)1 + (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
                     session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
                     send_heartbeat(worker_ctx, xsession, orilink_protocol);
                 } else {
@@ -426,7 +426,7 @@ static inline status_t turns_to_polling_1ms(
                     return FAILURE;
                 }
             } else {
-                if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)10 + (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
+                if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)1 + (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
                     session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
                     send_heartbeat(worker_ctx, xsession, orilink_protocol);
                 } else {

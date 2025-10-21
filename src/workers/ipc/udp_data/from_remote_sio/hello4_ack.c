@@ -49,6 +49,24 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         return FAILURE;
     }
     */
+//----------------------------------------------------------------------
+    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
+    if (current_time.status != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
+    double filter_x = (double)(current_time.r_uint64_t - session->hello4.sent_time);
+    double filter_y = session->rtt.value_prediction;
+    if (filter_y == (double)0) {
+        filter_y = (double)1000000000;
+    }
+    if (filter_x >= ((double)20 * (double)filter_y)) {
+        LOG_ERROR("%sRcv Unexpected Ack.", worker_ctx->label);
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
 //======================================================================
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
@@ -321,18 +339,6 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     memcpy(&remote_id_be, decrypted_remote_identity + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t), sizeof(uint64_t));
     uint64_t remote_id = be64toh(remote_id_be);
 //----------------------------------------------------------------------
-    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
-    if (current_time.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
-        return FAILURE;
-    }
     session->heartbeat.sent_try_count++;
     session->heartbeat.sent_time = current_time.r_uint64_t;
 //======================================================================
@@ -444,20 +450,14 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
     }
 //======================================================================
-    double filter_x = (double)(current_time.r_uint64_t - session->hello4.sent_time);
-    double filter_y = session->rtt.value_prediction;
-    if (filter_y == (double)0) {
-        filter_y = (double)1000000000;
-    }
-    if (filter_x < ((double)MAX_RETRY_CNT * (double)filter_y)) {
-        session->hello4.ack_rcvd_time = current_time.r_uint64_t;
-        uint64_t interval_ull = session->hello4.ack_rcvd_time - session->hello4.sent_time;
-        double rtt_value = (double)interval_ull;
-        calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-        //cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello4, false);
-        
-        printf("%sRTT Hello-4 = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
-    }
+    session->hello4.ack_rcvd_time = current_time.r_uint64_t;
+    uint64_t interval_ull = session->hello4.ack_rcvd_time - session->hello4.sent_time;
+    double rtt_value = (double)interval_ull;
+    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    //cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello4, false);
+    
+    printf("%sRTT Hello-4 = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
+//======================================================================
     session->hello4.ack_rcvd = true;
 //======================================================================
 // Heartbeat Ack Security 1 & Security 2 Open

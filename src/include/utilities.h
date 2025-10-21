@@ -156,49 +156,150 @@ static inline void decrement_ctr(uint32_t *ctr, uint8_t *nonce) {
     }
 }
 
-static inline bool is_1greater_ctr(uint32_t *ctr1, uint32_t *ctr2, uint8_t *nonce2) {
+static inline bool is_1greater_ctr(const char* label, uint8_t *data, uint8_t* key_mac, uint8_t *nonce, uint32_t *ctr) {
     uint8_t *tmp_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
     if (!tmp_nonce) {
-        false;
-        return FAILURE_NOMEM;
+        return false;
     }
-    memcpy(tmp_nonce, nonce2, AES_NONCE_BYTES);
-    uint32_t tmp_ctr = *ctr2;
+    memcpy(tmp_nonce, nonce, AES_NONCE_BYTES);
+    uint32_t tmp_ctr = *ctr;
+//----------------------------------------------------------------------
     increment_ctr(&tmp_ctr, tmp_nonce);
-    bool isgtr = (*ctr1 == tmp_ctr);
-    memset(tmp_nonce, 0, AES_NONCE_BYTES);
-    free(tmp_nonce);
-    return isgtr;
-}
-
-static inline bool is_1lower_equal_ctr(uint32_t *ctr1, uint32_t *ctr2, uint8_t *nonce2) {
-    if (*ctr1 == *ctr2) {
-        return true;
+    const size_t header_offset = AES_TAG_BYTES;
+    const size_t header_len = sizeof(uint32_t) +
+                              ORILINK_VERSION_BYTES +
+                              sizeof(uint8_t) +
+                              sizeof(uint8_t) +
+                              sizeof(uint8_t);
+    uint8_t *header = data + header_offset;
+    uint8_t decripted_header[header_len];
+    if (encrypt_decrypt_128(
+            label,
+            key_mac,
+            tmp_nonce,
+            &tmp_ctr,
+            header,
+            decripted_header,
+            header_len
+        ) != SUCCESS
+    )
+    {
+        memset(tmp_nonce, 0, AES_NONCE_BYTES);
+        free(tmp_nonce);
+        return false;
     }
-    uint8_t *tmp_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-    if (!tmp_nonce) {
-        false;
-        return FAILURE_NOMEM;
-    }
-    memcpy(tmp_nonce, nonce2, AES_NONCE_BYTES);
-    uint32_t tmp_ctr = *ctr2;
-    decrement_ctr(&tmp_ctr, tmp_nonce);
-    bool islwr = (*ctr1 == tmp_ctr);
+    uint32_t data_ctr_be;
+    memcpy(&data_ctr_be, decripted_header, sizeof(uint32_t));
+    uint32_t data_ctr = be32toh(data_ctr_be);
+    bool islwr = (data_ctr == tmp_ctr);
+//----------------------------------------------------------------------    
     memset(tmp_nonce, 0, AES_NONCE_BYTES);
     free(tmp_nonce);
     return islwr;
 }
 
-static inline bool is_1lower_ctr(uint32_t *ctr1, uint32_t *ctr2, uint8_t *nonce2) {
+static inline bool is_1lower_equal_ctr(const char* label, uint8_t *data, uint8_t* key_mac, uint8_t *nonce, uint32_t *ctr) {
     uint8_t *tmp_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
     if (!tmp_nonce) {
-        false;
-        return FAILURE_NOMEM;
+        return false;
     }
-    memcpy(tmp_nonce, nonce2, AES_NONCE_BYTES);
-    uint32_t tmp_ctr = *ctr2;
+    memcpy(tmp_nonce, nonce, AES_NONCE_BYTES);
+    uint32_t tmp_ctr = *ctr;
+//----------------------------------------------------------------------
+    const size_t header_offset = AES_TAG_BYTES;
+    const size_t header_len = sizeof(uint32_t) +
+                              ORILINK_VERSION_BYTES +
+                              sizeof(uint8_t) +
+                              sizeof(uint8_t) +
+                              sizeof(uint8_t);
+    uint8_t *header = data + header_offset;
+    uint8_t decripted_header[header_len];
+    if (encrypt_decrypt_128(
+            label,
+            key_mac,
+            tmp_nonce,
+            &tmp_ctr,
+            header,
+            decripted_header,
+            header_len
+        ) != SUCCESS
+    )
+    {
+        memset(tmp_nonce, 0, AES_NONCE_BYTES);
+        free(tmp_nonce);
+        return false;
+    }
+    uint32_t data_ctr_be;
+    memcpy(&data_ctr_be, decripted_header, sizeof(uint32_t));
+    uint32_t data_ctr = be32toh(data_ctr_be);
+    bool issme = (data_ctr == tmp_ctr);
+    if (issme) {
+        memset(tmp_nonce, 0, AES_NONCE_BYTES);
+        free(tmp_nonce);
+        return issme;
+    }
     decrement_ctr(&tmp_ctr, tmp_nonce);
-    bool islwr = (*ctr1 == tmp_ctr);
+    if (encrypt_decrypt_128(
+            label,
+            key_mac,
+            tmp_nonce,
+            &tmp_ctr,
+            header,
+            decripted_header,
+            header_len
+        ) != SUCCESS
+    )
+    {
+        memset(tmp_nonce, 0, AES_NONCE_BYTES);
+        free(tmp_nonce);
+        return false;
+    }
+    memcpy(&data_ctr_be, decripted_header, sizeof(uint32_t));
+    data_ctr = be32toh(data_ctr_be);
+    bool islwr = (data_ctr == tmp_ctr);
+//----------------------------------------------------------------------    
+    memset(tmp_nonce, 0, AES_NONCE_BYTES);
+    free(tmp_nonce);
+    return islwr;
+}
+
+static inline bool is_1lower_ctr(const char* label, uint8_t *data, uint8_t* key_mac, uint8_t *nonce, uint32_t *ctr) {
+    uint8_t *tmp_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
+    if (!tmp_nonce) {
+        return false;
+    }
+    memcpy(tmp_nonce, nonce, AES_NONCE_BYTES);
+    uint32_t tmp_ctr = *ctr;
+//----------------------------------------------------------------------
+    decrement_ctr(&tmp_ctr, tmp_nonce);
+    const size_t header_offset = AES_TAG_BYTES;
+    const size_t header_len = sizeof(uint32_t) +
+                              ORILINK_VERSION_BYTES +
+                              sizeof(uint8_t) +
+                              sizeof(uint8_t) +
+                              sizeof(uint8_t);
+    uint8_t *header = data + header_offset;
+    uint8_t decripted_header[header_len];
+    if (encrypt_decrypt_128(
+            label,
+            key_mac,
+            tmp_nonce,
+            &tmp_ctr,
+            header,
+            decripted_header,
+            header_len
+        ) != SUCCESS
+    )
+    {
+        memset(tmp_nonce, 0, AES_NONCE_BYTES);
+        free(tmp_nonce);
+        return false;
+    }
+    uint32_t data_ctr_be;
+    memcpy(&data_ctr_be, decripted_header, sizeof(uint32_t));
+    uint32_t data_ctr = be32toh(data_ctr_be);
+    bool islwr = (data_ctr == tmp_ctr);
+//----------------------------------------------------------------------    
     memset(tmp_nonce, 0, AES_NONCE_BYTES);
     free(tmp_nonce);
     return islwr;
