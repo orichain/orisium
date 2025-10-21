@@ -114,7 +114,11 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
     }
 //======================================================================
     double filter_x = (double)(current_time.r_uint64_t - session->heartbeat.sent_time);
-    if (filter_x < ((double)MAX_RETRY_CNT * (double)session->rtt.value_prediction)) {
+    double filter_y = session->rtt.value_prediction;
+    if (filter_y == (double)0) {
+        filter_y = (double)1000000000;
+    }
+    if (filter_x < ((double)MAX_RETRY_CNT * (double)filter_y)) {
         session->heartbeat.ack_rcvd_time = current_time.r_uint64_t;
         uint64_t interval_ull = session->heartbeat.ack_rcvd_time - session->heartbeat.sent_time;
         double rtt_value = (double)interval_ull;
