@@ -156,24 +156,26 @@ static inline status_t polling_1ms(
 )
 {
     double polling_interval = (double)1000000 / (double)1e9;
-    if (!h->ack_rcvd) {
-        h->polling_1ms_cnt++;
-        uint16_t polling_1ms_max_cnt = h->polling_1ms_max_cnt;
-        if (h->polling_1ms_cnt >= polling_1ms_max_cnt) {
-            retry_transmit(
-                worker_ctx,
-                xsession,
-                h,
-                orilink_protocol
-            );
-        } else {
-            if (update_timer_oneshot(worker_ctx->label, &h->polling_timer_fd, polling_interval) != SUCCESS) {
-                update_timer_oneshot(worker_ctx->label, &h->polling_timer_fd, polling_interval);
-                return FAILURE;
+    if (h->data != NULL) {
+        if (!h->ack_rcvd) {
+            h->polling_1ms_cnt++;
+            uint16_t polling_1ms_max_cnt = h->polling_1ms_max_cnt;
+            if (h->polling_1ms_cnt >= polling_1ms_max_cnt) {
+                retry_transmit(
+                    worker_ctx,
+                    xsession,
+                    h,
+                    orilink_protocol
+                );
+            } else {
+                if (update_timer_oneshot(worker_ctx->label, &h->polling_timer_fd, polling_interval) != SUCCESS) {
+                    update_timer_oneshot(worker_ctx->label, &h->polling_timer_fd, polling_interval);
+                    return FAILURE;
+                }
             }
+        } else {
+            cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false);
         }
-    } else {
-        cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false);
     }
     return SUCCESS;
 }

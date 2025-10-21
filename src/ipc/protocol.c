@@ -27,7 +27,7 @@
 #include "pqc.h"
 #include "xorshiro128plus.h"
 
-static inline size_t calculate_ipc_payload_fixed_size(const char *label, ipc_protocol_type_t type, bool plus_header) {
+inline size_t calculate_ipc_payload_fixed_size(const char *label, ipc_protocol_type_t type, bool plus_header) {
 	size_t payload_fixed_size = 0;
     switch (type) {
         case IPC_MASTER_WORKER_INFO: {
@@ -86,7 +86,7 @@ static inline size_t calculate_ipc_payload_fixed_size(const char *label, ipc_pro
            payload_fixed_size;
 }
 
-static inline size_t_status_t calculate_ipc_payload_size(const char *label, const ipc_protocol_t* p) {
+inline size_t_status_t calculate_ipc_payload_size(const char *label, const ipc_protocol_t* p) {
 	size_t_status_t result;
     result.r_size_t = 0;
     result.status = FAILURE;
@@ -115,7 +115,7 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
     return result;
 }
 
-ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, const ipc_protocol_t* p, uint8_t** ptr_buffer, size_t* buffer_size) {
+inline ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, const ipc_protocol_t* p, uint8_t** ptr_buffer, size_t* buffer_size) {
     ssize_t_status_t result;
     result.r_ssize_t = 0;
     result.status = FAILURE;
@@ -300,7 +300,7 @@ ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes, uint8_t* key
     return result;
 }
 
-ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uint8_t* nonce, uint32_t *ctr, uint8_t* buffer, size_t len) {
+inline ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uint8_t* nonce, uint32_t *ctr, uint8_t* buffer, size_t len) {
     ipc_protocol_t_status_t result;
     result.r_ipc_protocol_t = NULL;
     result.status = FAILURE;
@@ -604,7 +604,7 @@ ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uin
     return result;
 }
 
-ssize_t_status_t send_ipc_protocol_message(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, int *uds_fd, const ipc_protocol_t* p) {
+inline ssize_t_status_t send_ipc_protocol_message(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, int *uds_fd, const ipc_protocol_t* p) {
 	ssize_t_status_t result;
     result.r_ssize_t = 0;
     result.status = FAILURE;
@@ -670,7 +670,7 @@ ssize_t_status_t send_ipc_protocol_message(const char *label, uint8_t* key_aes, 
     return result;
 }
 
-status_t ipc_check_mac(const char *label, uint8_t* key_mac, ipc_raw_protocol_t *r) {
+inline status_t ipc_check_mac(const char *label, uint8_t* key_mac, ipc_raw_protocol_t *r) {
     uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
     if (memcmp(
             key_mac, 
@@ -700,7 +700,7 @@ status_t ipc_check_mac(const char *label, uint8_t* key_mac, ipc_raw_protocol_t *
     return SUCCESS;
 }
 
-status_t ipc_check_ctr(const char *label, uint8_t* key_aes, uint32_t* ctr, ipc_raw_protocol_t *r) {
+inline status_t ipc_check_ctr(const char *label, uint8_t* key_aes, uint32_t* ctr, ipc_raw_protocol_t *r) {
     uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
     if (memcmp(
             key_aes, 
@@ -719,7 +719,7 @@ status_t ipc_check_ctr(const char *label, uint8_t* key_aes, uint32_t* ctr, ipc_r
     return SUCCESS;
 }
 
-status_t ipc_read_header(const char *label, uint8_t* key_mac, uint8_t* nonce, ipc_raw_protocol_t *r) {
+inline status_t ipc_read_header(const char *label, uint8_t* key_mac, uint8_t* nonce, ipc_raw_protocol_t *r) {
     size_t current_offset = 0;
     size_t total_buffer_len = (size_t)r->n;
     uint8_t *cursor = r->recv_buffer + current_offset;
@@ -779,7 +779,7 @@ status_t ipc_read_header(const char *label, uint8_t* key_mac, uint8_t* nonce, ip
     return SUCCESS;
 }
 
-status_t ipc_read_cleartext_header(const char *label, ipc_raw_protocol_t *r) {
+inline status_t ipc_read_cleartext_header(const char *label, ipc_raw_protocol_t *r) {
     size_t current_offset = 0;
     size_t total_buffer_len = (size_t)r->n;
     uint8_t *cursor = r->recv_buffer + current_offset;
@@ -822,7 +822,7 @@ status_t ipc_read_cleartext_header(const char *label, ipc_raw_protocol_t *r) {
     return SUCCESS;
 }
 
-ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, int *uds_fd) {
+inline ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, int *uds_fd) {
     ipc_raw_protocol_t_status_t result;
     result.status = FAILURE;
     result.r_ipc_raw_protocol_t = NULL;
@@ -920,7 +920,7 @@ ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, 
     return result;
 }
 
-status_t ipc_add_protocol_queue(const char *label, uint64_t queue_id, worker_type_t wot, uint8_t index, int *uds_fd, ipc_protocol_t *p, ipc_protocol_queue_t **head) {
+inline status_t ipc_add_protocol_queue(const char *label, uint64_t queue_id, worker_type_t wot, uint8_t index, int *uds_fd, ipc_protocol_t *p, ipc_protocol_queue_t **head) {
     ipc_protocol_queue_t *new_queue = (ipc_protocol_queue_t *)calloc(1, sizeof(ipc_protocol_queue_t));
     if (!new_queue) {
         LOG_ERROR("%sFailed to allocate ipc_protocol_queue_t buffer. %s", label, strerror(errno));
@@ -936,7 +936,7 @@ status_t ipc_add_protocol_queue(const char *label, uint64_t queue_id, worker_typ
     return SUCCESS;
 }
 
-void ipc_remove_protocol_queue(uint64_t queue_id, ipc_protocol_queue_t **head) {
+inline void ipc_remove_protocol_queue(uint64_t queue_id, ipc_protocol_queue_t **head) {
     ipc_protocol_queue_t *current = *head;
     ipc_protocol_queue_t *previous = NULL;
     while (current != NULL && current->queue_id != queue_id) {
@@ -954,7 +954,7 @@ void ipc_remove_protocol_queue(uint64_t queue_id, ipc_protocol_queue_t **head) {
     }
 }
 
-void ipc_cleanup_protocol_queue(ipc_protocol_queue_t **head) {
+inline void ipc_cleanup_protocol_queue(ipc_protocol_queue_t **head) {
     ipc_protocol_queue_t *current = *head;
     ipc_protocol_queue_t *next;
     while (current != NULL) {
@@ -965,192 +965,3 @@ void ipc_cleanup_protocol_queue(ipc_protocol_queue_t **head) {
     }
     *head = NULL;
 }
-
-/*
-ssize_t_status_t send_ipc_protocol_message_wfdtopass(const char *label, int *uds_fd, const ipc_protocol_t* p, int *fd_to_pass) {
-	ssize_t_status_t result;
-    result.r_ssize_t = 0;
-    result.status = FAILURE;
-    uint8_t* serialized_ipc_data_buffer = NULL;
-    size_t serialized_ipc_data_len = 0;
-
-    ssize_t_status_t serialize_result = ipc_serialize(label, p, &serialized_ipc_data_buffer, &serialized_ipc_data_len);
-    if (serialize_result.status != SUCCESS) {
-        LOG_ERROR("%sError serializing IPC protocol: %d", serialize_result.status);
-        if (serialized_ipc_data_buffer) {
-            free(serialized_ipc_data_buffer);
-        }
-        return result;
-    }
-    size_t total_message_len_to_send = IPC_LENGTH_PREFIX_BYTES + serialized_ipc_data_len;
-    uint8_t *final_send_buffer = (uint8_t *)malloc(total_message_len_to_send);
-    if (!final_send_buffer) {
-        LOG_ERROR("%smalloc failed for final_send_buffer. %s", label, strerror(errno));
-        if (serialized_ipc_data_buffer) {
-            free(serialized_ipc_data_buffer);
-        }
-        return result;
-    }
-    size_t offset = 0;
-    uint32_t ipc_protocol_data_len_be = htobe32((uint32_t)serialized_ipc_data_len);
-    memcpy(final_send_buffer + offset, &ipc_protocol_data_len_be, IPC_LENGTH_PREFIX_BYTES);
-    offset += IPC_LENGTH_PREFIX_BYTES;
-    memcpy(final_send_buffer + offset, serialized_ipc_data_buffer, serialized_ipc_data_len);
-    LOG_DEBUG("%sTotal pesan untuk dikirim: %zu byte (Prefix %zu + IPC Data %zu).",
-            label, total_message_len_to_send, IPC_LENGTH_PREFIX_BYTES, serialized_ipc_data_len);
-    struct msghdr msg = {0};
-    struct iovec iov[1];
-    iov[0].iov_base = final_send_buffer;
-    iov[0].iov_len = total_message_len_to_send;
-    msg.msg_iov = iov;
-    msg.msg_iovlen = 1;
-    char cmsgbuf[CMSG_SPACE(sizeof(int))];
-    if (*fd_to_pass != -1) {
-        msg.msg_control = cmsgbuf;
-        msg.msg_controllen = sizeof(cmsgbuf);
-        struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
-        cmsg->cmsg_level = SOL_SOCKET;
-        cmsg->cmsg_type = SCM_RIGHTS;
-        cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-        *((int *) CMSG_DATA(cmsg)) = *fd_to_pass;
-        LOG_DEBUG("%sMengirim FD: %d\n", label, *fd_to_pass);
-    } else {
-        msg.msg_control = NULL;
-        msg.msg_controllen = 0;
-    }
-    result.r_ssize_t = sendmsg(*uds_fd, &msg, 0);
-    if (result.r_ssize_t == -1) {
-        LOG_ERROR("%ssend_ipc_protocol_message sendmsg. %s", label, strerror(errno));
-        free(final_send_buffer);
-        if (serialized_ipc_data_buffer) {
-            free(serialized_ipc_data_buffer);
-        }
-        return result;
-    } else if (result.r_ssize_t != (ssize_t)total_message_len_to_send) {
-        LOG_ERROR("%sendmsg hanya mengirim %zd dari %zu byte!",
-                label, result.r_ssize_t, total_message_len_to_send);
-        free(final_send_buffer);
-        if (serialized_ipc_data_buffer) {
-            free(serialized_ipc_data_buffer);
-        }
-        return result;
-    } else {
-        LOG_DEBUG("%sBerhasil mengirim %zd byte.\n", label, result.r_ssize_t);
-    }
-    free(final_send_buffer);
-    if (serialized_ipc_data_buffer) {
-        free(serialized_ipc_data_buffer);
-    }
-    result.status = SUCCESS;
-    return result;
-}
-
-ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message_wfdrcvd(const char *label, int *uds_fd, int *fd_received) {
-    ipc_raw_protocol_t_status_t result;
-    result.status = FAILURE;
-    result.r_ipc_raw_protocol_t = NULL;
-    if (fd_received) {
-        *fd_received = -1;
-    }
-    uint32_t total_ipc_payload_len_be;
-    char temp_len_prefix_buf[IPC_LENGTH_PREFIX_BYTES];
-    struct msghdr msg_prefix = {0};
-    struct iovec iov_prefix[1];
-    iov_prefix[0].iov_base = temp_len_prefix_buf;
-    iov_prefix[0].iov_len = IPC_LENGTH_PREFIX_BYTES;
-    msg_prefix.msg_iov = iov_prefix;
-    msg_prefix.msg_iovlen = 1;
-    char cmsgbuf_prefix[CMSG_SPACE(sizeof(int))];
-    msg_prefix.msg_control = cmsgbuf_prefix;
-    msg_prefix.msg_controllen = sizeof(cmsgbuf_prefix);
-    LOG_DEBUG("%sTahap 1: Membaca length prefix dan potensi FD (%zu byte).", label, IPC_LENGTH_PREFIX_BYTES);
-    ssize_t bytes_read_prefix_and_fd = recvmsg(*uds_fd, &msg_prefix, MSG_WAITALL);
-    if (bytes_read_prefix_and_fd == -1) {
-        if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            LOG_ERROR("%sreceive_and_deserialize_ipc_message recvmsg (length prefix + FD). %s", label, strerror(errno));
-        }
-        return result;
-    }
-    if (bytes_read_prefix_and_fd != (ssize_t)IPC_LENGTH_PREFIX_BYTES) {
-        LOG_ERROR("%sGagal membaca length prefix sepenuhnya. Diharapkan %zu byte, diterima %zd.",
-                label, IPC_LENGTH_PREFIX_BYTES, bytes_read_prefix_and_fd);
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-    struct cmsghdr *cmsg_prefix = CMSG_FIRSTHDR(&msg_prefix);
-    if (cmsg_prefix && cmsg_prefix->cmsg_level == SOL_SOCKET && cmsg_prefix->cmsg_type == SCM_RIGHTS && cmsg_prefix->cmsg_len == CMSG_LEN(sizeof(int))) {
-        if (fd_received) {
-            *fd_received = *((int *) CMSG_DATA(cmsg_prefix));
-        }
-        LOG_DEBUG("%sFD diterima: %d", label, *fd_received);
-    } else {
-        LOG_DEBUG("%sTidak ada FD yang diterima dengan length prefix.", label);
-    }
-    memcpy(&total_ipc_payload_len_be, temp_len_prefix_buf, IPC_LENGTH_PREFIX_BYTES);
-    uint32_t total_ipc_payload_len = be32toh(total_ipc_payload_len_be);
-    LOG_DEBUG("%sDitemukan panjang payload IPC: %u byte.", label, total_ipc_payload_len);
-    if (total_ipc_payload_len == 0) {
-        LOG_ERROR("%sPanjang payload IPC adalah 0. Tidak ada data untuk dibaca.", label);
-        result.status = FAILURE_BAD_PROTOCOL;
-        return result;
-    }
-    uint8_t *full_ipc_payload_buffer = (uint8_t *)malloc(total_ipc_payload_len);
-    if (!full_ipc_payload_buffer) {
-        LOG_ERROR("%sreceive_and_deserialize_ipc_message: malloc failed for full_ipc_payload_buffer. %s", label, strerror(errno));
-        result.status = FAILURE_NOMEM;
-        return result;
-    }
-    struct msghdr msg_payload = {0};
-    struct iovec iov_payload[1];
-    iov_payload[0].iov_base = full_ipc_payload_buffer;
-    iov_payload[0].iov_len = total_ipc_payload_len;
-    msg_payload.msg_iov = iov_payload;
-    msg_payload.msg_iovlen = 1;
-    msg_payload.msg_control = NULL;
-    msg_payload.msg_controllen = 0;
-    LOG_DEBUG("%sTahap 2: Membaca %u byte payload IPC.", label, total_ipc_payload_len);
-    ssize_t bytes_read_payload = recvmsg(*uds_fd, &msg_payload, MSG_WAITALL);
-    if (bytes_read_payload == -1) {
-        if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            LOG_ERROR("%sreceive_and_deserialize_ipc_message recvmsg (payload). %s", label, strerror(errno));
-        }
-        free(full_ipc_payload_buffer);
-        result.status = FAILURE;
-        return result;
-    } else if (bytes_read_payload < (ssize_t)(IPC_VERSION_BYTES + sizeof(uint8_t))) {
-        LOG_ERROR("%sreceive_ipc_raw_protocol_message received 0 bytes (unexpected for IPC).", label);
-        free(full_ipc_payload_buffer);
-        result.status = FAILURE_OOBUF;
-        return result;
-    } else if (bytes_read_payload != (ssize_t)total_ipc_payload_len) {
-        LOG_ERROR("%sPayload IPC tidak lengkap. Diharapkan %u byte, diterima %zd.", label, total_ipc_payload_len, bytes_read_payload);
-        free(full_ipc_payload_buffer);
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-    ipc_raw_protocol_t* r = (ipc_raw_protocol_t*)calloc(1, sizeof(ipc_raw_protocol_t));
-    if (!r) {
-        LOG_ERROR("%sFailed to allocate ipc_raw_protocol_t. %s", label, strerror(errno));
-        free(full_ipc_payload_buffer);
-        result.status = FAILURE_NOMEM;
-        return result;
-    }
-    uint8_t *b = (uint8_t*) calloc(1, bytes_read_payload);
-    if (!b) {
-        LOG_ERROR("%sFailed to allocate ipc_raw_protocol_t buffer. %s", label, strerror(errno));
-        free(full_ipc_payload_buffer);
-        CLOSE_IPC_RAW_PROTOCOL(&r);
-        result.status = FAILURE_NOMEM;
-        return result;
-    }
-    memcpy(b, full_ipc_payload_buffer, bytes_read_payload);
-    free(full_ipc_payload_buffer);
-    r->recv_buffer = b;
-    r->n = (uint32_t)bytes_read_payload;
-    memcpy(r->version, b, IPC_VERSION_BYTES);
-    memcpy((uint8_t *)&r->type, b + IPC_VERSION_BYTES, sizeof(uint8_t));
-    result.r_ipc_raw_protocol_t = r;
-    result.status = SUCCESS;
-    return result;
-}
-*/

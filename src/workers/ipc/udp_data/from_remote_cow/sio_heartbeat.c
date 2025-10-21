@@ -2,7 +2,6 @@
 #include <inttypes.h>
 #include <netinet/in.h>
 #include <string.h>
-#include <stdlib.h>
 
 #include "log.h"
 #include "ipc/protocol.h"
@@ -250,17 +249,6 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         );
         if (le != SUCCESS) {
             return le;
-        }
-        if (!session->heartbeat.sent) {
-//======================================================================
-            double timer_interval = session->heartbeat_interval;
-            double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
-            timer_interval *= (1.0 + jitter_amount);
-//======================================================================
-            status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, timer_interval);
-            if (chst != SUCCESS) {
-                return FAILURE;
-            }
         }
         return SUCCESS;
     }
