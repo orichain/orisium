@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <math.h>
 
 #include "log.h"
 #include "async.h"
@@ -62,7 +63,7 @@ void run_cow_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
 //----------------------------------------------------------------------
 // Heartbeat dengan jitter
 //----------------------------------------------------------------------
-				double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+				double jitter_amount = fabs(((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE);
                 double new_heartbeat_interval_double = WORKER_HEARTBEAT_INTERVAL * (1.0 + jitter_amount);
                 if (new_heartbeat_interval_double < 0.1) {
                     new_heartbeat_interval_double = 0.1;

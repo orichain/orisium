@@ -210,8 +210,8 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
     }
 //======================================================================
     session->heartbeat_interval = oheartbeat->hb_interval;
-    if (session->heartbeat_interval < (double)1) {
-        session->heartbeat_interval = (double)1;
+    if (session->heartbeat_interval < (double)0.001) {
+        session->heartbeat_interval = (double)0.001;
     }
     if (session->heartbeat_interval > (double)100) {
         session->heartbeat_interval = (double)100;
@@ -277,7 +277,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
 //======================================================================
 // Test Packet Dropped
 //======================================================================
-    session->test_drop_heartbeat_ack++;
+    //session->test_drop_heartbeat_ack++;
     if (
         session->test_drop_heartbeat_ack == 1 ||
         session->test_drop_heartbeat_ack == 3 ||

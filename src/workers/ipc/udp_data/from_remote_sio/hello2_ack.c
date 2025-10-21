@@ -14,6 +14,7 @@
 #include "orilink/protocol.h"
 #include "stdbool.h"
 #include "utilities.h"
+#include "constants.h"
 
 status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
     uint8_t inc_ctr = oudp_datao->inc_ctr;
@@ -28,12 +29,14 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
+    /*
     if (session->hello2.ack_rcvd) {
         LOG_ERROR("%sHello2_Ack Received Already.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
+    */
 //======================================================================
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
@@ -217,15 +220,17 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
         calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
     }
 //======================================================================
+    double filter_x = (double)(current_time.r_uint64_t - session->heartbeat.sent_time);
+    if (filter_x < ((double)MAX_RETRY_CNT * (double)session->rtt.value_prediction)) {
+        session->hello2.ack_rcvd_time = current_time.r_uint64_t;
+        uint64_t interval_ull = session->hello2.ack_rcvd_time - session->hello2.sent_time;
+        double rtt_value = (double)interval_ull;
+        calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+        //cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello2, false);
+        
+        printf("%sRTT Hello-2 = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
+    }
     session->hello2.ack_rcvd = true;
-    session->hello2.ack_rcvd_time = current_time.r_uint64_t;
-    uint64_t interval_ull = session->hello2.ack_rcvd_time - session->hello2.sent_time;
-    double rtt_value = (double)interval_ull;
-    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-    //cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello2, false);
-    
-    printf("%sRTT Hello-2 = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
-    
 //======================================================================
     session->hello3.sent = true;
 //======================================================================

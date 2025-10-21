@@ -38,7 +38,12 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
         double try_count = (double)strycount-(double)1;
         calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
     }
-    if (strycount == (uint8_t)1) {
+    double filter_x = (double)interval_ull;
+    double filter_y = session->rtt.value_prediction;
+    if (filter_y == (double)0) {
+        filter_y = (double)1000000000;
+    }
+    if (filter_x < ((double)MAX_RETRY_CNT * (double)filter_y)) {
         double rtt_value = (double)interval_ull;
         calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     

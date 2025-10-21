@@ -51,7 +51,7 @@ static inline status_t retry_transmit(
             double retry_timer_interval = (double)session->retry.value_prediction;
             retry_timer_interval = pow((double)2, retry_timer_interval);
             if (retry_timer_interval < (double)MIN_RETRY_SEC) retry_timer_interval = (double)MIN_RETRY_SEC;
-            double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+            double jitter_amount = fabs(((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE);
             retry_timer_interval *= (1.0 + jitter_amount);
 //----------------------------------------------------------------------
             if (retry_control_packet(
@@ -110,7 +110,7 @@ static inline status_t retry_transmit(
             double retry_timer_interval = (double)session->retry.value_prediction;
             retry_timer_interval = pow((double)2, retry_timer_interval);
             if (retry_timer_interval < (double)MIN_RETRY_SEC) retry_timer_interval = (double)MIN_RETRY_SEC;
-            double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+            double jitter_amount = fabs(((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE);
             retry_timer_interval *= (1.0 + jitter_amount);
 //----------------------------------------------------------------------
             if (retry_control_packet(
@@ -189,7 +189,7 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
             orilink_security_t *security = &session->security;
 //======================================================================
             double hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
-            double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+            double jitter_amount = fabs(((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE);
             hb_interval *= (1.0 + jitter_amount);
             hb_interval += session->rtt.value_prediction / (double)1e9;
 //======================================================================
@@ -287,7 +287,7 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
             orilink_security_t *security = &session->security;
 //======================================================================
             double hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
-            double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+            double jitter_amount = fabs(((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE);
             hb_interval *= (1.0 + jitter_amount);
             hb_interval += session->rtt.value_prediction / (double)1e9;
 //======================================================================
@@ -403,7 +403,7 @@ static inline status_t turns_to_polling_1ms(
                     return FAILURE;
                 }
             } else {
-                if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)1 + (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
+                if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)10 + (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
                     session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
                     send_heartbeat(worker_ctx, xsession, orilink_protocol);
                 } else {
@@ -426,7 +426,7 @@ static inline status_t turns_to_polling_1ms(
                     return FAILURE;
                 }
             } else {
-                if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)1 + (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
+                if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)10 + (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
                     session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
                     send_heartbeat(worker_ctx, xsession, orilink_protocol);
                 } else {

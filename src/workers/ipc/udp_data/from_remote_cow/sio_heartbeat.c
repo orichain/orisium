@@ -38,7 +38,12 @@ static inline status_t last_execution(worker_context_t *worker_ctx, sio_c_sessio
             double try_count = (double)strycount-(double)1;
             calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
         }
-        if (strycount == (uint8_t)1) {
+        double filter_x = (double)interval_ull;
+        double filter_y = session->rtt.value_prediction;
+        if (filter_y == (double)0) {
+            filter_y = (double)1000000000;
+        }
+        if (filter_x < ((double)MAX_RETRY_CNT * (double)filter_y)) {
             double rtt_value = (double)interval_ull;
             calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
             
@@ -181,6 +186,13 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
 //----------------------------------------------------------------------
             if (session->heartbeat_cnt == 0x01) {
                 session->heartbeat_cnt = 0x00;
+                uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
+                if (current_time.status != SUCCESS) {
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                    return FAILURE;
+                }
+                session->hello4_ack.ack_sent_time = current_time.r_uint64_t;
             }
 //----------------------------------------------------------------------
             if (oudp_datao_ctr == security->remote_ctr) {
@@ -367,7 +379,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
 //======================================================================
 // Test Packet Dropped
 //======================================================================
-    session->test_drop_heartbeat_ack++;
+    //session->test_drop_heartbeat_ack++;
     if (
         session->test_drop_heartbeat_ack == 1 ||
         session->test_drop_heartbeat_ack == 3 ||

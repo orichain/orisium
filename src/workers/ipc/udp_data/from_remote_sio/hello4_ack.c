@@ -41,12 +41,14 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
+    /*
     if (session->hello4.ack_rcvd) {
         LOG_ERROR("%sHello4_Ack Received Already.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
+    */
 //======================================================================
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
@@ -336,10 +338,11 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
 //======================================================================
     double hb_interval = false;
     hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
-    double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+    double jitter_amount = fabs(((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE);
     hb_interval *= (1.0 + jitter_amount);
     hb_interval += session->rtt.value_prediction / (double)1e9;
     session->heartbeat_interval = hb_interval;
+    printf("%sSend HB Interval %f\n", worker_ctx->label, hb_interval);
 //======================================================================
     l_inc_ctr = 0x01;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_heartbeat(
@@ -441,14 +444,17 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
     }
 //======================================================================
+    double filter_x = (double)(current_time.r_uint64_t - session->heartbeat.sent_time);
+    if (filter_x < ((double)MAX_RETRY_CNT * (double)session->rtt.value_prediction)) {
+        session->hello4.ack_rcvd_time = current_time.r_uint64_t;
+        uint64_t interval_ull = session->hello4.ack_rcvd_time - session->hello4.sent_time;
+        double rtt_value = (double)interval_ull;
+        calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+        //cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello4, false);
+        
+        printf("%sRTT Hello-4 = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
+    }
     session->hello4.ack_rcvd = true;
-    session->hello4.ack_rcvd_time = current_time.r_uint64_t;
-    uint64_t interval_ull = session->hello4.ack_rcvd_time - session->hello4.sent_time;
-    double rtt_value = (double)interval_ull;
-    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-    //cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->hello4, false);
-    
-    printf("%sRTT Hello-4 = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
 //======================================================================
 // Heartbeat Ack Security 1 & Security 2 Open
 //======================================================================

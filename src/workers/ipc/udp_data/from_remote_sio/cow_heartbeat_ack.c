@@ -9,6 +9,7 @@
 #include "workers/ipc/handlers.h"
 #include "orilink/protocol.h"
 #include "stdbool.h"
+#include "constants.h"
 
 struct sockaddr_in6;
 
@@ -24,12 +25,14 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
+    /*
     if (session->heartbeat.ack_rcvd) {
         LOG_ERROR("%sHeartbeat_Ack Received Already.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
+    */
 //======================================================================
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
@@ -110,14 +113,17 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
         calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
     }
 //======================================================================
-    session->heartbeat.ack_rcvd = true;
-    session->heartbeat.ack_rcvd_time = current_time.r_uint64_t;
-    uint64_t interval_ull = session->heartbeat.ack_rcvd_time - session->heartbeat.sent_time;
-    double rtt_value = (double)interval_ull;
-    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-    //cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
+    double filter_x = (double)(current_time.r_uint64_t - session->heartbeat.sent_time);
+    if (filter_x < ((double)MAX_RETRY_CNT * (double)session->rtt.value_prediction)) {
+        session->heartbeat.ack_rcvd_time = current_time.r_uint64_t;
+        uint64_t interval_ull = session->heartbeat.ack_rcvd_time - session->heartbeat.sent_time;
+        double rtt_value = (double)interval_ull;
+        calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+        //cleanup_control_packet(worker_ctx->label, &worker_ctx->async, &session->heartbeat, false);
 
-    printf("%sRTT Heartbeat = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
+        printf("%sRTT Heartbeat = %f ms\n", worker_ctx->label, session->rtt.value_prediction / 1e6);
+    }
+    session->heartbeat.ack_rcvd = true;
 //======================================================================
 // Heartbeat Security 2 Open
 //======================================================================
