@@ -17,15 +17,19 @@
 #include "constants.h"
 
 status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
-    uint8_t inc_ctr = oudp_datao->inc_ctr;
     uint8_t l_inc_ctr = 0xFF;
     uint8_t trycount = oudp_datao->trycount;
-    uint32_t oudp_datao_ctr = oudp_datao->ctr;
     bool isretry = false;
-    bool is_loss_1st_pkt = false;
 //======================================================================
 // + Security
 //======================================================================
+    status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
+    if (cmac != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
+//----------------------------------------------------------------------
     //print_hex("SIO Receiving Hello1 ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
     if (trycount != (uint8_t)1) {
         if (trycount > (uint8_t)MAX_RETRY_CNT) {
@@ -40,95 +44,11 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return FAILURE_IVLDTRY;
         }
-        status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
-        if (cmac != SUCCESS) {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE;
-        }
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-        /*
-        bool _1le_ = is_1lower_equal_ctr(worker_ctx->label, (uint8_t*)oudp_datao->recv_buffer, security->mac_key, security->remote_nonce, &security->remote_ctr);
-        if (!_1le_) {
-            bool _1g_ = is_1greater_ctr(worker_ctx->label, (uint8_t*)oudp_datao->recv_buffer, security->mac_key, security->remote_nonce, &security->remote_ctr);
-            if (!_1g_) {
-                LOG_ERROR("%sCounter Invalid.", worker_ctx->label);
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-                return FAILURE;
-            } else {
-                LOG_ERROR("%sCounter Is Greater.", worker_ctx->label);
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-                return FAILURE;
-            }
-        }
-        */
-        status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
-        if (rhd != SUCCESS) {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE;
-        }
-//----------------------------------------------------------------------
-        inc_ctr = oudp_datao->inc_ctr;
-        oudp_datao_ctr = oudp_datao->ctr;
-//----------------------------------------------------------------------
-        if (oudp_datao_ctr != (uint32_t)0 && oudp_datao_ctr == security->remote_ctr) {
-            LOG_DEVEL_DEBUG("%sHello1 From Peer's Retry Timer", worker_ctx->label);
-            isretry = false;
-            is_loss_1st_pkt = true;
-        } else {
-            LOG_DEVEL_DEBUG("%sHello1 Retry From Peer", worker_ctx->label);
-            isretry = true;
-        }
-    } else {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-        /*
-        status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
-        if (cmac != SUCCESS) {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE;
-        }
-        bool _1l_ = is_1lower_ctr(worker_ctx->label, (uint8_t*)oudp_datao->recv_buffer, security->mac_key, security->remote_nonce, &security->remote_ctr);
-        if (_1l_) {
-            isretry = true;
-        }
-        */
+        isretry = true;
     }
-    if (session->hello1_ack.rcvd && !isretry) {
-        LOG_ERROR("%sHello1 Closed.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        return FAILURE;
-    }
+//----------------------------------------------------------------------
     session->hello1_ack.last_trycount = trycount;
-//======================================================================
-    if (!isretry) {
-        if (!is_loss_1st_pkt) {
-            status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
-            if (rhd != SUCCESS) {
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-                return FAILURE;
-            }
 //----------------------------------------------------------------------
-            inc_ctr = oudp_datao->inc_ctr;
-            oudp_datao_ctr = oudp_datao->ctr;
-//----------------------------------------------------------------------
-        }
-        status_t cctr = orilink_check_ctr(worker_ctx->label, security->aes_key, &security->remote_ctr, oudp_datao);
-        if (cctr != SUCCESS) {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE;
-        }
-    }
     if (isretry) {
         if (session->hello1_ack.data != NULL) {
             //print_hex("SIO Sending Hello1 Ack Retry Response ", session->hello1_ack.data, session->hello1_ack.len, 1);
@@ -166,12 +86,6 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        if (inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
         return FAILURE;
     } else {
         remote_wot = oudp_datao->local_wot;
@@ -215,18 +129,6 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
     if (orilink_cmd_result.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
-        if (l_inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-            //decrement_ctr(&security->local_ctr, security->local_nonce);
-        }
         return FAILURE;
     }
     puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
@@ -241,18 +143,6 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
     if (udp_data.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
-        if (l_inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-            //decrement_ctr(&security->local_ctr, security->local_nonce);
-        }
         return FAILURE;
     }
     //print_hex("SIO Sending Hello1 Ack ", udp_data.r_puint8_t, udp_data.r_size_t, 1);
@@ -288,18 +178,6 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
             /*
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-            if (inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-                //decrement_ctr(&security->remote_ctr, security->remote_nonce);
-            }
-            if (l_inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-                //decrement_ctr(&security->local_ctr, security->local_nonce);
-            }
             return FAILURE;
             */
         }
@@ -320,18 +198,6 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
         {
             CLOSE_IPC_PROTOCOL(&received_protocol);
             CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-            if (inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-                //decrement_ctr(&security->remote_ctr, security->remote_nonce);
-            }
-            if (l_inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-                //decrement_ctr(&security->local_ctr, security->local_nonce);
-            }
             return FAILURE;
         }
         if (session->test_drop_hello1_ack >= 1000000) {

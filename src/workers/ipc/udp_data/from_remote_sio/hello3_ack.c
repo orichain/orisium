@@ -18,44 +18,9 @@
 #include "stdbool.h"
 
 status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, cow_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao) {
-    uint8_t inc_ctr = oudp_datao->inc_ctr;
     uint8_t l_inc_ctr = 0xFF;
 //======================================================================
 // + Security
-//======================================================================
-    //print_hex("COW Receiving Hello3 Ack ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
-    if (!session->hello3.sent) {
-        LOG_ERROR("%sReceive Hello3_Ack But This Worker Session Is Never Sending Hello3.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        return FAILURE;
-    }
-    /*
-    if (session->hello3.ack_rcvd) {
-        LOG_ERROR("%sHello3_Ack Received Already.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        return FAILURE;
-    }
-    */
-//----------------------------------------------------------------------
-    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
-    if (current_time.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        return FAILURE;
-    }
-    double filter_x = (double)(current_time.r_uint64_t - session->hello3.sent_time);
-    double filter_y = session->rtt.value_prediction;
-    if (filter_y == (double)0) {
-        filter_y = (double)1000000000;
-    }
-    if (filter_x >= ((double)20 * (double)filter_y)) {
-        LOG_ERROR("%sRcv Unexpected Ack.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        return FAILURE;
-    }
 //======================================================================
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
@@ -63,17 +28,24 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
-    status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
-    if (rhd != SUCCESS) {
+//----------------------------------------------------------------------
+    //print_hex("COW Receiving Hello3 Ack ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
+    if (!session->hello3.sent) {
+        LOG_ERROR("%sReceive Hello3_Ack But This Worker Session Is Never Sending Hello3.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
-    inc_ctr = oudp_datao->inc_ctr;
+    if (session->hello3.ack_rcvd) {
+        LOG_ERROR("%sHello3_Ack Received Already.", worker_ctx->label);
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
 //----------------------------------------------------------------------
-    status_t cctr = orilink_check_ctr(worker_ctx->label, security->aes_key, &security->remote_ctr, oudp_datao);
-    if (cctr != SUCCESS) {
+    status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
+    if (rhd != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
@@ -87,12 +59,6 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-        if (inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
@@ -108,12 +74,6 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
         LOG_ERROR("%sReceive Different Id Between Hello3_Ack And Hello3.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
         return FAILURE;
     }
 //======================================================================
@@ -131,12 +91,6 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
         LOG_ERROR("%sFailed to KEM_DECODE_SHAREDSECRET.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -147,12 +101,6 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
         LOG_ERROR("%sFailed to generate_nonce.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -212,12 +160,6 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
         return FAILURE;
     }
 //======================================================================    
@@ -230,6 +172,12 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     memcpy(encrypted_local_identity2, encrypted_local_identity1, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t));
     memcpy(encrypted_local_identity2 + AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), mac, AES_TAG_BYTES);
 //======================================================================
+    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
+    if (current_time.status != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        return FAILURE;
+    }
     session->hello4.sent_try_count++;
     session->hello4.sent_time = current_time.r_uint64_t;
 //======================================================================
@@ -250,18 +198,6 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     if (orilink_cmd_result.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
-        if (l_inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-            //decrement_ctr(&security->local_ctr, security->local_nonce);
-        }
         return FAILURE;
     }
     puint8_t_size_t_status_t udp_data = create_orilink_raw_protocol_packet(
@@ -276,18 +212,6 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     if (udp_data.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
-        if (l_inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-            //decrement_ctr(&security->local_ctr, security->local_nonce);
-        }
         return FAILURE;
     }
     if (worker_master_udp_data(
@@ -306,18 +230,6 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-            //decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
-        if (l_inc_ctr != 0xFF) {
-//----------------------------------------------------------------------
-// No Counter Yet
-//----------------------------------------------------------------------
-            //decrement_ctr(&security->local_ctr, security->local_nonce);
-        }
         return FAILURE;
     }
 //======================================================================

@@ -18,6 +18,9 @@
 #define MAX_MASTER_COW_SESSIONS (MAX_COW_WORKERS * MAX_CONNECTION_PER_COW_WORKER)
 #define MAX_DOWNSTREAM_NODES_LIMIT 25
 
+#define ORILINK_DECRYPT_HEADER
+//#undef ORILINK_DECRYPT_HEADER
+
 #define SALT_LEN 4
 #define ORILINK_SALT_LEN 14
 //----------------------------------------------------------------------

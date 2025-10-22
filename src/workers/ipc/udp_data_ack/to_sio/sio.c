@@ -10,7 +10,6 @@
 #include "orilink/protocol.h"
 #include "workers/timer/handlers.h"
 #include "constants.h"
-#include "utilities.h"
 
 status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void *worker_sessions, ipc_protocol_t* received_protocol) {
     ipc_udp_data_ack_t *iudp_data_acki = received_protocol->payload.ipc_udp_data_ack;
@@ -47,11 +46,6 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
                 retry_timer_interval *= (1.0 + jitter_amount);
 //----------------------------------------------------------------------
                 if (create_polling_1ms(worker_ctx, &session->heartbeat, retry_timer_interval) != SUCCESS) {
-                    CLOSE_IPC_PROTOCOL(&received_protocol);
-                    return FAILURE;
-                }
-                double timer_interval = session->heartbeat_interval;
-                if (create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd, timer_interval) != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
                     return FAILURE;
                 }

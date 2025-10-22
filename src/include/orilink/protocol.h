@@ -289,7 +289,6 @@ status_t orilink_read_header(
 );
 status_t udp_data_to_orilink_raw_protocol_packet(const char *label, ipc_udp_data_t *iudp_datai, orilink_raw_protocol_t *oudp_datao);
 status_t orilink_check_mac(const char *label, uint8_t* key_mac, orilink_raw_protocol_t *r);
-status_t orilink_check_ctr(const char *label, uint8_t* key_aes, uint32_t* ctr, orilink_raw_protocol_t *r);
 orilink_protocol_t_status_t orilink_deserialize(const char *label, uint8_t *key_aes, uint8_t *nonce, uint32_t *ctr, uint8_t* buffer, size_t len);
 
 #endif

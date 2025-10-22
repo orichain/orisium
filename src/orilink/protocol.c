@@ -400,29 +400,31 @@ inline ssize_t_status_t orilink_serialize(const char *label, uint8_t* key_aes, u
         ) != 0
     )
     {
-        const size_t header_offset = AES_TAG_BYTES;
-        const size_t header_len = sizeof(uint32_t) +
-                                  ORILINK_VERSION_BYTES +
-                                  sizeof(uint8_t) +
-                                  sizeof(uint8_t) +
-                                  sizeof(uint8_t);
-        uint8_t *header = current_buffer + header_offset;
-        uint8_t *encrypted_header = current_buffer + header_offset;
-        if (encrypt_decrypt_128(
-                label,
-                key_mac,
-                nonce,
-                ctr,
-                header,
-                encrypted_header,
-                header_len
-            ) != SUCCESS
-        )
-        {
-            free(key0);
-            result.status = FAILURE;
-            return result;
-        }
+        #if defined(ORILINK_DECRYPT_HEADER)
+            const size_t header_offset = AES_TAG_BYTES;
+            const size_t header_len = sizeof(uint32_t) +
+                                      ORILINK_VERSION_BYTES +
+                                      sizeof(uint8_t) +
+                                      sizeof(uint8_t) +
+                                      sizeof(uint8_t);
+            uint8_t *header = current_buffer + header_offset;
+            uint8_t *encrypted_header = current_buffer + header_offset;
+            if (encrypt_decrypt_128(
+                    label,
+                    key_mac,
+                    nonce,
+                    ctr,
+                    header,
+                    encrypted_header,
+                    header_len
+                ) != SUCCESS
+            )
+            {
+                free(key0);
+                result.status = FAILURE;
+                return result;
+            }
+        #endif
         const size_t data_4mac_offset = AES_TAG_BYTES;
         const size_t data_4mac_len = offset - AES_TAG_BYTES;
         uint8_t *data_4mac = current_buffer + data_4mac_offset;
@@ -947,25 +949,6 @@ inline status_t orilink_check_mac(const char *label, uint8_t* key_mac, orilink_r
     return SUCCESS;
 }
 
-inline status_t orilink_check_ctr(const char *label, uint8_t* key_aes, uint32_t* ctr, orilink_raw_protocol_t *r) {
-    uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
-    if (memcmp(
-            key_aes, 
-            key0, 
-            HASHES_BYTES
-        ) != 0
-    )
-    {
-        if (r->ctr != *(uint32_t *)ctr) {
-            LOG_ERROR("%sOrilink Counter not match. Protocol %d, data_ctr: %u, *ctr: %u", label, r->type, r->ctr, *(uint32_t *)ctr);
-            free(key0);
-            return FAILURE_CTRMSMTCH;
-        }
-    }
-    free(key0);
-    return SUCCESS;
-}
-
 inline status_t orilink_read_header(
     const char *label,
     uint8_t* key_mac, 
@@ -977,38 +960,40 @@ inline status_t orilink_read_header(
     size_t current_offset = 0;
     size_t total_buffer_len = (size_t)r->n;
     uint8_t *cursor = r->recv_buffer + current_offset;
-    uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
-    if (memcmp(
-            key_mac, 
-            key0, 
-            HASHES_BYTES
-        ) != 0
-    )
-    {
-        const size_t header_offset = AES_TAG_BYTES;
-        const size_t header_len = sizeof(uint32_t) +
-                                  ORILINK_VERSION_BYTES +
-                                  sizeof(uint8_t) +
-                                  sizeof(uint8_t) +
-                                  sizeof(uint8_t);
-        uint8_t *header = cursor + header_offset;
-        uint8_t *decripted_header = cursor + header_offset;
-        if (encrypt_decrypt_128(
-                label,
-                key_mac,
-                nonce,
-                ctr,
-                header,
-                decripted_header,
-                header_len
-            ) != SUCCESS
+    #if defined(ORILINK_DECRYPT_HEADER)
+        uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
+        if (memcmp(
+                key_mac, 
+                key0, 
+                HASHES_BYTES
+            ) != 0
         )
         {
-            free(key0);
-            return FAILURE;
+            const size_t header_offset = AES_TAG_BYTES;
+            const size_t header_len = sizeof(uint32_t) +
+                                      ORILINK_VERSION_BYTES +
+                                      sizeof(uint8_t) +
+                                      sizeof(uint8_t) +
+                                      sizeof(uint8_t);
+            uint8_t *header = cursor + header_offset;
+            uint8_t *decripted_header = cursor + header_offset;
+            if (encrypt_decrypt_128(
+                    label,
+                    key_mac,
+                    nonce,
+                    ctr,
+                    header,
+                    decripted_header,
+                    header_len
+                ) != SUCCESS
+            )
+            {
+                free(key0);
+                return FAILURE;
+            }
         }
-    }
-    free(key0);
+        free(key0);
+    #endif
 //----------------------------------------------------------------------    
 // Mac
 //----------------------------------------------------------------------    
