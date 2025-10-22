@@ -151,6 +151,12 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
     }
+    if (current_time.r_uint64_t < session->heartbeat.ack_rcvd_time) {
+        printf("%s????????. Current Time %" PRIu64 ", Last Rcvd Time %" PRIu64 "\n", worker_ctx->label, current_time.r_uint64_t, session->heartbeat.ack_rcvd_time);
+        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+        return FAILURE;
+    }
     uint64_t hb_time_from_last_ack_rcvd = current_time.r_uint64_t - session->heartbeat.ack_rcvd_time;
     printf("%sInterval From Last Ack Received %" PRIu64 "\n", worker_ctx->label, hb_time_from_last_ack_rcvd);
     if (hb_time_from_last_ack_rcvd < (uint64_t)1000000) {
