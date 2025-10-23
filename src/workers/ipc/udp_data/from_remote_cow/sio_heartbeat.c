@@ -114,8 +114,13 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
                     return FAILURE;
                 }
             }
-            LOG_DEVEL_DEBUG("%sHeartbeat From Peer's Retry Timer", worker_ctx->label);
-            from_retry_timer = true;
+            if (session->heartbeat_ack.ack_sent_try_count == 0x00) {
+                LOG_DEVEL_DEBUG("%sHeartbeat From Peer's Retry Timer", worker_ctx->label);
+                from_retry_timer = true;
+            } else {
+                LOG_DEVEL_DEBUG("%sRetry With Same Counter", worker_ctx->label);
+                isretry = true;
+            }
         }
 //----------------------------------------------------------------------
         if (session->heartbeat_cnt == 0x01) {
@@ -232,7 +237,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         return FAILURE;
     }
     uint64_t hb_time_from_last_ack_rcvd = current_time.r_uint64_t - session->heartbeat.ack_rcvd_time;
-    printf("%sInterval From Last Ack Received %" PRIu64 "\n", worker_ctx->label, hb_time_from_last_ack_rcvd);
+    //printf("%sInterval From Last Ack Received %" PRIu64 "\n", worker_ctx->label, hb_time_from_last_ack_rcvd);
     if (hb_time_from_last_ack_rcvd < (uint64_t)1000000) {
         LOG_ERROR("%sNeed Minimal 1ms Delay For New Hearbeat.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);

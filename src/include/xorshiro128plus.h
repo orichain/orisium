@@ -56,6 +56,14 @@ static inline uint8_t _next_xoroshiro128plus_uint8(void) {
     return result_byte;
 }
 
-void generate_fast_salt(uint8_t *buffer, size_t len);
+static inline void generate_fast_salt(uint8_t *buffer, size_t len) {
+    size_t i = 0;
+    while (i < len) {
+        uint64_t random_val = _next_xoroshiro128plus();
+        size_t bytes_to_copy = (len - i > 8) ? 8 : (len - i);
+        memcpy(&buffer[i], &random_val, bytes_to_copy);
+        i += bytes_to_copy;
+    }
+}
 
 #endif
