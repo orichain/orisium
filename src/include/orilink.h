@@ -32,7 +32,6 @@
 #include "constants.h"
 #include "pqc.h"
 #include "xorshiro128plus.h"
-#include "globals.h"
 
 static inline size_t calculate_orilink_payload_fixed_size(const char *label, orilink_protocol_type_t type, bool plus_header) {
 	size_t payload_fixed_size = 0;

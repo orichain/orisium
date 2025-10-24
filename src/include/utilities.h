@@ -210,16 +210,6 @@ static inline status_t compare_mac(
     return SUCCESS;
 }
 
-static inline bool is_same_ctr(uint32_t *ctr1, uint8_t *nonce1, uint32_t *ctr2, uint8_t *nonce2) {
-    if (*ctr1 != *ctr2) {
-        return false;
-    }
-    if (memcmp(nonce1, nonce2, AES_NONCE_BYTES) != 0) {
-        return false;
-    }
-    return true;
-}
-
 static inline void decrement_ctr(uint32_t *ctr, uint8_t *nonce) {
     if (*ctr == 0) {
         *ctr = 0xFFFFFFFFUL;

@@ -172,21 +172,6 @@ void run_logic_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_
 void run_cow_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
 void run_dbr_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
 void run_dbw_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd);
-status_t retry_control_packet(
-    worker_context_t *worker_ctx, 
-    orilink_identity_t *identity, 
-    orilink_security_t *security, 
-    control_packet_t *control_packet,
-    orilink_protocol_type_t orilink_protocol,
-    bool lower_counter
-);
-status_t retry_control_packet_ack(
-    worker_context_t *worker_ctx, 
-    orilink_identity_t *identity, 
-    orilink_security_t *security, 
-    control_packet_ack_t *control_packet_ack,
-    orilink_protocol_type_t orilink_protocol
-);
 
 static inline void initialize_node_metrics(const char *label, node_metrics_t* metrics) {
     uint64_t_status_t rt = get_monotonic_time_ns(label);

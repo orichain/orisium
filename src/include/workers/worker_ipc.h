@@ -4,7 +4,6 @@
 #include <endian.h>
 #include <errno.h>
 #include <inttypes.h>
-#include <math.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,7 +36,7 @@
 #include "utilities.h"
 #include "workers/polling.h"
 #include "workers/workers.h"
-#include "globals.h"
+#include "xorshiro128plus.h"
 
 static inline status_t worker_master_heartbeat(worker_context_t *ctx, double new_heartbeat_interval_double) {
 	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_master_heartbeat(
@@ -143,7 +142,7 @@ static inline status_t worker_master_hello2(worker_context_t *ctx, uint8_t encry
     return SUCCESS;
 }
 
-static inline status_t worker_master_udp_data(
+static inline status_t worker_master_udp_data_ack_send_ipc(
     const char *label, 
     worker_context_t *worker_ctx, 
     worker_type_t wot, 
@@ -152,8 +151,7 @@ static inline status_t worker_master_udp_data(
     uint8_t orilink_protocol, 
     uint8_t trycount,
     struct sockaddr_in6 *addr,
-    puint8_t_size_t_status_t *r,
-    control_packet_t *h
+    control_packet_ack_t *h
 ) 
 {
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data(
@@ -164,53 +162,34 @@ static inline status_t worker_master_udp_data(
         orilink_protocol,
         trycount,
         addr,
-        r->r_size_t,
-        r->r_puint8_t
+        h->len,
+        h->data
     );
     if (cmd_result.status != SUCCESS) {
-        memset(r->r_puint8_t, 0, r->r_size_t);
-        free(r->r_puint8_t);
-        r->r_puint8_t = NULL;
-        r->r_size_t = 0;
+        memset(h->data, 0, h->len);
+        free(h->data);
+        h->data = NULL;
+        h->len = 0;
         return FAILURE;
     }
     if (worker_ctx->is_rekeying) {
         uint64_t queue_id;
         if (generate_uint64_t_id(worker_ctx->label, &queue_id) != SUCCESS) {
-            memset(r->r_puint8_t, 0, r->r_size_t);
-            free(r->r_puint8_t);
-            r->r_puint8_t = NULL;
-            r->r_size_t = 0;
+            memset(h->data, 0, h->len);
+            free(h->data);
+            h->data = NULL;
+            h->len = 0;
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
         if (ipc_add_protocol_queue(worker_ctx->label, queue_id, *worker_ctx->wot, *worker_ctx->index, worker_ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &worker_ctx->rekeying_queue) != SUCCESS) {
-            memset(r->r_puint8_t, 0, r->r_size_t);
-            free(r->r_puint8_t);
-            r->r_puint8_t = NULL;
-            r->r_size_t = 0;
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
-            return FAILURE;
-        }
-//======================================================================
-        if (h->data) {
             memset(h->data, 0, h->len);
             free(h->data);
             h->data = NULL;
-            h->len = (uint16_t)0;
+            h->len = 0;
+            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+            return FAILURE;
         }
-        h->len = r->r_size_t;
-        h->data = r->r_puint8_t;
-        r->r_puint8_t = NULL;
-        r->r_size_t = 0;
-//======================================================================
-        //h->len = r->r_size_t;
-        //h->data = (uint8_t *)calloc(1, r->r_size_t);
-        //memcpy(h->data, r->r_puint8_t, h->len);
-        //memset(r->r_puint8_t, 0, r->r_size_t);
-        //free(r->r_puint8_t);
-        //r->r_puint8_t = NULL;
-        //r->r_size_t = 0;
     } else {
         ssize_t_status_t send_result = send_ipc_protocol_message(
             worker_ctx->label,
@@ -223,36 +202,149 @@ static inline status_t worker_master_udp_data(
         );
         if (send_result.status != SUCCESS) {
             LOG_ERROR("%sFailed to sent udp_data to Master.", worker_ctx->label);
-            free(r->r_puint8_t);
-            r->r_puint8_t = NULL;
-            r->r_size_t = 0;
+            free(h->data);
+            h->data = NULL;
+            h->len = 0;
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
             return send_result.status;
         } else {
             LOG_DEBUG("%sSent udp_data to Master.", worker_ctx->label);
         }
-//======================================================================
-        if (h->data) {
-            memset(h->data, 0, h->len);
-            free(h->data);
-            h->data = NULL;
-            h->len = (uint16_t)0;
-        }
-        h->len = r->r_size_t;
-        h->data = r->r_puint8_t;
-        r->r_puint8_t = NULL;
-        r->r_size_t = 0;
-//======================================================================
-        //h->len = r->r_size_t;
-        //h->data = (uint8_t *)calloc(1, r->r_size_t);
-        //memcpy(h->data, r->r_puint8_t, h->len);
-        //memset(r->r_puint8_t, 0, r->r_size_t);
-        //free(r->r_puint8_t);
-        //r->r_puint8_t = NULL;
-        //r->r_size_t = 0;
         CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
     }
     return SUCCESS;
+}
+
+static inline status_t worker_master_udp_data_send_ipc(
+    const char *label, 
+    worker_context_t *worker_ctx, 
+    worker_type_t wot, 
+    uint8_t index,
+    uint8_t session_index,
+    uint8_t orilink_protocol, 
+    uint8_t trycount,
+    struct sockaddr_in6 *addr,
+    control_packet_t *h
+) 
+{
+    ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data(
+        label,
+        wot,
+        index,
+        session_index,
+        orilink_protocol,
+        trycount,
+        addr,
+        h->len,
+        h->data
+    );
+    if (cmd_result.status != SUCCESS) {
+        memset(h->data, 0, h->len);
+        free(h->data);
+        h->data = NULL;
+        h->len = 0;
+        return FAILURE;
+    }
+    if (worker_ctx->is_rekeying) {
+        uint64_t queue_id;
+        if (generate_uint64_t_id(worker_ctx->label, &queue_id) != SUCCESS) {
+            memset(h->data, 0, h->len);
+            free(h->data);
+            h->data = NULL;
+            h->len = 0;
+            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+            return FAILURE;
+        }
+        if (ipc_add_protocol_queue(worker_ctx->label, queue_id, *worker_ctx->wot, *worker_ctx->index, worker_ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &worker_ctx->rekeying_queue) != SUCCESS) {
+            memset(h->data, 0, h->len);
+            free(h->data);
+            h->data = NULL;
+            h->len = 0;
+            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+            return FAILURE;
+        }
+    } else {
+        ssize_t_status_t send_result = send_ipc_protocol_message(
+            worker_ctx->label,
+            worker_ctx->aes_key,
+            worker_ctx->mac_key,
+            worker_ctx->local_nonce,
+            &worker_ctx->local_ctr,
+            worker_ctx->master_uds_fd, 
+            cmd_result.r_ipc_protocol_t
+        );
+        if (send_result.status != SUCCESS) {
+            LOG_ERROR("%sFailed to sent udp_data to Master.", worker_ctx->label);
+            free(h->data);
+            h->data = NULL;
+            h->len = 0;
+            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+            return send_result.status;
+        } else {
+            LOG_DEBUG("%sSent udp_data to Master.", worker_ctx->label);
+        }
+        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+    }
+    return SUCCESS;
+}
+
+static inline status_t worker_master_udp_data(
+    const char *label, 
+    worker_context_t *worker_ctx, 
+    worker_type_t wot, 
+    uint8_t index,
+    uint8_t session_index,
+    uint8_t orilink_protocol, 
+    uint8_t trycount,
+    struct sockaddr_in6 *addr,
+    puint8_t_size_t_status_t *r,
+    control_packet_t *h,
+    uint8_t* key_mac,
+    uint8_t *nonce,
+    uint32_t *ctr
+) 
+{
+    if (h->data != NULL) {
+        switch ((orilink_protocol_type_t)orilink_protocol) {
+            case ORILINK_HELLO1:
+            case ORILINK_HELLO2:
+            case ORILINK_HELLO3:
+            case ORILINK_HELLO4: {
+                memset(h->data, 0, h->len);
+                free(h->data);
+                break;
+            }
+            default: {
+                bool _1l_ = is_1lower_ctr(label, r->r_puint8_t, key_mac, nonce, ctr);
+                if (_1l_) {
+                    memset(h->data, 0, h->len);
+                    free(h->data);
+                } else {
+                    printf("%sError. Trying To Send Data With Invalid Counter\n", label);
+                    memset(r->r_puint8_t, 0, r->r_size_t);
+                    free(r->r_puint8_t);
+                    r->r_puint8_t = NULL;
+                    r->r_size_t = 0;
+                    return FAILURE;
+                }
+            }
+        }
+    }
+    h->len = r->r_size_t;
+    h->data = r->r_puint8_t;
+    r->r_puint8_t = NULL;
+    r->r_size_t = 0;
+    return worker_master_udp_data_send_ipc(
+        label,
+        worker_ctx,
+        wot,
+        index,
+        session_index,
+        orilink_protocol,
+        trycount,
+        addr,
+        h
+    );
 }
 
 static inline status_t worker_master_udp_data_ack(
@@ -265,107 +357,53 @@ static inline status_t worker_master_udp_data_ack(
     uint8_t trycount,
     struct sockaddr_in6 *addr,
     puint8_t_size_t_status_t *r,
-    control_packet_ack_t *h
+    control_packet_ack_t *h,
+    uint8_t* key_mac,
+    uint8_t *nonce,
+    uint32_t *ctr
 ) 
 {
-    ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data(
+    if (h->data != NULL) {
+        switch ((orilink_protocol_type_t)orilink_protocol) {
+            case ORILINK_HELLO1_ACK:
+            case ORILINK_HELLO2_ACK:
+            case ORILINK_HELLO3_ACK:
+            case ORILINK_HELLO4_ACK: {
+                memset(h->data, 0, h->len);
+                free(h->data);
+                break;
+            }
+            default: {
+                bool _1l_ = is_1lower_ctr(label, r->r_puint8_t, key_mac, nonce, ctr);
+                if (_1l_) {
+                    memset(h->data, 0, h->len);
+                    free(h->data);
+                } else {
+                    printf("%sError. Trying To Send Data With Invalid Counter\n", label);
+                    memset(r->r_puint8_t, 0, r->r_size_t);
+                    free(r->r_puint8_t);
+                    r->r_puint8_t = NULL;
+                    r->r_size_t = 0;
+                    return FAILURE;
+                }
+            }
+        }
+    }
+    h->len = r->r_size_t;
+    h->data = r->r_puint8_t;
+    r->r_puint8_t = NULL;
+    r->r_size_t = 0;
+    return worker_master_udp_data_ack_send_ipc(
         label,
+        worker_ctx,
         wot,
         index,
         session_index,
         orilink_protocol,
         trycount,
         addr,
-        r->r_size_t,
-        r->r_puint8_t
+        h
     );
-    if (cmd_result.status != SUCCESS) {
-        memset(r->r_puint8_t, 0, r->r_size_t);
-        free(r->r_puint8_t);
-        r->r_puint8_t = NULL;
-        r->r_size_t = 0;
-        return FAILURE;
-    }
-    if (worker_ctx->is_rekeying) {
-        uint64_t queue_id;
-        if (generate_uint64_t_id(worker_ctx->label, &queue_id) != SUCCESS) {
-            memset(r->r_puint8_t, 0, r->r_size_t);
-            free(r->r_puint8_t);
-            r->r_puint8_t = NULL;
-            r->r_size_t = 0;
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
-            return FAILURE;
-        }
-        if (ipc_add_protocol_queue(worker_ctx->label, queue_id, *worker_ctx->wot, *worker_ctx->index, worker_ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &worker_ctx->rekeying_queue) != SUCCESS) {
-            memset(r->r_puint8_t, 0, r->r_size_t);
-            free(r->r_puint8_t);
-            r->r_puint8_t = NULL;
-            r->r_size_t = 0;
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
-            return FAILURE;
-        }
-//======================================================================
-        if (h->data) {
-            memset(h->data, 0, h->len);
-            free(h->data);
-            h->data = NULL;
-            h->len = (uint16_t)0;
-        }
-        h->len = r->r_size_t;
-        h->data = r->r_puint8_t;
-        r->r_puint8_t = NULL;
-        r->r_size_t = 0;
-//======================================================================
-        //h->len = r->r_size_t;
-        //h->data = (uint8_t *)calloc(1, r->r_size_t);
-        //memcpy(h->data, r->r_puint8_t, h->len);
-        //memset(r->r_puint8_t, 0, r->r_size_t);
-        //free(r->r_puint8_t);
-        //r->r_puint8_t = NULL;
-        //r->r_size_t = 0;
-    } else {
-        ssize_t_status_t send_result = send_ipc_protocol_message(
-            worker_ctx->label,
-            worker_ctx->aes_key,
-            worker_ctx->mac_key,
-            worker_ctx->local_nonce,
-            &worker_ctx->local_ctr,
-            worker_ctx->master_uds_fd, 
-            cmd_result.r_ipc_protocol_t
-        );
-        if (send_result.status != SUCCESS) {
-            LOG_ERROR("%sFailed to sent udp_data to Master.", worker_ctx->label);
-            memset(r->r_puint8_t, 0, r->r_size_t);
-            free(r->r_puint8_t);
-            r->r_puint8_t = NULL;
-            r->r_size_t = 0;
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
-            return send_result.status;
-        } else {
-            LOG_DEBUG("%sSent udp_data to Master.", worker_ctx->label);
-        }
-//======================================================================
-        if (h->data) {
-            memset(h->data, 0, h->len);
-            free(h->data);
-            h->data = NULL;
-            h->len = (uint16_t)0;
-        }
-        h->len = r->r_size_t;
-        h->data = r->r_puint8_t;
-        r->r_puint8_t = NULL;
-        r->r_size_t = 0;
-//======================================================================
-        //h->len = r->r_size_t;
-        //h->data = (uint8_t *)calloc(1, r->r_size_t);
-        //memcpy(h->data, r->r_puint8_t, h->len);
-        //memset(r->r_puint8_t, 0, r->r_size_t);
-        //free(r->r_puint8_t);
-        //r->r_puint8_t = NULL;
-        //r->r_size_t = 0;
-        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
-    }
-    return SUCCESS;
 }
 
 static inline status_t worker_master_task_info(worker_context_t *ctx, uint8_t session_index, task_info_type_t flag) {
@@ -577,7 +615,10 @@ static inline status_t handle_workers_ipc_cow_connect(worker_context_t *worker_c
             session->hello1.sent_try_count,
             &identity->remote_addr, 
             &udp_data, 
-            &session->hello1
+            &session->hello1,
+            security->mac_key,
+            security->local_nonce,
+            &security->local_ctr
         ) != SUCCESS
     )
     {
@@ -866,9 +907,7 @@ static inline status_t first_heartbeat_finalization(worker_context_t *worker_ctx
 			calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
 		}
 		double rtt_value = (double)interval_ull;
-        double crvp =  session->retry.value_prediction;
-        if (crvp == (double)0) crvp = (double)1000000000;
-        if (rtt_value <= (double)MAX_RETRY_CNT * crvp) {
+        if (rtt_value <= (double)MAX_RETRY_CNT * session->retry.value_prediction) {
             calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
         } else {
             double try_count = (double)1;
@@ -1015,9 +1054,7 @@ static inline status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_cont
     session->heartbeat.ack_rcvd_time = current_time.r_uint64_t;
     uint64_t interval_ull = session->heartbeat.ack_rcvd_time - session->heartbeat.sent_time;
     double rtt_value = (double)interval_ull;
-    double crvp =  session->retry.value_prediction;
-    if (crvp == (double)0) crvp = (double)1000000000;
-    if (rtt_value <= (double)MAX_RETRY_CNT * crvp) {
+    if (rtt_value <= (double)MAX_RETRY_CNT * session->retry.value_prediction) {
         calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     } else {
         double try_count = (double)1;
@@ -1035,6 +1072,166 @@ static inline status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_cont
     //session->metrics.count_ack += (double)1;
     //session->metrics.sum_hb_interval += session->heartbeat_interval;
     //session->metrics.hb_interval = session->heartbeat_interval;
+//======================================================================
+    return SUCCESS;
+}
+
+static inline status_t retry_control_packet_ack(
+    worker_context_t *worker_ctx, 
+    orilink_identity_t *identity, 
+    orilink_security_t *security, 
+    control_packet_ack_t *control_packet_ack,
+    orilink_protocol_type_t orilink_protocol
+)
+{
+//======================================================================
+// Initalize Or FAILURE Now
+//----------------------------------------------------------------------
+    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
+    if (current_time.status != SUCCESS) {
+        memset(control_packet_ack->data, 0, control_packet_ack->len);
+        free(control_packet_ack->data);
+        return FAILURE;
+    }
+    control_packet_ack->ack_sent_try_count++;
+    control_packet_ack->ack_sent_time = current_time.r_uint64_t;
+//----------------------------------------------------------------------
+// Update trycount
+//----------------------------------------------------------------------
+    const size_t trycount_offset = AES_TAG_BYTES +
+                                   sizeof(uint32_t) +
+                                   ORILINK_VERSION_BYTES +
+                                   
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   
+                                   sizeof(uint64_t) +
+                                   
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t);
+    memcpy(control_packet_ack->data + trycount_offset, &control_packet_ack->ack_sent_try_count, sizeof(uint8_t));
+    uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
+    if (memcmp(
+            security->mac_key, 
+            key0, 
+            HASHES_BYTES
+        ) != 0
+    )
+    {
+        const size_t data_4mac_offset = AES_TAG_BYTES;
+        size_t data_4mac_len = control_packet_ack->len - AES_TAG_BYTES;
+        uint8_t *data_4mac = control_packet_ack->data + data_4mac_offset;
+        uint8_t mac[AES_TAG_BYTES];
+        calculate_mac(security->mac_key, data_4mac, mac, data_4mac_len);
+        memcpy(control_packet_ack->data, mac, AES_TAG_BYTES);
+    } else {
+        uint8_t rendom_mac[AES_TAG_BYTES];
+        generate_fast_salt(rendom_mac, AES_TAG_BYTES);
+        memcpy(control_packet_ack->data, rendom_mac, AES_TAG_BYTES);
+    }
+    free(key0);
+//----------------------------------------------------------------------
+    if (worker_master_udp_data_ack_send_ipc(
+            worker_ctx->label, 
+            worker_ctx, 
+            identity->local_wot, 
+            identity->local_index, 
+            identity->local_session_index, 
+            (uint8_t)orilink_protocol,
+            control_packet_ack->ack_sent_try_count,
+            &identity->remote_addr, 
+            control_packet_ack
+        ) != SUCCESS
+    )
+    {
+        memset(control_packet_ack->data, 0, control_packet_ack->len);
+        free(control_packet_ack->data);
+        return FAILURE;
+    }
+//======================================================================
+    return SUCCESS;
+}
+
+static inline status_t retry_control_packet(
+    worker_context_t *worker_ctx, 
+    orilink_identity_t *identity, 
+    orilink_security_t *security, 
+    control_packet_t *control_packet,
+    orilink_protocol_type_t orilink_protocol
+)
+{
+//======================================================================
+// Initalize Or FAILURE Now
+//----------------------------------------------------------------------
+    uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
+    if (current_time.status != SUCCESS) {
+        memset(control_packet->data, 0, control_packet->len);
+        free(control_packet->data);
+        return FAILURE;
+    }
+    control_packet->sent_try_count++;
+    control_packet->sent_time = current_time.r_uint64_t;
+//----------------------------------------------------------------------
+// Update trycount
+//----------------------------------------------------------------------
+    const size_t trycount_offset = AES_TAG_BYTES +
+                                   sizeof(uint32_t) +
+                                   ORILINK_VERSION_BYTES +
+                                   
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   
+                                   sizeof(uint64_t) +
+                                   
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t) +
+                                   sizeof(uint8_t);
+    memcpy(control_packet->data + trycount_offset, &control_packet->sent_try_count, sizeof(uint8_t));
+    uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
+    if (memcmp(
+            security->mac_key, 
+            key0, 
+            HASHES_BYTES
+        ) != 0
+    )
+    {
+        const size_t data_4mac_offset = AES_TAG_BYTES;
+        size_t data_4mac_len = control_packet->len - AES_TAG_BYTES;
+        uint8_t *data_4mac = control_packet->data + data_4mac_offset;
+        uint8_t mac[AES_TAG_BYTES];
+        calculate_mac(security->mac_key, data_4mac, mac, data_4mac_len);
+        memcpy(control_packet->data, mac, AES_TAG_BYTES);
+    } else {
+        uint8_t rendom_mac[AES_TAG_BYTES];
+        generate_fast_salt(rendom_mac, AES_TAG_BYTES);
+        memcpy(control_packet->data, rendom_mac, AES_TAG_BYTES);
+    }
+    free(key0);
+//----------------------------------------------------------------------    
+    if (worker_master_udp_data_send_ipc(
+            worker_ctx->label, 
+            worker_ctx, 
+            identity->local_wot, 
+            identity->local_index, 
+            identity->local_session_index, 
+            (uint8_t)orilink_protocol,
+            control_packet->sent_try_count,
+            &identity->remote_addr, 
+            control_packet
+        ) != SUCCESS
+    )
+    {
+        memset(control_packet->data, 0, control_packet->len);
+        free(control_packet->data);
+        return FAILURE;
+    }
 //======================================================================
     return SUCCESS;
 }
@@ -1279,9 +1476,6 @@ static inline status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_
     if (orilink_cmd_result.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
         LOG_ERROR("%sError orilink_prepare_cmd_heartbeat_ack.", worker_ctx->label);
         return FAILURE;
     }
@@ -1310,7 +1504,7 @@ static inline status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_
 //======================================================================
 // Test Packet Dropped
 //======================================================================
-    //session->test_drop_heartbeat_ack++;
+    session->test_drop_heartbeat_ack++;
     if (
         session->test_drop_heartbeat_ack == 1 ||
         session->test_drop_heartbeat_ack == 3 ||
@@ -1331,7 +1525,10 @@ static inline status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_
                 session->heartbeat_ack.ack_sent_try_count,
                 &fake_addr, 
                 &udp_data, 
-                &session->heartbeat_ack
+                &session->heartbeat_ack,
+                security->mac_key,
+                security->local_nonce,
+                &security->local_ctr
             ) != SUCCESS
         )
         {
@@ -1363,7 +1560,10 @@ static inline status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_
                 session->heartbeat_ack.ack_sent_try_count,
                 remote_addr, 
                 &udp_data, 
-                &session->heartbeat_ack
+                &session->heartbeat_ack,
+                security->mac_key,
+                security->local_nonce,
+                &security->local_ctr
             ) != SUCCESS
         )
         {
@@ -1783,7 +1983,7 @@ static inline status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *
 //======================================================================
 // Test Packet Dropped
 //======================================================================
-    //session->test_drop_hello4_ack++;
+    session->test_drop_hello4_ack++;
     if (
         session->test_drop_hello4_ack == 1
     )
@@ -1801,7 +2001,10 @@ static inline status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *
                 session->hello4_ack.ack_sent_try_count,
                 &fake_addr, 
                 &udp_data, 
-                &session->hello4_ack
+                &session->hello4_ack,
+                security->mac_key,
+                security->local_nonce,
+                &security->local_ctr
             ) != SUCCESS
         )
         {
@@ -1826,7 +2029,10 @@ static inline status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *
                 session->hello4_ack.ack_sent_try_count,
                 remote_addr, 
                 &udp_data, 
-                &session->hello4_ack
+                &session->hello4_ack,
+                security->mac_key,
+                security->local_nonce,
+                &security->local_ctr
             ) != SUCCESS
         )
         {
@@ -1868,9 +2074,7 @@ static inline status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *
         calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
     }
     double rtt_value = (double)interval_ull;
-    double crvp =  session->retry.value_prediction;
-    if (crvp == (double)0) crvp = (double)1000000000;
-    if (rtt_value <= (double)MAX_RETRY_CNT * crvp) {
+    if (rtt_value <= (double)MAX_RETRY_CNT * session->retry.value_prediction) {
         calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     } else {
         double try_count = (double)1;
@@ -2052,7 +2256,7 @@ static inline status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *
 //======================================================================
 // Test Packet Dropped
 //======================================================================
-    //session->test_drop_hello3_ack++;
+    session->test_drop_hello3_ack++;
     if (
         session->test_drop_hello3_ack == 1
     )
@@ -2070,7 +2274,10 @@ static inline status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *
                 session->hello3_ack.ack_sent_try_count,
                 &fake_addr, 
                 &udp_data, 
-                &session->hello3_ack
+                &session->hello3_ack,
+                security->mac_key,
+                security->local_nonce,
+                &security->local_ctr
             ) != SUCCESS
         )
         {
@@ -2095,7 +2302,10 @@ static inline status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *
                 session->hello3_ack.ack_sent_try_count,
                 remote_addr, 
                 &udp_data, 
-                &session->hello3_ack
+                &session->hello3_ack,
+                security->mac_key,
+                security->local_nonce,
+                &security->local_ctr
             ) != SUCCESS
         )
         {
@@ -2143,9 +2353,7 @@ static inline status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *
         calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
     }
     double rtt_value = (double)interval_ull;
-    double crvp =  session->retry.value_prediction;
-    if (crvp == (double)0) crvp = (double)1000000000;
-    if (rtt_value <= (double)MAX_RETRY_CNT * crvp) {
+    if (rtt_value <= (double)MAX_RETRY_CNT * session->retry.value_prediction) {
         calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     } else {
         double try_count = (double)1;
@@ -2315,7 +2523,7 @@ static inline status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *
 //======================================================================
 // Test Packet Dropped
 //======================================================================
-    //session->test_drop_hello2_ack++;
+    session->test_drop_hello2_ack++;
     if (
         session->test_drop_hello2_ack == 1
     )
@@ -2333,7 +2541,10 @@ static inline status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *
                 session->hello2_ack.ack_sent_try_count,
                 &fake_addr, 
                 &udp_data, 
-                &session->hello2_ack
+                &session->hello2_ack,
+                security->mac_key,
+                security->local_nonce,
+                &security->local_ctr
             ) != SUCCESS
         )
         {
@@ -2358,7 +2569,10 @@ static inline status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *
                 session->hello2_ack.ack_sent_try_count,
                 remote_addr,
                 &udp_data, 
-                &session->hello2_ack
+                &session->hello2_ack,
+                security->mac_key,
+                security->local_nonce,
+                &security->local_ctr
             ) != SUCCESS
         )
         {
@@ -2399,14 +2613,7 @@ static inline status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *
         calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
     }
     double rtt_value = (double)interval_ull;
-    double crvp =  session->retry.value_prediction;
-    if (crvp == (double)0) crvp = (double)1000000000;
-    if (rtt_value <= (double)MAX_RETRY_CNT * crvp) {
-        calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-    } else {
-        double try_count = (double)1;
-        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
-    }
+    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     printf("%sRTT Hello-1 Ack = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
 //======================================================================
     session->hello2_ack.ack_sent = true;
@@ -2547,7 +2754,7 @@ static inline status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *
 //======================================================================
 // Test Packet Dropped
 //======================================================================
-    //session->test_drop_hello1_ack++;
+    session->test_drop_hello1_ack++;
     if (
         session->test_drop_hello1_ack == 1
     )
@@ -2565,7 +2772,10 @@ static inline status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *
                 session->hello1_ack.ack_sent_try_count,
                 &fake_addr, 
                 &udp_data, 
-                &session->hello1_ack
+                &session->hello1_ack,
+                security->mac_key,
+                security->local_nonce,
+                &security->local_ctr
             ) != SUCCESS
         )
         {
@@ -2590,7 +2800,10 @@ static inline status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *
                 session->hello1_ack.ack_sent_try_count,
                 remote_addr, 
                 &udp_data, 
-                &session->hello1_ack
+                &session->hello1_ack,
+                security->mac_key,
+                security->local_nonce,
+                &security->local_ctr
             ) != SUCCESS
         )
         {
@@ -2726,9 +2939,7 @@ static inline status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_cont
     session->heartbeat.ack_rcvd_time = current_time.r_uint64_t;
     uint64_t interval_ull = session->heartbeat.ack_rcvd_time - session->heartbeat.sent_time;
     double rtt_value = (double)interval_ull;
-    double crvp =  session->retry.value_prediction;
-    if (crvp == (double)0) crvp = (double)1000000000;
-    if (rtt_value <= (double)MAX_RETRY_CNT * crvp) {
+    if (rtt_value <= (double)MAX_RETRY_CNT * session->retry.value_prediction) {
         calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     } else {
         double try_count = (double)1;
@@ -2965,9 +3176,6 @@ static inline status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_
     if (orilink_cmd_result.status != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
-        if (inc_ctr != 0xFF) {
-            decrement_ctr(&security->remote_ctr, security->remote_nonce);
-        }
         LOG_ERROR("%sError orilink_prepare_cmd_heartbeat_ack.", worker_ctx->label);
         return FAILURE;
     }
@@ -3017,7 +3225,10 @@ static inline status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_
                 session->heartbeat_ack.ack_sent_try_count,
                 &fake_addr, 
                 &udp_data, 
-                &session->heartbeat_ack
+                &session->heartbeat_ack,
+                security->mac_key,
+                security->local_nonce,
+                &security->local_ctr
             ) != SUCCESS
         )
         {
@@ -3049,7 +3260,10 @@ static inline status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_
                 session->heartbeat_ack.ack_sent_try_count,
                 remote_addr, 
                 &udp_data, 
-                &session->heartbeat_ack
+                &session->heartbeat_ack,
+                security->mac_key,
+                security->local_nonce,
+                &security->local_ctr
             ) != SUCCESS
         )
         {
@@ -3374,7 +3588,10 @@ static inline status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context
             session->heartbeat.sent_try_count,
             remote_addr, 
             &udp_data, 
-            &session->heartbeat
+            &session->heartbeat,
+            security->mac_key,
+            security->local_nonce,
+            &security->local_ctr
         ) != SUCCESS
     )
     {
@@ -3405,9 +3622,7 @@ static inline status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context
     session->hello4.ack_rcvd_time = current_time.r_uint64_t;
     uint64_t interval_ull = session->hello4.ack_rcvd_time - session->hello4.sent_time;
     double rtt_value = (double)interval_ull;
-    double crvp =  session->retry.value_prediction;
-    if (crvp == (double)0) crvp = (double)1000000000;
-    if (rtt_value <= (double)MAX_RETRY_CNT * crvp) {
+    if (rtt_value <= (double)MAX_RETRY_CNT * session->retry.value_prediction) {
         calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     } else {
         double try_count = (double)1;
@@ -3637,7 +3852,10 @@ static inline status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context
             session->hello4.sent_try_count,
             remote_addr, 
             &udp_data, 
-            &session->hello4
+            &session->hello4,
+            security->mac_key,
+            security->local_nonce,
+            &security->local_ctr
         ) != SUCCESS
     )
     {
@@ -3673,9 +3891,7 @@ static inline status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context
     session->hello3.ack_rcvd_time = current_time.r_uint64_t;
     uint64_t interval_ull = session->hello3.ack_rcvd_time - session->hello3.sent_time;
     double rtt_value = (double)interval_ull;
-    double crvp =  session->retry.value_prediction;
-    if (crvp == (double)0) crvp = (double)1000000000;
-    if (rtt_value <= (double)MAX_RETRY_CNT * crvp) {
+    if (rtt_value <= (double)MAX_RETRY_CNT * session->retry.value_prediction) {
         calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     } else {
         double try_count = (double)1;
@@ -3805,7 +4021,10 @@ static inline status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context
             session->hello3.sent_try_count,
             remote_addr, 
             &udp_data, 
-            &session->hello3
+            &session->hello3,
+            security->mac_key,
+            security->local_nonce,
+            &security->local_ctr
         ) != SUCCESS
     )
     {
@@ -3831,9 +4050,7 @@ static inline status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context
     session->hello2.ack_rcvd_time = current_time.r_uint64_t;
     uint64_t interval_ull = session->hello2.ack_rcvd_time - session->hello2.sent_time;
     double rtt_value = (double)interval_ull;
-    double crvp =  session->retry.value_prediction;
-    if (crvp == (double)0) crvp = (double)1000000000;
-    if (rtt_value <= (double)MAX_RETRY_CNT * crvp) {
+    if (rtt_value <= (double)MAX_RETRY_CNT * session->retry.value_prediction) {
         calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     } else {
         double try_count = (double)1;
@@ -3967,7 +4184,10 @@ static inline status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context
             session->hello2.sent_try_count,
             remote_addr, 
             &udp_data, 
-            &session->hello2
+            &session->hello2,
+            security->mac_key,
+            security->local_nonce,
+            &security->local_ctr
         ) != SUCCESS
     )
     {
@@ -3994,14 +4214,7 @@ static inline status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context
     session->hello1.ack_rcvd_time = current_time.r_uint64_t;
     uint64_t interval_ull = session->hello1.ack_rcvd_time - session->hello1.sent_time;
     double rtt_value = (double)interval_ull;
-    double crvp =  session->retry.value_prediction;
-    if (crvp == (double)0) crvp = (double)1000000000;
-    if (rtt_value <= (double)MAX_RETRY_CNT * crvp) {
-        calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-    } else {
-        double try_count = (double)1;
-        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
-    }
+    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
     printf("%sRTT Hello-1 = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
 //======================================================================
     session->hello1.ack_rcvd = true;

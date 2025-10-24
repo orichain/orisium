@@ -1,11 +1,9 @@
 #ifndef WORKERS_TIMERS_H
 #define WORKERS_TIMERS_H
 
-#include <math.h>
 #include <unistd.h>
 #include <inttypes.h>
 #include <stddef.h>
-#include <stdlib.h>
 #include <stdio.h>
 
 #include "types.h"
@@ -61,8 +59,7 @@ static inline status_t retry_transmit(
                     identity, 
                     security, 
                     h,
-                    orilink_protocol,
-                    false
+                    orilink_protocol
                 ) != SUCCESS
             )
             {
@@ -117,8 +114,7 @@ static inline status_t retry_transmit(
                     identity, 
                     security, 
                     h,
-                    orilink_protocol,
-                    false
+                    orilink_protocol
                 ) != SUCCESS
             )
             {
@@ -279,7 +275,10 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
                     session->heartbeat.sent_try_count,
                     &session->identity.remote_addr, 
                     &udp_data, 
-                    &session->heartbeat
+                    &session->heartbeat,
+                    session->security.mac_key,
+                    session->security.local_nonce,
+                    &session->security.local_ctr
                 ) != SUCCESS
             )
             {
@@ -374,7 +373,10 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
                     session->heartbeat.sent_try_count,
                     &session->identity.remote_addr, 
                     &udp_data, 
-                    &session->heartbeat
+                    &session->heartbeat,
+                    session->security.mac_key,
+                    session->security.local_nonce,
+                    &session->security.local_ctr
                 ) != SUCCESS
             )
             {
