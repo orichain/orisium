@@ -12,7 +12,6 @@
 #include "orilink/protocol.h"
 #include "types.h"
 #include "log.h"
-#include "orilink/hello2_ack.h"
 #include "constants.h"
 #include "pqc.h"
 

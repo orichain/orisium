@@ -6,7 +6,7 @@
 #include <inttypes.h>
 
 #include "log.h"
-#include "orilink/protocol.h"
+#include "orilink.h"
 #include "types.h"
 #include "master/udp/socket_udp.h"
 #include "master/master.h"
@@ -16,6 +16,7 @@
 #include "stdbool.h"
 #include "master/ipc/worker_ipc_cmds.h"
 #include "utilities.h"
+#include "orilink/protocol.h"
 
 status_t handle_master_udp_sock_event(const char *label, master_context_t *master_ctx) {
     struct sockaddr_in6 remote_addr;

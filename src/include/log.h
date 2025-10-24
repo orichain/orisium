@@ -1,8 +1,6 @@
 #ifndef LOG_H
 #define LOG_H
 
-#include <stdio.h>
-
 #ifdef PRODUCTION
 	void log_write(const char *level, const char *fmt, ...);
     #ifdef NDEBUG

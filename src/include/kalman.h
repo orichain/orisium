@@ -3,8 +3,11 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "utilities.h"
+#include "constants.h"
+#include "log.h"
 
 typedef struct {
     float process_noise;

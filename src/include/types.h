@@ -1,10 +1,9 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include <stddef.h>
 #include <stdint.h>
-#include <unistd.h>
-#include <netinet/in.h>
-#include "constants.h"
+#include <sys/types.h>
 
 typedef enum {
 //----------------------------------------------------------------------

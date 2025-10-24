@@ -1,18 +1,23 @@
 #ifndef WORKERS_WORKERS_H
 #define WORKERS_WORKERS_H
 
-#include <sys/types.h>
-#include <bits/types/sig_atomic_t.h>
+#include <netinet/in.h>
+#include <signal.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "async.h"
 #include "constants.h"
-#include "types.h"
-#include "node.h"
-#include "pqc.h"
+#include "ipc/protocol.h"
 #include "kalman.h"
+#include "log.h"
 #include "orilink/protocol.h"
+#include "pqc.h"
+#include "stdbool.h"
+#include "types.h"
 #include "utilities.h"
-#include "poly1305-donna.h"
 
 typedef struct {
     double hb_interval;
@@ -72,7 +77,10 @@ typedef struct {
     uint8_t heartbeat_cnt;
     int heartbeat_sender_timer_fd;
     uint16_t heartbeat_sender_polling_1ms_cnt;
+    uint16_t heartbeat_sender_polling_greater_counter_1ms_cnt;
     int heartbeat_openner_timer_fd;
+    bool greater_counter;
+    bool stop_retry;
 //----------------------------------------------------------------------
     int test_drop_hello1_ack;
     int test_drop_hello2_ack;
@@ -112,7 +120,10 @@ typedef struct {
     double heartbeat_interval;
     int heartbeat_sender_timer_fd;
     uint16_t heartbeat_sender_polling_1ms_cnt;
+    uint16_t heartbeat_sender_polling_greater_counter_1ms_cnt;
     int heartbeat_openner_timer_fd;
+    bool greater_counter;
+    bool stop_retry;
 //----------------------------------------------------------------------
     int test_drop_heartbeat_ack;
     int test_double_heartbeat;
@@ -166,7 +177,8 @@ status_t retry_control_packet(
     orilink_identity_t *identity, 
     orilink_security_t *security, 
     control_packet_t *control_packet,
-    orilink_protocol_type_t orilink_protocol
+    orilink_protocol_type_t orilink_protocol,
+    bool lower_counter
 );
 status_t retry_control_packet_ack(
     worker_context_t *worker_ctx, 
@@ -326,7 +338,12 @@ static inline void setup_control_packet_ack(control_packet_ack_t *h) {
 }
 
 static inline status_t setup_cow_session(const char *label, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
+//----------------------------------------------------------------------
+    single_session->greater_counter = false;
+    single_session->stop_retry = false;
+//----------------------------------------------------------------------
     single_session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
+    single_session->heartbeat_sender_polling_greater_counter_1ms_cnt = (uint16_t)0;
 //----------------------------------------------------------------------
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
@@ -376,7 +393,12 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
 }
 
 static inline void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session) {
+//----------------------------------------------------------------------
+    single_session->greater_counter = false;
+    single_session->stop_retry = false;
+//----------------------------------------------------------------------
     single_session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
+    single_session->heartbeat_sender_polling_greater_counter_1ms_cnt = (uint16_t)0;
 //----------------------------------------------------------------------
     cleanup_control_packet(label, cow_async, &single_session->hello1, true);
     cleanup_control_packet(label, cow_async, &single_session->hello2, true);
@@ -426,7 +448,12 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
 }
 
 static inline status_t setup_sio_session(const char *label, sio_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
+//----------------------------------------------------------------------
+    single_session->greater_counter = false;
+    single_session->stop_retry = false;
+//----------------------------------------------------------------------
     single_session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
+    single_session->heartbeat_sender_polling_greater_counter_1ms_cnt = (uint16_t)0;
 //----------------------------------------------------------------------
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
@@ -475,7 +502,12 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
 }
 
 static inline void cleanup_sio_session(const char *label, async_type_t *sio_async, sio_c_session_t *single_session) {
+//----------------------------------------------------------------------
+    single_session->greater_counter = false;
+    single_session->stop_retry = false;
+//----------------------------------------------------------------------
     single_session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
+    single_session->heartbeat_sender_polling_greater_counter_1ms_cnt = (uint16_t)0;
 //----------------------------------------------------------------------
     cleanup_control_packet_ack(&single_session->hello1_ack, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->hello2_ack, true, CDT_FREE);

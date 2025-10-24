@@ -12,7 +12,6 @@
 #include "orilink/protocol.h"
 #include "types.h"
 #include "log.h"
-#include "orilink/heartbeat_ack.h"
 #include "constants.h"
 
 static inline status_t orilink_serialize_heartbeat_ack(const char *label, const orilink_heartbeat_ack_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {

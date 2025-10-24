@@ -12,7 +12,6 @@
 #include "orilink/protocol.h"
 #include "types.h"
 #include "log.h"
-#include "orilink/hello3.h"
 #include "constants.h"
 
 static inline status_t orilink_serialize_hello3(const char *label, const orilink_hello3_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {

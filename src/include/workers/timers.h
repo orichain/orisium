@@ -1,19 +1,25 @@
+#ifndef WORKERS_TIMERS_H
+#define WORKERS_TIMERS_H
+
 #include <math.h>
 #include <unistd.h>
 #include <inttypes.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "types.h"
 #include "workers/workers.h"
-#include "workers/timer/handlers.h"
-#include "workers/ipc/master_ipc_cmds.h"
+#include "workers/worker_ipc.h"
+#include "workers/polling.h"
 #include "constants.h"
 #include "log.h"
 #include "stdbool.h"
 #include "utilities.h"
 #include "orilink/heartbeat.h"
 #include "orilink/protocol.h"
+#include "orilink.h"
+#include "async.h"
 
 static inline status_t retry_transmit(
     worker_context_t *worker_ctx, 
@@ -48,18 +54,15 @@ static inline status_t retry_transmit(
             double try_count = (double)h->sent_try_count;
             calculate_retry(worker_ctx->label, session, c_wot, try_count);
 //----------------------------------------------------------------------            
-            double retry_timer_interval = (double)session->retry.value_prediction;
-            retry_timer_interval = pow((double)2, retry_timer_interval);
-            if (retry_timer_interval < (double)MIN_RETRY_SEC) retry_timer_interval = (double)MIN_RETRY_SEC;
-            double jitter_amount = fabs(((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE);
-            retry_timer_interval *= (1.0 + jitter_amount);
+            double retry_timer_interval = retry_interval_with_jitter(session->retry.value_prediction);
 //----------------------------------------------------------------------
             if (retry_control_packet(
                     worker_ctx, 
                     identity, 
                     security, 
                     h,
-                    orilink_protocol
+                    orilink_protocol,
+                    false
                 ) != SUCCESS
             )
             {
@@ -107,18 +110,15 @@ static inline status_t retry_transmit(
             double try_count = (double)h->sent_try_count;
             calculate_retry(worker_ctx->label, session, c_wot, try_count);
 //----------------------------------------------------------------------   
-            double retry_timer_interval = (double)session->retry.value_prediction;
-            retry_timer_interval = pow((double)2, retry_timer_interval);
-            if (retry_timer_interval < (double)MIN_RETRY_SEC) retry_timer_interval = (double)MIN_RETRY_SEC;
-            double jitter_amount = fabs(((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE);
-            retry_timer_interval *= (1.0 + jitter_amount);
+            double retry_timer_interval = retry_interval_with_jitter(session->retry.value_prediction);
 //----------------------------------------------------------------------
             if (retry_control_packet(
                     worker_ctx, 
                     identity, 
                     security, 
                     h,
-                    orilink_protocol
+                    orilink_protocol,
+                    false
                 ) != SUCCESS
             )
             {
@@ -155,6 +155,31 @@ static inline status_t polling_1ms(
     orilink_protocol_type_t orilink_protocol
 )
 {
+    worker_type_t wot = *worker_ctx->wot;
+    switch (wot) {
+        case COW: {
+            cow_c_session_t *session = (cow_c_session_t *)xsession;
+            if (session->stop_retry) {
+                cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false);
+                async_delete_event(worker_ctx->label, &worker_ctx->async, &h->polling_timer_fd);
+                CLOSE_FD(&h->polling_timer_fd);
+                return SUCCESS;
+            }
+            break;
+        }
+        case SIO: {
+            sio_c_session_t *session = (sio_c_session_t *)xsession;
+            if (session->stop_retry) {
+                cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false);
+                async_delete_event(worker_ctx->label, &worker_ctx->async, &h->polling_timer_fd);
+                CLOSE_FD(&h->polling_timer_fd);
+                return SUCCESS;
+            }
+            break;
+        }
+        default:
+            return FAILURE;
+    }
     double polling_interval = (double)1000000 / (double)1e9;
     if (h->data != NULL) {
         if (!h->ack_rcvd) {
@@ -188,10 +213,7 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
             orilink_identity_t *identity = &session->identity;
             orilink_security_t *security = &session->security;
 //======================================================================
-            double hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
-            double jitter_amount = fabs(((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE);
-            hb_interval *= (1.0 + jitter_amount);
-            hb_interval += session->rtt.value_prediction / (double)1e9;
+            double hb_interval = node_hb_interval_with_jitter(session->rtt.value_prediction, session->retry.value_prediction);
 //======================================================================
             uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
             if (current_time.status != SUCCESS) {
@@ -286,10 +308,7 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
             orilink_identity_t *identity = &session->identity;
             orilink_security_t *security = &session->security;
 //======================================================================
-            double hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, (double)session->retry.value_prediction);
-            double jitter_amount = fabs(((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE);
-            hb_interval *= (1.0 + jitter_amount);
-            hb_interval += session->rtt.value_prediction / (double)1e9;
+            double hb_interval = node_hb_interval_with_jitter(session->rtt.value_prediction, session->retry.value_prediction);
 //======================================================================
             uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
             if (current_time.status != SUCCESS) {
@@ -405,7 +424,31 @@ static inline status_t turns_to_polling_1ms(
             } else {
                 if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)1 + (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
                     session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
-                    send_heartbeat(worker_ctx, xsession, orilink_protocol);
+                    if (session->greater_counter) {
+//----------------------------------------------------------------------
+// Wait Until Our Peer Doin Retry
+//----------------------------------------------------------------------
+                        double retry_timer_interval = retry_interval_with_jitter(session->retry.value_prediction);
+                        printf("%s(2)Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 ", Current RVP %lf.\n", worker_ctx->label, session->security.remote_ctr, session->security.local_ctr, retry_timer_interval);
+                        session->stop_retry = true;
+                        session->heartbeat_sender_polling_greater_counter_1ms_cnt++;
+                        worker_type_t c_wot = session->identity.local_wot;
+                        double try_count = (double)session->heartbeat_sender_polling_greater_counter_1ms_cnt;
+                        calculate_retry(worker_ctx->label, session, c_wot, try_count);
+                        retry_timer_interval = retry_interval_with_jitter(session->retry.value_prediction);
+                        printf("%s(2)Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 ", Current RVP %lf.\n", worker_ctx->label, session->security.remote_ctr, session->security.local_ctr, retry_timer_interval);
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
+                        if (create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, retry_timer_interval) != SUCCESS) {
+                            create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, retry_timer_interval);
+                            return FAILURE;
+                        }
+//----------------------------------------------------------------------
+                    } else {
+                        session->stop_retry = false;
+                        session->heartbeat_sender_polling_greater_counter_1ms_cnt = (uint16_t)0;
+                        send_heartbeat(worker_ctx, xsession, orilink_protocol);
+                    }
                 } else {
                     session->heartbeat_sender_polling_1ms_cnt++;
                     if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, polling_interval) != SUCCESS) {
@@ -428,7 +471,31 @@ static inline status_t turns_to_polling_1ms(
             } else {
                 if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)1 + (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
                     session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
-                    send_heartbeat(worker_ctx, xsession, orilink_protocol);
+                    if (session->greater_counter) {
+//----------------------------------------------------------------------
+// Wait Until Our Peer Doin Retry
+//----------------------------------------------------------------------
+                        double retry_timer_interval = retry_interval_with_jitter(session->retry.value_prediction);
+                        printf("%s(2)Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 ", Current RVP %lf.\n", worker_ctx->label, session->security.remote_ctr, session->security.local_ctr, retry_timer_interval);
+                        session->stop_retry = true;
+                        session->heartbeat_sender_polling_greater_counter_1ms_cnt++;
+                        worker_type_t c_wot = session->identity.local_wot;
+                        double try_count = (double)session->heartbeat_sender_polling_greater_counter_1ms_cnt;
+                        calculate_retry(worker_ctx->label, session, c_wot, try_count);
+                        retry_timer_interval = retry_interval_with_jitter(session->retry.value_prediction);
+                        printf("%s(2)Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 ", Current RVP %lf.\n", worker_ctx->label, session->security.remote_ctr, session->security.local_ctr, retry_timer_interval);
+                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
+                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
+                        if (create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, retry_timer_interval) != SUCCESS) {
+                            create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, retry_timer_interval);
+                            return FAILURE;
+                        }
+//----------------------------------------------------------------------
+                    } else {
+                        session->stop_retry = false;
+                        session->heartbeat_sender_polling_greater_counter_1ms_cnt = (uint16_t)0;
+                        send_heartbeat(worker_ctx, xsession, orilink_protocol);
+                    }
                 } else {
                     session->heartbeat_sender_polling_1ms_cnt++;
                     if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, polling_interval) != SUCCESS) {
@@ -445,7 +512,7 @@ static inline status_t turns_to_polling_1ms(
     return SUCCESS;
 }
 
-status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions, int *current_fd) {
+static inline status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions, int *current_fd) {
     worker_type_t wot = *worker_ctx->wot;
     switch (wot) {
         case COW: {
@@ -513,3 +580,5 @@ status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions
     }
     return FAILURE;
 }
+
+#endif

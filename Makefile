@@ -88,11 +88,12 @@ IWYU_BIN_PATH := $(IWYU_BUILD_PATH)/bin/include-what-you-use
 EXCLUDED_DIRS := PQClean iwyu lmdb
 EXCLUDE_PATHS := $(foreach dir,$(EXCLUDED_DIRS),-path ./$(dir) -prune -o)
 CFILES := $(shell find . $(EXCLUDE_PATHS) -name '*.c' -print)
+HFILES := $(shell find . $(EXCLUDE_PATHS) -name '*.h' -print)
 
 # =============================
 # Build Targets
 # =============================
-.PHONY: all dev prod clean run debug check_iwyu
+.PHONY: all dev prod clean run debug check_iwyu_h check_iwyu_c
 
 # Target default
 all: prod
@@ -144,14 +145,14 @@ prod-libraries:
 	$(call install_pkg,python3)	
 
 dev:
-	$(MAKE) dev-libraries check_iwyu $(TARGET)
+	$(MAKE) dev-libraries check_iwyu_h check_iwyu_c $(TARGET)
 	@echo "-------------------------------------"
 	@echo "orisium dikompilasi dalam mode DEVELOPMENT!"
 	@echo "Executable: $(TARGET)"
 	@echo "-------------------------------------"
 
 prod:
-	$(MAKE) prod-libraries check_iwyu $(TARGET) BUILD_MODE=PRODUCTION
+	$(MAKE) prod-libraries check_iwyu_h check_iwyu_c $(TARGET) BUILD_MODE=PRODUCTION
 	@echo "-------------------------------------"
 	@echo "orisium dikompilasi dalam mode PRODUCTION!"
 	@echo "Executable: $(TARGET)"
@@ -224,25 +225,48 @@ $(LMDB_LIB_PATH):
 # =============================
 # IWYU Check
 # =============================
-check_iwyu: $(IWYU_BIN_PATH)
+check_iwyu_c: $(IWYU_BIN_PATH)
 	@echo "🔍 Menjalankan IWYU untuk *.c (kecuali: $(EXCLUDED_DIRS))..."
-	@rm -f iwyu_failed.log iwyu_applied.log
+	@rm -f iwyu_failed_c.log iwyu_applied_c.log
 	@for file in $(CFILES); do \
 		echo "🧪 $$file"; \
 		$(IWYU_BIN_PATH) $(FINAL_CFLAGS) "$$file" > /tmp/iwyu.tmp 2>&1; \
 		if grep -q "should" /tmp/iwyu.tmp; then \
-			echo "❌ IWYU error in $$file" | tee -a iwyu_failed.log; \
-			cat /tmp/iwyu.tmp >> iwyu_failed.log; \
-			echo "" >> iwyu_failed.log; \
-			python3 $(IWYU_DIR)/fix_includes.py < /tmp/iwyu.tmp >> iwyu_applied.log 2>&1; \
-			echo "🔧 FIX applied to $$file" >> iwyu_applied.log; \
+			echo "❌ IWYU error in $$file" | tee -a iwyu_failed_c.log; \
+			cat /tmp/iwyu.tmp >> iwyu_failed_c.log; \
+			echo "" >> iwyu_failed_c.log; \
+			python3 $(IWYU_DIR)/fix_includes.py < /tmp/iwyu.tmp >> iwyu_applied_c.log 2>&1; \
+			echo "🔧 FIX applied to $$file" >> iwyu_applied_c.log; \
 		else \
 			echo "✅ Tidak ada masalah di $$file."; \
 		fi; \
 		rm -f /tmp/iwyu.tmp; \
 	done; \
-	if [ -f iwyu_failed.log ]; then \
-		echo "📌 IWYU sudah diperbaiki secara otomatis, log: iwyu_applied.log"; \
+	if [ -f iwyu_failed_c.log ]; then \
+		echo "📌 IWYU sudah diperbaiki secara otomatis, log: iwyu_applied_c.log"; \
+	else \
+		echo "✅ Semua file bersih dari masalah IWYU."; \
+	fi
+	
+check_iwyu_h: $(IWYU_BIN_PATH)
+	@echo "🔍 Menjalankan IWYU untuk *.h (kecuali: $(EXCLUDED_DIRS))..."
+	@rm -f iwyu_failed_h.log iwyu_applied_h.log
+	@for file in $(HFILES); do \
+		echo "🧪 $$file"; \
+		$(IWYU_BIN_PATH) $(FINAL_CFLAGS) "$$file" > /tmp/iwyu.tmp 2>&1; \
+		if grep -q "should" /tmp/iwyu.tmp; then \
+			echo "❌ IWYU error in $$file" | tee -a iwyu_failed_h.log; \
+			cat /tmp/iwyu.tmp >> iwyu_failed_h.log; \
+			echo "" >> iwyu_failed_h.log; \
+			python3 $(IWYU_DIR)/fix_includes.py < /tmp/iwyu.tmp >> iwyu_applied_h.log 2>&1; \
+			echo "🔧 FIX applied to $$file" >> iwyu_applied_h.log; \
+		else \
+			echo "✅ Tidak ada masalah di $$file."; \
+		fi; \
+		rm -f /tmp/iwyu.tmp; \
+	done; \
+	if [ -f iwyu_failed_h.log ]; then \
+		echo "📌 IWYU sudah diperbaiki secara otomatis, log: iwyu_applied_h.log"; \
 	else \
 		echo "✅ Semua file bersih dari masalah IWYU."; \
 	fi
@@ -295,7 +319,7 @@ $(IWYU_BIN_PATH):
 # =============================
 clean:
 	@echo "Membersihkan file objek dan executable..."
-	rm -rf $(OBJ_DIR) $(TARGET) iwyu_failed.log
+	rm -rf $(OBJ_DIR) $(TARGET)
 
 run: $(TARGET)
 	@echo "Menjalankan Orisium..."

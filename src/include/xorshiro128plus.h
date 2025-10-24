@@ -1,16 +1,11 @@
 #ifndef XOROSHIRO128PLUS_H
 #define XOROSHIRO128PLUS_H
 
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
-
-#include <fcntl.h>
-#include <unistd.h>
-#include <time.h>
-#include <sys/types.h>
+#include <endian.h>
 #include <randombytes.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
 
 static uint64_t s[2];
 static bool is_seeded = false;

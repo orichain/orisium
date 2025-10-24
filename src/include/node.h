@@ -1,6 +1,9 @@
 #ifndef NODE_H
 #define NODE_H
 
+#include <netinet/in.h>
+#include <stdint.h>
+
 #include "types.h"
 #include "constants.h"
 

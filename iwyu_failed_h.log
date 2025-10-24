@@ -1,0 +1,133 @@
+❌ IWYU error in ./src/include/workers/timers.h
+In file included from ./src/include/workers/timers.h:12:
+./src/include/workers/workers.h:232:5: error: label at end of compound statement is a C23 extension [-Werror,-Wc23-extensions]
+  232 |     }
+      |     ^
+./src/include/workers/workers.h:261:5: error: label at end of compound statement is a C23 extension [-Werror,-Wc23-extensions]
+  261 |     }
+      |     ^
+./src/include/workers/workers.h:324:5: error: label at end of compound statement is a C23 extension [-Werror,-Wc23-extensions]
+  324 |     }
+      |     ^
+
+src/include/workers/timers.h should add these lines:
+
+src/include/workers/timers.h should remove these lines:
+- #include <math.h>  // lines 4-4
+- #include <stdlib.h>  // lines 8-8
+
+The full include-list for src/include/workers/timers.h:
+#include <inttypes.h>            // for uint8_t, uint16_t, uint64_t, PRIu32
+#include <stddef.h>              // for NULL
+#include <stdio.h>               // for printf
+#include <unistd.h>              // for read
+#include "async.h"               // for async_delete_event
+#include "constants.h"           // for MAX_RETRY_CNT, MAX_CONNECTION_PER_CO...
+#include "log.h"                 // for LOG_DEVEL_DEBUG
+#include "orilink.h"             // for create_orilink_raw_protocol_packet
+#include "orilink/heartbeat.h"   // for orilink_prepare_cmd_heartbeat
+#include "orilink/protocol.h"    // for ORILINK_HEARTBEAT, CLOSE_ORILINK_PRO...
+#include "stdbool.h"             // for false, true
+#include "types.h"               // for FAILURE, SUCCESS, worker_type_t, COW
+#include "utilities.h"           // for update_timer_oneshot, decrement_ctr
+#include "workers/polling.h"     // for create_polling_1ms
+#include "workers/worker_ipc.h"  // for worker_master_task_info, worker_mast...
+#include "workers/workers.h"     // for cow_c_session_t, sio_c_session_t
+---
+
+❌ IWYU error in ./src/include/workers/worker_ipc.h
+In file included from ./src/include/workers/worker_ipc.h:38:
+In file included from ./src/include/workers/polling.h:7:
+./src/include/workers/workers.h:232:5: error: label at end of compound statement is a C23 extension [-Werror,-Wc23-extensions]
+  232 |     }
+      |     ^
+./src/include/workers/workers.h:261:5: error: label at end of compound statement is a C23 extension [-Werror,-Wc23-extensions]
+  261 |     }
+      |     ^
+./src/include/workers/workers.h:324:5: error: label at end of compound statement is a C23 extension [-Werror,-Wc23-extensions]
+  324 |     }
+      |     ^
+
+src/include/workers/worker_ipc.h should add these lines:
+
+src/include/workers/worker_ipc.h should remove these lines:
+- #include <math.h>  // lines 7-7
+- #include "globals.h"  // lines 40-40
+
+The full include-list for src/include/workers/worker_ipc.h:
+#include <endian.h>                       // for be64toh, htobe64
+#include <errno.h>                        // for errno
+#include <inttypes.h>                     // for uint8_t, uint64_t, PRIu32
+#include <netinet/in.h>                   // for sockaddr_in6
+#include <stdio.h>                        // for printf, NULL, size_t
+#include <stdlib.h>                       // for free, calloc
+#include <string.h>                       // for memcpy, memset, strerror
+#include "constants.h"                    // for AES_NONCE_BYTES, HASHES_BYTES
+#include "ipc.h"                          // for send_ipc_protocol_message
+#include "ipc/protocol.h"                 // for CLOSE_IPC_PROTOCOL, CLOSE_I...
+#include "ipc/udp_data.h"                 // for ipc_prepare_cmd_udp_data
+#include "ipc/worker_master_heartbeat.h"  // for ipc_prepare_cmd_worker_mast...
+#include "ipc/worker_master_hello1.h"     // for ipc_prepare_cmd_worker_mast...
+#include "ipc/worker_master_hello2.h"     // for ipc_prepare_cmd_worker_mast...
+#include "ipc/worker_master_task_info.h"  // for ipc_prepare_cmd_worker_mast...
+#include "log.h"                          // for LOG_ERROR, LOG_DEBUG, LOG_D...
+#include "orilink.h"                      // for orilink_check_mac, orilink_...
+#include "orilink/heartbeat.h"            // for orilink_prepare_cmd_heartbeat
+#include "orilink/heartbeat_ack.h"        // for orilink_prepare_cmd_heartbe...
+#include "orilink/hello1.h"               // for orilink_prepare_cmd_hello1
+#include "orilink/hello1_ack.h"           // for orilink_prepare_cmd_hello1_ack
+#include "orilink/hello2.h"               // for orilink_prepare_cmd_hello2
+#include "orilink/hello2_ack.h"           // for orilink_prepare_cmd_hello2_ack
+#include "orilink/hello3.h"               // for orilink_prepare_cmd_hello3
+#include "orilink/hello3_ack.h"           // for orilink_prepare_cmd_hello3_ack
+#include "orilink/hello4.h"               // for orilink_prepare_cmd_hello4
+#include "orilink/hello4_ack.h"           // for orilink_prepare_cmd_hello4_ack
+#include "orilink/protocol.h"             // for CLOSE_ORILINK_RAW_PROTOCOL
+#include "pqc.h"                          // for KEM_CIPHERTEXT_BYTES, KEM_P...
+#include "stdbool.h"                      // for true, false, bool
+#include "types.h"                        // for FAILURE, SUCCESS, status_t
+#include "utilities.h"                    // for decrement_ctr, get_monotoni...
+#include "workers/polling.h"              // for create_polling_1ms
+#include "workers/workers.h"              // for calculate_retry, worker_con...
+---
+
+❌ IWYU error in ./src/include/orilink.h
+
+src/include/orilink.h should add these lines:
+
+src/include/orilink.h should remove these lines:
+- #include "globals.h"  // lines 35-35
+
+The full include-list for src/include/orilink.h:
+#include <endian.h>                 // for be64toh, be32toh, htobe32, htobe64
+#include <errno.h>                  // for errno, EAGAIN, EWOULDBLOCK
+#include <netinet/in.h>             // for sockaddr_in6
+#include <stdbool.h>                // for bool, false, true
+#include <stdint.h>                 // for uint8_t, uint64_t, uint32_t, uint...
+#include <stdio.h>                  // for size_t, NULL
+#include <stdlib.h>                 // for free, calloc, realloc
+#include <string.h>                 // for memcpy, strerror, memcmp, memset
+#include <sys/socket.h>             // for recvfrom, sendto, socklen_t
+#include <sys/types.h>              // for ssize_t
+#include "constants.h"              // for AES_TAG_BYTES, ORILINK_VERSION_BYTES
+#include "ipc/protocol.h"           // for ipc_udp_data_t
+#include "log.h"                    // for LOG_ERROR, LOG_DEBUG
+#include "orilink/heartbeat.h"      // for orilink_deserialize_heartbeat
+#include "orilink/heartbeat_ack.h"  // for orilink_deserialize_heartbeat_ack
+#include "orilink/hello1.h"         // for orilink_deserialize_hello1, orili...
+#include "orilink/hello1_ack.h"     // for orilink_deserialize_hello1_ack
+#include "orilink/hello2.h"         // for orilink_deserialize_hello2, orili...
+#include "orilink/hello2_ack.h"     // for orilink_deserialize_hello2_ack
+#include "orilink/hello3.h"         // for orilink_deserialize_hello3, orili...
+#include "orilink/hello3_ack.h"     // for orilink_deserialize_hello3_ack
+#include "orilink/hello4.h"         // for orilink_deserialize_hello4, orili...
+#include "orilink/hello4_ack.h"     // for orilink_deserialize_hello4_ack
+#include "orilink/info.h"           // for orilink_deserialize_info, orilink...
+#include "orilink/info_ack.h"       // for orilink_deserialize_info_ack, ori...
+#include "orilink/protocol.h"       // for CLOSE_ORILINK_PROTOCOL, (anonymou...
+#include "pqc.h"                    // for KEM_CIPHERTEXT_BYTES, KEM_PUBLICK...
+#include "types.h"                  // for FAILURE_OOBUF, SUCCESS, FAILURE
+#include "utilities.h"              // for CHECK_BUFFER_BOUNDS, encrypt_decr...
+#include "xorshiro128plus.h"        // for generate_fast_salt
+---
+

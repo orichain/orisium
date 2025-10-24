@@ -1,14 +1,8 @@
 #ifndef PQC_H
 #define PQC_H
 
-#include <stdint.h>
-#include <crypto_sign/falcon-padded-512/clean/api.h>
-#include <crypto_sign/ml-dsa-87/clean/api.h>
 #include <crypto_kem/ml-kem-1024/clean/api.h>
-#include <fips202.h>
-#include <randombytes.h>
-#include <aes.h>
-#include "types.h"
+#include <crypto_sign/falcon-padded-512/clean/api.h>
 
 #define KEM_ALGO MLKEM1024
 #define SIGN_ALGO FALCONPADDED512

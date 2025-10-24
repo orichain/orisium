@@ -1,17 +1,18 @@
 #ifndef MASTER_MASTER_H
 #define MASTER_MASTER_H
 
-#include <sys/types.h>
-#include <stdbool.h>
+#include <netinet/in.h>
 #include <signal.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <sys/types.h>
 
 #include "async.h"
-#include "constants.h"
-#include "types.h"
-#include "node.h"
+#include "ipc/protocol.h"
 #include "kalman.h"
-#include "orilink/protocol.h"
-#include "pqc.h"
+#include "node.h"
+#include "types.h" 
 
 typedef struct {
     double hb_interval;

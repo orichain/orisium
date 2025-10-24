@@ -1,16 +1,13 @@
 #include <stdint.h>
-#include <stdlib.h>
 #include <unistd.h>
-#include <math.h>
 
 #include "log.h"
 #include "async.h"
 #include "types.h"
 #include "constants.h"
 #include "workers/workers.h"
-#include "workers/ipc/handlers.h"
-#include "workers/timer/handlers.h"
-#include "workers/ipc/master_ipc_cmds.h"
+#include "workers/timers.h"
+#include "workers/worker_ipc.h"
 #include "utilities.h"
 
 static inline void cleanup_cow_worker(worker_context_t *worker_ctx, cow_c_session_t *sessions) {
@@ -63,11 +60,7 @@ void run_cow_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
 //----------------------------------------------------------------------
 // Heartbeat dengan jitter
 //----------------------------------------------------------------------
-				double jitter_amount = fabs(((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE);
-                double new_heartbeat_interval_double = WORKER_HEARTBEAT_INTERVAL * (1.0 + jitter_amount);
-                if (new_heartbeat_interval_double < 0.1) {
-                    new_heartbeat_interval_double = 0.1;
-                }
+				double new_heartbeat_interval_double = worker_hb_interval_with_jitter();
                 status_t uhst = update_timer_oneshot(worker_ctx->label, &worker_ctx->heartbeat_timer_fd, new_heartbeat_interval_double);
                 if (uhst != SUCCESS) {
                     worker_ctx->shutdown_requested = 1;

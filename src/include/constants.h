@@ -1,8 +1,6 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-#include <stdint.h>
-
 #define MAX_EVENTS 1000
 #define MAX_BOOTSTRAP_NODES 313
 #define MAX_BOOTSTRAP_FILE_SIZE 1024

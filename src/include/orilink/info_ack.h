@@ -12,7 +12,6 @@
 #include "orilink/protocol.h"
 #include "types.h"
 #include "log.h"
-#include "orilink/info_ack.h"
 #include "constants.h"
 
 static inline status_t orilink_serialize_info_ack(const char *label, const orilink_info_ack_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {

@@ -11,7 +11,6 @@
 #include "orilink/protocol.h"
 #include "types.h"
 #include "log.h"
-#include "orilink/hello4_ack.h"
 #include "constants.h"
 
 static inline status_t orilink_serialize_hello4_ack(const char *label, const orilink_hello4_ack_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {

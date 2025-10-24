@@ -4,17 +4,18 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <endian.h>
 
 #include "async.h"
 #include "utilities.h"
 #include "types.h"
 #include "constants.h"
-#include "workers/workers.h"
 #include "pqc.h"
 #include "stdbool.h"
-#include "ipc/protocol.h"
+#include "ipc.h"
 #include "orilink/protocol.h"
-#include "workers/ipc/master_ipc_cmds.h"
+#include "workers/workers.h"
+#include "workers/worker_ipc.h"
 #include "xorshiro128plus.h"
 
 status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
@@ -103,7 +104,8 @@ status_t retry_control_packet(
     orilink_identity_t *identity, 
     orilink_security_t *security, 
     control_packet_t *control_packet,
-    orilink_protocol_type_t orilink_protocol
+    orilink_protocol_type_t orilink_protocol,
+    bool lower_counter
 )
 {
 //======================================================================
@@ -148,6 +150,71 @@ status_t retry_control_packet(
         ) != 0
     )
     {
+//----------------------------------------------------------------------
+        if (lower_counter) {
+            control_packet->sent_try_count = 0x01;
+            memcpy(udp_data.r_puint8_t + trycount_offset, &control_packet->sent_try_count, sizeof(uint8_t));
+            uint8_t *tmp_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
+            if (!tmp_nonce) {
+                return false;
+            }
+            memcpy(tmp_nonce, security->local_nonce, AES_NONCE_BYTES);
+            uint32_t tmp_ctr = security->local_ctr;
+            decrement_ctr(&tmp_ctr, tmp_nonce);
+            const size_t header_offset = AES_TAG_BYTES;
+            const size_t header_len = sizeof(uint32_t) +
+                                      ORILINK_VERSION_BYTES +
+                                      sizeof(uint8_t) +
+                                      sizeof(uint8_t) +
+                                      sizeof(uint8_t);
+            uint8_t *header = udp_data.r_puint8_t + header_offset;
+            uint8_t decripted_header[header_len];
+            #if defined(ORILINK_DECRYPT_HEADER)
+                if (encrypt_decrypt_128(
+                        worker_ctx->label,
+                        security->mac_key,
+                        security->local_nonce,
+                        &security->local_ctr,
+                        header,
+                        decripted_header,
+                        header_len
+                    ) != SUCCESS
+                )
+                {
+                    memset(tmp_nonce, 0, AES_NONCE_BYTES);
+                    free(tmp_nonce);
+                    return false;
+                }
+            #else
+                memcpy(decripted_header, header, header_len);
+            #endif
+            uint32_t tmp_ctr_be = htobe32(tmp_ctr);
+            memcpy(decripted_header, &tmp_ctr_be, sizeof(uint32_t));
+            uint8_t encrypted_header[header_len];            
+            #if defined(ORILINK_DECRYPT_HEADER)
+                if (encrypt_decrypt_128(
+                        worker_ctx->label,
+                        security->mac_key,
+                        tmp_nonce,
+                        &tmp_ctr,
+                        decripted_header,
+                        encrypted_header,
+                        header_len
+                    ) != SUCCESS
+                )
+                {
+                    memset(tmp_nonce, 0, AES_NONCE_BYTES);
+                    free(tmp_nonce);
+                    return false;
+                }
+            #else
+                memcpy(encrypted_header, decripted_header, header_len);
+            #endif
+            memcpy(header, encrypted_header, header_len);
+            memset(tmp_nonce, 0, AES_NONCE_BYTES);
+            free(tmp_nonce);
+        }
+//----------------------------------------------------------------------
         const size_t data_4mac_offset = AES_TAG_BYTES;
         size_t data_4mac_len = control_packet->len - AES_TAG_BYTES;
         uint8_t *data_4mac = udp_data.r_puint8_t + data_4mac_offset;

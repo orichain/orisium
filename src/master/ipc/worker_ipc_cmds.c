@@ -5,7 +5,7 @@
 #include "constants.h"
 #include "types.h"
 #include "master/master.h"
-#include "ipc/protocol.h"
+#include "ipc.h"
 #include "ipc/master_worker_info.h"
 #include "ipc/master_worker_hello1_ack.h"
 #include "ipc/master_worker_hello2_ack.h"
@@ -15,6 +15,7 @@
 #include "ipc/udp_data_ack.h"
 #include "orilink/protocol.h"
 #include "utilities.h"
+#include "ipc/protocol.h"
 
 struct sockaddr_in6;
                         

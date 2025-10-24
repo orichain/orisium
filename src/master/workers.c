@@ -19,7 +19,7 @@
 #include "master/master.h"
 #include "kalman.h"
 #include "pqc.h"
-#include "ipc/protocol.h"
+#include "ipc.h"
 
 status_t close_worker(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
     master_worker_session_t *session = get_master_worker_session(master_ctx, wot, index);

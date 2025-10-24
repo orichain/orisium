@@ -1,9 +1,12 @@
-#ifndef WORKERS_TIMER_HANDLERS_H
-#define WORKERS_TIMER_HANDLERS_H
+#ifndef WORKERS_POLLING_H
+#define WORKERS_POLLING_H
+
+#include <math.h>
+#include <stdint.h>
 
 #include "workers/workers.h"
-
-status_t handle_workers_timer_event(worker_context_t *worker_ctx, void *sessions, int *current_fd);
+#include "types.h"
+#include "utilities.h"
 
 static inline status_t create_polling_1ms(worker_context_t *worker_ctx, control_packet_t *h, double total_polling_interval) {
     double polling_interval = (double)1000000 / (double)1e9;

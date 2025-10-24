@@ -3,12 +3,13 @@
 #include <stdlib.h>
 
 #include "log.h"
-#include "ipc/protocol.h"
+#include "ipc.h"
 #include "types.h"
 #include "master/master.h"
 #include "master/ipc/handlers.h"
 #include "master/ipc/worker_ipc_cmds.h"
-#include "orilink/protocol.h"
+#include "orilink.h"
+#include "ipc/protocol.h"
 
 status_t handle_master_ipc_udp_data(const char *label, master_context_t *master_ctx, worker_security_t *security, ipc_raw_protocol_t_status_t *ircvdi) {
     worker_type_t rcvd_wot = ircvdi->r_ipc_raw_protocol_t->wot;
