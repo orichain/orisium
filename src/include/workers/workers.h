@@ -81,6 +81,7 @@ typedef struct {
     int heartbeat_openner_timer_fd;
     bool greater_counter;
     bool stop_retry;
+    bool stop_sender;
 //----------------------------------------------------------------------
     int test_drop_hello1_ack;
     int test_drop_hello2_ack;
@@ -124,6 +125,7 @@ typedef struct {
     int heartbeat_openner_timer_fd;
     bool greater_counter;
     bool stop_retry;
+    bool stop_sender;
 //----------------------------------------------------------------------
     int test_drop_heartbeat_ack;
     int test_double_heartbeat;
@@ -246,22 +248,34 @@ static inline void calculate_rtt(const char *label, void *void_session, worker_t
     }
 }
 
-static inline void cleanup_control_packet(const char *label, async_type_t *async, control_packet_t *h, bool clean_state) {
+static inline void cleanup_control_packet(const char *label, async_type_t *async, control_packet_t *h, bool clean_state, clean_data_type_t clean_data) {
     if (clean_state) {
         h->sent = false;
         h->sent_time = (uint64_t)0;
         h->ack_rcvd_time = (uint64_t)0;
         h->ack_rcvd = false;
     }
+    switch (clean_data) {
+        case CDT_RESET: {
+            memset(h->data, 0, h->len);
+            h->len = (uint16_t)0;
+            break;
+        }
+        case CDT_FREE: {
+            if (h->data) {
+                memset(h->data, 0, h->len);
+                free(h->data);
+                h->data = NULL;
+            }
+            h->len = (uint16_t)0;
+            break;
+        }
+        default:
+    }
     h->sent_try_count = 0x00;
     h->polling_1ms_last_cnt = h->polling_1ms_cnt;
     h->polling_1ms_cnt = (uint16_t)0;
     h->polling_1ms_max_cnt = (uint16_t)0;
-    if (h->data) {
-        free(h->data);
-        h->data = NULL;
-    }
-    h->len = (uint16_t)0;
     if (clean_state) {
         async_delete_event(label, async, &h->polling_timer_fd);
         CLOSE_FD(&h->polling_timer_fd);
@@ -326,6 +340,7 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
 //----------------------------------------------------------------------
     single_session->greater_counter = false;
     single_session->stop_retry = false;
+    single_session->stop_sender = false;
 //----------------------------------------------------------------------
     single_session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
     single_session->heartbeat_sender_polling_greater_counter_1ms_cnt = (uint16_t)0;
@@ -381,15 +396,16 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
 //----------------------------------------------------------------------
     single_session->greater_counter = false;
     single_session->stop_retry = false;
+    single_session->stop_sender = false;
 //----------------------------------------------------------------------
     single_session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
     single_session->heartbeat_sender_polling_greater_counter_1ms_cnt = (uint16_t)0;
 //----------------------------------------------------------------------
-    cleanup_control_packet(label, cow_async, &single_session->hello1, true);
-    cleanup_control_packet(label, cow_async, &single_session->hello2, true);
-    cleanup_control_packet(label, cow_async, &single_session->hello3, true);
-    cleanup_control_packet(label, cow_async, &single_session->hello4, true);
-    cleanup_control_packet(label, cow_async, &single_session->heartbeat, true);
+    cleanup_control_packet(label, cow_async, &single_session->hello1, true, CDT_FREE);
+    cleanup_control_packet(label, cow_async, &single_session->hello2, true, CDT_FREE);
+    cleanup_control_packet(label, cow_async, &single_session->hello3, true, CDT_FREE);
+    cleanup_control_packet(label, cow_async, &single_session->hello4, true, CDT_FREE);
+    cleanup_control_packet(label, cow_async, &single_session->heartbeat, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->heartbeat_ack, true, CDT_FREE);
     single_session->heartbeat_interval = (double)NODE_HEARTBEAT_INTERVAL;
     async_delete_event(label, cow_async, &single_session->heartbeat_sender_timer_fd);
@@ -436,6 +452,7 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
 //----------------------------------------------------------------------
     single_session->greater_counter = false;
     single_session->stop_retry = false;
+    single_session->stop_sender = false;
 //----------------------------------------------------------------------
     single_session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
     single_session->heartbeat_sender_polling_greater_counter_1ms_cnt = (uint16_t)0;
@@ -490,6 +507,7 @@ static inline void cleanup_sio_session(const char *label, async_type_t *sio_asyn
 //----------------------------------------------------------------------
     single_session->greater_counter = false;
     single_session->stop_retry = false;
+    single_session->stop_sender = false;
 //----------------------------------------------------------------------
     single_session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
     single_session->heartbeat_sender_polling_greater_counter_1ms_cnt = (uint16_t)0;
@@ -498,7 +516,7 @@ static inline void cleanup_sio_session(const char *label, async_type_t *sio_asyn
     cleanup_control_packet_ack(&single_session->hello2_ack, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->hello3_ack, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->hello4_ack, true, CDT_FREE);
-    cleanup_control_packet(label, sio_async, &single_session->heartbeat, true);
+    cleanup_control_packet(label, sio_async, &single_session->heartbeat, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->heartbeat_ack, true, CDT_FREE);
     single_session->heartbeat_interval = (double)1;
     single_session->heartbeat_cnt = 0x00;

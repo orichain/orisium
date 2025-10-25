@@ -32,6 +32,13 @@
 #include "pqc.h"
 #include "types.h"
 
+static inline void get_time_str(char *buf, size_t len) {
+    time_t t = time(NULL);
+    struct tm tm_info;
+    localtime_r(&t, &tm_info);
+    strftime(buf, len, "%Y-%m-%d %H:%M:%S", &tm_info);
+}
+
 static inline void print_hex(const char* label, const uint8_t* data, size_t len, int uppercase) {
     if (label)
         printf("%s", label);

@@ -17,7 +17,6 @@
 #include "orilink/heartbeat.h"
 #include "orilink/protocol.h"
 #include "orilink.h"
-#include "async.h"
 
 static inline status_t retry_transmit(
     worker_context_t *worker_ctx, 
@@ -65,18 +64,6 @@ static inline status_t retry_transmit(
             {
                 return FAILURE;
             }
-            if (orilink_protocol == ORILINK_HEARTBEAT) {
-//======================================================================
-// Heartbeat Ack Security 1 & Security 2 Open
-//======================================================================
-                session->heartbeat.sent = true;
-                session->heartbeat.ack_rcvd = false;
-//======================================================================
-// Heartbeat Security 2 Open
-//======================================================================
-                session->heartbeat_ack.rcvd = false;
-//======================================================================
-            }
             h->polling_1ms_cnt = (uint16_t)0;
             if (create_polling_1ms(worker_ctx, h, retry_timer_interval) != SUCCESS) {
                 return FAILURE;
@@ -120,18 +107,6 @@ static inline status_t retry_transmit(
             {
                 return FAILURE;
             }
-            if (orilink_protocol == ORILINK_HEARTBEAT) {
-//======================================================================
-// Heartbeat Ack Security 1 & Security 2 Open
-//======================================================================
-                session->heartbeat.sent = true;
-                session->heartbeat.ack_rcvd = false;
-//======================================================================
-// Heartbeat Security 2 Open
-//======================================================================
-                session->heartbeat_ack.rcvd = false;
-//======================================================================
-            }
             h->polling_1ms_cnt = (uint16_t)0;
             if (create_polling_1ms(worker_ctx, h, retry_timer_interval) != SUCCESS) {
                 return FAILURE;
@@ -156,9 +131,8 @@ static inline status_t polling_1ms(
         case COW: {
             cow_c_session_t *session = (cow_c_session_t *)xsession;
             if (session->stop_retry) {
-                cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false);
-                async_delete_event(worker_ctx->label, &worker_ctx->async, &h->polling_timer_fd);
-                CLOSE_FD(&h->polling_timer_fd);
+                session->stop_retry = false;
+                cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false, CDT_NOACTION);
                 return SUCCESS;
             }
             break;
@@ -166,9 +140,8 @@ static inline status_t polling_1ms(
         case SIO: {
             sio_c_session_t *session = (sio_c_session_t *)xsession;
             if (session->stop_retry) {
-                cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false);
-                async_delete_event(worker_ctx->label, &worker_ctx->async, &h->polling_timer_fd);
-                CLOSE_FD(&h->polling_timer_fd);
+                session->stop_retry = false;
+                cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false, CDT_NOACTION);
                 return SUCCESS;
             }
             break;
@@ -182,6 +155,9 @@ static inline status_t polling_1ms(
             h->polling_1ms_cnt++;
             uint16_t polling_1ms_max_cnt = h->polling_1ms_max_cnt;
             if (h->polling_1ms_cnt >= polling_1ms_max_cnt) {
+                char timebuf[32];
+                get_time_str(timebuf, sizeof(timebuf));
+                printf("%s%s - Retry Heartbeat Cnt MS %u\n", worker_ctx->label, timebuf, h->polling_1ms_cnt);
                 retry_transmit(
                     worker_ctx,
                     xsession,
@@ -195,7 +171,7 @@ static inline status_t polling_1ms(
                 }
             }
         } else {
-            cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false);
+            cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false, CDT_NOACTION);
         }
     }
     return SUCCESS;
@@ -210,6 +186,7 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
             orilink_security_t *security = &session->security;
 //======================================================================
             double hb_interval = node_hb_interval_with_jitter(session->rtt.value_prediction, session->retry.value_prediction);
+            session->heartbeat_interval = hb_interval;
 //======================================================================
             uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
             if (current_time.status != SUCCESS) {
@@ -290,16 +267,6 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
                 }
                 return FAILURE;
             }
-//======================================================================
-// Heartbeat Ack Security 1 & Security 2 Open
-//======================================================================
-            session->heartbeat.sent = true;
-            session->heartbeat.ack_rcvd = false;
-//======================================================================
-// Heartbeat Security 2 Open
-//======================================================================
-            session->heartbeat_ack.rcvd = false;
-//======================================================================
             break;
         }
         case SIO: {
@@ -308,6 +275,7 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
             orilink_security_t *security = &session->security;
 //======================================================================
             double hb_interval = node_hb_interval_with_jitter(session->rtt.value_prediction, session->retry.value_prediction);
+            session->heartbeat_interval = hb_interval;
 //======================================================================
             uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
             if (current_time.status != SUCCESS) {
@@ -388,16 +356,6 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
                 }
                 return FAILURE;
             }
-//======================================================================
-// Heartbeat Ack Security 1 & Security 2 Open
-//======================================================================
-            session->heartbeat.sent = true;
-            session->heartbeat.ack_rcvd = false;
-//======================================================================
-// Heartbeat Security 2 Open
-//======================================================================
-            session->heartbeat_ack.rcvd = false;
-//======================================================================
             break;
         }
         default:
@@ -416,39 +374,38 @@ static inline status_t turns_to_polling_1ms(
     switch (wot) {
         case COW: {
             cow_c_session_t *session = (cow_c_session_t *)xsession;
+            if (session->stop_sender) {
+                session->stop_sender = false;
+                return SUCCESS;
+            }
             double polling_interval = (double)1000000 / (double)1e9;
             if (!session->heartbeat.ack_rcvd) {
-                //printf("COW Heartbeat Waiting Previous Ack\n");
                 if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, polling_interval) != SUCCESS) {
                     update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, polling_interval);
+                    return FAILURE;
+                }
+                session->heartbeat_ack.ack_sent = false;
+                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_openner_timer_fd, polling_interval) != SUCCESS) {
+                    update_timer_oneshot(worker_ctx->label, &session->heartbeat_openner_timer_fd, polling_interval);
                     return FAILURE;
                 }
             } else {
                 if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)1 + (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
                     session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
                     if (session->greater_counter) {
-//----------------------------------------------------------------------
-// Wait Until Our Peer Doin Retry
-//----------------------------------------------------------------------
+                        session->greater_counter = false;
                         double retry_timer_interval = retry_interval_with_jitter(session->retry.value_prediction);
-                        printf("%s(2)Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 ", Current RVP %lf.\n", worker_ctx->label, session->security.remote_ctr, session->security.local_ctr, retry_timer_interval);
-                        session->stop_retry = true;
-                        session->heartbeat_sender_polling_greater_counter_1ms_cnt++;
-                        worker_type_t c_wot = session->identity.local_wot;
-                        double try_count = (double)session->heartbeat_sender_polling_greater_counter_1ms_cnt;
-                        calculate_retry(worker_ctx->label, session, c_wot, try_count);
-                        retry_timer_interval = retry_interval_with_jitter(session->retry.value_prediction);
-                        printf("%s(2)Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 ", Current RVP %lf.\n", worker_ctx->label, session->security.remote_ctr, session->security.local_ctr, retry_timer_interval);
-                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
-                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
-                        if (create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, retry_timer_interval) != SUCCESS) {
-                            create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, retry_timer_interval);
+                        if (create_polling_1ms(worker_ctx, &session->heartbeat, retry_timer_interval) != SUCCESS) {
                             return FAILURE;
                         }
-//----------------------------------------------------------------------
+                        return SUCCESS;
                     } else {
-                        session->stop_retry = false;
-                        session->heartbeat_sender_polling_greater_counter_1ms_cnt = (uint16_t)0;
+                        char timebuf[32];
+                        get_time_str(timebuf, sizeof(timebuf));
+                        printf("%s%s - Send Heartbeat\n", worker_ctx->label, timebuf);
+                        session->heartbeat.sent = true;
+                        session->heartbeat.ack_rcvd = false;
+                        session->heartbeat_ack.rcvd = false;
                         send_heartbeat(worker_ctx, xsession, orilink_protocol);
                     }
                 } else {
@@ -457,12 +414,21 @@ static inline status_t turns_to_polling_1ms(
                         update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, polling_interval);
                         return FAILURE;
                     }
+                    session->heartbeat_ack.ack_sent = false;
+                    if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_openner_timer_fd, polling_interval) != SUCCESS) {
+                        update_timer_oneshot(worker_ctx->label, &session->heartbeat_openner_timer_fd, polling_interval);
+                        return FAILURE;
+                    }
                 }
             }
             break;
         }
         case SIO: {
             sio_c_session_t *session = (sio_c_session_t *)xsession;
+            if (session->stop_sender) {
+                session->stop_sender = false;
+                return SUCCESS;
+            }
             double polling_interval = (double)1000000 / (double)1e9;
             if (!session->heartbeat.ack_rcvd) {
                 //printf("SIO Heartbeat Waiting Previous Ack\n");
@@ -470,38 +436,39 @@ static inline status_t turns_to_polling_1ms(
                     update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, polling_interval);
                     return FAILURE;
                 }
+                session->heartbeat_ack.ack_sent = false;
+                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_openner_timer_fd, polling_interval) != SUCCESS) {
+                    update_timer_oneshot(worker_ctx->label, &session->heartbeat_openner_timer_fd, polling_interval);
+                    return FAILURE;
+                }
             } else {
                 if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)1 + (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
                     session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
                     if (session->greater_counter) {
-//----------------------------------------------------------------------
-// Wait Until Our Peer Doin Retry
-//----------------------------------------------------------------------
+                        session->greater_counter = false;
                         double retry_timer_interval = retry_interval_with_jitter(session->retry.value_prediction);
-                        printf("%s(2)Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 ", Current RVP %lf.\n", worker_ctx->label, session->security.remote_ctr, session->security.local_ctr, retry_timer_interval);
-                        session->stop_retry = true;
-                        session->heartbeat_sender_polling_greater_counter_1ms_cnt++;
-                        worker_type_t c_wot = session->identity.local_wot;
-                        double try_count = (double)session->heartbeat_sender_polling_greater_counter_1ms_cnt;
-                        calculate_retry(worker_ctx->label, session, c_wot, try_count);
-                        retry_timer_interval = retry_interval_with_jitter(session->retry.value_prediction);
-                        printf("%s(2)Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 ", Current RVP %lf.\n", worker_ctx->label, session->security.remote_ctr, session->security.local_ctr, retry_timer_interval);
-                        async_delete_event(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd);
-                        CLOSE_FD(&session->heartbeat_sender_timer_fd);
-                        if (create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, retry_timer_interval) != SUCCESS) {
-                            create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, retry_timer_interval);
+                        if (create_polling_1ms(worker_ctx, &session->heartbeat, retry_timer_interval) != SUCCESS) {
                             return FAILURE;
                         }
-//----------------------------------------------------------------------
+                        return SUCCESS;
                     } else {
-                        session->stop_retry = false;
-                        session->heartbeat_sender_polling_greater_counter_1ms_cnt = (uint16_t)0;
+                        char timebuf[32];
+                        get_time_str(timebuf, sizeof(timebuf));
+                        printf("%s%s - Send Heartbeat\n", worker_ctx->label, timebuf);
+                        session->heartbeat.sent = true;
+                        session->heartbeat.ack_rcvd = false;
+                        session->heartbeat_ack.rcvd = false;
                         send_heartbeat(worker_ctx, xsession, orilink_protocol);
                     }
                 } else {
                     session->heartbeat_sender_polling_1ms_cnt++;
                     if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, polling_interval) != SUCCESS) {
                         update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, polling_interval);
+                        return FAILURE;
+                    }
+                    session->heartbeat_ack.ack_sent = false;
+                    if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_openner_timer_fd, polling_interval) != SUCCESS) {
+                        update_timer_oneshot(worker_ctx->label, &session->heartbeat_openner_timer_fd, polling_interval);
                         return FAILURE;
                     }
                 }
