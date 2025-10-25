@@ -1076,8 +1076,12 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
 //======================================================================
     bool _1l_ = is_1lower_ctr(worker_ctx->label, (uint8_t*)oudp_datao->recv_buffer, security->mac_key, security->remote_nonce, &security->remote_ctr);
     if (_1l_) {
-        LOG_ERROR("%sPeer's Counter Is Lower.", worker_ctx->label);
-        session->greater_counter = true;
+        if (session->heartbeat.sent_try_count != 0x01) {
+            LOG_ERROR("%sPeer's Counter Is Lower.", worker_ctx->label);
+            session->greater_counter = true;
+        } else {
+            LOG_ERROR("%s XXX - Peer's Counter Is Lower.", worker_ctx->label);
+        }
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
@@ -2917,8 +2921,12 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
 //======================================================================
     bool _1l_ = is_1lower_ctr(worker_ctx->label, (uint8_t*)oudp_datao->recv_buffer, security->mac_key, security->remote_nonce, &security->remote_ctr);
     if (_1l_) {
-        LOG_ERROR("%sPeer's Counter Is Lower.", worker_ctx->label);
-        session->greater_counter = true;
+        if (session->heartbeat.sent_try_count != 0x01) {
+            LOG_ERROR("%sPeer's Counter Is Lower.", worker_ctx->label);
+            session->greater_counter = true;
+        } else {
+            LOG_ERROR("%s XXX - Peer's Counter Is Lower.", worker_ctx->label);
+        }
         CLOSE_IPC_PROTOCOL(&received_protocol);
         CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
         return FAILURE;
