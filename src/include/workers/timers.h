@@ -181,7 +181,6 @@ static inline status_t turns_to_polling_1ms(
                 if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)1 + (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
                     session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
                     if (session->greater_counter) {
-                        session->greater_counter = false;
                         char timebuf[32];
                         get_time_str(timebuf, sizeof(timebuf));
                         printf("%s%s - Send Heartbeat GC\n", worker_ctx->label, timebuf);
@@ -225,7 +224,6 @@ static inline status_t turns_to_polling_1ms(
                 if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)1 + (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
                     session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
                     if (session->greater_counter) {
-                        session->greater_counter = false;
                         char timebuf[32];
                         get_time_str(timebuf, sizeof(timebuf));
                         printf("%s%s - Send Heartbeat GC\n", worker_ctx->label, timebuf);

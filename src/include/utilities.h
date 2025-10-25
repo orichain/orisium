@@ -87,7 +87,8 @@ static inline status_t update_timer_oneshot(const char* label, int *file_descrip
 }
 
 static void increment_ctr(uint32_t *ctr, uint8_t *nonce) {
-    if (*ctr == 0xFFFFFFFFUL) {
+    //if (*ctr == 0xFFFFFFFFUL) { 0xFFFFFFFF is used by gc
+    if (*ctr == 0xFFFFFFFEUL) {
         *ctr = 0;
         uint8_t carry = 1;
         for (int i = ((int)AES_NONCE_BYTES-(int)1); i >= 0; i--) {
@@ -219,7 +220,8 @@ static inline status_t compare_mac(
 
 static inline void decrement_ctr(uint32_t *ctr, uint8_t *nonce) {
     if (*ctr == 0) {
-        *ctr = 0xFFFFFFFFUL;
+        //*ctr = 0xFFFFFFFFUL; 0xFFFFFFFF is used by gc
+        *ctr = 0xFFFFFFFEUL;
         uint8_t borrow = 1;
         for (int i = ((int)AES_NONCE_BYTES-(int)1); i >= 0; i--) {
             int16_t temp_diff = nonce[i] - borrow;
