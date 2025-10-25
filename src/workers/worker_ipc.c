@@ -1279,17 +1279,51 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     if (!isretry && !from_retry_timer) {
         if (session->heartbeat_cnt == 0x00) {
             if (!session->hello4_ack.ack_sent) {
-                LOG_ERROR("%sReceive Heartbeat But This Worker Session Is Never Sending Hello4_Ack.", worker_ctx->label);
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-                return FAILURE;
+                if (session->lower_counter) {
+                    session->lower_counter = false;
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+//======================================================================
+                    double try_count = (double)MAX_RETRY_CNT;
+                    calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+                    double timer_interval = session->heartbeat_interval;
+//======================================================================
+                    LOG_ERROR("%sInitiate New Heartbeat timer_interval %lf.", worker_ctx->label, timer_interval);
+                    status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, timer_interval);
+                    if (chst != SUCCESS) {
+                        return FAILURE;
+                    }
+                    return SUCCESS;
+                } else {
+                    LOG_ERROR("%sReceive Heartbeat But This Worker Session Is Never Sending Hello4_Ack.", worker_ctx->label);
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                    return FAILURE;
+                }
             }
         } else {
             if (!session->heartbeat_ack.ack_sent) {
-                LOG_ERROR("%sReceive Heartbeat But This Worker Session Is Never Sending Heartbeat_Ack.", worker_ctx->label);
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-                return FAILURE;
+                if (session->lower_counter) {
+                    session->lower_counter = false;
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+//======================================================================
+                    double try_count = (double)MAX_RETRY_CNT;
+                    calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+                    double timer_interval = session->heartbeat_interval;
+//======================================================================
+                    LOG_ERROR("%sInitiate New Heartbeat timer_interval %lf.", worker_ctx->label, timer_interval);
+                    status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, timer_interval);
+                    if (chst != SUCCESS) {
+                        return FAILURE;
+                    }
+                    return SUCCESS;
+                } else {
+                    LOG_ERROR("%sReceive Heartbeat But This Worker Session Is Never Sending Heartbeat_Ack.", worker_ctx->label);
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                    return FAILURE;
+                }
             }
         }
         bool _1l_ = is_1lower_ctr(worker_ctx->label, (uint8_t*)oudp_datao->recv_buffer, security->mac_key, security->remote_nonce, &security->remote_ctr);
@@ -1328,6 +1362,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return FAILURE;
         }
+        session->lower_counter = true;
         return first_heartbeat_finalization(
             worker_ctx, 
             session, 
@@ -1448,13 +1483,6 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
 //session->metrics.sum_hb_interval += session->heartbeat_interval;
 //session->metrics.hb_interval = session->heartbeat_interval;
 //======================================================================
-    double timer_interval = session->heartbeat_interval;
-//======================================================================
-    status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, timer_interval);
-    if (chst != SUCCESS) {
-        LOG_ERROR("%sError create_timer_oneshot.", worker_ctx->label);
-        return FAILURE;
-    }
     return SUCCESS;
 }
 
@@ -2882,10 +2910,27 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
 //======================================================================
     if (!isretry && !from_retry_timer) {
         if (!session->heartbeat_ack.ack_sent) {
-            LOG_ERROR("%sReceive Heartbeat But This Worker Session Is Never Sending Heartbeat_Ack.", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
-            return FAILURE;
+            if (session->lower_counter) {
+                session->lower_counter = false;
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+//======================================================================
+                double try_count = (double)MAX_RETRY_CNT;
+                calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+                double timer_interval = session->heartbeat_interval;
+//======================================================================
+                LOG_ERROR("%sInitiate New Heartbeat timer_interval %lf.", worker_ctx->label, timer_interval);
+                status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, timer_interval);
+                if (chst != SUCCESS) {
+                    return FAILURE;
+                }
+                return SUCCESS;
+            } else {
+                LOG_ERROR("%sReceive Heartbeat But This Worker Session Is Never Sending Heartbeat_Ack.", worker_ctx->label);
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
+                return FAILURE;
+            }
         }
         bool _1l_ = is_1lower_ctr(worker_ctx->label, (uint8_t*)oudp_datao->recv_buffer, security->mac_key, security->remote_nonce, &security->remote_ctr);
         if (_1l_) {
@@ -2923,6 +2968,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
             CLOSE_ORILINK_RAW_PROTOCOL(&oudp_datao);
             return FAILURE;
         }
+        session->lower_counter = true;
         return SUCCESS;
     }
 //----------------------------------------------------------------------
@@ -3023,12 +3069,6 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
 //session->metrics.sum_hb_interval += session->heartbeat_interval;
 //session->metrics.hb_interval = session->heartbeat_interval;
 //======================================================================
-    double timer_interval = session->heartbeat_interval;
-//======================================================================
-    status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, timer_interval);
-    if (chst != SUCCESS) {
-        return FAILURE;
-    }
     return SUCCESS;
 }
 
@@ -4202,6 +4242,17 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
             break;
         }
         case ORILINK_HEARTBEAT_ACK: {
+            if (!session->heartbeat_sender_active) {
+                session->heartbeat_sender_active = true;
+                double polling_interval = (double)1000000 / (double)1e9;
+//======================================================================
+                status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, polling_interval);
+                if (chst != SUCCESS) {
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    return FAILURE;
+                }
+//======================================================================
+            }
             CLOSE_IPC_PROTOCOL(&received_protocol);
             break;
         }
@@ -4253,7 +4304,17 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
             break;
         }
         case ORILINK_HEARTBEAT_ACK: {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            if (!session->heartbeat_sender_active) {
+                session->heartbeat_sender_active = true;
+                double polling_interval = (double)1000000 / (double)1e9;
+//======================================================================
+                status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, polling_interval);
+                if (chst != SUCCESS) {
+                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    return FAILURE;
+                }
+//======================================================================
+            }
             break;
         }
         default:

@@ -461,6 +461,13 @@ static inline double retry_interval_with_jitter(double retry_value_prediction) {
     return add_jitter(retry_interval);
 }
 
+static inline double retry_interval(double retry_value_prediction) {
+    double retry_interval = retry_value_prediction;
+    retry_interval = pow((double)2, retry_interval);
+    if (retry_interval < (double)MIN_RETRY_SEC) retry_interval = (double)MIN_RETRY_SEC;
+    return retry_interval;
+}
+
 static inline double node_hb_interval_with_jitter(double rtt_value_prediction, double retry_value_prediction) {
     double hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, retry_value_prediction);
     hb_interval = add_jitter(hb_interval);
