@@ -401,6 +401,51 @@ static inline bool is_equal_ctr(const char* label, uint8_t *data, uint8_t* key_m
     return issme;
 }
 
+static inline bool is_gc_ctr(const char* label, uint8_t *data, uint8_t* key_mac, uint8_t *nonce) {
+    uint8_t *tmp_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
+    if (!tmp_nonce) {
+        return false;
+    }
+    memcpy(tmp_nonce, nonce, AES_NONCE_BYTES);
+    uint32_t tmp_ctr = 0xffffffff;
+//----------------------------------------------------------------------
+    const size_t header_offset = AES_TAG_BYTES;
+    const size_t header_len = sizeof(uint32_t) +
+                              ORILINK_VERSION_BYTES +
+                              sizeof(uint8_t) +
+                              sizeof(uint8_t) +
+                              sizeof(uint8_t);
+    uint8_t *header = data + header_offset;
+    uint8_t decripted_header[header_len];
+    #if defined(ORILINK_DECRYPT_HEADER)
+        if (encrypt_decrypt_128(
+                label,
+                key_mac,
+                tmp_nonce,
+                &tmp_ctr,
+                header,
+                decripted_header,
+                header_len
+            ) != SUCCESS
+        )
+        {
+            memset(tmp_nonce, 0, AES_NONCE_BYTES);
+            free(tmp_nonce);
+            return false;
+        }
+    #else
+        memcpy(decripted_header, header, header_len);
+    #endif
+    uint32_t data_ctr_be;
+    memcpy(&data_ctr_be, decripted_header, sizeof(uint32_t));
+    uint32_t data_ctr = be32toh(data_ctr_be);
+    bool issme = (data_ctr == tmp_ctr);
+//----------------------------------------------------------------------    
+    memset(tmp_nonce, 0, AES_NONCE_BYTES);
+    free(tmp_nonce);
+    return issme;
+}
+
 static inline double add_jitter(double value) {
     double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
     value *= (1.0 + jitter_amount);

@@ -40,6 +40,8 @@ typedef struct {
     uint16_t polling_1ms_max_cnt;
     bool ack_rcvd;
     uint64_t ack_rcvd_time;
+    uint32_t ack_rcvd_ctr;
+    uint32_t ctr;
     uint16_t len;
     uint8_t *data;
 } control_packet_t;
@@ -47,9 +49,11 @@ typedef struct {
 typedef struct {
     bool rcvd;
     uint64_t rcvd_time;
+    uint32_t rcvd_ctr;
     bool ack_sent;
     uint8_t ack_sent_try_count;
     uint64_t ack_sent_time;
+    uint32_t ctr;
     uint16_t len;
     uint8_t *data;
     uint8_t last_trycount;
@@ -80,8 +84,6 @@ typedef struct {
     uint16_t heartbeat_sender_polling_greater_counter_1ms_cnt;
     int heartbeat_openner_timer_fd;
     bool greater_counter;
-    bool stop_retry;
-    bool stop_sender;
 //----------------------------------------------------------------------
     int test_drop_hello1_ack;
     int test_drop_hello2_ack;
@@ -124,8 +126,6 @@ typedef struct {
     uint16_t heartbeat_sender_polling_greater_counter_1ms_cnt;
     int heartbeat_openner_timer_fd;
     bool greater_counter;
-    bool stop_retry;
-    bool stop_sender;
 //----------------------------------------------------------------------
     int test_drop_heartbeat_ack;
     int test_double_heartbeat;
@@ -253,11 +253,13 @@ static inline void cleanup_control_packet(const char *label, async_type_t *async
         h->sent = false;
         h->sent_time = (uint64_t)0;
         h->ack_rcvd_time = (uint64_t)0;
+        h->ack_rcvd_ctr = (uint32_t)0;
         h->ack_rcvd = false;
     }
     switch (clean_data) {
         case CDT_RESET: {
             memset(h->data, 0, h->len);
+            h->ctr = (uint32_t)0;
             h->len = (uint16_t)0;
             break;
         }
@@ -267,6 +269,7 @@ static inline void cleanup_control_packet(const char *label, async_type_t *async
                 free(h->data);
                 h->data = NULL;
             }
+            h->ctr = (uint32_t)0;
             h->len = (uint16_t)0;
             break;
         }
@@ -286,12 +289,14 @@ static inline void setup_control_packet(control_packet_t *h) {
     h->sent = false;
     h->sent_time = (uint64_t)0;
     h->ack_rcvd_time = (uint64_t)0;
+    h->ack_rcvd_ctr = (uint32_t)0;
     h->ack_rcvd = false;
     h->sent_try_count = 0x00;
     h->polling_1ms_last_cnt = (uint16_t)0;
     h->polling_1ms_cnt = (uint16_t)0;
     h->polling_1ms_max_cnt = (uint16_t)0;
     h->data = NULL;
+    h->ctr = (uint32_t)0;
     h->len = (uint16_t)0;
     h->polling_timer_fd = -1;
 }
@@ -300,6 +305,7 @@ static inline void cleanup_control_packet_ack(control_packet_ack_t *h, bool clea
     if (clean_state) {
         h->rcvd = false;
         h->rcvd_time = (uint64_t)0;
+        h->rcvd_ctr = (uint32_t)0;
         h->ack_sent_time = (uint64_t)0;
         h->ack_sent = false;
     }
@@ -307,6 +313,7 @@ static inline void cleanup_control_packet_ack(control_packet_ack_t *h, bool clea
     switch (clean_data) {
         case CDT_RESET: {
             memset(h->data, 0, h->len);
+            h->ctr = (uint32_t)0;
             h->len = (uint16_t)0;
             break;
         }
@@ -316,6 +323,7 @@ static inline void cleanup_control_packet_ack(control_packet_ack_t *h, bool clea
                 free(h->data);
                 h->data = NULL;
             }
+            h->ctr = (uint32_t)0;
             h->len = (uint16_t)0;
             break;
         }
@@ -328,10 +336,12 @@ static inline void cleanup_control_packet_ack(control_packet_ack_t *h, bool clea
 static inline void setup_control_packet_ack(control_packet_ack_t *h) {
     h->rcvd = false;
     h->rcvd_time = (uint64_t)0;
+    h->rcvd_ctr = (uint32_t)0;
     h->ack_sent_time = (uint64_t)0;
     h->ack_sent = false;
     h->ack_sent_try_count = 0x00;
     h->data = NULL;
+    h->ctr = (uint32_t)0;
     h->len = (uint16_t)0;
     h->last_trycount = (uint8_t)0;
 }
@@ -339,8 +349,6 @@ static inline void setup_control_packet_ack(control_packet_ack_t *h) {
 static inline status_t setup_cow_session(const char *label, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
 //----------------------------------------------------------------------
     single_session->greater_counter = false;
-    single_session->stop_retry = false;
-    single_session->stop_sender = false;
 //----------------------------------------------------------------------
     single_session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
     single_session->heartbeat_sender_polling_greater_counter_1ms_cnt = (uint16_t)0;
@@ -395,8 +403,6 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
 static inline void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session) {
 //----------------------------------------------------------------------
     single_session->greater_counter = false;
-    single_session->stop_retry = false;
-    single_session->stop_sender = false;
 //----------------------------------------------------------------------
     single_session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
     single_session->heartbeat_sender_polling_greater_counter_1ms_cnt = (uint16_t)0;
@@ -451,8 +457,6 @@ static inline void cleanup_cow_session(const char *label, async_type_t *cow_asyn
 static inline status_t setup_sio_session(const char *label, sio_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
 //----------------------------------------------------------------------
     single_session->greater_counter = false;
-    single_session->stop_retry = false;
-    single_session->stop_sender = false;
 //----------------------------------------------------------------------
     single_session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
     single_session->heartbeat_sender_polling_greater_counter_1ms_cnt = (uint16_t)0;
@@ -506,8 +510,6 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
 static inline void cleanup_sio_session(const char *label, async_type_t *sio_async, sio_c_session_t *single_session) {
 //----------------------------------------------------------------------
     single_session->greater_counter = false;
-    single_session->stop_retry = false;
-    single_session->stop_sender = false;
 //----------------------------------------------------------------------
     single_session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
     single_session->heartbeat_sender_polling_greater_counter_1ms_cnt = (uint16_t)0;
