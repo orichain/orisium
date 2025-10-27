@@ -85,13 +85,8 @@ void run_cow_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
                     continue;
                 }
             } else {
-                status_t event_founded = handle_workers_timer_event(worker_ctx, sessions, &current_fd);
-                if (event_founded == SUCCESS) continue;
-//======================================================================
-// Event yang belum ditangkap
-//======================================================================                 
-                LOG_ERROR("%sUnknown FD event %d.", worker_ctx->label, current_fd);
-//======================================================================
+                handle_workers_timer_event(worker_ctx, sessions, &current_fd);
+                continue;
             }
         }
     }

@@ -142,6 +142,16 @@ static inline status_t async_set_timerfd_time(const char* label, int *timer_fd,
 }
 
 static inline status_t async_create_incoming_event(const char* label, async_type_t *async, int *fd_to_add) {
+    async->event.events = EPOLLIN;
+    async->event.data.fd = *fd_to_add;
+    if (epoll_ctl(async->async_fd, EPOLL_CTL_ADD, *fd_to_add, &async->event) == -1) {
+        LOG_ERROR("%s%s", label, strerror(errno));
+        return FAILURE;
+    }
+    return SUCCESS;
+}
+
+static inline status_t async_create_incoming_epollet_event(const char* label, async_type_t *async, int *fd_to_add) {
     async->event.events = EPOLLIN | EPOLLET;
     async->event.data.fd = *fd_to_add;
     if (epoll_ctl(async->async_fd, EPOLL_CTL_ADD, *fd_to_add, &async->event) == -1) {
@@ -152,7 +162,7 @@ static inline status_t async_create_incoming_event(const char* label, async_type
 }
 
 static inline status_t async_create_incoming_event_with_disconnect(const char* label, async_type_t *async, int *fd_to_add) {
-    async->event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
+    async->event.events = EPOLLIN | EPOLLRDHUP;
     async->event.data.fd = *fd_to_add;
     if (epoll_ctl(async->async_fd, EPOLL_CTL_ADD, *fd_to_add, &async->event) == -1) {
         LOG_ERROR("%s%s", label, strerror(errno));

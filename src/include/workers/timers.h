@@ -4,7 +4,6 @@
 #include <unistd.h>
 #include <inttypes.h>
 #include <stddef.h>
-#include <stdio.h>
 
 #include "types.h"
 #include "workers/workers.h"
@@ -44,7 +43,7 @@ static inline status_t retry_transmit(
                 }
                 return FAILURE_MAXTRY;
             }
-            if (h->data == NULL) {
+            if (h->udp_data.r_puint8_t == NULL) {
                 return FAILURE;
             }
             double try_count = (double)h->sent_try_count;
@@ -87,7 +86,7 @@ static inline status_t retry_transmit(
                 }
                 return FAILURE_MAXTRY;
             }
-            if (h->data == NULL) {
+            if (h->udp_data.r_puint8_t == NULL) {
                 return FAILURE;
             }
             double try_count = (double)h->sent_try_count;
@@ -129,14 +128,11 @@ static inline status_t polling_1ms(
     //get_time_str(timebuf, sizeof(timebuf));
     //printf("%s%s - Retry Polling..\n", worker_ctx->label, timebuf);
     double polling_interval = (double)1000000 / (double)1e9;
-    if (h->data != NULL) {
+    if (h->udp_data.r_puint8_t != NULL) {
         if (!h->ack_rcvd) {
             h->polling_1ms_cnt++;
             uint16_t polling_1ms_max_cnt = h->polling_1ms_max_cnt;
             if (h->polling_1ms_cnt >= polling_1ms_max_cnt) {
-                char timebuf[32];
-                get_time_str(timebuf, sizeof(timebuf));
-                printf("%s%s - Retry Heartbeat Cnt MS %u, For Ctr %" PRIu32 "\n", worker_ctx->label, timebuf, h->polling_1ms_cnt, h->ctr);
                 retry_transmit(
                     worker_ctx,
                     xsession,
@@ -150,7 +146,7 @@ static inline status_t polling_1ms(
                 }
             }
         } else {
-            cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false, CDT_NOACTION);
+            cleanup_control_packet(worker_ctx->label, &worker_ctx->async, h, false, CDT_FREE);
         }
     }
     return SUCCESS;
@@ -172,35 +168,14 @@ static inline status_t turns_to_polling_1ms(
                     update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, polling_interval);
                     return FAILURE;
                 }
-                session->heartbeat_ack.ack_sent = false;
-                if (create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd, polling_interval) != SUCCESS) {
-                    create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd, polling_interval);
-                    return FAILURE;
-                }
             } else {
-                if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)50 + (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
+                if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
                     session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
-                    if (session->greater_counter) {
-                        //char timebuf[32];
-                        //get_time_str(timebuf, sizeof(timebuf));
-                        //printf("%s%s - Send Heartbeat GC\n", worker_ctx->label, timebuf);
-                        //send_heartbeat_gc(worker_ctx, xsession, orilink_protocol);
-                    } else {
-                        char timebuf[32];
-                        get_time_str(timebuf, sizeof(timebuf));
-                        printf("%s%s - Send Heartbeat\n", worker_ctx->label, timebuf);
-                        send_heartbeat(worker_ctx, xsession, orilink_protocol);
-                    }
-                    session->heartbeat_sender_active = false;
+                    send_heartbeat(worker_ctx, xsession, orilink_protocol);
                 } else {
                     session->heartbeat_sender_polling_1ms_cnt++;
                     if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, polling_interval) != SUCCESS) {
                         update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, polling_interval);
-                        return FAILURE;
-                    }
-                    session->heartbeat_ack.ack_sent = false;
-                    if (create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd, polling_interval) != SUCCESS) {
-                        create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd, polling_interval);
                         return FAILURE;
                     }
                 }
@@ -216,88 +191,16 @@ static inline status_t turns_to_polling_1ms(
                     update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, polling_interval);
                     return FAILURE;
                 }
-                session->heartbeat_ack.ack_sent = false;
-                if (create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd, polling_interval) != SUCCESS) {
-                    create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd, polling_interval);
-                    return FAILURE;
-                }
             } else {
-                if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)50 + (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
+                if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
                     session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
-                    if (session->greater_counter) {
-                        //char timebuf[32];
-                        //get_time_str(timebuf, sizeof(timebuf));
-                        //printf("%s%s - Send Heartbeat GC\n", worker_ctx->label, timebuf);
-                        //send_heartbeat_gc(worker_ctx, xsession, orilink_protocol);
-                    } else {
-                        char timebuf[32];
-                        get_time_str(timebuf, sizeof(timebuf));
-                        printf("%s%s - Send Heartbeat\n", worker_ctx->label, timebuf);
-                        send_heartbeat(worker_ctx, xsession, orilink_protocol);
-                    }
-                    session->heartbeat_sender_active = false;
+                    send_heartbeat(worker_ctx, xsession, orilink_protocol);
                 } else {
                     session->heartbeat_sender_polling_1ms_cnt++;
                     if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, polling_interval) != SUCCESS) {
                         update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, polling_interval);
                         return FAILURE;
                     }
-                    session->heartbeat_ack.ack_sent = false;
-                    if (create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd, polling_interval) != SUCCESS) {
-                        create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd, polling_interval);
-                        return FAILURE;
-                    }
-                }
-            }
-            break;
-        }
-        default:
-            return FAILURE;
-    }
-    return SUCCESS;
-}
-
-static inline status_t delay_create_1ms(
-    worker_context_t *worker_ctx, 
-    void *xsession
-)
-{
-    worker_type_t wot = *worker_ctx->wot;
-    switch (wot) {
-        case COW: {
-            cow_c_session_t *session = (cow_c_session_t *)xsession;
-            double polling_interval = (double)1000000 / (double)1e9;
-            double timer_interval = session->heartbeat_interval;
-            if (session->heartbeat_sender_polling_1ms_cnt > 50) {
-                session->heartbeat_sender_polling_1ms_cnt++;
-                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
-                    update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, timer_interval);
-                    return FAILURE;
-                }
-            } else {
-                session->heartbeat_sender_polling_1ms_cnt++;
-                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, polling_interval) != SUCCESS) {
-                    update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, polling_interval);
-                    return FAILURE;
-                }
-            }
-            break;
-        }
-        case SIO: {
-            sio_c_session_t *session = (sio_c_session_t *)xsession;
-            double polling_interval = (double)1000000 / (double)1e9;
-            double timer_interval = session->heartbeat_interval;
-            if (session->heartbeat_sender_polling_1ms_cnt > 50) {
-                session->heartbeat_sender_polling_1ms_cnt++;
-                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, timer_interval) != SUCCESS) {
-                    update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, timer_interval);
-                    return FAILURE;
-                }
-            } else {
-                session->heartbeat_sender_polling_1ms_cnt++;
-                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, polling_interval) != SUCCESS) {
-                    update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, polling_interval);
-                    return FAILURE;
                 }
             }
             break;
@@ -339,11 +242,7 @@ static inline status_t handle_workers_timer_event(worker_context_t *worker_ctx, 
                 } else if (*current_fd == session->heartbeat_sender_timer_fd) {
                     uint64_t u;
                     read(session->heartbeat_sender_timer_fd, &u, sizeof(u));
-                    if (session->heartbeat_sender_polling_1ms_cnt <= 50) {
-                        return delay_create_1ms(worker_ctx, session);
-                    } else {
-                        return turns_to_polling_1ms(worker_ctx, session, ORILINK_HEARTBEAT);
-                    }
+                    return turns_to_polling_1ms(worker_ctx, session, ORILINK_HEARTBEAT);
                 } else if (*current_fd == session->heartbeat_openner_timer_fd) {
                     uint64_t u;
                     read(session->heartbeat_openner_timer_fd, &u, sizeof(u));
@@ -365,11 +264,7 @@ static inline status_t handle_workers_timer_event(worker_context_t *worker_ctx, 
                 } else if (*current_fd == session->heartbeat_sender_timer_fd) {
                     uint64_t u;
                     read(session->heartbeat_sender_timer_fd, &u, sizeof(u));
-                    if (session->heartbeat_sender_polling_1ms_cnt <= 50) {
-                        return delay_create_1ms(worker_ctx, session);
-                    } else {
-                        return turns_to_polling_1ms(worker_ctx, session, ORILINK_HEARTBEAT);
-                    }
+                    return turns_to_polling_1ms(worker_ctx, session, ORILINK_HEARTBEAT);
                 } else if (*current_fd == session->heartbeat_openner_timer_fd) {
                     uint64_t u;
                     read(session->heartbeat_openner_timer_fd, &u, sizeof(u));

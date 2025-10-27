@@ -364,7 +364,7 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                     master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                     continue;
                                 }	
-                                if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->udp_sock) != SUCCESS) {
+                                if (async_create_incoming_epollet_event(label, &master_ctx->master_async, &master_ctx->udp_sock) != SUCCESS) {
                                     LOG_ERROR("%sFailed to async_create_incoming_event socket_udp. Initiating graceful shutdown...", label);
                                     master_ctx->shutdown_requested = 1;
                                     master_workers_info(label, master_ctx, IT_SHUTDOWN);
