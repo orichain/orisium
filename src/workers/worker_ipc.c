@@ -3963,10 +3963,6 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
                     CLOSE_IPC_PROTOCOL(&received_protocol);
                     return FAILURE;
                 }
-                if (create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd, session->heartbeat_interval - (session->rtt.value_prediction / (double)1e9)) != SUCCESS) {
-                    CLOSE_IPC_PROTOCOL(&received_protocol);
-                    return FAILURE;
-                }
 //======================================================================
             }
             CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -4021,10 +4017,6 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
             if (iudp_data_acki->trycount == (uint8_t)1) {
 //======================================================================
                 if (create_polling_1ms(worker_ctx, &session->heartbeat, retry_timer_interval) != SUCCESS) {
-                    CLOSE_IPC_PROTOCOL(&received_protocol);
-                    return FAILURE;
-                }
-                if (create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd, session->heartbeat_interval - (session->rtt.value_prediction / (double)1e9)) != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
                     return FAILURE;
                 }

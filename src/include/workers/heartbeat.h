@@ -22,7 +22,6 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
             orilink_security_t *security = &session->security;
 //======================================================================
             double hb_interval = node_hb_interval_with_jitter(session->rtt.value_prediction, session->retry.value_prediction);
-            session->heartbeat_interval = hb_interval;
 //======================================================================
             uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
             if (current_time.status != SUCCESS) {
@@ -102,6 +101,13 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
             session->heartbeat.sent = true;
             session->heartbeat.ack_rcvd = false;
             session->heartbeat_ack.rcvd = false;
+//----------------------------------------------------------------------
+// Allow Heartbeat Base On Schedule
+//----------------------------------------------------------------------
+            if (create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd, hb_interval) != SUCCESS) {
+                return FAILURE;
+            }
+//----------------------------------------------------------------------
             break;
         }
         case SIO: {
@@ -190,6 +196,13 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
             session->heartbeat.sent = true;
             session->heartbeat.ack_rcvd = false;
             session->heartbeat_ack.rcvd = false;
+//----------------------------------------------------------------------
+// Allow Heartbeat Base On Schedule
+//----------------------------------------------------------------------
+            if (create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd, hb_interval) != SUCCESS) {
+                return FAILURE;
+            }
+//----------------------------------------------------------------------
             break;
         }
         default:
