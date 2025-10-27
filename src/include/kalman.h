@@ -160,7 +160,7 @@ static inline void kalman_long_double_init(
 static inline float kalman_filter(kalman_t *filter, float measurement, uint64_t current_timestamp_us) {
     float delta_t = 0.0f;
     if (filter->last_timestamp_us != (uint64_t)0) {
-        delta_t = (float)(current_timestamp_us - filter->last_timestamp_us) / 1000000.0f;
+        delta_t = (float)(current_timestamp_us - filter->last_timestamp_us) / (float)1e9;
     }
     filter->last_timestamp_us = current_timestamp_us;
     if (delta_t < 1e-6f) {
@@ -210,7 +210,7 @@ static inline float kalman_filter(kalman_t *filter, float measurement, uint64_t 
 static inline double kalman_double_filter(kalman_double_t *filter, double measurement, uint64_t current_timestamp_us) {
     double delta_t = 0.0;
     if (filter->last_timestamp_us != (uint64_t)0) {
-        delta_t = (double)(current_timestamp_us - filter->last_timestamp_us) / 1000000.0;
+        delta_t = (double)(current_timestamp_us - filter->last_timestamp_us) / (double)1e9;
     }
     filter->last_timestamp_us = current_timestamp_us;
     if (delta_t < 1e-6) {
@@ -248,7 +248,7 @@ static inline double kalman_double_filter(kalman_double_t *filter, double measur
 static inline long double kalman_long_double_filter(kalman_long_double_t *filter, long double measurement, uint64_t current_timestamp_us) {
     long double delta_t = 0.0L;
     if (filter->last_timestamp_us != (uint64_t)0) {
-        delta_t = (long double)(current_timestamp_us - filter->last_timestamp_us) / 1000000.0L;
+        delta_t = (long double)(current_timestamp_us - filter->last_timestamp_us) / (long double)1e9;
     }
     filter->last_timestamp_us = current_timestamp_us;
     if (delta_t < 1e-6L) {
