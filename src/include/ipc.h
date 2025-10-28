@@ -846,11 +846,15 @@ static inline ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const
     msg_prefix.msg_controllen = sizeof(cmsgbuf_prefix);
     LOG_DEBUG("%sTahap 1: Membaca length prefix dan potensi FD (%zu byte).", label, IPC_LENGTH_PREFIX_BYTES);
     ssize_t bytes_read_prefix_and_fd = recvmsg(*uds_fd, &msg_prefix, MSG_WAITALL);
-    if (bytes_read_prefix_and_fd == -1) {
-        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+    if (bytes_read_prefix_and_fd < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+			result.status = FAILURE_EAGNEWBLK;
+            return result;
+        } else {
             LOG_ERROR("%sreceive_ipc_raw_protocol_message recvmsg (length prefix + FD). %s", label, strerror(errno));
+            result.status = FAILURE;
+            return result;
         }
-        return result;
     }
     if (bytes_read_prefix_and_fd != (ssize_t)IPC_LENGTH_PREFIX_BYTES) {
         LOG_ERROR("%sGagal membaca length prefix sepenuhnya. Diharapkan %zu byte, diterima %zd.",
@@ -889,17 +893,16 @@ static inline ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const
                             sizeof(uint8_t) +
                             sizeof(uint8_t);
     if (bytes_read_payload < 0) {
-        if (errno != EAGAIN && errno != EWOULDBLOCK) {
-			LOG_ERROR("%sreceive_ipc_raw_protocol_message recvmsg (payload). %s", label, strerror(errno));
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
 			free(full_ipc_payload_buffer);
 			result.status = FAILURE_EAGNEWBLK;
             return result;
         } else {
-			LOG_ERROR("%sreceive_ipc_raw_protocol_message recvmsg (payload). %s", label, strerror(errno));
+            LOG_ERROR("%sreceive_ipc_raw_protocol_message recvmsg (payload). %s", label, strerror(errno));
 			free(full_ipc_payload_buffer);
 			result.status = FAILURE;
 			return result;
-		}
+        }
     } else if (bytes_read_payload < (ssize_t)min_size) {
         LOG_ERROR("%sreceive_ipc_raw_protocol_message received 0 bytes (unexpected for IPC).", label);
         free(full_ipc_payload_buffer);

@@ -175,13 +175,16 @@ void run_master(const char *label, master_context_t *master_ctx) {
 				master_workers_info(label, master_ctx,IT_SHUTDOWN);
 				continue;
 			} else if (current_fd == master_ctx->udp_sock) {
-				if (async_event_is_EPOLLIN(current_events)) {
-					if (handle_master_udp_sock_event(label, master_ctx) != SUCCESS) {
+                if (async_event_is_EPOLLHUP(current_events) ||
+                    async_event_is_EPOLLERR(current_events) ||
+                    async_event_is_EPOLLRDHUP(current_events))
+                {
+                    CLOSE_FD(&current_fd);
+                } else {
+                    if (handle_master_udp_sock_event(label, master_ctx) != SUCCESS) {
 						continue;
 					}
-				} else {
-					CLOSE_FD(&current_fd);
-				}
+                }
             } else {
                 bool event_founded_in_uds = false;
                 worker_type_t wot = UNKNOWN;
@@ -364,7 +367,7 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                     master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                     continue;
                                 }	
-                                if (async_create_incoming_epollet_event(label, &master_ctx->master_async, &master_ctx->udp_sock) != SUCCESS) {
+                                if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->udp_sock) != SUCCESS) {
                                     LOG_ERROR("%sFailed to async_create_incoming_event socket_udp. Initiating graceful shutdown...", label);
                                     master_ctx->shutdown_requested = 1;
                                     master_workers_info(label, master_ctx, IT_SHUTDOWN);

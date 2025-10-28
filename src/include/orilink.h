@@ -1297,7 +1297,6 @@ static inline orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packe
                             sizeof(uint8_t);
     if (bytes_read_payload < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-			LOG_ERROR("%sreceive_orilink_raw_protocol_packet failed: %s", label, strerror(errno));
 			free(full_orilink_payload_buffer);
             result.status = FAILURE_EAGNEWBLK;
             return result;
