@@ -169,7 +169,7 @@ static inline float kalman_filter(kalman_t *filter, float measurement, uint64_t 
 
     // Prediction Step
     // State: [position, velocity] -> Model: Constant Velocity
-    float predicted_rtt = filter->state_estimate + filter->value_velocity * delta_t;
+    float predicted_value = filter->state_estimate + filter->value_velocity * delta_t;
     
     // Prediction Covariance Matrix P (Error Estimate)
     // P_pos_pos_new = P_pos_pos_old + P_pos_vel * delta_t + P_vel_pos * delta_t + P_vel_vel * delta_t^2 + Q_pos
@@ -184,11 +184,11 @@ static inline float kalman_filter(kalman_t *filter, float measurement, uint64_t 
     filter->P_vel_vel = filter->P_vel_vel + filter->process_noise_vel; // P_vel_vel_new + Q_vel
 
     // Update Step
-    float innovation = measurement - predicted_rtt;
+    float innovation = measurement - predicted_value;
     float innovation_covariance = filter->estimated_error + filter->measurement_noise;
 
     if (fabsf(innovation_covariance) < 1e-9f) {
-        return predicted_rtt;
+        return predicted_value;
     }
 
     // Kalman Gain K
@@ -196,7 +196,7 @@ static inline float kalman_filter(kalman_t *filter, float measurement, uint64_t 
     float kalman_gain_vel = filter->P_pos_vel / innovation_covariance;     // K_vel = P_pos_vel / S (note: P_pos_vel is the position-velocity covariance)
 
     // Correct State Estimate: X(k) = X(k|k-1) + K(k) * y(k)
-    filter->state_estimate = predicted_rtt + kalman_gain_pos * innovation;
+    filter->state_estimate = predicted_value + kalman_gain_pos * innovation;
     filter->value_velocity = filter->value_velocity + kalman_gain_vel * innovation;
 
     // Correct Error Covariance: P(k) = (I - K(k)H) P(k|k-1)
@@ -218,7 +218,7 @@ static inline double kalman_double_filter(kalman_double_t *filter, double measur
     }
 
     // Prediction Step
-    double predicted_rtt = filter->state_estimate + filter->value_velocity * delta_t;
+    double predicted_value = filter->state_estimate + filter->value_velocity * delta_t;
     double FP_pos_pos = filter->estimated_error + filter->P_pos_vel * delta_t;
     double FP_pos_vel = filter->P_pos_vel + filter->P_vel_vel * delta_t;
     double P_pos_pos_temp = FP_pos_pos + FP_pos_vel * delta_t;
@@ -227,16 +227,16 @@ static inline double kalman_double_filter(kalman_double_t *filter, double measur
     filter->P_vel_vel = filter->P_vel_vel + filter->process_noise_vel;
 
     // Update Step
-    double innovation = measurement - predicted_rtt;
+    double innovation = measurement - predicted_value;
     double innovation_covariance = filter->estimated_error + filter->measurement_noise;
     if (fabs(innovation_covariance) < 1e-9) {
-        return predicted_rtt;
+        return predicted_value;
     }
 
     double kalman_gain_pos = filter->estimated_error / innovation_covariance;
     double kalman_gain_vel = filter->P_pos_vel / innovation_covariance;
     
-    filter->state_estimate = predicted_rtt + kalman_gain_pos * innovation;
+    filter->state_estimate = predicted_value + kalman_gain_pos * innovation;
     filter->value_velocity = filter->value_velocity + kalman_gain_vel * innovation;
     filter->estimated_error -= kalman_gain_pos * filter->estimated_error;
     filter->P_pos_vel -= kalman_gain_pos * filter->P_pos_vel;
@@ -256,7 +256,7 @@ static inline long double kalman_long_double_filter(kalman_long_double_t *filter
     }
     
     // Prediction Step
-    long double predicted_rtt = filter->state_estimate + filter->value_velocity * delta_t;
+    long double predicted_value = filter->state_estimate + filter->value_velocity * delta_t;
     long double FP_pos_pos = filter->estimated_error + filter->P_pos_vel * delta_t;
     long double FP_pos_vel = filter->P_pos_vel + filter->P_vel_vel * delta_t;
     long double P_pos_pos_temp = FP_pos_pos + FP_pos_vel * delta_t;
@@ -265,16 +265,16 @@ static inline long double kalman_long_double_filter(kalman_long_double_t *filter
     filter->P_vel_vel = filter->P_vel_vel + filter->process_noise_vel;
 
     // Update Step
-    long double innovation = measurement - predicted_rtt;
+    long double innovation = measurement - predicted_value;
     long double innovation_covariance = filter->estimated_error + filter->measurement_noise;
     if (fabsl(innovation_covariance) < 1e-9L) {
-        return predicted_rtt;
+        return predicted_value;
     }
 
     long double kalman_gain_pos = filter->estimated_error / innovation_covariance;
     long double kalman_gain_vel = filter->P_pos_vel / innovation_covariance;
 
-    filter->state_estimate = predicted_rtt + kalman_gain_pos * innovation;
+    filter->state_estimate = predicted_value + kalman_gain_pos * innovation;
     filter->value_velocity = filter->value_velocity + kalman_gain_vel * innovation;
     filter->estimated_error -= kalman_gain_pos * filter->estimated_error;
     filter->P_pos_vel -= kalman_gain_pos * filter->P_pos_vel;
