@@ -78,7 +78,7 @@ static inline uint32_t_status_t async_getevents(const char* label, async_type_t 
 
 static inline int_status_t async_wait(const char* label, async_type_t *async) {
     int_status_t result;
-    result.r_int = epoll_wait(async->async_fd, async->events, MAX_EVENTS, 1);
+    result.r_int = epoll_wait(async->async_fd, async->events, MAX_EVENTS, -1);
     if (result.r_int == -1) {
         if (errno == EINTR) {
             result.status = FAILURE_EINTR;
