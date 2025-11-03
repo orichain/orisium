@@ -19,8 +19,8 @@
 #define ORILINK_DECRYPT_HEADER
 //#undef ORILINK_DECRYPT_HEADER
 
-#define SALT_LEN 4
-#define ORILINK_SALT_LEN 14
+#define MAX_TIMER_LEVELS 3 
+#define WHEEL_SIZE 256
 //----------------------------------------------------------------------
 #define KALMAN_CALIBRATION_SAMPLES 50
 //----------------------------------------------------------------------
