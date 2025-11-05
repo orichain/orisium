@@ -405,7 +405,7 @@ static inline status_t htw_setup(const char *label, async_type_t *async, hierarc
 }
 
 static inline void htw_cleanup(const char *label, async_type_t *async, hierarchical_timer_wheel_t *timer) {
-    hashmap_cleanup(timer->hash_map_ctx);    
+    hashmap_cleanup(timer->hash_map_ctx);   
     for (uint32_t l = 0; l < MAX_TIMER_LEVELS; ++l) {
         timer_wheel_level_t *level = &timer->levels[l];
         for (uint32_t s = 0; s < WHEEL_SIZE; ++s) {
