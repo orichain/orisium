@@ -11,6 +11,7 @@
 #include <limits.h>
 #include <inttypes.h>
 #include <errno.h>
+#include <math.h>
 
 #include "types.h"
 
@@ -60,6 +61,9 @@ static inline void free_linked_list_internal(timer_event_t *head) {
 
 static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, uint64_t timer_id, double double_delay_ms) {
     uint64_t delay_ms = (uint64_t)ceil(double_delay_ms);
+    if (delay_ms == 0 && double_delay_ms > 0.0) {
+        delay_ms = 1;
+    }
     timer_event_t *new_event = malloc(sizeof(timer_event_t));
     if (!new_event) {
         return FAILURE_NOMEM;
@@ -70,7 +74,6 @@ static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, uint64_t
     new_event->prev_next_ptr = NULL;
     new_event->level_index = (uint8_t)MAX_TIMER_LEVELS;
     new_event->slot_index = WHEEL_SIZE;
-    
     if (timer->new_event_queue_head == NULL) {
         timer->new_event_queue_head = new_event;
         timer->new_event_queue_tail = new_event;
@@ -300,7 +303,8 @@ static inline status_t htw_reschedule_main_timer(const char *label, async_type_t
     if (next_expiration_tick > timer->global_current_tick) {
         uint64_t delay_tick = next_expiration_tick - timer->global_current_tick;
         double delay_ms = (double)delay_tick;
-        double delay_s = delay_ms / 1000.0;
+        double delay_s = delay_ms / (double)1e3;
+        
         timer->last_delay_ms = delay_ms;
         if (create_timer_oneshot(label, async, &timer->tick_event_fd, delay_s) != SUCCESS) {
             LOG_ERROR("%sFailed to re-arm main tick timer.", label);
@@ -330,7 +334,6 @@ static inline status_t htw_setup(const char *label, async_type_t *async, hierarc
     timer->global_current_tick = 0;
     timer->last_delay_ms = 0.0;
     timer->next_expiration_tick = ULLONG_MAX;
-    
     uint64_t current_factor = 1;
     for (uint32_t l = 0; l < MAX_TIMER_LEVELS; ++l) {
         timer_wheel_level_t *level = &timer->levels[l];
