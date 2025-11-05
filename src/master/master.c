@@ -308,7 +308,7 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                     metrics->sum_hb_interval = metrics->hb_interval;
                                 }
                                 double ch = worker_check_healthy_ms();
-                                status_t chst = htw_add_event(&master_ctx->timer, master_ctx->check_healthy_timer_id, (uint64_t)ch);
+                                status_t chst = htw_add_event(&master_ctx->timer, master_ctx->check_healthy_timer_id, ch);
                                 if (chst != SUCCESS) {
                                     LOG_INFO("%sGagal async_create_timerfd hb checker. Initiating graceful shutdown...", label);
                                     master_ctx->shutdown_requested = 1;

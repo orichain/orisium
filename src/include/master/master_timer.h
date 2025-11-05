@@ -35,15 +35,6 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
         if (drain_event_fd(label, timer->add_event_fd) != SUCCESS) return FAILURE;
         if (htw_move_queue_to_wheel(timer) != SUCCESS) return FAILURE;
         return htw_reschedule_main_timer(label, &master_ctx->master_async, timer);
-    } else if (*current_fd == timer->cancel_event_fd) {
-        if (drain_event_fd(label, timer->cancel_event_fd) != SUCCESS) return FAILURE;
-        htw_find_earliest_event(timer);
-        if (htw_reschedule_main_timer(label, &master_ctx->master_async, timer) != SUCCESS) {
-            LOG_ERROR("%sFailed to reschedule main tick timer after cancel event.", label);
-            return FAILURE;
-        }
-        LOG_DEVEL_DEBUG("%sReceived cancel signal. Timer rescheduled.", label);
-        return SUCCESS;
     } else if (*current_fd == timer->tick_event_fd) {
         if (drain_event_fd(label, timer->tick_event_fd) != SUCCESS) return FAILURE;
         uint64_t advance_ticks = (uint64_t)(timer->last_delay_ms);
@@ -72,7 +63,7 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
             if (expired_timer_id == master_ctx->check_healthy_timer_id) {
                 
                 double ch = worker_check_healthy_ms();
-                status_t chst = htw_add_event(&master_ctx->timer, master_ctx->check_healthy_timer_id, (uint64_t)ch);
+                status_t chst = htw_add_event(&master_ctx->timer, master_ctx->check_healthy_timer_id, ch);
                 if (chst != SUCCESS) {
                     LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
                     master_ctx->shutdown_requested = 1;

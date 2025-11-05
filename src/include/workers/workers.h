@@ -268,9 +268,9 @@ static inline void cleanup_control_packet(const char *label, hierarchical_timer_
     h->polling_1ms_last_cnt = h->polling_1ms_cnt;
     h->polling_1ms_cnt = (uint16_t)0;
     h->polling_1ms_max_cnt = (uint16_t)0;
-    if (clean_state) {
-        htw_cancel_event(timer, h->polling_timer_id);
-    }
+    //if (clean_state) {
+    //    htw_cancel_event(timer, h->polling_timer_id);
+    //}
 }
 
 static inline void setup_control_packet(const char *label, control_packet_t *h) {
@@ -393,8 +393,8 @@ static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *s
     cleanup_control_packet(ctx->label, &ctx->timer, &single_session->heartbeat, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->heartbeat_ack, true, CDT_FREE);
     single_session->heartbeat_interval = (double)NODE_HEARTBEAT_INTERVAL;
-    htw_cancel_event(&ctx->timer, single_session->heartbeat_sender_timer_id);
-    htw_cancel_event(&ctx->timer, single_session->heartbeat_openner_timer_id);
+    //htw_cancel_event(&ctx->timer, single_session->heartbeat_sender_timer_id);
+    //htw_cancel_event(&ctx->timer, single_session->heartbeat_openner_timer_id);
     cleanup_oricle_double(&single_session->retry);
     cleanup_oricle_double(&single_session->rtt);
     cleanup_oricle_long_double(&single_session->avgtt);
@@ -497,8 +497,8 @@ static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *s
     cleanup_control_packet_ack(&single_session->heartbeat_ack, true, CDT_FREE);
     single_session->heartbeat_interval = (double)1;
     single_session->heartbeat_cnt = 0x00;
-    htw_cancel_event(&ctx->timer, single_session->heartbeat_sender_timer_id);
-    htw_cancel_event(&ctx->timer, single_session->heartbeat_openner_timer_id);
+    //htw_cancel_event(&ctx->timer, single_session->heartbeat_sender_timer_id);
+    //htw_cancel_event(&ctx->timer, single_session->heartbeat_openner_timer_id);
     cleanup_oricle_double(&single_session->retry);
     cleanup_oricle_double(&single_session->rtt);
     cleanup_oricle_double(&single_session->healthy);

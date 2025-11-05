@@ -17,7 +17,7 @@
 static inline status_t create_polling_1ms(worker_context_t *worker_ctx, control_packet_t *h, double total_polling_interval) {
     double polling_interval = (double)1;
     h->polling_1ms_max_cnt = (uint16_t)ceil(total_polling_interval);
-    status_t ctmr = htw_add_event(&worker_ctx->timer, h->polling_timer_id, (uint64_t)polling_interval);
+    status_t ctmr = htw_add_event(&worker_ctx->timer, h->polling_timer_id, polling_interval);
     if (ctmr != SUCCESS) {
         return FAILURE;
     }
@@ -145,7 +145,7 @@ static inline status_t polling_1ms(
                     orilink_protocol
                 );
             } else {
-                htw_add_event(&worker_ctx->timer, h->polling_timer_id, (uint64_t)polling_interval);
+                htw_add_event(&worker_ctx->timer, h->polling_timer_id, polling_interval);
             }
         } else {
             cleanup_control_packet(worker_ctx->label, &worker_ctx->timer, h, false, CDT_FREE);
@@ -166,14 +166,14 @@ static inline status_t turns_to_polling_1ms(
             cow_c_session_t *session = (cow_c_session_t *)xsession;
             double polling_interval = (double)1;
             if (!session->heartbeat.ack_rcvd) {
-                htw_add_event(&worker_ctx->timer, session->heartbeat_sender_timer_id, (uint64_t)polling_interval);
+                htw_add_event(&worker_ctx->timer, session->heartbeat_sender_timer_id, polling_interval);
             } else {
                 if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
                     session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
                     send_heartbeat(worker_ctx, xsession, orilink_protocol);
                 } else {
                     session->heartbeat_sender_polling_1ms_cnt++;
-                    htw_add_event(&worker_ctx->timer, session->heartbeat_sender_timer_id, (uint64_t)polling_interval);
+                    htw_add_event(&worker_ctx->timer, session->heartbeat_sender_timer_id, polling_interval);
                 }
             }
             break;
@@ -182,14 +182,14 @@ static inline status_t turns_to_polling_1ms(
             sio_c_session_t *session = (sio_c_session_t *)xsession;
             double polling_interval = (double)1;
             if (!session->heartbeat.ack_rcvd) {
-                htw_add_event(&worker_ctx->timer, session->heartbeat_sender_timer_id, (uint64_t)polling_interval);
+                htw_add_event(&worker_ctx->timer, session->heartbeat_sender_timer_id, polling_interval);
             } else {
                 if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
                     session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
                     send_heartbeat(worker_ctx, xsession, orilink_protocol);
                 } else {
                     session->heartbeat_sender_polling_1ms_cnt++;
-                    htw_add_event(&worker_ctx->timer, session->heartbeat_sender_timer_id, (uint64_t)polling_interval);
+                    htw_add_event(&worker_ctx->timer, session->heartbeat_sender_timer_id, polling_interval);
                 }
             }
             break;
@@ -270,15 +270,6 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
         if (drain_event_fd(worker_ctx->label, timer->add_event_fd) != SUCCESS) return FAILURE;
         if (htw_move_queue_to_wheel(timer) != SUCCESS) return FAILURE;
         return htw_reschedule_main_timer(worker_ctx->label, &worker_ctx->async, timer);
-    } else if (*current_fd == timer->cancel_event_fd) {
-        if (drain_event_fd(worker_ctx->label, timer->cancel_event_fd) != SUCCESS) return FAILURE;
-        htw_find_earliest_event(timer);
-        if (htw_reschedule_main_timer(worker_ctx->label, &worker_ctx->async, timer) != SUCCESS) {
-            LOG_ERROR("%sFailed to reschedule main tick timer after cancel event.", worker_ctx->label);
-            return FAILURE;
-        }
-        LOG_DEVEL_DEBUG("%sReceived cancel signal. Timer rescheduled.", worker_ctx->label);
-        return SUCCESS;
     } else if (*current_fd == timer->tick_event_fd) {
         if (drain_event_fd(worker_ctx->label, timer->tick_event_fd) != SUCCESS) return FAILURE;
         uint64_t advance_ticks = (uint64_t)(timer->last_delay_ms);
@@ -306,7 +297,7 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
             uint64_t expired_timer_id = current_event->timer_id;
             if (expired_timer_id == worker_ctx->heartbeat_timer_id) {
                 double new_heartbeat_interval_double = worker_hb_interval_with_jitter_ms();
-                status_t chst = htw_add_event(&worker_ctx->timer, worker_ctx->heartbeat_timer_id, (uint64_t)new_heartbeat_interval_double);
+                status_t chst = htw_add_event(&worker_ctx->timer, worker_ctx->heartbeat_timer_id, new_heartbeat_interval_double);
                 if (chst != SUCCESS) {
                     LOG_ERROR("%sWorker error htw_add_event for heartbeat.", worker_ctx->label);
                     handler_result = FAILURE;

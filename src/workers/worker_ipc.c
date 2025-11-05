@@ -711,7 +711,7 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
 // Aktifkan Heartbeat Karna security/Enkripsi Sudah Ready
 //---------------------------------------------------------------------- 
         double delay_ms = worker_hb_interval_ms();
-        status_t chst = htw_add_event(&worker_ctx->timer, worker_ctx->heartbeat_timer_id, (uint64_t)delay_ms);
+        status_t chst = htw_add_event(&worker_ctx->timer, worker_ctx->heartbeat_timer_id, delay_ms);
         if (chst != SUCCESS) {
             LOG_ERROR("%sWorker error htw_add_event...", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -3934,7 +3934,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
             if (iudp_data_acki->trycount == (uint8_t)1) {
                 double timer_interval = session->heartbeat_interval;
 //======================================================================
-                status_t chst = htw_add_event(&worker_ctx->timer, session->heartbeat_sender_timer_id, (uint64_t)timer_interval);
+                status_t chst = htw_add_event(&worker_ctx->timer, session->heartbeat_sender_timer_id, timer_interval);
                 if (chst != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
                     return FAILURE;
@@ -3991,7 +3991,7 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
             if (iudp_data_acki->trycount == (uint8_t)1) {
                 double timer_interval = session->heartbeat_interval;
 //======================================================================
-                status_t chst = htw_add_event(&worker_ctx->timer, session->heartbeat_sender_timer_id, (uint64_t)timer_interval);
+                status_t chst = htw_add_event(&worker_ctx->timer, session->heartbeat_sender_timer_id, timer_interval);
                 if (chst != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
                     return FAILURE;
