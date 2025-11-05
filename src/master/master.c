@@ -17,10 +17,12 @@
 #include "master/ipc/handlers.h"
 #include "master/workers.h"
 #include "master/master.h"
+#include "master/master_timer.h"
 #include "master/ipc/worker_ipc_cmds.h"
 #include "master/worker_metrics.h"
 #include "master/worker_selector.h"
 #include "node.h"
+#include "timer.h"
 
 volatile sig_atomic_t shutdown_requested = 0;
 int *shutdown_event_fd = NULL;
@@ -70,7 +72,9 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
 	master_ctx->master_pid = 0;
 	master_ctx->shutdown_event_fd = -1;
     master_ctx->udp_sock = -1;
-    master_ctx->check_healthy_timer_fd = -1;
+    if (generate_uint64_t_id(label, &master_ctx->check_healthy_timer_id) != SUCCESS) {
+        return FAILURE;
+    }
     master_ctx->master_async.async_fd = -1;
     master_ctx->master_pid = getpid();
 //======================================================================
@@ -79,13 +83,14 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
 	if (async_create(label, &master_ctx->master_async) != SUCCESS) {
         return FAILURE;
 	}
-	if (async_create_eventfd_nonblock_close_after_exec(label, &master_ctx->shutdown_event_fd) != SUCCESS) {
+	if (async_create_event(label, &master_ctx->shutdown_event_fd) != SUCCESS) {
         return FAILURE;
 	}
 	if (async_create_incoming_event(label, &master_ctx->master_async, &master_ctx->shutdown_event_fd) != SUCCESS) {
         return FAILURE;
 	}
     shutdown_event_fd = &master_ctx->shutdown_event_fd;
+    if (htw_setup(label, &master_ctx->master_async, &master_ctx->timer) != SUCCESS) return FAILURE;
     return SUCCESS;
 }
 
@@ -119,9 +124,11 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     master_ctx->all_workers_is_ready = false;
     master_ctx->last_sio_rr_idx = 0;
     master_ctx->last_cow_rr_idx = 0;
+    async_delete_event(label, &master_ctx->master_async, &master_ctx->udp_sock);
     CLOSE_FD(&master_ctx->udp_sock);
-    async_delete_event(label, &master_ctx->master_async, &master_ctx->check_healthy_timer_fd);
-    CLOSE_FD(&master_ctx->check_healthy_timer_fd);
+    async_delete_event(label, &master_ctx->master_async, &master_ctx->shutdown_event_fd);
+    CLOSE_FD(&master_ctx->shutdown_event_fd);
+    htw_cleanup(label, &master_ctx->master_async, &master_ctx->timer);
     CLOSE_FD(&master_ctx->master_async.async_fd);
     master_ctx->listen_port = (uint16_t)0;
     memset(&master_ctx->bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
@@ -148,26 +155,7 @@ void run_master(const char *label, master_context_t *master_ctx) {
 			uint32_t_status_t events_status = async_getevents(label, &master_ctx->master_async, n);
 			if (events_status.status != SUCCESS) continue;
 			uint32_t current_events = events_status.r_uint32_t;	
-			if (current_fd == master_ctx->check_healthy_timer_fd) {
-				uint64_t u;
-				read(master_ctx->check_healthy_timer_fd, &u, sizeof(u)); //Jangan lupa read event timer
-                status_t uhst = update_timer_oneshot(label, &master_ctx->check_healthy_timer_fd, (double)WORKER_CHECK_HEALTHY);
-                if (uhst != SUCCESS) {
-                    LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
-                    master_ctx->shutdown_requested = 1;
-                    master_workers_info(label, master_ctx, IT_SHUTDOWN);
-                    continue;
-                }
-                master_ctx->hb_check_times++;
-                if (master_ctx->hb_check_times >= REKEYING_HB_TIMES) {
-                    master_ctx->hb_check_times = (uint16_t)0;
-                    master_ctx->is_rekeying = true;
-                    master_ctx->all_workers_is_ready = false;
-                    master_workers_info(label, master_ctx, IT_REKEYING);
-                } else {
-                    if (check_workers_healthy(label, master_ctx) != SUCCESS) continue;
-                }
-			} else if (current_fd == master_ctx->shutdown_event_fd) {
+			if (current_fd == master_ctx->shutdown_event_fd) {
 				uint64_t u;
 				read(master_ctx->shutdown_event_fd, &u, sizeof(u));
 				LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
@@ -319,7 +307,8 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                     metrics->hb_interval = (double)0;
                                     metrics->sum_hb_interval = metrics->hb_interval;
                                 }
-                                status_t chst = create_timer_oneshot(label, &master_ctx->master_async, &master_ctx->check_healthy_timer_fd, (double)WORKER_CHECK_HEALTHY);
+                                double ch = worker_check_healthy_ms();
+                                status_t chst = htw_add_event(&master_ctx->timer, master_ctx->check_healthy_timer_id, (uint64_t)ch);
                                 if (chst != SUCCESS) {
                                     LOG_INFO("%sGagal async_create_timerfd hb checker. Initiating graceful shutdown...", label);
                                     master_ctx->shutdown_requested = 1;
@@ -383,18 +372,13 @@ void run_master(const char *label, master_context_t *master_ctx) {
                         }
                     }
                 }
-//======================================================================
-// Event yang belum ditangkap
-//======================================================================                 
-                LOG_ERROR("%sUnknown FD event %d.", label, current_fd);
-//======================================================================
+                handle_master_timer_event(label, master_ctx, &current_fd);
+                continue;
             }
         }
     }
 //======================================================================
 // Cleanup
-// event shutdown tidak di close karena
-// async_create_eventfd_nonblock_close_after_exec <= close after exec/read
 //======================================================================
 exit:
     cleanup_workers(label, master_ctx);

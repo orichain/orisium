@@ -12,6 +12,7 @@
 #include "orilink.h"
 #include "stdbool.h"
 #include "orilink/heartbeat_ack.h"
+#include "timer.h"
 
 static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsession, orilink_protocol_type_t orilink_protocol) {
     worker_type_t wot = *worker_ctx->wot;
@@ -21,13 +22,10 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
             orilink_identity_t *identity = &session->identity;
             orilink_security_t *security = &session->security;
 //======================================================================
-            double hb_interval = node_hb_interval_with_jitter(session->rtt.value_prediction, session->retry.value_prediction);
+            double hb_interval = node_hb_interval_with_jitter_ms(session->rtt.value_prediction, session->retry.value_prediction);
 //======================================================================
             uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
             if (current_time.status != SUCCESS) {
-                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, hb_interval) != SUCCESS) {
-                    return FAILURE;
-                }
                 return FAILURE;
             }
 //----------------------------------------------------------------------
@@ -53,9 +51,6 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
                 if (l_inc_ctr != 0xFF) {
                     decrement_ctr(&security->local_ctr, security->local_nonce);
                 }
-                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, hb_interval) != SUCCESS) {
-                    return FAILURE;
-                }
                 return FAILURE;
             }
             session->heartbeat.udp_data = create_orilink_raw_protocol_packet(
@@ -70,9 +65,6 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
             if (session->heartbeat.udp_data.status != SUCCESS) {
                 if (l_inc_ctr != 0xFF) {
                     decrement_ctr(&security->local_ctr, security->local_nonce);
-                }
-                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, hb_interval) != SUCCESS) {
-                    return FAILURE;
                 }
                 return FAILURE;
             }
@@ -93,9 +85,6 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
                 if (l_inc_ctr != 0xFF) {
                     decrement_ctr(&security->local_ctr, security->local_nonce);
                 }
-                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, hb_interval) != SUCCESS) {
-                    return FAILURE;
-                }
                 return FAILURE;
             }
             session->heartbeat.sent = true;
@@ -104,7 +93,9 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
 //----------------------------------------------------------------------
 // Allow Heartbeat Base On Schedule
 //----------------------------------------------------------------------
-            if (create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd, hb_interval) != SUCCESS) {
+            double openner_intv = hb_interval - (double)10;
+            status_t otmr = htw_add_event(&worker_ctx->timer, session->heartbeat_openner_timer_id, (uint64_t)openner_intv);
+            if (otmr != SUCCESS) {
                 return FAILURE;
             }
 //----------------------------------------------------------------------
@@ -115,14 +106,10 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
             orilink_identity_t *identity = &session->identity;
             orilink_security_t *security = &session->security;
 //======================================================================
-            double hb_interval = node_hb_interval_with_jitter(session->rtt.value_prediction, session->retry.value_prediction);
-            session->heartbeat_interval = hb_interval;
+            double hb_interval = node_hb_interval_with_jitter_ms(session->rtt.value_prediction, session->retry.value_prediction);
 //======================================================================
             uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
             if (current_time.status != SUCCESS) {
-                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, hb_interval) != SUCCESS) {
-                    return FAILURE;
-                }
                 return FAILURE;
             }
 //----------------------------------------------------------------------
@@ -148,9 +135,6 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
                 if (l_inc_ctr != 0xFF) {
                     decrement_ctr(&security->local_ctr, security->local_nonce);
                 }
-                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, hb_interval) != SUCCESS) {
-                    return FAILURE;
-                }
                 return FAILURE;
             }
             session->heartbeat.udp_data = create_orilink_raw_protocol_packet(
@@ -165,9 +149,6 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
             if (session->heartbeat.udp_data.status != SUCCESS) {
                 if (l_inc_ctr != 0xFF) {
                     decrement_ctr(&security->local_ctr, security->local_nonce);
-                }
-                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, hb_interval) != SUCCESS) {
-                    return FAILURE;
                 }
                 return FAILURE;
             }
@@ -188,9 +169,6 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
                 if (l_inc_ctr != 0xFF) {
                     decrement_ctr(&security->local_ctr, security->local_nonce);
                 }
-                if (update_timer_oneshot(worker_ctx->label, &session->heartbeat_sender_timer_fd, hb_interval) != SUCCESS) {
-                    return FAILURE;
-                }
                 return FAILURE;
             }
             session->heartbeat.sent = true;
@@ -199,7 +177,9 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
 //----------------------------------------------------------------------
 // Allow Heartbeat Base On Schedule
 //----------------------------------------------------------------------
-            if (create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_openner_timer_fd, hb_interval) != SUCCESS) {
+            double openner_intv = hb_interval - (double)10;
+            status_t otmr = htw_add_event(&worker_ctx->timer, session->heartbeat_openner_timer_id, (uint64_t)openner_intv);
+            if (otmr != SUCCESS) {
                 return FAILURE;
             }
 //----------------------------------------------------------------------

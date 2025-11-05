@@ -16,8 +16,9 @@
 #include "orilink/protocol.h"
 #include "pqc.h"
 #include "stdbool.h"
-#include "types.h"
 #include "utilities.h"
+#include "types.h"
+#include "timer.h"
 
 typedef struct {
     double hb_interval;
@@ -34,7 +35,7 @@ typedef struct {
     bool sent;
     uint8_t sent_try_count;
     uint64_t sent_time;
-    int polling_timer_fd;
+    uint64_t polling_timer_id;
     uint16_t polling_1ms_last_cnt;
     uint16_t polling_1ms_cnt;
     uint16_t polling_1ms_max_cnt;
@@ -73,9 +74,9 @@ typedef struct {
     control_packet_ack_t heartbeat_ack;
     double heartbeat_interval;
     uint8_t heartbeat_cnt;
-    int heartbeat_sender_timer_fd;
+    uint64_t heartbeat_sender_timer_id;
     uint16_t heartbeat_sender_polling_1ms_cnt;
-    int heartbeat_openner_timer_fd;
+    uint64_t heartbeat_openner_timer_id;
 //----------------------------------------------------------------------
     int test_drop_hello1_ack;
     int test_drop_hello2_ack;
@@ -113,9 +114,9 @@ typedef struct {
     control_packet_t heartbeat;
     control_packet_ack_t heartbeat_ack;
     double heartbeat_interval;
-    int heartbeat_sender_timer_fd;
+    uint64_t heartbeat_sender_timer_id;
     uint16_t heartbeat_sender_polling_1ms_cnt;
-    int heartbeat_openner_timer_fd;
+    uint64_t heartbeat_openner_timer_id;
 //----------------------------------------------------------------------
     int test_drop_heartbeat_ack;
     int test_double_heartbeat;
@@ -137,7 +138,7 @@ typedef struct {
     int *master_uds_fd;
     sig_atomic_t shutdown_requested;
     async_type_t async;
-    int heartbeat_timer_fd;
+    uint64_t heartbeat_timer_id;
     char *label;
     uint8_t *kem_privatekey;
     uint8_t *kem_publickey;
@@ -155,6 +156,7 @@ typedef struct {
     bool hello2_ack_rcvd;
     bool is_rekeying;
     ipc_protocol_queue_t *rekeying_queue;
+    hierarchical_timer_wheel_t timer;
 } worker_context_t;
 
 status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *wot, uint8_t *index, int *master_uds_fd);
@@ -238,7 +240,7 @@ static inline void calculate_rtt(const char *label, void *void_session, worker_t
     }
 }
 
-static inline void cleanup_control_packet(const char *label, async_type_t *async, control_packet_t *h, bool clean_state, clean_data_type_t clean_data) {
+static inline void cleanup_control_packet(const char *label, hierarchical_timer_wheel_t *timer, control_packet_t *h, bool clean_state, clean_data_type_t clean_data) {
     if (clean_state) {
         h->sent = false;
         h->sent_time = (uint64_t)0;
@@ -267,12 +269,11 @@ static inline void cleanup_control_packet(const char *label, async_type_t *async
     h->polling_1ms_cnt = (uint16_t)0;
     h->polling_1ms_max_cnt = (uint16_t)0;
     if (clean_state) {
-        async_delete_event(label, async, &h->polling_timer_fd);
-        CLOSE_FD(&h->polling_timer_fd);
+        htw_cancel_event(timer, h->polling_timer_id);
     }
 }
 
-static inline void setup_control_packet(control_packet_t *h) {
+static inline void setup_control_packet(const char *label, control_packet_t *h) {
     h->sent = false;
     h->sent_time = (uint64_t)0;
     h->ack_rcvd_time = (uint64_t)0;
@@ -283,7 +284,7 @@ static inline void setup_control_packet(control_packet_t *h) {
     h->polling_1ms_max_cnt = (uint16_t)0;
     h->udp_data.r_puint8_t = NULL;
     h->udp_data.r_size_t = (size_t)0;
-    h->polling_timer_fd = -1;
+    generate_uint64_t_id(label, &h->polling_timer_id);
 }
 
 static inline void cleanup_control_packet_ack(control_packet_ack_t *h, bool clean_state, clean_data_type_t clean_data) {
@@ -335,15 +336,19 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
     single_session->test_drop_heartbeat_ack = 0;
     single_session->test_double_heartbeat = 0;
 //----------------------------------------------------------------------
-    setup_control_packet(&single_session->hello1);
-    setup_control_packet(&single_session->hello2);
-    setup_control_packet(&single_session->hello3);
-    setup_control_packet(&single_session->hello4);
-    setup_control_packet(&single_session->heartbeat);
+    setup_control_packet(label, &single_session->hello1);
+    setup_control_packet(label, &single_session->hello2);
+    setup_control_packet(label, &single_session->hello3);
+    setup_control_packet(label, &single_session->hello4);
+    setup_control_packet(label, &single_session->heartbeat);
     setup_control_packet_ack(&single_session->heartbeat_ack);
     single_session->heartbeat_interval = (double)NODE_HEARTBEAT_INTERVAL;
-    single_session->heartbeat_sender_timer_fd = -1;
-    single_session->heartbeat_openner_timer_fd = -1;
+    if (generate_uint64_t_id(label, &single_session->heartbeat_sender_timer_id) != SUCCESS) {
+        return FAILURE;
+    }
+    if (generate_uint64_t_id(label, &single_session->heartbeat_openner_timer_id) != SUCCESS) {
+        return FAILURE;
+    }
     setup_oricle_double(&single_session->retry, (double)0);
     setup_oricle_double(&single_session->rtt, (double)0);
     setup_oricle_long_double(&single_session->avgtt, (long double)0);
@@ -377,21 +382,19 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
     return SUCCESS;
 }
 
-static inline void cleanup_cow_session(const char *label, async_type_t *cow_async, cow_c_session_t *single_session) {
+static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *single_session) {
 //----------------------------------------------------------------------
     single_session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
 //----------------------------------------------------------------------
-    cleanup_control_packet(label, cow_async, &single_session->hello1, true, CDT_FREE);
-    cleanup_control_packet(label, cow_async, &single_session->hello2, true, CDT_FREE);
-    cleanup_control_packet(label, cow_async, &single_session->hello3, true, CDT_FREE);
-    cleanup_control_packet(label, cow_async, &single_session->hello4, true, CDT_FREE);
-    cleanup_control_packet(label, cow_async, &single_session->heartbeat, true, CDT_FREE);
+    cleanup_control_packet(ctx->label, &ctx->timer, &single_session->hello1, true, CDT_FREE);
+    cleanup_control_packet(ctx->label, &ctx->timer, &single_session->hello2, true, CDT_FREE);
+    cleanup_control_packet(ctx->label, &ctx->timer, &single_session->hello3, true, CDT_FREE);
+    cleanup_control_packet(ctx->label, &ctx->timer, &single_session->hello4, true, CDT_FREE);
+    cleanup_control_packet(ctx->label, &ctx->timer, &single_session->heartbeat, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->heartbeat_ack, true, CDT_FREE);
     single_session->heartbeat_interval = (double)NODE_HEARTBEAT_INTERVAL;
-    async_delete_event(label, cow_async, &single_session->heartbeat_sender_timer_fd);
-    CLOSE_FD(&single_session->heartbeat_sender_timer_fd);
-    async_delete_event(label, cow_async, &single_session->heartbeat_openner_timer_fd);
-    CLOSE_FD(&single_session->heartbeat_openner_timer_fd);
+    htw_cancel_event(&ctx->timer, single_session->heartbeat_sender_timer_id);
+    htw_cancel_event(&ctx->timer, single_session->heartbeat_openner_timer_id);
     cleanup_oricle_double(&single_session->retry);
     cleanup_oricle_double(&single_session->rtt);
     cleanup_oricle_long_double(&single_session->avgtt);
@@ -445,12 +448,16 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     setup_control_packet_ack(&single_session->hello2_ack);
     setup_control_packet_ack(&single_session->hello3_ack);
     setup_control_packet_ack(&single_session->hello4_ack);
-    setup_control_packet(&single_session->heartbeat);
+    setup_control_packet(label, &single_session->heartbeat);
     setup_control_packet_ack(&single_session->heartbeat_ack);
     single_session->heartbeat_interval = (double)1;
     single_session->heartbeat_cnt = 0x00;
-    single_session->heartbeat_sender_timer_fd = -1;
-    single_session->heartbeat_openner_timer_fd = -1;
+    if (generate_uint64_t_id(label, &single_session->heartbeat_sender_timer_id) != SUCCESS) {
+        return FAILURE;
+    }
+    if (generate_uint64_t_id(label, &single_session->heartbeat_openner_timer_id) != SUCCESS) {
+        return FAILURE;
+    }
     setup_oricle_double(&single_session->retry, (double)0);
     setup_oricle_double(&single_session->rtt, (double)0);
     setup_oricle_double(&single_session->healthy, (double)100);
@@ -478,7 +485,7 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     return SUCCESS;
 }
 
-static inline void cleanup_sio_session(const char *label, async_type_t *sio_async, sio_c_session_t *single_session) {
+static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *single_session) {
 //----------------------------------------------------------------------
     single_session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
 //----------------------------------------------------------------------
@@ -486,14 +493,12 @@ static inline void cleanup_sio_session(const char *label, async_type_t *sio_asyn
     cleanup_control_packet_ack(&single_session->hello2_ack, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->hello3_ack, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->hello4_ack, true, CDT_FREE);
-    cleanup_control_packet(label, sio_async, &single_session->heartbeat, true, CDT_FREE);
+    cleanup_control_packet(ctx->label, &ctx->timer, &single_session->heartbeat, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->heartbeat_ack, true, CDT_FREE);
     single_session->heartbeat_interval = (double)1;
     single_session->heartbeat_cnt = 0x00;
-    async_delete_event(label, sio_async, &single_session->heartbeat_sender_timer_fd);
-    CLOSE_FD(&single_session->heartbeat_sender_timer_fd);
-    async_delete_event(label, sio_async, &single_session->heartbeat_openner_timer_fd);
-    CLOSE_FD(&single_session->heartbeat_openner_timer_fd);
+    htw_cancel_event(&ctx->timer, single_session->heartbeat_sender_timer_id);
+    htw_cancel_event(&ctx->timer, single_session->heartbeat_openner_timer_id);
     cleanup_oricle_double(&single_session->retry);
     cleanup_oricle_double(&single_session->rtt);
     cleanup_oricle_double(&single_session->healthy);

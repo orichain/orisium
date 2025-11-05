@@ -87,8 +87,7 @@ static inline status_t update_timer_oneshot(const char* label, int *file_descrip
 }
 
 static void increment_ctr(uint32_t *ctr, uint8_t *nonce) {
-    //if (*ctr == 0xFFFFFFFFUL) { 0xFFFFFFFF is used by gc
-    if (*ctr == 0xFFFFFFFEUL) {
+    if (*ctr == 0xFFFFFFFFUL) {
         *ctr = 0;
         uint8_t carry = 1;
         for (int i = ((int)AES_NONCE_BYTES-(int)1); i >= 0; i--) {
@@ -220,8 +219,7 @@ static inline status_t compare_mac(
 
 static inline void decrement_ctr(uint32_t *ctr, uint8_t *nonce) {
     if (*ctr == 0) {
-        //*ctr = 0xFFFFFFFFUL; 0xFFFFFFFF is used by gc
-        *ctr = 0xFFFFFFFEUL;
+        *ctr = 0xFFFFFFFFUL;
         uint8_t borrow = 1;
         for (int i = ((int)AES_NONCE_BYTES-(int)1); i >= 0; i--) {
             int16_t temp_diff = nonce[i] - borrow;
@@ -454,33 +452,55 @@ static inline double add_jitter(double value) {
     return value;
 }
 
-static inline double retry_interval_with_jitter(double retry_value_prediction) {
+static inline double retry_interval_with_jitter_ms(double retry_value_prediction) {
     double retry_interval = retry_value_prediction;
     retry_interval = pow((double)2, retry_interval);
     if (retry_interval < (double)MIN_RETRY_SEC) retry_interval = (double)MIN_RETRY_SEC;
+    retry_interval *= (double)1e3;
     return add_jitter(retry_interval);
 }
 
-static inline double retry_interval(double retry_value_prediction) {
+static inline double retry_interval_ms(double retry_value_prediction) {
     double retry_interval = retry_value_prediction;
     retry_interval = pow((double)2, retry_interval);
     if (retry_interval < (double)MIN_RETRY_SEC) retry_interval = (double)MIN_RETRY_SEC;
+    retry_interval *= (double)1e3;
     return retry_interval;
 }
 
-static inline double node_hb_interval_with_jitter(double rtt_value_prediction, double retry_value_prediction) {
+static inline double node_hb_interval_with_jitter_ms(double rtt_value_prediction, double retry_value_prediction) {
     double hb_interval = (double)NODE_HEARTBEAT_INTERVAL * pow((double)2, retry_value_prediction);
+    hb_interval *= (double)1e3;
     hb_interval = add_jitter(hb_interval);
-    hb_interval += rtt_value_prediction / (double)1e9;
+    hb_interval += rtt_value_prediction / (double)1e6;
     if (hb_interval < 0.001) {
         hb_interval = 0.001;
     }
     return hb_interval;
 }
 
-static inline double worker_hb_interval_with_jitter() {
+static inline double worker_hb_interval_with_jitter_ms() {
     double hb_interval = (double)WORKER_HEARTBEAT_INTERVAL;
+    hb_interval *= (double)1e3;
     hb_interval = add_jitter(hb_interval);
+    if (hb_interval < 0.1) {
+        hb_interval = 0.1;
+    }
+    return hb_interval;
+}
+
+static inline double worker_hb_interval_ms() {
+    double hb_interval = (double)WORKER_HEARTBEAT_INTERVAL;
+    hb_interval *= (double)1e3;
+    if (hb_interval < 0.1) {
+        hb_interval = 0.1;
+    }
+    return hb_interval;
+}
+
+static inline double worker_check_healthy_ms() {
+    double hb_interval = (double)WORKER_CHECK_HEALTHY;
+    hb_interval *= (double)1e3;
     if (hb_interval < 0.1) {
         hb_interval = 0.1;
     }

@@ -11,8 +11,6 @@
 #include "log.h"
 #include "types.h"
 
-// --- Kalman Filter Structures (Float) ---
-
 typedef struct {
     float state_estimate;
     float value_velocity;
@@ -25,8 +23,6 @@ typedef struct {
     uint64_t last_timestamp_us;    
     uint8_t is_initialized;
 } kalman_t;
-
-// --- Kalman Filter Structures (Double) ---
 
 typedef struct {
     double state_estimate;
@@ -41,8 +37,6 @@ typedef struct {
     uint8_t is_initialized;
 } kalman_double_t;
 
-// --- Kalman Filter Structures (Long Double) ---
-
 typedef struct {
     long double state_estimate;
     long double value_velocity;
@@ -56,8 +50,6 @@ typedef struct {
     uint8_t is_initialized;
 } kalman_long_double_t;
 
-// --- Oricle (Oracle + Filter) Structures (Float) ---
-
 typedef struct {
     uint8_t first_check;
     kalman_t kalman_filter;
@@ -67,8 +59,6 @@ typedef struct {
     float temp_ewma_value;
     float value_prediction;
 } oricle_t;
-
-// --- Oricle (Oracle + Filter) Structures (Double) ---
 
 typedef struct {
     uint8_t first_check;
@@ -80,8 +70,6 @@ typedef struct {
     double value_prediction;
 } oricle_double_t;
 
-// --- Oricle (Oracle + Filter) Structures (Long Double) ---
-
 typedef struct {
     uint8_t first_check;
     kalman_long_double_t kalman_filter;
@@ -91,10 +79,6 @@ typedef struct {
     long double temp_ewma_value;
     long double value_prediction;
 } oricle_long_double_t;
-
-// -----------------------------------------------------------------
-// --- Initialization Functions ---
-// -----------------------------------------------------------------
 
 static inline void kalman_init(
     kalman_t *filter,
@@ -153,10 +137,6 @@ static inline void kalman_long_double_init(
     filter->is_initialized          = false;
 }
 
-// -----------------------------------------------------------------
-// --- Filter Update Functions (Constant Velocity Model) ---
-// -----------------------------------------------------------------
-
 static inline float kalman_filter(kalman_t *filter, float measurement, uint64_t current_timestamp_us) {
     float delta_t = 0.0f;
     if (filter->last_timestamp_us != (uint64_t)0) {
@@ -166,44 +146,25 @@ static inline float kalman_filter(kalman_t *filter, float measurement, uint64_t 
     if (delta_t < 1e-6f) {
         return filter->state_estimate;
     }
-
-    // Prediction Step
-    // State: [position, velocity] -> Model: Constant Velocity
     float predicted_value = filter->state_estimate + filter->value_velocity * delta_t;
-    
-    // Prediction Covariance Matrix P (Error Estimate)
-    // P_pos_pos_new = P_pos_pos_old + P_pos_vel * delta_t + P_vel_pos * delta_t + P_vel_vel * delta_t^2 + Q_pos
-    // For this 2x2 matrix, the implementation uses:
-    float FP_pos_pos = filter->estimated_error + filter->P_pos_vel * delta_t; // P_pos_pos + P_pos_vel * delta_t (equivalent to P_pos_pos_old + P_pos_vel_old * dt)
-    float FP_pos_vel = filter->P_pos_vel + filter->P_vel_vel * delta_t; // P_pos_vel + P_vel_vel * delta_t (equivalent to P_pos_vel_old + P_vel_vel_old * dt)
-
-    // P(k) = F P(k-1) F^T + Q
-    float P_pos_pos_temp = FP_pos_pos + FP_pos_vel * delta_t; // P_pos_pos_temp = (P_pos_pos + P_pos_vel*dt) + (P_pos_vel+P_vel_vel*dt)*dt
+    float FP_pos_pos = filter->estimated_error + filter->P_pos_vel * delta_t;
+    float FP_pos_vel = filter->P_pos_vel + filter->P_vel_vel * delta_t;
+    float P_pos_pos_temp = FP_pos_pos + FP_pos_vel * delta_t;
     filter->P_pos_vel = FP_pos_vel;
-    filter->estimated_error = P_pos_pos_temp + filter->process_noise; // P_pos_pos_new + Q_pos
-    filter->P_vel_vel = filter->P_vel_vel + filter->process_noise_vel; // P_vel_vel_new + Q_vel
-
-    // Update Step
+    filter->estimated_error = P_pos_pos_temp + filter->process_noise;
+    filter->P_vel_vel = filter->P_vel_vel + filter->process_noise_vel;
     float innovation = measurement - predicted_value;
     float innovation_covariance = filter->estimated_error + filter->measurement_noise;
-
     if (fabsf(innovation_covariance) < 1e-9f) {
         return predicted_value;
     }
-
-    // Kalman Gain K
-    float kalman_gain_pos = filter->estimated_error / innovation_covariance; // K_pos = P_pos_pos / S
-    float kalman_gain_vel = filter->P_pos_vel / innovation_covariance;     // K_vel = P_pos_vel / S (note: P_pos_vel is the position-velocity covariance)
-
-    // Correct State Estimate: X(k) = X(k|k-1) + K(k) * y(k)
+    float kalman_gain_pos = filter->estimated_error / innovation_covariance;
+    float kalman_gain_vel = filter->P_pos_vel / innovation_covariance;
     filter->state_estimate = predicted_value + kalman_gain_pos * innovation;
     filter->value_velocity = filter->value_velocity + kalman_gain_vel * innovation;
-
-    // Correct Error Covariance: P(k) = (I - K(k)H) P(k|k-1)
-    filter->estimated_error -= kalman_gain_pos * filter->estimated_error; // P_pos_pos_new = (1 - K_pos) * P_pos_pos_predicted
-    filter->P_pos_vel -= kalman_gain_pos * filter->P_pos_vel;             // P_pos_vel_new = (1 - K_pos) * P_pos_vel_predicted
-    filter->P_vel_vel -= kalman_gain_vel * filter->P_pos_vel;             // P_vel_vel_new = P_vel_vel_predicted - K_vel * P_pos_vel_predicted (simplification from full matrix)
-    
+    filter->estimated_error -= kalman_gain_pos * filter->estimated_error;
+    filter->P_pos_vel -= kalman_gain_pos * filter->P_pos_vel;
+    filter->P_vel_vel -= kalman_gain_vel * filter->P_pos_vel;
     return filter->state_estimate;
 }
 
@@ -216,8 +177,6 @@ static inline double kalman_double_filter(kalman_double_t *filter, double measur
     if (delta_t < 1e-6) {
         return filter->state_estimate;
     }
-
-    // Prediction Step
     double predicted_value = filter->state_estimate + filter->value_velocity * delta_t;
     double FP_pos_pos = filter->estimated_error + filter->P_pos_vel * delta_t;
     double FP_pos_vel = filter->P_pos_vel + filter->P_vel_vel * delta_t;
@@ -225,23 +184,18 @@ static inline double kalman_double_filter(kalman_double_t *filter, double measur
     filter->P_pos_vel = FP_pos_vel;
     filter->estimated_error = P_pos_pos_temp + filter->process_noise;
     filter->P_vel_vel = filter->P_vel_vel + filter->process_noise_vel;
-
-    // Update Step
     double innovation = measurement - predicted_value;
     double innovation_covariance = filter->estimated_error + filter->measurement_noise;
     if (fabs(innovation_covariance) < 1e-9) {
         return predicted_value;
     }
-
     double kalman_gain_pos = filter->estimated_error / innovation_covariance;
     double kalman_gain_vel = filter->P_pos_vel / innovation_covariance;
-    
     filter->state_estimate = predicted_value + kalman_gain_pos * innovation;
     filter->value_velocity = filter->value_velocity + kalman_gain_vel * innovation;
     filter->estimated_error -= kalman_gain_pos * filter->estimated_error;
     filter->P_pos_vel -= kalman_gain_pos * filter->P_pos_vel;
     filter->P_vel_vel -= kalman_gain_vel * filter->P_pos_vel;
-    
     return filter->state_estimate;
 }
 
@@ -254,8 +208,6 @@ static inline long double kalman_long_double_filter(kalman_long_double_t *filter
     if (delta_t < 1e-6L) {
         return filter->state_estimate;
     }
-    
-    // Prediction Step
     long double predicted_value = filter->state_estimate + filter->value_velocity * delta_t;
     long double FP_pos_pos = filter->estimated_error + filter->P_pos_vel * delta_t;
     long double FP_pos_vel = filter->P_pos_vel + filter->P_vel_vel * delta_t;
@@ -263,30 +215,20 @@ static inline long double kalman_long_double_filter(kalman_long_double_t *filter
     filter->P_pos_vel = FP_pos_vel;
     filter->estimated_error = P_pos_pos_temp + filter->process_noise;
     filter->P_vel_vel = filter->P_vel_vel + filter->process_noise_vel;
-
-    // Update Step
     long double innovation = measurement - predicted_value;
     long double innovation_covariance = filter->estimated_error + filter->measurement_noise;
     if (fabsl(innovation_covariance) < 1e-9L) {
         return predicted_value;
     }
-
     long double kalman_gain_pos = filter->estimated_error / innovation_covariance;
     long double kalman_gain_vel = filter->P_pos_vel / innovation_covariance;
-
     filter->state_estimate = predicted_value + kalman_gain_pos * innovation;
     filter->value_velocity = filter->value_velocity + kalman_gain_vel * innovation;
     filter->estimated_error -= kalman_gain_pos * filter->estimated_error;
     filter->P_pos_vel -= kalman_gain_pos * filter->P_pos_vel;
     filter->P_vel_vel -= kalman_gain_vel * filter->P_pos_vel;
-    
     return filter->state_estimate;
 }
-
-
-// -----------------------------------------------------------------
-// --- Oricle Setup and Cleanup Functions ---
-// -----------------------------------------------------------------
 
 static inline void setup_oricle(oricle_t *o, float initial_value) {
     o->first_check = true;
@@ -330,10 +272,6 @@ static inline void cleanup_oricle_long_double(oricle_long_double_t *o) {
     o->kalman_calibration_samples = NULL;
 }
 
-// -----------------------------------------------------------------
-// --- Oricle Calculation Functions (Calibration + Filtering) ---
-// -----------------------------------------------------------------
-
 static inline void calculate_oricle(const char *label, const char *desc, oricle_t *o, float value, float max_value) {
     uint64_t_status_t current_time = get_monotonic_time_ns(label);
     if (current_time.status != SUCCESS) {
@@ -342,7 +280,6 @@ static inline void calculate_oricle(const char *label, const char *desc, oricle_
     if (o->first_check) {
         o->first_check = false;
         o->kalman_calibration_samples = (float *)calloc(KALMAN_CALIBRATION_SAMPLES, sizeof(float));
-        // Handle allocation failure if necessary, but assuming success for now based on original code structure
         o->temp_ewma_value = o->initial_value;
         o->value_prediction = o->initial_value;
         o->kalman_filter.is_initialized = false;
@@ -363,21 +300,17 @@ static inline void calculate_oricle(const char *label, const char *desc, oricle_
             o->kalman_calibration_samples[o->kalman_initialized_count] = value;
             o->kalman_initialized_count++;
             if (o->kalman_initialized_count > 1) {
-                // Exponentially Weighted Moving Average (EWMA) during calibration
                 o->temp_ewma_value = KALMAN_ALPHA_EWMA * value + (1.0f - KALMAN_ALPHA_EWMA) * o->temp_ewma_value;
             }
             if (o->kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
                 float avg_value = calculate_average(o->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
                 float var_value = calculate_variance(o->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_value);
                 free(o->kalman_calibration_samples);
-                o->kalman_calibration_samples = NULL;
-                
-                if (var_value < 0.1f) var_value = 0.1f; // Minimum Variance
-                
-                float kalman_q_avg_task = 1.0f;        // Process Noise (Q)
-                float kalman_r_avg_task = var_value;   // Measurement Noise (R)
-                float kalman_p0_avg_task = var_value * 2.0f; // Initial Error Covariance (P0)
-                
+                o->kalman_calibration_samples = NULL;               
+                if (var_value < 0.1f) var_value = 0.1f;
+                float kalman_q_avg_task = 1.0f;
+                float kalman_r_avg_task = var_value;
+                float kalman_p0_avg_task = var_value * 2.0f;
                 kalman_init(&o->kalman_filter, kalman_q_avg_task, kalman_r_avg_task, kalman_p0_avg_task, avg_value);
                 o->kalman_filter.is_initialized = true;              
                 o->value_prediction = o->kalman_filter.state_estimate;
@@ -434,13 +367,10 @@ static inline void calculate_oricle_double(const char *label, const char *desc, 
                 double var_value = calculate_double_variance(o->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_value);
                 free(o->kalman_calibration_samples);
                 o->kalman_calibration_samples = NULL;
-                
-                if (var_value < 0.1) var_value = 0.1;
-                
+                if (var_value < 0.1) var_value = 0.1;                
                 double kalman_q_avg_task = 1.0;
                 double kalman_r_avg_task = var_value;
                 double kalman_p0_avg_task = var_value * 2.0;
-                
                 kalman_double_init(&o->kalman_filter, kalman_q_avg_task, kalman_r_avg_task, kalman_p0_avg_task, avg_value);
                 o->kalman_filter.is_initialized = true;              
                 o->value_prediction = o->kalman_filter.state_estimate;
@@ -496,14 +426,11 @@ static inline void calculate_oricle_long_double(const char *label, const char *d
                 long double avg_value = calculate_long_double_average(o->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
                 long double var_value = calculate_long_double_variance(o->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_value);
                 free(o->kalman_calibration_samples);
-                o->kalman_calibration_samples = NULL;
-                
+                o->kalman_calibration_samples = NULL;                
                 if (var_value < 0.1L) var_value = 0.1L;
-                
                 long double kalman_q_avg_task = 1.0L;
                 long double kalman_r_avg_task = var_value;
                 long double kalman_p0_avg_task = var_value * 2.0L;
-                
                 kalman_long_double_init(&o->kalman_filter, kalman_q_avg_task, kalman_r_avg_task, kalman_p0_avg_task, avg_value);
                 o->kalman_filter.is_initialized = true;              
                 o->value_prediction = o->kalman_filter.state_estimate;

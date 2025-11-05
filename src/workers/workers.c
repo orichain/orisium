@@ -13,12 +13,17 @@
 #include "stdbool.h"
 #include "ipc.h"
 #include "workers/workers.h"
+#include "timer.h"
 
 status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
     ctx->pid = getpid();
     ctx->shutdown_requested = 0;
     ctx->async.async_fd = -1;
-    ctx->heartbeat_timer_fd = -1;
+//----------------------------------------------------------------------
+    if (generate_uint64_t_id(ctx->label, &ctx->heartbeat_timer_id) != SUCCESS) {
+        return FAILURE;
+    }
+//----------------------------------------------------------------------
     ctx->wot = wot;
     ctx->index = index;
     ctx->master_uds_fd = master_uds_fd;
@@ -57,7 +62,9 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
     ctx->rekeying_queue = NULL;
 //----------------------------------------------------------------------
 	if (async_create(ctx->label, &ctx->async) != SUCCESS) return FAILURE;
-	if (async_create_incoming_event_with_disconnect(ctx->label, &ctx->async, ctx->master_uds_fd) != SUCCESS) return FAILURE;
+	if (async_create_incoming_event(ctx->label, &ctx->async, ctx->master_uds_fd) != SUCCESS) return FAILURE;
+//----------------------------------------------------------------------
+    if (htw_setup(ctx->label, &ctx->async, &ctx->timer) != SUCCESS) return FAILURE;
 //----------------------------------------------------------------------
     return SUCCESS;
 }
@@ -89,8 +96,11 @@ void cleanup_worker(worker_context_t *ctx) {
     ipc_cleanup_protocol_queue(&ctx->rekeying_queue);
     async_delete_event(ctx->label, &ctx->async, ctx->master_uds_fd);
     CLOSE_FD(ctx->master_uds_fd);
-	async_delete_event(ctx->label, &ctx->async, &ctx->heartbeat_timer_fd);
-    CLOSE_FD(&ctx->heartbeat_timer_fd);
+//----------------------------------------------------------------------
+    ctx->heartbeat_timer_id = 0ULL;
+//----------------------------------------------------------------------
+    htw_cleanup(ctx->label, &ctx->async, &ctx->timer);
+//----------------------------------------------------------------------
     CLOSE_FD(&ctx->async.async_fd);
     free(ctx->label);
 }

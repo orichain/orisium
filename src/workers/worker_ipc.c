@@ -30,11 +30,12 @@
 #include "stdbool.h"
 #include "types.h"
 #include "utilities.h"
-#include "workers/polling.h"
 #include "workers/workers.h"
 #include "workers/heartbeat.h"
 #include "xorshiro128plus.h"
 #include "workers/worker_ipc.h"
+#include "workers/worker_timer.h"
+#include "timer.h"
 
 status_t worker_master_heartbeat(worker_context_t *ctx, double new_heartbeat_interval_double) {
 	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_master_heartbeat(
@@ -709,9 +710,10 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
 //----------------------------------------------------------------------
 // Aktifkan Heartbeat Karna security/Enkripsi Sudah Ready
 //---------------------------------------------------------------------- 
-        status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &worker_ctx->heartbeat_timer_fd, (double)WORKER_HEARTBEAT_INTERVAL);
+        double delay_ms = worker_hb_interval_ms();
+        status_t chst = htw_add_event(&worker_ctx->timer, worker_ctx->heartbeat_timer_id, (uint64_t)delay_ms);
         if (chst != SUCCESS) {
-            LOG_ERROR("%sWorker error async_create_timerfd...", worker_ctx->label);
+            LOG_ERROR("%sWorker error htw_add_event...", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
             return FAILURE;
         }
@@ -1282,11 +1284,11 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     }
 //======================================================================
     session->heartbeat_interval = oheartbeat->hb_interval;
-    if (session->heartbeat_interval < (double)0.001) {
-        session->heartbeat_interval = (double)0.001;
+    if (session->heartbeat_interval < (double)1) {
+        session->heartbeat_interval = (double)1;
     }
-    if (session->heartbeat_interval > (double)100) {
-        session->heartbeat_interval = (double)100;
+    if (session->heartbeat_interval > (double)100000) {
+        session->heartbeat_interval = (double)100000;
     }
 //======================================================================
     cleanup_control_packet_ack(&session->heartbeat_ack, false, CDT_FREE);
@@ -2777,11 +2779,11 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
     }
 //======================================================================
     session->heartbeat_interval = oheartbeat->hb_interval;
-    if (session->heartbeat_interval < (double)0.001) {
-        session->heartbeat_interval = (double)0.001;
+    if (session->heartbeat_interval < (double)1) {
+        session->heartbeat_interval = (double)1;
     }
-    if (session->heartbeat_interval > (double)100) {
-        session->heartbeat_interval = (double)100;
+    if (session->heartbeat_interval > (double)100000) {
+        session->heartbeat_interval = (double)100000;
     }
 //======================================================================
     cleanup_control_packet_ack(&session->heartbeat_ack, false, CDT_FREE);
@@ -3026,9 +3028,9 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     session->heartbeat.sent_try_count++;
     session->heartbeat.sent_time = current_time.r_uint64_t;
 //======================================================================
-    double hb_interval = node_hb_interval_with_jitter(session->rtt.value_prediction, session->retry.value_prediction);
+    double hb_interval = node_hb_interval_with_jitter_ms(session->rtt.value_prediction, session->retry.value_prediction);
     session->heartbeat_interval = hb_interval;
-    printf("%sSend HB Interval %f\n", worker_ctx->label, hb_interval);
+    printf("%sSend HB Interval %f ms\n", worker_ctx->label, hb_interval);
 //======================================================================
     l_inc_ctr = 0x01;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_heartbeat(
@@ -3866,7 +3868,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
     uint8_t session_index = iudp_data_acki->session_index;
     cow_c_session_t *cow_c_session = (cow_c_session_t *)worker_sessions;
     cow_c_session_t *session = &cow_c_session[session_index];
-    double retry_timer_interval = retry_interval_with_jitter(session->retry.value_prediction);
+    double retry_timer_interval = retry_interval_with_jitter_ms(session->retry.value_prediction);
     switch ((orilink_protocol_type_t)iudp_data_acki->orilink_protocol) {
         case ORILINK_HELLO1: {
             if (iudp_data_acki->trycount == (uint8_t)1) {
@@ -3932,7 +3934,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
             if (iudp_data_acki->trycount == (uint8_t)1) {
                 double timer_interval = session->heartbeat_interval;
 //======================================================================
-                status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, timer_interval);
+                status_t chst = htw_add_event(&worker_ctx->timer, session->heartbeat_sender_timer_id, (uint64_t)timer_interval);
                 if (chst != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
                     return FAILURE;
@@ -3955,7 +3957,7 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
     uint8_t session_index = iudp_data_acki->session_index;
     sio_c_session_t *sio_c_session = (sio_c_session_t *)worker_sessions;
     sio_c_session_t *session = &sio_c_session[session_index];
-    double retry_timer_interval = retry_interval_with_jitter(session->retry.value_prediction);
+    double retry_timer_interval = retry_interval_with_jitter_ms(session->retry.value_prediction);
     switch ((orilink_protocol_type_t)iudp_data_acki->orilink_protocol) {
         case ORILINK_HELLO1_ACK: {
             CLOSE_IPC_PROTOCOL(&received_protocol);
@@ -3989,7 +3991,7 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
             if (iudp_data_acki->trycount == (uint8_t)1) {
                 double timer_interval = session->heartbeat_interval;
 //======================================================================
-                status_t chst = create_timer_oneshot(worker_ctx->label, &worker_ctx->async, &session->heartbeat_sender_timer_fd, timer_interval);
+                status_t chst = htw_add_event(&worker_ctx->timer, session->heartbeat_sender_timer_id, (uint64_t)timer_interval);
                 if (chst != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
                     return FAILURE;

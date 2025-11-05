@@ -19,12 +19,12 @@
 #define ORILINK_DECRYPT_HEADER
 //#undef ORILINK_DECRYPT_HEADER
 
-#define MAX_TIMER_LEVELS 3 
+#define MAX_TIMER_LEVELS 4
 #define WHEEL_SIZE 256
+#define TIMER_HASHMAP_SIZE 100003
 //----------------------------------------------------------------------
 #define KALMAN_CALIBRATION_SAMPLES 50
 //----------------------------------------------------------------------
-#define SRTT_THRESHOLD_TO2X_RCNT_MS 3000000
 #define MIN_POLLING_1MS_CNT 1
 #define MAX_RETRY_CNT 5
 #define MIN_RETRY_SEC 1

@@ -13,6 +13,7 @@
 #include "kalman.h"
 #include "node.h"
 #include "types.h" 
+#include "timer.h" 
 
 typedef struct {
     double hb_interval;
@@ -86,7 +87,7 @@ typedef struct {
 //----------------------------------------------------------------------
 	int master_pid;
     int udp_sock;
-    int check_healthy_timer_fd;
+    uint64_t check_healthy_timer_id;
     int shutdown_event_fd;
     async_type_t master_async;
 //----------------------------------------------------------------------
@@ -110,6 +111,7 @@ typedef struct {
     master_sio_c_session_t *sio_c_session;
     master_cow_c_session_t *cow_c_session;
 //----------------------------------------------------------------------
+    hierarchical_timer_wheel_t timer;
 } master_context_t;
 
 static inline master_worker_session_t *get_master_worker_session(master_context_t *master_context, worker_type_t wot, uint8_t index) {
