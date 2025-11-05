@@ -11,7 +11,7 @@
 #include <limits.h>
 #include <inttypes.h>
 #include <errno.h>
-
+ 
 #include "types.h"
 #include "timer_hashmap.h"
 
@@ -19,9 +19,9 @@ typedef struct timer_event_t {
     struct timer_event_t *next;
     uint64_t expiration_tick;
     uint64_t timer_id;
-    struct timer_event_t **prev_next_ptr;
+    struct timer_event_t **prev_next_ptr; 
     uint8_t level_index;
-    uint16_t slot_index;
+    uint16_t slot_index; 
 } timer_event_t;
 
 typedef struct {
@@ -65,13 +65,13 @@ static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, uint64_t
     timer_event_t *new_event = malloc(sizeof(timer_event_t));
     if (!new_event) {
         return FAILURE_NOMEM;
-    }
+    }   
     new_event->expiration_tick = timer->global_current_tick + delay_ms;
     new_event->timer_id = timer_id;
     new_event->next = NULL;
-    new_event->prev_next_ptr = NULL;
-    new_event->level_index = (uint8_t)MAX_TIMER_LEVELS;
-    new_event->slot_index = WHEEL_SIZE;
+    new_event->prev_next_ptr = NULL; 
+    new_event->level_index = (uint8_t)MAX_TIMER_LEVELS; 
+    new_event->slot_index = WHEEL_SIZE; 
     if (hashmap_insert(timer->hash_map_ctx, timer_id, new_event) != SUCCESS) {
         free(new_event);
         return FAILURE;
@@ -79,16 +79,16 @@ static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, uint64_t
     if (timer->new_event_queue_head == NULL) {
         timer->new_event_queue_head = new_event;
         timer->new_event_queue_tail = new_event;
-        new_event->prev_next_ptr = &timer->new_event_queue_head;
+        new_event->prev_next_ptr = &timer->new_event_queue_head; 
     } else {
-        new_event->prev_next_ptr = &timer->new_event_queue_tail->next;
+        new_event->prev_next_ptr = &timer->new_event_queue_tail->next; 
         timer->new_event_queue_tail->next = new_event;
         timer->new_event_queue_tail = new_event;
     }
     uint64_t val = 1ULL;
     if (write(timer->add_event_fd, &val, sizeof(uint64_t)) != sizeof(uint64_t)) {
         hashmap_remove(timer->hash_map_ctx, timer_id);
-        free(new_event);
+        free(new_event); 
         return FAILURE;
     }
     return SUCCESS;
@@ -103,20 +103,21 @@ static inline status_t htw_cancel_event(hierarchical_timer_wheel_t *timer, uint6
         LOG_ERROR("Internal error: Timer event found without prev_next_ptr.");
         return FAILURE;
     }
-    timer_event_t **p_next = event_to_cancel->prev_next_ptr;
-    *p_next = event_to_cancel->next;
+    timer_event_t **p_next = event_to_cancel->prev_next_ptr; 
+    *p_next = event_to_cancel->next; 
     if (event_to_cancel->next != NULL) {
         event_to_cancel->next->prev_next_ptr = p_next;
-    }
-    uint8_t level = event_to_cancel->level_index;
-    if (level < MAX_TIMER_LEVELS) {
-        timer_bucket_t *bucket = &timer->levels[level].buckets[event_to_cancel->slot_index];
-        if (bucket->tail == event_to_cancel) {
-            bucket->tail = NULL;
-        }
-    } else if (level == (uint8_t)MAX_TIMER_LEVELS) {
-        if (timer->new_event_queue_tail == event_to_cancel) {
-            timer->new_event_queue_tail = NULL;
+    } else {
+        uint8_t level = event_to_cancel->level_index;        
+        if (level < MAX_TIMER_LEVELS) { 
+            timer_bucket_t *bucket = &timer->levels[level].buckets[event_to_cancel->slot_index];
+            if (bucket->tail == event_to_cancel) {
+                bucket->tail = NULL;
+            }
+        } else if (level == MAX_TIMER_LEVELS) {
+            if (timer->new_event_queue_tail == event_to_cancel) {
+                timer->new_event_queue_tail = NULL;
+            }
         }
     }
     hashmap_remove(timer->hash_map_ctx, timer_id);
@@ -124,11 +125,11 @@ static inline status_t htw_cancel_event(hierarchical_timer_wheel_t *timer, uint6
         uint64_t val = 1ULL;
         if (write(timer->cancel_event_fd, &val, sizeof(uint64_t)) != sizeof(uint64_t)) {
             LOG_ERROR("Failed to signal cancel event to worker.");
-            free(event_to_cancel);
+            free(event_to_cancel); 
             return FAILURE;
         }
     }
-    free(event_to_cancel);
+    free(event_to_cancel); 
     return SUCCESS;
 }
 
@@ -141,7 +142,7 @@ static inline void htw_calculate_level_and_slot(
 {
     if (expiration_tick <= timer->global_current_tick) {
         *level_index = 0;
-        *slot_index = (timer->levels[0].current_index + 1) % WHEEL_SIZE;
+        *slot_index = timer->levels[0].current_index; 
         return;
     }
     uint64_t delta_tick = expiration_tick - timer->global_current_tick;
@@ -150,8 +151,8 @@ static inline void htw_calculate_level_and_slot(
         uint64_t wheel_span = current_tick_factor * WHEEL_SIZE;
         if (delta_tick < wheel_span) {
             *level_index = level;
-            uint64_t abs_slot_index = expiration_tick / current_tick_factor;
-            *slot_index = (uint32_t)(abs_slot_index % WHEEL_SIZE);
+            uint64_t ticks_at_level = delta_tick / current_tick_factor;
+            *slot_index = (timer->levels[level].current_index + (uint32_t)ticks_at_level) % WHEEL_SIZE;
             return;
         }
         if (level < MAX_TIMER_LEVELS - 1) {
@@ -184,13 +185,13 @@ static inline status_t htw_move_queue_to_wheel(hierarchical_timer_wheel_t *timer
         timer_bucket_t *bucket = &timer->levels[level_index].buckets[slot_index];
         current->level_index = (uint8_t)level_index;
         current->slot_index = (uint16_t)slot_index;
-        current->next = bucket->head;
+        current->next = bucket->head;        
         if (bucket->head != NULL) {
-            bucket->head->prev_next_ptr = &current->next;
+            bucket->head->prev_next_ptr = &current->next; 
         } else {
             bucket->tail = current;
         }
-        current->prev_next_ptr = &bucket->head;
+        current->prev_next_ptr = &bucket->head; 
         bucket->head = current;
         if (current->expiration_tick < timer->next_expiration_tick) {
             timer->next_expiration_tick = current->expiration_tick;
@@ -223,7 +224,7 @@ static inline uint64_t htw_find_earliest_event(hierarchical_timer_wheel_t *timer
 }
 
 static inline status_t htw_cascading_events(hierarchical_timer_wheel_t *timer, uint32_t source_level_index, uint32_t target_slot_index) {
-    if (source_level_index >= MAX_TIMER_LEVELS) return SUCCESS;
+    if (source_level_index >= MAX_TIMER_LEVELS) return SUCCESS; 
     timer_bucket_t *source_bucket = &timer->levels[source_level_index].buckets[target_slot_index];
     timer_event_t *current = source_bucket->head;
     timer_event_t *next_node = NULL;
@@ -248,7 +249,7 @@ static inline status_t htw_cascading_events(hierarchical_timer_wheel_t *timer, u
         } else {
             target_bucket->tail = current;
         }
-        current->prev_next_ptr = &target_bucket->head;
+        current->prev_next_ptr = &target_bucket->head; 
         target_bucket->head = current;
         if (current->expiration_tick < timer->next_expiration_tick) {
             timer->next_expiration_tick = current->expiration_tick;
@@ -271,13 +272,13 @@ static inline status_t htw_process_expired_l0(hierarchical_timer_wheel_t *timer,
             if (cur->expiration_tick <= timer->global_current_tick) {
                 cur->next = NULL;
                 if (timer->ready_queue_tail) {
-                    cur->prev_next_ptr = &timer->ready_queue_tail->next;
+                    cur->prev_next_ptr = &timer->ready_queue_tail->next; 
                     timer->ready_queue_tail->next = cur;
                     timer->ready_queue_tail = cur;
                 } else {
                     timer->ready_queue_head = cur;
                     timer->ready_queue_tail = cur;
-                    cur->prev_next_ptr = &timer->ready_queue_head;
+                    cur->prev_next_ptr = &timer->ready_queue_head; 
                 }
                 hashmap_remove(timer->hash_map_ctx, cur->timer_id);
             } else {
@@ -285,9 +286,9 @@ static inline status_t htw_process_expired_l0(hierarchical_timer_wheel_t *timer,
                     bucket->head = cur;
                     bucket->tail = cur;
                     cur->next = NULL;
-                    cur->prev_next_ptr = &bucket->head;
+                    cur->prev_next_ptr = &bucket->head; 
                 } else {
-                    cur->prev_next_ptr = &bucket->tail->next;
+                    cur->prev_next_ptr = &bucket->tail->next; 
                     bucket->tail->next = cur;
                     bucket->tail = cur;
                     cur->next = NULL;
@@ -306,7 +307,7 @@ static inline status_t htw_process_expired_l0(hierarchical_timer_wheel_t *timer,
 }
 
 static inline status_t htw_advance_time_and_process_expired(hierarchical_timer_wheel_t *timer, uint64_t ticks_to_advance) {
-    if (ticks_to_advance == 0) return SUCCESS;
+    if (ticks_to_advance == 0) return SUCCESS;    
     uint64_t remaining_ticks = ticks_to_advance;
     while (remaining_ticks > 0) {
         uint32_t l0_start_index = timer->levels[0].current_index;
@@ -317,7 +318,7 @@ static inline status_t htw_advance_time_and_process_expired(hierarchical_timer_w
         timer->levels[0].current_index = (uint16_t)l0_end_index;
         timer->global_current_tick += chunk_advance;
         if (l0_end_index == 0) {
-            uint64_t carry = 1;
+            uint64_t carry = 1; 
             for (uint32_t level = 1; level < MAX_TIMER_LEVELS && carry > 0; ++level) {
                 timer_wheel_level_t *lvl = &timer->levels[level];
                 uint64_t sum = (uint64_t)lvl->current_index + carry;
@@ -325,7 +326,7 @@ static inline status_t htw_advance_time_and_process_expired(hierarchical_timer_w
                 carry = sum / WHEEL_SIZE;
                 lvl->current_index = (uint16_t)new_index;
                 if (htw_cascading_events(timer, level, new_index) != SUCCESS) {
-                    return FAILURE;
+                     return FAILURE;
                 }
             }
         }
@@ -342,10 +343,10 @@ static inline status_t htw_reschedule_main_timer(const char *label, async_type_t
     if (next_expiration_tick == ULLONG_MAX || next_expiration_tick <= timer->global_current_tick) {
         next_expiration_tick = htw_find_earliest_event(timer);
     }
-    if (next_expiration_tick > timer->global_current_tick) {
+    if (next_expiration_tick > timer->global_current_tick) { 
         uint64_t delay_tick = next_expiration_tick - timer->global_current_tick;
         double delay_ms = (double)delay_tick;
-        double delay_s = delay_ms / 1000.0;
+        double delay_s = delay_ms / 1000.0; 
         timer->last_delay_ms = delay_ms;
         if (create_timer_oneshot(label, async, &timer->tick_event_fd, delay_s) != SUCCESS) {
             LOG_ERROR("%sFailed to re-arm main tick timer.", label);
@@ -404,7 +405,7 @@ static inline status_t htw_setup(const char *label, async_type_t *async, hierarc
 }
 
 static inline void htw_cleanup(const char *label, async_type_t *async, hierarchical_timer_wheel_t *timer) {
-    hashmap_cleanup(timer->hash_map_ctx);
+    hashmap_cleanup(timer->hash_map_ctx);    
     for (uint32_t l = 0; l < MAX_TIMER_LEVELS; ++l) {
         timer_wheel_level_t *level = &timer->levels[l];
         for (uint32_t s = 0; s < WHEEL_SIZE; ++s) {
