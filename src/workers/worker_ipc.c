@@ -1278,12 +1278,6 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     }
 //======================================================================
     session->heartbeat_interval = oheartbeat->hb_interval;
-    if (session->heartbeat_interval < (double)1) {
-        session->heartbeat_interval = (double)1;
-    }
-    if (session->heartbeat_interval > (double)100000) {
-        session->heartbeat_interval = (double)100000;
-    }
 //======================================================================
     cleanup_control_packet_ack(&session->heartbeat_ack, false, CDT_FREE);
     if (send_heartbeat_ack(worker_ctx, session, ORILINK_HEARTBEAT_ACK) != SUCCESS) {
@@ -2767,12 +2761,6 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
     }
 //======================================================================
     session->heartbeat_interval = oheartbeat->hb_interval;
-    if (session->heartbeat_interval < (double)1) {
-        session->heartbeat_interval = (double)1;
-    }
-    if (session->heartbeat_interval > (double)100000) {
-        session->heartbeat_interval = (double)100000;
-    }
 //======================================================================
     cleanup_control_packet_ack(&session->heartbeat_ack, false, CDT_FREE);
     if (send_heartbeat_ack(worker_ctx, session, ORILINK_HEARTBEAT_ACK) != SUCCESS) {

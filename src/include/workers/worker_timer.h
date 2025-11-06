@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <math.h>
+#include <sys/types.h>
 
 #include "log.h"
 #include "timer.h"
@@ -13,6 +15,9 @@
 #include "workers/workers.h"
 #include "workers/worker_ipc.h"
 #include "workers/heartbeat.h"
+#include "constants.h"
+#include "orilink/protocol.h"
+#include "stdbool.h"
 
 static inline status_t create_polling_1ms(worker_context_t *worker_ctx, control_packet_t *h, double total_polling_interval) {
     double polling_interval = (double)1;
@@ -273,7 +278,7 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
     } else if (*current_fd == timer->tick_event_fd) {
         if (drain_event_fd(worker_ctx->label, timer->tick_event_fd) != SUCCESS) return FAILURE;
         uint64_t advance_ticks = (uint64_t)(timer->last_delay_ms);
-        if (htw_advance_time_and_process_expired(timer, advance_ticks) != SUCCESS) return FAILURE;
+        if (htw_advance_time_and_process_expired(worker_ctx->label, timer, advance_ticks) != SUCCESS) return FAILURE;
         if (htw_reschedule_main_timer(worker_ctx->label, &worker_ctx->async, timer) != SUCCESS) return FAILURE;
         uint64_t val = 1ULL;
         ssize_t w;

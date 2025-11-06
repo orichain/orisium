@@ -1,19 +1,22 @@
 #ifndef TIMER_H
 #define TIMER_H
 
-#include <netinet/in.h>
-#include <signal.h>
+#include <errno.h>
+#include <limits.h>
+#include <math.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 #include <unistd.h>
-#include <limits.h>
-#include <inttypes.h>
-#include <errno.h>
-#include <math.h>
 
+#include "async.h"
+#include "constants.h"
+#include "log.h"
 #include "types.h"
+#include "utilities.h"
 
 #if (WHEEL_SIZE & (WHEEL_SIZE - 1)) != 0
 #error "WHEEL_SIZE must be a power of 2 for optimal performance."
@@ -76,6 +79,7 @@ struct hierarchical_timer_wheel_t {
     int timeout_event_fd;
     timer_event_t *new_event_queue_head;
     timer_event_t *new_event_queue_tail;
+    uint64_t new_event_queue_min_exp;
     timer_event_t *ready_queue_head;
     timer_event_t *ready_queue_tail;
     uint64_t global_current_tick;
@@ -236,7 +240,7 @@ static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, uint64_t
     uint64_t delay_ms = (uint64_t)ceil(double_delay_ms);
     if (delay_ms == 0 && double_delay_ms > 0.0) {
         delay_ms = 1;
-    }
+    }    
     timer_event_t *new_event = htw_pool_alloc(timer);
     if (!new_event) {
         return FAILURE_NOMEM;
@@ -245,7 +249,19 @@ static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, uint64_t
     if (expire < timer->global_current_tick) expire = ULLONG_MAX;
     new_event->expiration_tick = expire;
     new_event->timer_id = timer_id;
-    if (timer->new_event_queue_head == NULL) {
+    new_event->next = NULL;
+    bool was_empty = (timer->new_event_queue_head == NULL);
+    bool should_trigger_write = false;
+    if (was_empty) {
+        timer->new_event_queue_min_exp = expire;
+        should_trigger_write = true; 
+    } else {
+        if (expire < timer->new_event_queue_min_exp) {
+            timer->new_event_queue_min_exp = expire;
+            should_trigger_write = true;
+        }
+    }
+    if (was_empty) {
         timer->new_event_queue_head = new_event;
         timer->new_event_queue_tail = new_event;
         new_event->prev_next_ptr = &timer->new_event_queue_head;
@@ -254,18 +270,20 @@ static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, uint64_t
         timer->new_event_queue_tail->next = new_event;
         timer->new_event_queue_tail = new_event;
     }
-    uint64_t val = 1ULL;
-    ssize_t w;
-    do {
-        w = write(timer->add_event_fd, &val, sizeof(uint64_t));
-    } while (w == -1 && errno == EINTR);
-    if (w == -1) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            return SUCCESS;
+    if (should_trigger_write) {
+        uint64_t val = 1ULL;
+        ssize_t w;
+        do {
+            w = write(timer->add_event_fd, &val, sizeof(uint64_t));
+        } while (w == -1 && errno == EINTR);
+        if (w == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                return SUCCESS;
+            }
+            return FAILURE;
         }
-        return FAILURE;
+        if (w != sizeof(uint64_t)) return FAILURE;
     }
-    if (w != sizeof(uint64_t)) return FAILURE;
     return SUCCESS;
 }
 
@@ -303,6 +321,7 @@ static inline status_t htw_move_queue_to_wheel(hierarchical_timer_wheel_t *timer
     timer_event_t *temp_head = timer->new_event_queue_head;
     timer->new_event_queue_head = NULL;
     timer->new_event_queue_tail = NULL;
+    timer->new_event_queue_min_exp = ULLONG_MAX;
     if (temp_head == NULL) {
         return SUCCESS;
     }
@@ -473,7 +492,7 @@ static inline status_t htw_process_expired_l0(hierarchical_timer_wheel_t *timer,
     return SUCCESS;
 }
 
-static inline status_t htw_advance_time_and_process_expired(hierarchical_timer_wheel_t *timer, uint64_t ticks_to_advance) {
+static inline status_t htw_advance_time_and_process_expired(const char *label, hierarchical_timer_wheel_t *timer, uint64_t ticks_to_advance) {
     if (ticks_to_advance == 0) return SUCCESS;
     uint64_t remaining_ticks = ticks_to_advance;
     while (remaining_ticks > 0) {
@@ -591,6 +610,7 @@ static inline void htw_cleanup(const char *label, async_type_t *async, hierarchi
     free_linked_list_internal(timer->new_event_queue_head);
     timer->new_event_queue_head = NULL;
     timer->new_event_queue_tail = NULL;
+    timer->new_event_queue_min_exp = ULLONG_MAX;
     free_linked_list_internal(timer->ready_queue_head);
     timer->ready_queue_head = NULL;
     timer->ready_queue_tail = NULL;

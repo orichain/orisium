@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <sys/types.h>
 
 #include "log.h"
 #include "timer.h"
@@ -12,7 +13,8 @@
 #include "utilities.h"
 #include "master/master.h"
 #include "master/ipc/worker_ipc_cmds.h"
-#include "master/worker_metrics.h"
+#include "constants.h"
+#include "stdbool.h"
 
 static inline status_t drain_event_fd(const char *label, int fd) {
     uint64_t u;
@@ -38,7 +40,7 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
     } else if (*current_fd == timer->tick_event_fd) {
         if (drain_event_fd(label, timer->tick_event_fd) != SUCCESS) return FAILURE;
         uint64_t advance_ticks = (uint64_t)(timer->last_delay_ms);
-        if (htw_advance_time_and_process_expired(timer, advance_ticks) != SUCCESS) return FAILURE;
+        if (htw_advance_time_and_process_expired(label, timer, advance_ticks) != SUCCESS) return FAILURE;
         if (htw_reschedule_main_timer(label, &master_ctx->master_async, timer) != SUCCESS) return FAILURE;
         uint64_t val = 1ULL;
         ssize_t w;

@@ -473,9 +473,6 @@ static inline double node_hb_interval_with_jitter_ms(double rtt_value_prediction
     hb_interval *= (double)1e3;
     hb_interval = add_jitter(hb_interval);
     hb_interval += rtt_value_prediction / (double)1e6;
-    if (hb_interval < 0.001) {
-        hb_interval = 0.001;
-    }
     return hb_interval;
 }
 
@@ -483,27 +480,18 @@ static inline double worker_hb_interval_with_jitter_ms() {
     double hb_interval = (double)WORKER_HEARTBEAT_INTERVAL;
     hb_interval *= (double)1e3;
     hb_interval = add_jitter(hb_interval);
-    if (hb_interval < 0.1) {
-        hb_interval = 0.1;
-    }
     return hb_interval;
 }
 
 static inline double worker_hb_interval_ms() {
     double hb_interval = (double)WORKER_HEARTBEAT_INTERVAL;
     hb_interval *= (double)1e3;
-    if (hb_interval < 0.1) {
-        hb_interval = 0.1;
-    }
     return hb_interval;
 }
 
 static inline double worker_check_healthy_ms() {
     double hb_interval = (double)WORKER_CHECK_HEALTHY;
     hb_interval *= (double)1e3;
-    if (hb_interval < 0.1) {
-        hb_interval = 0.1;
-    }
     return hb_interval;
 }
 
