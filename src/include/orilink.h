@@ -906,9 +906,31 @@ static inline ssize_t_status_t send_orilink_raw_protocol_packet(const char *labe
     result.r_ssize_t = 0;
     result.status = FAILURE;
     socklen_t dest_addr_len = sizeof(struct sockaddr_in6);
-    result.r_ssize_t = sendto(*sock_fd, r->r_puint8_t, r->r_size_t, 0, (const struct sockaddr *)dest_addr, dest_addr_len);
+    do {
+        result.r_ssize_t = sendto(*sock_fd, r->r_puint8_t, r->r_size_t, 0, (const struct sockaddr *)dest_addr, dest_addr_len);
+    } while (result.r_ssize_t == -1 && errno == EINTR);
+    if (result.r_ssize_t == -1) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            if (r->r_puint8_t) {
+                free(r->r_puint8_t);
+                r->r_puint8_t = NULL;
+                r->r_size_t = 0;
+            }
+            result.status = SUCCESS;
+            return result;
+        }
+        LOG_ERROR("%ssend_orilink_raw_protocol_packet sendto. %s", label, strerror(errno));
+        if (r->r_puint8_t) {
+            free(r->r_puint8_t);
+            r->r_puint8_t = NULL;
+            r->r_size_t = 0;
+        }
+        result.status = FAILURE;
+        return result;
+    }
     if (result.r_ssize_t != (ssize_t)r->r_size_t) {
-        LOG_ERROR("%ssendto failed to send_orilink_protocol_packet. %s", label, strerror(errno));
+        LOG_ERROR("%ssend_orilink_raw_protocol_packet sendto partial write %zd from %zu byte!",
+                label, result.r_ssize_t, r->r_size_t);
         if (r->r_puint8_t) {
             free(r->r_puint8_t);
             r->r_puint8_t = NULL;

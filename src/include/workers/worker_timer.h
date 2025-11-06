@@ -5,8 +5,6 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
-#include <math.h>
-#include <sys/types.h>
 
 #include "log.h"
 #include "timer.h"
@@ -15,9 +13,6 @@
 #include "workers/workers.h"
 #include "workers/worker_ipc.h"
 #include "workers/heartbeat.h"
-#include "constants.h"
-#include "orilink/protocol.h"
-#include "stdbool.h"
 
 static inline status_t create_polling_1ms(worker_context_t *worker_ctx, control_packet_t *h, double total_polling_interval) {
     double polling_interval = (double)1;
@@ -281,8 +276,19 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
         if (htw_advance_time_and_process_expired(timer, advance_ticks) != SUCCESS) return FAILURE;
         if (htw_reschedule_main_timer(worker_ctx->label, &worker_ctx->async, timer) != SUCCESS) return FAILURE;
         uint64_t val = 1ULL;
-        if (write(timer->timeout_event_fd, &val, sizeof(uint64_t)) != sizeof(uint64_t)) {
+        ssize_t w;
+        do {
+            w = write(timer->timeout_event_fd, &val, sizeof(uint64_t));
+        } while (w == -1 && errno == EINTR);
+        if (w == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                return SUCCESS;
+            }
             LOG_ERROR("%sFailed to write timeout_event_fd: %s", worker_ctx->label, strerror(errno));
+            return FAILURE;
+        }
+        if (w != sizeof(uint64_t)) {
+            LOG_ERROR("%sPartial write to timeout_event_fd: %zd bytes", worker_ctx->label, w);
             return FAILURE;
         }
         return SUCCESS;

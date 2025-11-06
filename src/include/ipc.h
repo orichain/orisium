@@ -650,24 +650,35 @@ static inline ssize_t_status_t send_ipc_protocol_message(const char *label, uint
     msg.msg_iovlen = 1;
     msg.msg_control = NULL;
     msg.msg_controllen = 0;
-    result.r_ssize_t = sendmsg(*uds_fd, &msg, 0);
+    do {
+        result.r_ssize_t = sendmsg(*uds_fd, &msg, 0);
+    } while (result.r_ssize_t == -1 && errno == EINTR);
     if (result.r_ssize_t == -1) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            free(final_send_buffer);
+            if (serialized_ipc_data_buffer) {
+                free(serialized_ipc_data_buffer);
+            }
+            result.status = SUCCESS;
+            return result;
+        }
         LOG_ERROR("%ssend_ipc_protocol_message sendmsg. %s", label, strerror(errno));
         free(final_send_buffer);
         if (serialized_ipc_data_buffer) {
             free(serialized_ipc_data_buffer);
         }
+        result.status = FAILURE;
         return result;
-    } else if (result.r_ssize_t != (ssize_t)total_message_len_to_send) {
-        LOG_ERROR("%sendmsg hanya mengirim %zd dari %zu byte!",
+    }
+    if (result.r_ssize_t != (ssize_t)total_message_len_to_send) {
+        LOG_ERROR("%ssend_ipc_protocol_message sendmsg partial write %zd from %zu byte!",
                 label, result.r_ssize_t, total_message_len_to_send);
         free(final_send_buffer);
         if (serialized_ipc_data_buffer) {
             free(serialized_ipc_data_buffer);
         }
+        result.status = FAILURE;
         return result;
-    } else {
-        LOG_DEBUG("%sBerhasil mengirim %zd byte.\n", label, result.r_ssize_t);
     }    
     free(final_send_buffer);
     if (serialized_ipc_data_buffer) {

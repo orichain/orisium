@@ -5,7 +5,6 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
-#include <sys/types.h>
 
 #include "log.h"
 #include "timer.h"
@@ -14,8 +13,6 @@
 #include "master/master.h"
 #include "master/ipc/worker_ipc_cmds.h"
 #include "master/worker_metrics.h"
-#include "constants.h"
-#include "stdbool.h"
 
 static inline status_t drain_event_fd(const char *label, int fd) {
     uint64_t u;
@@ -44,8 +41,19 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
         if (htw_advance_time_and_process_expired(timer, advance_ticks) != SUCCESS) return FAILURE;
         if (htw_reschedule_main_timer(label, &master_ctx->master_async, timer) != SUCCESS) return FAILURE;
         uint64_t val = 1ULL;
-        if (write(timer->timeout_event_fd, &val, sizeof(uint64_t)) != sizeof(uint64_t)) {
+        ssize_t w;
+        do {
+            w = write(timer->timeout_event_fd, &val, sizeof(uint64_t));
+        } while (w == -1 && errno == EINTR);
+        if (w == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                return SUCCESS;
+            }
             LOG_ERROR("%sFailed to write timeout_event_fd: %s", label, strerror(errno));
+            return FAILURE;
+        }
+        if (w != sizeof(uint64_t)) {
+            LOG_ERROR("%sPartial write to timeout_event_fd: %zd bytes", label, w);
             return FAILURE;
         }
         return SUCCESS;

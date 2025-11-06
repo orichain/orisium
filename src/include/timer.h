@@ -217,9 +217,10 @@ static inline timer_event_t *htw_pool_alloc(hierarchical_timer_wheel_t *timer) {
 }
 
 static inline void htw_pool_free(hierarchical_timer_wheel_t *timer, timer_event_t *event) {
-    if (event == NULL) return;
+    if (!event) return;
     event->next = timer->event_pool_head;
     timer->event_pool_head = event;
+    event->prev_next_ptr = NULL;
 }
 
 static inline void free_linked_list_internal(timer_event_t *head) {
@@ -240,7 +241,9 @@ static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, uint64_t
     if (!new_event) {
         return FAILURE_NOMEM;
     }
-    new_event->expiration_tick = timer->global_current_tick + delay_ms;
+    uint64_t expire = timer->global_current_tick + delay_ms;
+    if (expire < timer->global_current_tick) expire = ULLONG_MAX;
+    new_event->expiration_tick = expire;
     new_event->timer_id = timer_id;
     if (timer->new_event_queue_head == NULL) {
         timer->new_event_queue_head = new_event;
@@ -252,9 +255,17 @@ static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, uint64_t
         timer->new_event_queue_tail = new_event;
     }
     uint64_t val = 1ULL;
-    if (write(timer->add_event_fd, &val, sizeof(uint64_t)) != sizeof(uint64_t)) {
+    ssize_t w;
+    do {
+        w = write(timer->add_event_fd, &val, sizeof(uint64_t));
+    } while (w == -1 && errno == EINTR);
+    if (w == -1) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            return SUCCESS;
+        }
         return FAILURE;
     }
+    if (w != sizeof(uint64_t)) return FAILURE;
     return SUCCESS;
 }
 

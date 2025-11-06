@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <errno.h>
+#include <sys/types.h>
 
 #include "log.h"
 #include "constants.h"
@@ -29,10 +31,12 @@ int *shutdown_event_fd = NULL;
 
 void sigint_handler(int signum) {
     shutdown_requested = 1ULL;
-    //LOG_INFO("[Orisium]: SIGINT received. Initiating graceful shutdown...");
     if (shutdown_event_fd && *shutdown_event_fd != -1) {
-        static const uint64_t u = 1ULL;
-        write(*shutdown_event_fd, &u, sizeof(uint64_t));
+        uint64_t val = 1ULL;
+        ssize_t w;
+        do {
+            w = write(*shutdown_event_fd, &val, sizeof(uint64_t));
+        } while (w == -1 && errno == EINTR);
     }
 }
 
