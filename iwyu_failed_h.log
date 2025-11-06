@@ -1,0 +1,24 @@
+❌ IWYU error in ./src/include/timer.h
+
+src/include/timer.h should add these lines:
+
+src/include/timer.h should remove these lines:
+- #include <string.h>  // lines 11-11
+
+The full include-list for src/include/timer.h:
+#include <errno.h>      // for errno, EAGAIN, EINTR, EWOULDBLOCK
+#include <limits.h>     // for ULLONG_MAX
+#include <math.h>       // for ceil
+#include <stdbool.h>    // for true, bool, false
+#include <stdint.h>     // for uint64_t, uint32_t, uint16_t, uint8_t
+#include <stdio.h>      // for NULL
+#include <stdlib.h>     // for free, malloc
+#include <sys/types.h>  // for ssize_t
+#include <unistd.h>     // for write
+#include "async.h"      // for async_delete_event, async_create_event, async...
+#include "constants.h"  // for WHEEL_SIZE, MAX_TIMER_LEVELS
+#include "log.h"        // for LOG_ERROR
+#include "types.h"      // for SUCCESS, FAILURE, status_t, FAILURE_NOMEM
+#include "utilities.h"  // for CLOSE_FD, create_timer_oneshot, update_timer_...
+---
+

@@ -236,11 +236,62 @@ static inline void free_linked_list_internal(timer_event_t *head) {
     }
 }
 
+static inline bool htw_find_earliest_event(hierarchical_timer_wheel_t *timer, uint64_t *out_expiration) {
+    uint64_t min_abs_expiration = global_min_heap_get_min(&timer->global_min_heap);
+    if (min_abs_expiration == ULLONG_MAX || min_abs_expiration <= timer->global_current_tick) {
+        timer->next_expiration_tick = ULLONG_MAX;
+        if (out_expiration) *out_expiration = ULLONG_MAX;
+        return false;
+    }
+    timer->next_expiration_tick = min_abs_expiration;
+    if (out_expiration) *out_expiration = min_abs_expiration;
+    return true;
+}
+
+static inline status_t htw_remove_event(hierarchical_timer_wheel_t *timer, timer_event_t *event_to_remove) {
+    if (!event_to_remove || event_to_remove->prev_next_ptr == NULL || event_to_remove->level_index >= MAX_TIMER_LEVELS) {
+        return FAILURE; 
+    }
+    *(event_to_remove->prev_next_ptr) = event_to_remove->next;
+    if (event_to_remove->next != NULL) {
+        event_to_remove->next->prev_next_ptr = event_to_remove->prev_next_ptr;
+    }
+    timer_wheel_level_t *level = &timer->levels[event_to_remove->level_index];
+    timer_bucket_t *bucket = &level->buckets[event_to_remove->slot_index];
+    if (event_to_remove == bucket->tail) {
+        if (bucket->head == NULL) {
+            bucket->tail = NULL;
+        } else {
+            if (bucket->head == NULL) { 
+                 bucket->tail = NULL;
+            }
+        }
+    }
+    if (event_to_remove->expiration_tick == bucket->min_expiration) {
+        uint64_t new_min = ULLONG_MAX;
+        timer_event_t *cur = bucket->head;
+        while (cur != NULL) {
+            if (cur->expiration_tick < new_min) {
+                new_min = cur->expiration_tick;
+            }
+            cur = cur->next;
+        }
+        bucket->min_expiration = new_min;
+        min_heap_update(&level->min_heap, event_to_remove->slot_index, new_min);
+        global_min_heap_update(&timer->global_min_heap, event_to_remove->level_index, min_heap_get_min(&level->min_heap));
+        if (event_to_remove->expiration_tick == timer->next_expiration_tick) {
+            htw_find_earliest_event(timer, NULL);
+        }
+    }
+    htw_pool_free(timer, event_to_remove);
+    return SUCCESS;
+}
+
 static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, uint64_t timer_id, double double_delay_ms) {
     uint64_t delay_ms = (uint64_t)ceil(double_delay_ms);
     if (delay_ms == 0 && double_delay_ms > 0.0) {
         delay_ms = 1;
-    }    
+    }   
     timer_event_t *new_event = htw_pool_alloc(timer);
     if (!new_event) {
         return FAILURE_NOMEM;
@@ -363,18 +414,6 @@ static inline status_t htw_move_queue_to_wheel(hierarchical_timer_wheel_t *timer
         current = next_node;
     }
     return SUCCESS;
-}
-
-static inline bool htw_find_earliest_event(hierarchical_timer_wheel_t *timer, uint64_t *out_expiration) {
-    uint64_t min_abs_expiration = global_min_heap_get_min(&timer->global_min_heap);
-    if (min_abs_expiration == ULLONG_MAX || min_abs_expiration <= timer->global_current_tick) {
-        timer->next_expiration_tick = ULLONG_MAX;
-        if (out_expiration) *out_expiration = ULLONG_MAX;
-        return false;
-    }
-    timer->next_expiration_tick = min_abs_expiration;
-    if (out_expiration) *out_expiration = min_abs_expiration;
-    return true;
 }
 
 static inline status_t htw_cascading_events(hierarchical_timer_wheel_t *timer, uint32_t source_level_index, uint32_t target_slot_index) {
@@ -572,13 +611,14 @@ static inline status_t htw_setup(const char *label, async_type_t *async, hierarc
     uint64_t current_factor = 1;
     for (uint32_t l = 0; l < MAX_TIMER_LEVELS; ++l) {
         timer_wheel_level_t *level = &timer->levels[l];
-        memset(level->buckets, 0, sizeof(timer_bucket_t) * WHEEL_SIZE);
         level->current_index = 0;
         level->tick_factor = current_factor;
         level->current_tick_count = 0;
         min_heap_init(&level->min_heap);
         for (uint32_t s = 0; s < WHEEL_SIZE; ++s) {
-            level->buckets[s].min_expiration = ULLONG_MAX;
+            level->buckets[s].head = NULL;
+            level->buckets[s].tail = NULL;
+            level->buckets[s].min_expiration = ULLONG_MAX; 
         }
         global_min_heap_update(&timer->global_min_heap, (uint8_t)l, ULLONG_MAX);
         if (l < MAX_TIMER_LEVELS - 1) {
