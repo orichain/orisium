@@ -8,7 +8,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -83,7 +82,7 @@ struct hierarchical_timer_wheel_t {
     timer_event_t *ready_queue_head;
     timer_event_t *ready_queue_tail;
     uint64_t global_current_tick;
-    double last_delay_ms;
+    double last_delay_us;
     uint64_t next_expiration_tick;
     timer_event_t *event_pool_head;
 };
@@ -287,16 +286,16 @@ static inline status_t htw_remove_event(hierarchical_timer_wheel_t *timer, timer
     return SUCCESS;
 }
 
-static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, uint64_t timer_id, double double_delay_ms) {
-    uint64_t delay_ms = (uint64_t)ceil(double_delay_ms);
-    if (delay_ms == 0 && double_delay_ms > 0.0) {
-        delay_ms = 1;
+static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, uint64_t timer_id, double double_delay_us) {
+    uint64_t delay_us = (uint64_t)ceil(double_delay_us);
+    if (delay_us == 0 && double_delay_us > 0.0) {
+        delay_us = 1;
     }   
     timer_event_t *new_event = htw_pool_alloc(timer);
     if (!new_event) {
         return FAILURE_NOMEM;
     }
-    uint64_t expire = timer->global_current_tick + delay_ms;
+    uint64_t expire = timer->global_current_tick + delay_us;
     if (expire < timer->global_current_tick) expire = ULLONG_MAX;
     new_event->expiration_tick = expire;
     new_event->timer_id = timer_id;
@@ -575,15 +574,15 @@ static inline status_t htw_reschedule_main_timer(const char *label, async_type_t
     }
     if (next_expiration_tick > timer->global_current_tick && earliest_event_found) {
         uint64_t delay_tick = next_expiration_tick - timer->global_current_tick;
-        double delay_ms = (double)delay_tick;
-        double delay_s = delay_ms / (double)1e3;
-        timer->last_delay_ms = delay_ms;
+        double delay_us = (double)delay_tick;
+        double delay_s = delay_us / (double)1e6;
+        timer->last_delay_us = delay_us;
         if (create_timer_oneshot(label, async, &timer->tick_event_fd, delay_s) != SUCCESS) {
             LOG_ERROR("%sFailed to re-arm main tick timer.", label);
             return FAILURE;
         }
     } else {
-        timer->last_delay_ms = 0.0;
+        timer->last_delay_us = 0.0;
         timer->next_expiration_tick = ULLONG_MAX;
         if (timer->tick_event_fd != -1) {
             if (update_timer_oneshot(label, &timer->tick_event_fd, (double)0.0) != SUCCESS) {
@@ -604,7 +603,7 @@ static inline status_t htw_setup(const char *label, async_type_t *async, hierarc
     timer->ready_queue_head = NULL;
     timer->ready_queue_tail = NULL;
     timer->global_current_tick = 0;
-    timer->last_delay_ms = 0.0;
+    timer->last_delay_us = 0.0;
     timer->next_expiration_tick = ULLONG_MAX;
     timer->event_pool_head = NULL;
     global_min_heap_init(&timer->global_min_heap);

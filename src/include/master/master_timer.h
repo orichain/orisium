@@ -39,7 +39,7 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
         return htw_reschedule_main_timer(label, &master_ctx->master_async, timer);
     } else if (*current_fd == timer->tick_event_fd) {
         if (drain_event_fd(label, timer->tick_event_fd) != SUCCESS) return FAILURE;
-        uint64_t advance_ticks = (uint64_t)(timer->last_delay_ms);
+        uint64_t advance_ticks = (uint64_t)(timer->last_delay_us);
         if (htw_advance_time_and_process_expired(label, timer, advance_ticks) != SUCCESS) return FAILURE;
         if (htw_reschedule_main_timer(label, &master_ctx->master_async, timer) != SUCCESS) return FAILURE;
         uint64_t val = 1ULL;
@@ -69,7 +69,7 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
             timer_event_t *next = current_event->next;
             uint64_t expired_timer_id = current_event->timer_id;
             if (expired_timer_id == master_ctx->check_healthy_timer_id) {
-                double ch = worker_check_healthy_ms();
+                double ch = worker_check_healthy_us();
                 status_t chst = htw_add_event(&master_ctx->timer, master_ctx->check_healthy_timer_id, ch);
                 if (chst != SUCCESS) {
                     LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);

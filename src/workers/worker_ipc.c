@@ -710,7 +710,7 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
 //----------------------------------------------------------------------
 // Aktifkan Heartbeat Karna security/Enkripsi Sudah Ready
 //---------------------------------------------------------------------- 
-        double delay_ms = worker_hb_interval_ms();
+        double delay_ms = worker_hb_interval_us();
         status_t chst = htw_add_event(&worker_ctx->timer, worker_ctx->heartbeat_timer_id, delay_ms);
         if (chst != SUCCESS) {
             LOG_ERROR("%sWorker error htw_add_event...", worker_ctx->label);
@@ -3004,7 +3004,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     session->heartbeat.sent_try_count++;
     session->heartbeat.sent_time = current_time.r_uint64_t;
 //======================================================================
-    double hb_interval = node_hb_interval_with_jitter_ms(session->rtt.value_prediction, session->retry.value_prediction);
+    double hb_interval = node_hb_interval_with_jitter_us(session->rtt.value_prediction, session->retry.value_prediction);
     session->heartbeat_interval = hb_interval;
     printf("%sSend HB Interval %f ms\n", worker_ctx->label, hb_interval);
 //======================================================================
@@ -3844,7 +3844,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
     uint8_t session_index = iudp_data_acki->session_index;
     cow_c_session_t *cow_c_session = (cow_c_session_t *)worker_sessions;
     cow_c_session_t *session = &cow_c_session[session_index];
-    double retry_timer_interval = retry_interval_with_jitter_ms(session->retry.value_prediction);
+    double retry_timer_interval = retry_interval_with_jitter_us(session->retry.value_prediction);
     switch ((orilink_protocol_type_t)iudp_data_acki->orilink_protocol) {
         case ORILINK_HELLO1: {
             if (iudp_data_acki->trycount == (uint8_t)1) {
@@ -3933,7 +3933,7 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
     uint8_t session_index = iudp_data_acki->session_index;
     sio_c_session_t *sio_c_session = (sio_c_session_t *)worker_sessions;
     sio_c_session_t *session = &sio_c_session[session_index];
-    double retry_timer_interval = retry_interval_with_jitter_ms(session->retry.value_prediction);
+    double retry_timer_interval = retry_interval_with_jitter_us(session->retry.value_prediction);
     switch ((orilink_protocol_type_t)iudp_data_acki->orilink_protocol) {
         case ORILINK_HELLO1_ACK: {
             CLOSE_IPC_PROTOCOL(&received_protocol);
