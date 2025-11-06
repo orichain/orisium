@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <sys/types.h>
 
 #include "log.h"
 #include "timer.h"
@@ -13,6 +14,8 @@
 #include "master/master.h"
 #include "master/ipc/worker_ipc_cmds.h"
 #include "master/worker_metrics.h"
+#include "constants.h"
+#include "stdbool.h"
 
 static inline status_t drain_event_fd(const char *label, int fd) {
     uint64_t u;

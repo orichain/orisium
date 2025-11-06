@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <math.h>
+#include <sys/types.h>
 
 #include "log.h"
 #include "timer.h"
@@ -13,6 +15,9 @@
 #include "workers/workers.h"
 #include "workers/worker_ipc.h"
 #include "workers/heartbeat.h"
+#include "constants.h"
+#include "orilink/protocol.h"
+#include "stdbool.h"
 
 static inline status_t create_polling_1ms(worker_context_t *worker_ctx, control_packet_t *h, double total_polling_interval) {
     double polling_interval = (double)1;

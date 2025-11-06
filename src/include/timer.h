@@ -335,14 +335,16 @@ static inline status_t htw_move_queue_to_wheel(hierarchical_timer_wheel_t *timer
     return SUCCESS;
 }
 
-static inline uint64_t htw_find_earliest_event(hierarchical_timer_wheel_t *timer) {
+static inline bool htw_find_earliest_event(hierarchical_timer_wheel_t *timer, uint64_t *out_expiration) {
     uint64_t min_abs_expiration = global_min_heap_get_min(&timer->global_min_heap);
     if (min_abs_expiration == ULLONG_MAX || min_abs_expiration <= timer->global_current_tick) {
         timer->next_expiration_tick = ULLONG_MAX;
-        return 0ULL;
+        if (out_expiration) *out_expiration = ULLONG_MAX;
+        return false;
     }
     timer->next_expiration_tick = min_abs_expiration;
-    return min_abs_expiration;
+    if (out_expiration) *out_expiration = min_abs_expiration;
+    return true;
 }
 
 static inline status_t htw_cascading_events(hierarchical_timer_wheel_t *timer, uint32_t source_level_index, uint32_t target_slot_index) {
@@ -456,8 +458,7 @@ static inline status_t htw_process_expired_l0(hierarchical_timer_wheel_t *timer,
         current_slot_index = (current_slot_index + 1) & WHEEL_MASK;
     }
     global_min_heap_update(&timer->global_min_heap, 0, min_heap_get_min(&l0->min_heap));
-    timer->next_expiration_tick = ULLONG_MAX;
-    htw_find_earliest_event(timer);
+    htw_find_earliest_event(timer, NULL);
     return SUCCESS;
 }
 
@@ -499,10 +500,11 @@ static inline status_t htw_advance_time_and_process_expired(hierarchical_timer_w
 
 static inline status_t htw_reschedule_main_timer(const char *label, async_type_t *async, hierarchical_timer_wheel_t *timer) {
     uint64_t next_expiration_tick = timer->next_expiration_tick;
+    bool earliest_event_found = true;
     if (next_expiration_tick == ULLONG_MAX || next_expiration_tick <= timer->global_current_tick) {
-        next_expiration_tick = htw_find_earliest_event(timer);
+        earliest_event_found = htw_find_earliest_event(timer, &next_expiration_tick);
     }
-    if (next_expiration_tick > timer->global_current_tick) {
+    if (next_expiration_tick > timer->global_current_tick && earliest_event_found) {
         uint64_t delay_tick = next_expiration_tick - timer->global_current_tick;
         double delay_ms = (double)delay_tick;
         double delay_s = delay_ms / (double)1e3;
