@@ -248,7 +248,7 @@ static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, uint64_t
     }
     uint64_t val = 1ULL;
     if (write(timer->add_event_fd, &val, sizeof(uint64_t)) != sizeof(uint64_t)) {
-        htw_pool_free(timer, new_event);
+        //htw_pool_free(timer, new_event);
         return FAILURE;
     }
     return SUCCESS;

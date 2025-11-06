@@ -276,8 +276,7 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
         if (htw_advance_time_and_process_expired(timer, advance_ticks) != SUCCESS) return FAILURE;
         if (htw_reschedule_main_timer(worker_ctx->label, &worker_ctx->async, timer) != SUCCESS) return FAILURE;
         uint64_t val = 1ULL;
-        ssize_t w = write(timer->timeout_event_fd, &val, sizeof(uint64_t));
-        if (w != sizeof(uint64_t)) {
+        if (write(timer->timeout_event_fd, &val, sizeof(uint64_t)) != sizeof(uint64_t)) {
             LOG_ERROR("%sFailed to write timeout_event_fd: %s", worker_ctx->label, strerror(errno));
             return FAILURE;
         }
@@ -308,7 +307,7 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
                     handler_result = FAILURE;
                 }
             }
-            free(current_event);
+            htw_pool_free(timer, current_event);
             current_event = next;
         }
         return handler_result;
