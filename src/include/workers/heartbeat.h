@@ -13,6 +13,7 @@
 #include "stdbool.h"
 #include "orilink/heartbeat_ack.h"
 #include "timer.h"
+#include "constants.h"
 
 static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsession, orilink_protocol_type_t orilink_protocol) {
     worker_type_t wot = *worker_ctx->wot;

@@ -15,6 +15,11 @@
 
 #include "types.h"
 
+#if (WHEEL_SIZE & (WHEEL_SIZE - 1)) != 0
+#error "WHEEL_SIZE must be a power of 2 for optimal performance."
+#endif
+#define WHEEL_MASK (WHEEL_SIZE - 1)
+
 typedef struct timer_event_t timer_event_t;
 typedef struct hierarchical_timer_wheel_t hierarchical_timer_wheel_t;
 
@@ -248,7 +253,6 @@ static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, uint64_t
     }
     uint64_t val = 1ULL;
     if (write(timer->add_event_fd, &val, sizeof(uint64_t)) != sizeof(uint64_t)) {
-        //htw_pool_free(timer, new_event);
         return FAILURE;
     }
     return SUCCESS;
@@ -273,7 +277,7 @@ static inline void htw_calculate_level_and_slot(
         if (delta_tick < wheel_span) {
             *level_index = level;
             uint64_t abs_slot_index = expiration_tick / current_tick_factor;
-            *slot_index = (uint32_t)(abs_slot_index % WHEEL_SIZE);
+            *slot_index = (uint32_t)(abs_slot_index & WHEEL_MASK); 
             return;
         }
         if (level < MAX_TIMER_LEVELS - 1) {
@@ -305,6 +309,7 @@ static inline status_t htw_move_queue_to_wheel(hierarchical_timer_wheel_t *timer
         );
         timer_wheel_level_t *level = &timer->levels[level_index];
         timer_bucket_t *bucket = &level->buckets[slot_index];
+        
         current->level_index = (uint8_t)level_index;
         current->slot_index = (uint16_t)slot_index;
         current->next = bucket->head;
@@ -448,7 +453,7 @@ static inline status_t htw_process_expired_l0(hierarchical_timer_wheel_t *timer,
         bucket->min_expiration = new_min_exp;
         min_heap_update(&l0->min_heap, (uint16_t)current_slot_index, new_min_exp);
         if (current_slot_index == end_index) break;
-        current_slot_index = (current_slot_index + 1) % WHEEL_SIZE;
+        current_slot_index = (current_slot_index + 1) & WHEEL_MASK;
     }
     global_min_heap_update(&timer->global_min_heap, 0, min_heap_get_min(&l0->min_heap));
     timer->next_expiration_tick = ULLONG_MAX;
@@ -464,7 +469,7 @@ static inline status_t htw_advance_time_and_process_expired(hierarchical_timer_w
         uint64_t slots_until_wrap = WHEEL_SIZE - l0_start_index;
         uint64_t chunk_advance = remaining_ticks < slots_until_wrap ? remaining_ticks : slots_until_wrap;
         if (chunk_advance == 0) break;
-        uint32_t l0_end_index = (l0_start_index + (uint32_t)chunk_advance) % WHEEL_SIZE;
+        uint32_t l0_end_index = (l0_start_index + (uint32_t)chunk_advance) & WHEEL_MASK;
         timer->levels[0].current_index = (uint16_t)l0_end_index;
         timer->global_current_tick += chunk_advance;
         if (l0_end_index == 0) {
@@ -472,7 +477,7 @@ static inline status_t htw_advance_time_and_process_expired(hierarchical_timer_w
             for (uint32_t level = 1; level < MAX_TIMER_LEVELS && carry > 0; ++level) {
                 timer_wheel_level_t *lvl = &timer->levels[level];
                 uint64_t sum = (uint64_t)lvl->current_index + carry;
-                uint32_t new_index = (uint32_t)(sum % WHEEL_SIZE);
+                uint32_t new_index = (uint32_t)(sum & WHEEL_MASK); 
                 carry = sum / WHEEL_SIZE;
                 lvl->current_index = (uint16_t)new_index;
                 timer_bucket_t *bucket_to_cascade = &timer->levels[level].buckets[new_index];
