@@ -15,6 +15,73 @@
 
 #include "types.h"
 
+typedef struct {
+    uint64_t expiration_tick;
+    uint16_t bucket_index;
+} min_heap_node_t;
+
+typedef struct {
+    min_heap_node_t nodes[WHEEL_SIZE];
+    uint32_t size;
+    uint16_t bucket_to_heap_index[WHEEL_SIZE];
+} min_heap_t;
+
+static inline void min_heap_swap(min_heap_node_t *a, min_heap_node_t *b, min_heap_t *heap) {
+    heap->bucket_to_heap_index[a->bucket_index] = (uint16_t)(b - heap->nodes);
+    heap->bucket_to_heap_index[b->bucket_index] = (uint16_t)(a - heap->nodes);
+    min_heap_node_t temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+static inline void min_heapify_down(min_heap_t *heap, uint32_t i) {
+    uint32_t smallest = i;
+    uint32_t left = 2 * i + 1;
+    uint32_t right = 2 * i + 2;
+    if (left < heap->size && heap->nodes[left].expiration_tick < heap->nodes[smallest].expiration_tick) {
+        smallest = left;
+    }
+    if (right < heap->size && heap->nodes[right].expiration_tick < heap->nodes[smallest].expiration_tick) {
+        smallest = right;
+    }
+    if (smallest != i) {
+        min_heap_swap(&heap->nodes[i], &heap->nodes[smallest], heap);
+        min_heapify_down(heap, smallest);
+    }
+}
+
+static inline void min_heapify_up(min_heap_t *heap, uint32_t i) {
+    while (i != 0 && heap->nodes[(i - 1) / 2].expiration_tick > heap->nodes[i].expiration_tick) {
+        min_heap_swap(&heap->nodes[i], &heap->nodes[(i - 1) / 2], heap);
+        i = (i - 1) / 2;
+    }
+}
+
+static inline void min_heap_init(min_heap_t *heap) {
+    heap->size = WHEEL_SIZE;
+    for (uint32_t i = 0; i < WHEEL_SIZE; ++i) {
+        heap->nodes[i].expiration_tick = ULLONG_MAX;
+        heap->nodes[i].bucket_index = (uint16_t)i;
+        heap->bucket_to_heap_index[i] = (uint16_t)i;
+    }
+}
+
+static inline void min_heap_update(min_heap_t *heap, uint16_t bucket_index, uint64_t new_expiration) {
+    uint32_t i = heap->bucket_to_heap_index[bucket_index];
+    if (i >= heap->size) return; 
+    uint64_t old_expiration = heap->nodes[i].expiration_tick;
+    heap->nodes[i].expiration_tick = new_expiration;
+    if (new_expiration < old_expiration) {
+        min_heapify_up(heap, i);
+    } else if (new_expiration > old_expiration) {
+        min_heapify_down(heap, i);
+    }
+}
+
+static inline uint64_t min_heap_get_min(min_heap_t *heap) {
+    return heap->nodes[0].expiration_tick;
+}
+
 typedef struct timer_event_t {
     struct timer_event_t *next;
     uint64_t expiration_tick;
@@ -27,6 +94,7 @@ typedef struct timer_event_t {
 typedef struct {
     timer_event_t *head;
     timer_event_t *tail;
+    uint64_t min_expiration; 
 } timer_bucket_t;
 
 typedef struct {
@@ -34,6 +102,7 @@ typedef struct {
     uint16_t current_index;
     uint64_t tick_factor;
     uint64_t current_tick_count;
+    min_heap_t min_heap;
 } timer_wheel_level_t;
 
 typedef struct {
@@ -140,7 +209,8 @@ static inline status_t htw_move_queue_to_wheel(hierarchical_timer_wheel_t *timer
             &level_index,
             &slot_index
         );
-        timer_bucket_t *bucket = &timer->levels[level_index].buckets[slot_index];
+        timer_wheel_level_t *level = &timer->levels[level_index];
+        timer_bucket_t *bucket = &level->buckets[slot_index];
         current->level_index = (uint8_t)level_index;
         current->slot_index = (uint16_t)slot_index;
         current->next = bucket->head;
@@ -154,6 +224,10 @@ static inline status_t htw_move_queue_to_wheel(hierarchical_timer_wheel_t *timer
         if (current->expiration_tick < timer->next_expiration_tick) {
             timer->next_expiration_tick = current->expiration_tick;
         }
+        if (current->expiration_tick < bucket->min_expiration) {
+            bucket->min_expiration = current->expiration_tick;
+            min_heap_update(&level->min_heap, (uint16_t)slot_index, bucket->min_expiration);
+        }
         current = next_node;
     }
     return SUCCESS;
@@ -162,15 +236,9 @@ static inline status_t htw_move_queue_to_wheel(hierarchical_timer_wheel_t *timer
 static inline uint64_t htw_find_earliest_event(hierarchical_timer_wheel_t *timer) {
     uint64_t min_abs_expiration = ULLONG_MAX;
     for (uint32_t l = 0; l < MAX_TIMER_LEVELS; ++l) {
-        timer_wheel_level_t *level = &timer->levels[l];
-        for (uint32_t s = 0; s < WHEEL_SIZE; ++s) {
-            timer_bucket_t *bucket = &level->buckets[s];
-            if (bucket->head != NULL) {
-                uint64_t exp_tick = bucket->head->expiration_tick;
-                if (exp_tick > timer->global_current_tick && exp_tick < min_abs_expiration) {
-                    min_abs_expiration = exp_tick;
-                }
-            }
+        uint64_t level_min_exp = min_heap_get_min(&timer->levels[l].min_heap);
+        if (level_min_exp > timer->global_current_tick && level_min_exp < min_abs_expiration) {
+            min_abs_expiration = level_min_exp;
         }
     }
     if (min_abs_expiration == ULLONG_MAX) {
@@ -183,34 +251,56 @@ static inline uint64_t htw_find_earliest_event(hierarchical_timer_wheel_t *timer
 
 static inline status_t htw_cascading_events(hierarchical_timer_wheel_t *timer, uint32_t source_level_index, uint32_t target_slot_index) {
     if (source_level_index >= MAX_TIMER_LEVELS) return SUCCESS;
-    timer_bucket_t *source_bucket = &timer->levels[source_level_index].buckets[target_slot_index];
+    timer_wheel_level_t *source_level = &timer->levels[source_level_index];
+    timer_bucket_t *source_bucket = &source_level->buckets[target_slot_index];
+    if (source_bucket->head == NULL) return SUCCESS;
     timer_event_t *current = source_bucket->head;
     timer_event_t *next_node = NULL;
     source_bucket->head = NULL;
     source_bucket->tail = NULL;
+    source_bucket->min_expiration = ULLONG_MAX;
+    min_heap_update(&source_level->min_heap, (uint16_t)target_slot_index, ULLONG_MAX);    
     while (current != NULL) {
         next_node = current->next;
-        uint32_t new_level_index;
-        uint32_t new_slot_index;
-        htw_calculate_level_and_slot(
-            timer,
-            current->expiration_tick,
-            &new_level_index,
-            &new_slot_index
-        );
-        timer_bucket_t *target_bucket = &timer->levels[new_level_index].buckets[new_slot_index];
-        current->level_index = (uint8_t)new_level_index;
-        current->slot_index = (uint16_t)new_slot_index;
-        current->next = target_bucket->head;
-        if (target_bucket->head != NULL) {
-            target_bucket->head->prev_next_ptr = &current->next;
+        if (current->expiration_tick <= timer->global_current_tick) {
+            current->next = NULL;
+            if (timer->ready_queue_tail) {
+                current->prev_next_ptr = &timer->ready_queue_tail->next;
+                timer->ready_queue_tail->next = current;
+                timer->ready_queue_tail = current;
+            } else {
+                timer->ready_queue_head = current;
+                timer->ready_queue_tail = current;
+                current->prev_next_ptr = &timer->ready_queue_head;
+            }
         } else {
-            target_bucket->tail = current;
-        }
-        current->prev_next_ptr = &target_bucket->head;
-        target_bucket->head = current;
-        if (current->expiration_tick < timer->next_expiration_tick) {
-            timer->next_expiration_tick = current->expiration_tick;
+            uint32_t new_level_index;
+            uint32_t new_slot_index;
+            htw_calculate_level_and_slot(
+                timer,
+                current->expiration_tick,
+                &new_level_index,
+                &new_slot_index
+            );
+            timer_wheel_level_t *target_level = &timer->levels[new_level_index];
+            timer_bucket_t *target_bucket = &target_level->buckets[new_slot_index];
+            current->level_index = (uint8_t)new_level_index;
+            current->slot_index = (uint16_t)new_slot_index;
+            current->next = target_bucket->head;
+            if (target_bucket->head != NULL) {
+                target_bucket->head->prev_next_ptr = &current->next;
+            } else {
+                target_bucket->tail = current;
+            }
+            current->prev_next_ptr = &target_bucket->head;
+            target_bucket->head = current;
+            if (current->expiration_tick < timer->next_expiration_tick) {
+                timer->next_expiration_tick = current->expiration_tick;
+            }
+            if (current->expiration_tick < target_bucket->min_expiration) {
+                target_bucket->min_expiration = current->expiration_tick;
+                min_heap_update(&target_level->min_heap, (uint16_t)new_slot_index, target_bucket->min_expiration);
+            }
         }
         current = next_node;
     }
@@ -219,12 +309,14 @@ static inline status_t htw_cascading_events(hierarchical_timer_wheel_t *timer, u
 
 static inline status_t htw_process_expired_l0(hierarchical_timer_wheel_t *timer, uint32_t start_index, uint32_t end_index) {
     uint32_t current_slot_index = start_index;
+    timer_wheel_level_t *l0 = &timer->levels[0];
     while (true) {
-        timer_bucket_t *bucket = &timer->levels[0].buckets[current_slot_index];
+        timer_bucket_t *bucket = &l0->buckets[current_slot_index];
         timer_event_t *cur = bucket->head;
         timer_event_t *next_event = NULL;
         bucket->head = NULL;
         bucket->tail = NULL;
+        uint64_t new_min_exp = ULLONG_MAX;
         while (cur) {
             next_event = cur->next;
             if (cur->expiration_tick <= timer->global_current_tick) {
@@ -252,9 +344,14 @@ static inline status_t htw_process_expired_l0(hierarchical_timer_wheel_t *timer,
                 }
                 cur->level_index = 0;
                 cur->slot_index = (uint16_t)current_slot_index;
+                if (cur->expiration_tick < new_min_exp) {
+                    new_min_exp = cur->expiration_tick;
+                }
             }
             cur = next_event;
         }
+        bucket->min_expiration = new_min_exp;
+        min_heap_update(&l0->min_heap, (uint16_t)current_slot_index, new_min_exp);
         if (current_slot_index == end_index) break;
         current_slot_index = (current_slot_index + 1) % WHEEL_SIZE;
     }
@@ -273,7 +370,7 @@ static inline status_t htw_advance_time_and_process_expired(hierarchical_timer_w
         if (chunk_advance == 0) break;
         uint32_t l0_end_index = (l0_start_index + (uint32_t)chunk_advance) % WHEEL_SIZE;
         timer->levels[0].current_index = (uint16_t)l0_end_index;
-        timer->global_current_tick += chunk_advance;
+        timer->global_current_tick += chunk_advance;             
         if (l0_end_index == 0) {
             uint64_t carry = 1;
             for (uint32_t level = 1; level < MAX_TIMER_LEVELS && carry > 0; ++level) {
@@ -282,8 +379,17 @@ static inline status_t htw_advance_time_and_process_expired(hierarchical_timer_w
                 uint32_t new_index = (uint32_t)(sum % WHEEL_SIZE);
                 carry = sum / WHEEL_SIZE;
                 lvl->current_index = (uint16_t)new_index;
-                if (htw_cascading_events(timer, level, new_index) != SUCCESS) {
-                    return FAILURE;
+                
+                // BARIS YANG DIHAPUS: Blok if/else yang tidak melakukan apa-apa:
+                // if (new_index == 0 && carry > 0 && level < MAX_TIMER_LEVELS) {
+                // } else if (new_index != 0 || carry == 0) {
+                // }
+                
+                timer_bucket_t *bucket_to_cascade = &timer->levels[level].buckets[new_index];
+                if (bucket_to_cascade->head != NULL) {
+                    if (htw_cascading_events(timer, level, new_index) != SUCCESS) {
+                        return FAILURE;
+                    }
                 }
             }
         }
@@ -304,7 +410,6 @@ static inline status_t htw_reschedule_main_timer(const char *label, async_type_t
         uint64_t delay_tick = next_expiration_tick - timer->global_current_tick;
         double delay_ms = (double)delay_tick;
         double delay_s = delay_ms / (double)1e3;
-        
         timer->last_delay_ms = delay_ms;
         if (create_timer_oneshot(label, async, &timer->tick_event_fd, delay_s) != SUCCESS) {
             LOG_ERROR("%sFailed to re-arm main tick timer.", label);
@@ -341,6 +446,10 @@ static inline status_t htw_setup(const char *label, async_type_t *async, hierarc
         level->current_index = 0;
         level->tick_factor = current_factor;
         level->current_tick_count = 0;
+        min_heap_init(&level->min_heap);
+        for (uint32_t s = 0; s < WHEEL_SIZE; ++s) {
+            level->buckets[s].min_expiration = ULLONG_MAX;
+        }
         if (l < MAX_TIMER_LEVELS - 1) {
             current_factor *= WHEEL_SIZE;
         }
@@ -364,6 +473,7 @@ static inline void htw_cleanup(const char *label, async_type_t *async, hierarchi
             free_linked_list_internal(bucket->head);
             bucket->head = NULL;
             bucket->tail = NULL;
+            bucket->min_expiration = ULLONG_MAX;
         }
     }
     free_linked_list_internal(timer->new_event_queue_head);

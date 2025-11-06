@@ -93,7 +93,7 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
 //----------------------------------------------------------------------
 // Allow Heartbeat Base On Schedule
 //----------------------------------------------------------------------
-            status_t otmr = htw_add_event(&worker_ctx->timer, session->heartbeat_openner_timer_id, hb_interval - (double)5);
+            status_t otmr = htw_add_event(&worker_ctx->timer, session->heartbeat_openner_timer_id, hb_interval - (double)3);
             if (otmr != SUCCESS) {
                 return FAILURE;
             }
@@ -176,7 +176,7 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
 //----------------------------------------------------------------------
 // Allow Heartbeat Base On Schedule
 //----------------------------------------------------------------------
-            status_t otmr = htw_add_event(&worker_ctx->timer, session->heartbeat_openner_timer_id, hb_interval - (double)5);
+            status_t otmr = htw_add_event(&worker_ctx->timer, session->heartbeat_openner_timer_id, hb_interval - (double)3);
             if (otmr != SUCCESS) {
                 return FAILURE;
             }
