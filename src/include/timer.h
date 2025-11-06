@@ -26,6 +26,18 @@ typedef struct {
     uint16_t bucket_to_heap_index[WHEEL_SIZE];
 } min_heap_t;
 
+typedef struct {
+    uint64_t expiration_tick;
+    uint8_t level_index;
+} global_min_heap_node_t;
+
+typedef struct {
+    global_min_heap_node_t nodes[MAX_TIMER_LEVELS];
+    uint32_t size;
+    uint8_t level_to_heap_index[MAX_TIMER_LEVELS];
+} global_min_heap_t;
+
+
 static inline void min_heap_swap(min_heap_node_t *a, min_heap_node_t *b, min_heap_t *heap) {
     heap->bucket_to_heap_index[a->bucket_index] = (uint16_t)(b - heap->nodes);
     heap->bucket_to_heap_index[b->bucket_index] = (uint16_t)(a - heap->nodes);
@@ -82,6 +94,62 @@ static inline uint64_t min_heap_get_min(min_heap_t *heap) {
     return heap->nodes[0].expiration_tick;
 }
 
+static inline void global_min_heap_swap(global_min_heap_node_t *a, global_min_heap_node_t *b, global_min_heap_t *heap) {
+    heap->level_to_heap_index[a->level_index] = (uint8_t)(b - heap->nodes);
+    heap->level_to_heap_index[b->level_index] = (uint8_t)(a - heap->nodes);
+    global_min_heap_node_t temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+static inline void global_min_heapify_down(global_min_heap_t *heap, uint32_t i) {
+    uint32_t smallest = i;
+    uint32_t left = 2 * i + 1;
+    uint32_t right = 2 * i + 2;
+    if (left < heap->size && heap->nodes[left].expiration_tick < heap->nodes[smallest].expiration_tick) {
+        smallest = left;
+    }
+    if (right < heap->size && heap->nodes[right].expiration_tick < heap->nodes[smallest].expiration_tick) {
+        smallest = right;
+    }
+    if (smallest != i) {
+        global_min_heap_swap(&heap->nodes[i], &heap->nodes[smallest], heap);
+        global_min_heapify_down(heap, smallest);
+    }
+}
+
+static inline void global_min_heapify_up(global_min_heap_t *heap, uint32_t i) {
+    while (i != 0 && heap->nodes[(i - 1) / 2].expiration_tick > heap->nodes[i].expiration_tick) {
+        global_min_heap_swap(&heap->nodes[i], &heap->nodes[(i - 1) / 2], heap);
+        i = (i - 1) / 2;
+    }
+}
+
+static inline void global_min_heap_init(global_min_heap_t *heap) {
+    heap->size = MAX_TIMER_LEVELS;
+    for (uint32_t i = 0; i < MAX_TIMER_LEVELS; ++i) {
+        heap->nodes[i].expiration_tick = ULLONG_MAX;
+        heap->nodes[i].level_index = (uint8_t)i;
+        heap->level_to_heap_index[i] = (uint8_t)i;
+    }
+}
+
+static inline void global_min_heap_update(global_min_heap_t *heap, uint8_t level_index, uint64_t new_expiration) {
+    uint32_t i = heap->level_to_heap_index[level_index];
+    if (i >= heap->size) return; 
+    uint64_t old_expiration = heap->nodes[i].expiration_tick;
+    heap->nodes[i].expiration_tick = new_expiration;
+    if (new_expiration < old_expiration) {
+        global_min_heapify_up(heap, i);
+    } else if (new_expiration > old_expiration) {
+        global_min_heapify_down(heap, i);
+    }
+}
+
+static inline uint64_t global_min_heap_get_min(global_min_heap_t *heap) {
+    return heap->nodes[0].expiration_tick;
+}
+
 typedef struct timer_event_t {
     struct timer_event_t *next;
     uint64_t expiration_tick;
@@ -107,6 +175,7 @@ typedef struct {
 
 typedef struct {
     timer_wheel_level_t levels[MAX_TIMER_LEVELS];
+    global_min_heap_t global_min_heap;
     int tick_event_fd;
     int add_event_fd;
     int timeout_event_fd;
@@ -220,13 +289,16 @@ static inline status_t htw_move_queue_to_wheel(hierarchical_timer_wheel_t *timer
             bucket->tail = current;
         }
         current->prev_next_ptr = &bucket->head;
-        bucket->head = current;
+        bucket->head = current;        
         if (current->expiration_tick < timer->next_expiration_tick) {
             timer->next_expiration_tick = current->expiration_tick;
         }
         if (current->expiration_tick < bucket->min_expiration) {
             bucket->min_expiration = current->expiration_tick;
             min_heap_update(&level->min_heap, (uint16_t)slot_index, bucket->min_expiration);
+            if (bucket->min_expiration < global_min_heap_get_min(&timer->global_min_heap)) {
+                global_min_heap_update(&timer->global_min_heap, (uint8_t)level_index, bucket->min_expiration);
+            }
         }
         current = next_node;
     }
@@ -234,14 +306,8 @@ static inline status_t htw_move_queue_to_wheel(hierarchical_timer_wheel_t *timer
 }
 
 static inline uint64_t htw_find_earliest_event(hierarchical_timer_wheel_t *timer) {
-    uint64_t min_abs_expiration = ULLONG_MAX;
-    for (uint32_t l = 0; l < MAX_TIMER_LEVELS; ++l) {
-        uint64_t level_min_exp = min_heap_get_min(&timer->levels[l].min_heap);
-        if (level_min_exp > timer->global_current_tick && level_min_exp < min_abs_expiration) {
-            min_abs_expiration = level_min_exp;
-        }
-    }
-    if (min_abs_expiration == ULLONG_MAX) {
+    uint64_t min_abs_expiration = global_min_heap_get_min(&timer->global_min_heap);
+    if (min_abs_expiration == ULLONG_MAX || min_abs_expiration <= timer->global_current_tick) {
         timer->next_expiration_tick = ULLONG_MAX;
         return 0ULL;
     }
@@ -259,7 +325,8 @@ static inline status_t htw_cascading_events(hierarchical_timer_wheel_t *timer, u
     source_bucket->head = NULL;
     source_bucket->tail = NULL;
     source_bucket->min_expiration = ULLONG_MAX;
-    min_heap_update(&source_level->min_heap, (uint16_t)target_slot_index, ULLONG_MAX);    
+    min_heap_update(&source_level->min_heap, (uint16_t)target_slot_index, ULLONG_MAX);
+    global_min_heap_update(&timer->global_min_heap, (uint8_t)source_level_index, min_heap_get_min(&source_level->min_heap));
     while (current != NULL) {
         next_node = current->next;
         if (current->expiration_tick <= timer->global_current_tick) {
@@ -300,6 +367,9 @@ static inline status_t htw_cascading_events(hierarchical_timer_wheel_t *timer, u
             if (current->expiration_tick < target_bucket->min_expiration) {
                 target_bucket->min_expiration = current->expiration_tick;
                 min_heap_update(&target_level->min_heap, (uint16_t)new_slot_index, target_bucket->min_expiration);
+                if (target_bucket->min_expiration < global_min_heap_get_min(&timer->global_min_heap)) {
+                    global_min_heap_update(&timer->global_min_heap, (uint8_t)new_level_index, target_bucket->min_expiration);
+                }
             }
         }
         current = next_node;
@@ -355,6 +425,7 @@ static inline status_t htw_process_expired_l0(hierarchical_timer_wheel_t *timer,
         if (current_slot_index == end_index) break;
         current_slot_index = (current_slot_index + 1) % WHEEL_SIZE;
     }
+    global_min_heap_update(&timer->global_min_heap, 0, min_heap_get_min(&l0->min_heap));
     timer->next_expiration_tick = ULLONG_MAX;
     htw_find_earliest_event(timer);
     return SUCCESS;
@@ -379,17 +450,12 @@ static inline status_t htw_advance_time_and_process_expired(hierarchical_timer_w
                 uint32_t new_index = (uint32_t)(sum % WHEEL_SIZE);
                 carry = sum / WHEEL_SIZE;
                 lvl->current_index = (uint16_t)new_index;
-                
-                // BARIS YANG DIHAPUS: Blok if/else yang tidak melakukan apa-apa:
-                // if (new_index == 0 && carry > 0 && level < MAX_TIMER_LEVELS) {
-                // } else if (new_index != 0 || carry == 0) {
-                // }
-                
                 timer_bucket_t *bucket_to_cascade = &timer->levels[level].buckets[new_index];
                 if (bucket_to_cascade->head != NULL) {
                     if (htw_cascading_events(timer, level, new_index) != SUCCESS) {
                         return FAILURE;
                     }
+                } else {
                 }
             }
         }
@@ -404,7 +470,7 @@ static inline status_t htw_advance_time_and_process_expired(hierarchical_timer_w
 static inline status_t htw_reschedule_main_timer(const char *label, async_type_t *async, hierarchical_timer_wheel_t *timer) {
     uint64_t next_expiration_tick = timer->next_expiration_tick;
     if (next_expiration_tick == ULLONG_MAX || next_expiration_tick <= timer->global_current_tick) {
-        next_expiration_tick = htw_find_earliest_event(timer);
+        next_expiration_tick = htw_find_earliest_event(timer); 
     }
     if (next_expiration_tick > timer->global_current_tick) {
         uint64_t delay_tick = next_expiration_tick - timer->global_current_tick;
@@ -439,6 +505,7 @@ static inline status_t htw_setup(const char *label, async_type_t *async, hierarc
     timer->global_current_tick = 0;
     timer->last_delay_ms = 0.0;
     timer->next_expiration_tick = ULLONG_MAX;
+    global_min_heap_init(&timer->global_min_heap);
     uint64_t current_factor = 1;
     for (uint32_t l = 0; l < MAX_TIMER_LEVELS; ++l) {
         timer_wheel_level_t *level = &timer->levels[l];
@@ -450,6 +517,7 @@ static inline status_t htw_setup(const char *label, async_type_t *async, hierarc
         for (uint32_t s = 0; s < WHEEL_SIZE; ++s) {
             level->buckets[s].min_expiration = ULLONG_MAX;
         }
+        global_min_heap_update(&timer->global_min_heap, (uint8_t)l, ULLONG_MAX);
         if (l < MAX_TIMER_LEVELS - 1) {
             current_factor *= WHEEL_SIZE;
         }
