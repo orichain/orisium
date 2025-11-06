@@ -278,12 +278,8 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
         uint64_t val = 1ULL;
         ssize_t w = write(timer->timeout_event_fd, &val, sizeof(uint64_t));
         if (w != sizeof(uint64_t)) {
-            if (w == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-                LOG_DEVEL_DEBUG("%stimeout_event_fd write would block (EAGAIN).", worker_ctx->label);
-            } else {
-                LOG_ERROR("%sFailed to write timeout_event_fd: %s", worker_ctx->label, strerror(errno));
-                return FAILURE;
-            }
+            LOG_ERROR("%sFailed to write timeout_event_fd: %s", worker_ctx->label, strerror(errno));
+            return FAILURE;
         }
         return SUCCESS;
     } else if (*current_fd == timer->timeout_event_fd) {

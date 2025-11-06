@@ -43,12 +43,8 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
         uint64_t val = 1ULL;
         ssize_t w = write(timer->timeout_event_fd, &val, sizeof(uint64_t));
         if (w != sizeof(uint64_t)) {
-            if (w == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-                LOG_DEVEL_DEBUG("%stimeout_event_fd write would block (EAGAIN).", label);
-            } else {
-                LOG_ERROR("%sFailed to write timeout_event_fd: %s", label, strerror(errno));
-                return FAILURE;
-            }
+            LOG_ERROR("%sFailed to write timeout_event_fd: %s", label, strerror(errno));
+            return FAILURE;
         }
         return SUCCESS;
     } else if (*current_fd == timer->timeout_event_fd) {
@@ -61,7 +57,6 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
             timer_event_t *next = current_event->next;
             uint64_t expired_timer_id = current_event->timer_id;
             if (expired_timer_id == master_ctx->check_healthy_timer_id) {
-                
                 double ch = worker_check_healthy_ms();
                 status_t chst = htw_add_event(&master_ctx->timer, master_ctx->check_healthy_timer_id, ch);
                 if (chst != SUCCESS) {
@@ -79,7 +74,6 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                 } else {
                     check_workers_healthy(label, master_ctx);
                 }
-                
             } else {
                 handler_result = FAILURE;
             }
