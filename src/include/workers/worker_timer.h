@@ -6,9 +6,10 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/types.h>
+#include <stdio.h>
 
 #include "log.h"
-#include "timer.h"
+#include "oritw.h"
 #include "types.h"
 #include "utilities.h"
 #include "workers/workers.h"
@@ -146,7 +147,7 @@ static inline status_t handle_worker_session_timer_event(worker_context_t *worke
                 } else if (*timer_id == session->heartbeat_sender_timer_id.id) {
                     if (!session->heartbeat.ack_rcvd) {
                         double timer_interval = session->heartbeat_interval;
-                        status_t chst = htw_add_event(&worker_ctx->timer, &session->heartbeat_sender_timer_id.event, session->heartbeat_sender_timer_id.id, timer_interval);
+                        status_t chst = oritw_add_event(&worker_ctx->timer, &session->heartbeat_sender_timer_id.event, session->heartbeat_sender_timer_id.id, timer_interval);
                         if (chst != SUCCESS) {
                             return FAILURE;
                         }
@@ -162,6 +163,9 @@ static inline status_t handle_worker_session_timer_event(worker_context_t *worke
 //----------------------------------------------------------------------
                     session->heartbeat_openner_timer_id.event = NULL;
 //----------------------------------------------------------------------
+                    return SUCCESS;
+                } else {
+                    printf("COWWWWWW Sinnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnni\n");
                     return SUCCESS;
                 }
             }
@@ -181,7 +185,7 @@ static inline status_t handle_worker_session_timer_event(worker_context_t *worke
                 } else if (*timer_id == session->heartbeat_sender_timer_id.id) {
                     if (!session->heartbeat.ack_rcvd) {
                         double timer_interval = session->heartbeat_interval;
-                        status_t chst = htw_add_event(&worker_ctx->timer, &session->heartbeat_sender_timer_id.event, session->heartbeat_sender_timer_id.id, timer_interval);
+                        status_t chst = oritw_add_event(&worker_ctx->timer, &session->heartbeat_sender_timer_id.event, session->heartbeat_sender_timer_id.id, timer_interval);
                         if (chst != SUCCESS) {
                             return FAILURE;
                         }
@@ -197,6 +201,9 @@ static inline status_t handle_worker_session_timer_event(worker_context_t *worke
 //----------------------------------------------------------------------
                     session->heartbeat_openner_timer_id.event = NULL;
 //----------------------------------------------------------------------
+                    return SUCCESS;
+                } else {
+                    printf("SIOOOOOO Sinnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnni\n");
                     return SUCCESS;
                 }
             }
@@ -225,17 +232,17 @@ static inline status_t drain_event_fd(const char *label, int fd) {
 }
 
 static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, void *worker_sessions, int *current_fd) {
-    hierarchical_timer_wheel_t *timer = &worker_ctx->timer;
+    ori_timer_wheel_t *timer = &worker_ctx->timer;
     if (*current_fd == timer->add_event_fd) {
         if (drain_event_fd(worker_ctx->label, timer->add_event_fd) != SUCCESS) return FAILURE;
-        if (htw_move_queue_to_wheel(timer) != SUCCESS) return FAILURE;
+        if (oritw_move_queue_to_wheel(timer) != SUCCESS) return FAILURE;
         //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
-        return htw_reschedule_main_timer(worker_ctx->label, &worker_ctx->async, timer);
+        return oritw_reschedule_main_timer(worker_ctx->label, &worker_ctx->async, timer);
     } else if (*current_fd == timer->tick_event_fd) {
         if (drain_event_fd(worker_ctx->label, timer->tick_event_fd) != SUCCESS) return FAILURE;
         uint64_t advance_ticks = (uint64_t)(timer->last_delay_us);
-        if (htw_advance_time_and_process_expired(worker_ctx->label, timer, advance_ticks) != SUCCESS) return FAILURE;
-        if (htw_reschedule_main_timer(worker_ctx->label, &worker_ctx->async, timer) != SUCCESS) return FAILURE;
+        if (oritw_advance_time_and_process_expired(worker_ctx->label, timer, advance_ticks) != SUCCESS) return FAILURE;
+        if (oritw_reschedule_main_timer(worker_ctx->label, &worker_ctx->async, timer) != SUCCESS) return FAILURE;
         uint64_t val = 1ULL;
         ssize_t w;
         do {
@@ -256,9 +263,9 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
         return SUCCESS;
     } else if (*current_fd == timer->remove_event_fd) {
         if (drain_event_fd(worker_ctx->label, timer->remove_event_fd) != SUCCESS) return FAILURE;
-        if (htw_process_remove_queue(timer) != SUCCESS) return FAILURE;
+        if (oritw_process_remove_queue(timer) != SUCCESS) return FAILURE;
         //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
-        return htw_reschedule_main_timer(worker_ctx->label, &worker_ctx->async, timer);
+        return oritw_reschedule_main_timer(worker_ctx->label, &worker_ctx->async, timer);
     } else if (*current_fd == timer->timeout_event_fd) {
         if (drain_event_fd(worker_ctx->label, timer->timeout_event_fd) != SUCCESS) return FAILURE;
         timer_event_t *current_event = timer->ready_queue_head;
@@ -270,36 +277,35 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
             uint64_t expired_timer_id = current_event->timer_id;
             if (expired_timer_id == worker_ctx->heartbeat_timer_id.id) {
                 double new_heartbeat_interval_double = worker_hb_interval_with_jitter_us();
-                status_t chst = htw_add_event(&worker_ctx->timer, &worker_ctx->heartbeat_timer_id.event, worker_ctx->heartbeat_timer_id.id, new_heartbeat_interval_double);
+                double new_heartbeat_interval_double_ms = new_heartbeat_interval_double / (double)1e3;
+                status_t chst = oritw_add_event(&worker_ctx->timer, &worker_ctx->heartbeat_timer_id.event, worker_ctx->heartbeat_timer_id.id, new_heartbeat_interval_double);
                 if (chst != SUCCESS) {
-                    LOG_ERROR("%sWorker error htw_add_event for heartbeat.", worker_ctx->label);
+                    LOG_ERROR("%sWorker error oritw_add_event for heartbeat.", worker_ctx->label);
                     handler_result = FAILURE;
-                    htw_pool_free(timer, current_event);
+                    oritw_pool_free(timer, current_event);
                     current_event = next;
                     break;
                 }
-                if (worker_master_heartbeat(worker_ctx, new_heartbeat_interval_double) != SUCCESS) {
+                if (worker_master_heartbeat(worker_ctx, new_heartbeat_interval_double_ms) != SUCCESS) {
                     handler_result = FAILURE;
-                    htw_pool_free(timer, current_event);
+                    oritw_pool_free(timer, current_event);
+                    current_event = next;
+                    break;
+                }
+            } else if (worker_sessions != NULL) {
+                handler_result = handle_worker_session_timer_event(worker_ctx, worker_sessions, &expired_timer_id);
+                if (handler_result != SUCCESS) {
+                    oritw_pool_free(timer, current_event);
                     current_event = next;
                     break;
                 }
             } else {
-                if (worker_sessions != NULL) {
-                    handler_result = handle_worker_session_timer_event(worker_ctx, worker_sessions, &expired_timer_id);
-                    if (handler_result != SUCCESS) {
-                        htw_pool_free(timer, current_event);
-                        current_event = next;
-                        break;
-                    }
-                } else {
-                    handler_result = FAILURE;
-                    htw_pool_free(timer, current_event);
-                    current_event = next;
-                    break;
-                }
+                handler_result = FAILURE;
+                oritw_pool_free(timer, current_event);
+                current_event = next;
+                break;
             }
-            htw_pool_free(timer, current_event);
+            oritw_pool_free(timer, current_event);
             current_event = next;
         }
         //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);

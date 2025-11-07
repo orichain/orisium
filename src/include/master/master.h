@@ -13,7 +13,7 @@
 #include "kalman.h"
 #include "node.h"
 #include "types.h" 
-#include "timer.h" 
+#include "oritw.h" 
 
 typedef struct {
     double hb_interval;
@@ -111,7 +111,7 @@ typedef struct {
     master_sio_c_session_t *sio_c_session;
     master_cow_c_session_t *cow_c_session;
 //----------------------------------------------------------------------
-    hierarchical_timer_wheel_t timer;
+    ori_timer_wheel_t timer;
 } master_context_t;
 
 static inline master_worker_session_t *get_master_worker_session(master_context_t *master_context, worker_type_t wot, uint8_t index) {

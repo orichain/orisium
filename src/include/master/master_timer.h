@@ -8,7 +8,7 @@
 #include <sys/types.h>
 
 #include "log.h"
-#include "timer.h"
+#include "oritw.h"
 #include "types.h"
 #include "utilities.h"
 #include "master/master.h"
@@ -33,17 +33,17 @@ static inline status_t drain_event_fd(const char *label, int fd) {
 }
 
 static inline status_t handle_master_timer_event(const char *label, master_context_t *master_ctx, int *current_fd) {
-    hierarchical_timer_wheel_t *timer = &master_ctx->timer;
+    ori_timer_wheel_t *timer = &master_ctx->timer;
     if (*current_fd == timer->add_event_fd) {
         if (drain_event_fd(label, timer->add_event_fd) != SUCCESS) return FAILURE;
-        if (htw_move_queue_to_wheel(timer) != SUCCESS) return FAILURE;
+        if (oritw_move_queue_to_wheel(timer) != SUCCESS) return FAILURE;
         //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
-        return htw_reschedule_main_timer(label, &master_ctx->master_async, timer);
+        return oritw_reschedule_main_timer(label, &master_ctx->master_async, timer);
     } else if (*current_fd == timer->tick_event_fd) {
         if (drain_event_fd(label, timer->tick_event_fd) != SUCCESS) return FAILURE;
         uint64_t advance_ticks = (uint64_t)(timer->last_delay_us);
-        if (htw_advance_time_and_process_expired(label, timer, advance_ticks) != SUCCESS) return FAILURE;
-        if (htw_reschedule_main_timer(label, &master_ctx->master_async, timer) != SUCCESS) return FAILURE;
+        if (oritw_advance_time_and_process_expired(label, timer, advance_ticks) != SUCCESS) return FAILURE;
+        if (oritw_reschedule_main_timer(label, &master_ctx->master_async, timer) != SUCCESS) return FAILURE;
         uint64_t val = 1ULL;
         ssize_t w;
         do {
@@ -64,9 +64,9 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
         return SUCCESS;
     } else if (*current_fd == timer->remove_event_fd) {
         if (drain_event_fd(label, timer->remove_event_fd) != SUCCESS) return FAILURE;
-        if (htw_process_remove_queue(timer) != SUCCESS) return FAILURE;
+        if (oritw_process_remove_queue(timer) != SUCCESS) return FAILURE;
         //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
-        return htw_reschedule_main_timer(label, &master_ctx->master_async, timer);
+        return oritw_reschedule_main_timer(label, &master_ctx->master_async, timer);
     } else if (*current_fd == timer->timeout_event_fd) {
         if (drain_event_fd(label, timer->timeout_event_fd) != SUCCESS) return FAILURE;
         timer_event_t *current_event = timer->ready_queue_head;
@@ -78,13 +78,13 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
             uint64_t expired_timer_id = current_event->timer_id;
             if (expired_timer_id == master_ctx->check_healthy_timer_id.id) {
                 double ch = worker_check_healthy_us();
-                status_t chst = htw_add_event(&master_ctx->timer, &master_ctx->check_healthy_timer_id.event, master_ctx->check_healthy_timer_id.id, ch);
+                status_t chst = oritw_add_event(&master_ctx->timer, &master_ctx->check_healthy_timer_id.event, master_ctx->check_healthy_timer_id.id, ch);
                 if (chst != SUCCESS) {
                     LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
                     master_ctx->shutdown_requested = 1;
                     master_workers_info(label, master_ctx, IT_SHUTDOWN);
                     handler_result = FAILURE;
-                    htw_pool_free(timer, current_event);
+                    oritw_pool_free(timer, current_event);
                     current_event = next;
                     break;
                 }
@@ -95,25 +95,25 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                     master_ctx->all_workers_is_ready = false;
                     handler_result = master_workers_info(label, master_ctx, IT_REKEYING);
                     if (handler_result != SUCCESS) {
-                        htw_pool_free(timer, current_event);
+                        oritw_pool_free(timer, current_event);
                         current_event = next;
                         break;
                     }
                 } else {
                     handler_result = check_workers_healthy(label, master_ctx);
                     if (handler_result != SUCCESS) {
-                        htw_pool_free(timer, current_event);
+                        oritw_pool_free(timer, current_event);
                         current_event = next;
                         break;
                     }
                 }
             } else {
                 handler_result = FAILURE;
-                htw_pool_free(timer, current_event);
+                oritw_pool_free(timer, current_event);
                 current_event = next;
                 break;
             }
-            htw_pool_free(timer, current_event);
+            oritw_pool_free(timer, current_event);
             current_event = next;
         }
         //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);

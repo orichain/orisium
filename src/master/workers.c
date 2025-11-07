@@ -467,7 +467,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
         if (session == NULL) {
             return FAILURE;
         }
-        if (session->healthy.value_prediction < (double)5) {
+        if (session->healthy.value_prediction < (double)10) {
             session->isactive = false;
             if (recreate_worker(label, master_ctx, SIO, i) != SUCCESS) {
                 return FAILURE;
@@ -482,7 +482,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
         if (session == NULL) {
             return FAILURE;
         }
-        if (session->healthy.value_prediction < (double)5) {
+        if (session->healthy.value_prediction < (double)10) {
             session->isactive = false;
             if (recreate_worker(label, master_ctx, LOGIC, i) != SUCCESS) {
                 return FAILURE;
@@ -497,7 +497,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
         if (session == NULL) {
             return FAILURE;
         }
-        if (session->healthy.value_prediction < (double)5) {
+        if (session->healthy.value_prediction < (double)10) {
             session->isactive = false;
             if (recreate_worker(label, master_ctx, COW, i) != SUCCESS) {
                 return FAILURE;
@@ -512,7 +512,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
         if (session == NULL) {
             return FAILURE;
         }
-        if (session->healthy.value_prediction < (double)5) {
+        if (session->healthy.value_prediction < (double)10) {
             session->isactive = false;
             if (recreate_worker(label, master_ctx, DBR, i) != SUCCESS) {
                 return FAILURE;
@@ -527,7 +527,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
         if (session == NULL) {
             return FAILURE;
         }
-        if (session->healthy.value_prediction < (double)5) {
+        if (session->healthy.value_prediction < (double)10) {
             session->isactive = false;
             if (recreate_worker(label, master_ctx, DBW, i) != SUCCESS) {
                 return FAILURE;

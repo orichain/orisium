@@ -18,7 +18,7 @@
 #include "stdbool.h"
 #include "utilities.h"
 #include "types.h"
-#include "timer.h"
+#include "oritw.h"
 
 typedef struct {
     double hb_interval;
@@ -153,7 +153,7 @@ typedef struct {
     bool hello2_ack_rcvd;
     bool is_rekeying;
     ipc_protocol_queue_t *rekeying_queue;
-    hierarchical_timer_wheel_t timer;
+    ori_timer_wheel_t timer;
 } worker_context_t;
 
 status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *wot, uint8_t *index, int *master_uds_fd);
@@ -237,7 +237,7 @@ static inline void calculate_rtt(const char *label, void *void_session, worker_t
     }
 }
 
-static inline void cleanup_control_packet(hierarchical_timer_wheel_t *timer, control_packet_t *h, bool clean_state, clean_data_type_t clean_data) {
+static inline void cleanup_control_packet(ori_timer_wheel_t *timer, control_packet_t *h, bool clean_state, clean_data_type_t clean_data) {
     if (clean_state) {
         h->sent = false;
         h->sent_time = (uint64_t)0;
@@ -263,7 +263,7 @@ static inline void cleanup_control_packet(hierarchical_timer_wheel_t *timer, con
     }
     h->sent_try_count = 0x00;
     if (h->retry_timer_id.event) {
-        htw_queue_remove_event(timer, h->retry_timer_id.event);
+        oritw_queue_remove_event(timer, h->retry_timer_id.event);
         h->retry_timer_id.event = NULL;
 //----------------------------------------------------------------------
 // Reuse Old Id
@@ -391,12 +391,12 @@ static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *s
     single_session->last_send_heartbeat_interval = (double)0;
 //----------------------------------------------------------------------
     if (single_session->heartbeat_sender_timer_id.event) {
-        htw_queue_remove_event(&ctx->timer, single_session->heartbeat_sender_timer_id.event);
+        oritw_queue_remove_event(&ctx->timer, single_session->heartbeat_sender_timer_id.event);
         single_session->heartbeat_sender_timer_id.event = NULL;
         single_session->heartbeat_sender_timer_id.id = 0ULL;
     }
     if (single_session->heartbeat_openner_timer_id.event) {
-        htw_queue_remove_event(&ctx->timer, single_session->heartbeat_openner_timer_id.event);
+        oritw_queue_remove_event(&ctx->timer, single_session->heartbeat_openner_timer_id.event);
         single_session->heartbeat_openner_timer_id.event = NULL;
         single_session->heartbeat_openner_timer_id.id = 0ULL;
     }
@@ -503,12 +503,12 @@ static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *s
     single_session->heartbeat_cnt = 0x00;
 //----------------------------------------------------------------------
     if (single_session->heartbeat_sender_timer_id.event) {
-        htw_queue_remove_event(&ctx->timer, single_session->heartbeat_sender_timer_id.event);
+        oritw_queue_remove_event(&ctx->timer, single_session->heartbeat_sender_timer_id.event);
         single_session->heartbeat_sender_timer_id.event = NULL;
         single_session->heartbeat_sender_timer_id.id = 0ULL;
     }
     if (single_session->heartbeat_openner_timer_id.event) {
-        htw_queue_remove_event(&ctx->timer, single_session->heartbeat_openner_timer_id.event);
+        oritw_queue_remove_event(&ctx->timer, single_session->heartbeat_openner_timer_id.event);
         single_session->heartbeat_openner_timer_id.event = NULL;
         single_session->heartbeat_openner_timer_id.id = 0ULL;
     }
