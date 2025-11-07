@@ -19,11 +19,6 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
     ctx->pid = getpid();
     ctx->shutdown_requested = 0;
     ctx->async.async_fd = -1;
-//----------------------------------------------------------------------
-    if (generate_uint64_t_id(ctx->label, &ctx->heartbeat_timer_id) != SUCCESS) {
-        return FAILURE;
-    }
-//----------------------------------------------------------------------
     ctx->wot = wot;
     ctx->index = index;
     ctx->master_uds_fd = master_uds_fd;
@@ -38,6 +33,9 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
 	int needed = snprintf(NULL, 0, "[%s %d]: ", woname, *ctx->index);
 	ctx->label = malloc(needed + 1);
 	snprintf(ctx->label, needed + 1, "[%s %d]: ", woname, *ctx->index);  
+//----------------------------------------------------------------------
+    generate_uint64_t_id(ctx->label, &ctx->heartbeat_timer_id.id);
+    ctx->heartbeat_timer_id.event = NULL;
 //----------------------------------------------------------------------
 // Setup IPC security
 //----------------------------------------------------------------------
@@ -97,7 +95,13 @@ void cleanup_worker(worker_context_t *ctx) {
     async_delete_event(ctx->label, &ctx->async, ctx->master_uds_fd);
     CLOSE_FD(ctx->master_uds_fd);
 //----------------------------------------------------------------------
-    ctx->heartbeat_timer_id = 0ULL;
+    if (ctx->heartbeat_timer_id.event) {
+        if (ctx->heartbeat_timer_id.event->prev_next_ptr != NULL) {
+            htw_remove_event(&ctx->timer, ctx->heartbeat_timer_id.event);
+        }
+        ctx->heartbeat_timer_id.event = NULL;
+        ctx->heartbeat_timer_id.id = 0ULL;
+    }
 //----------------------------------------------------------------------
     htw_cleanup(ctx->label, &ctx->async, &ctx->timer);
 //----------------------------------------------------------------------

@@ -68,9 +68,9 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
         while (current_event != NULL) {
             timer_event_t *next = current_event->next;
             uint64_t expired_timer_id = current_event->timer_id;
-            if (expired_timer_id == master_ctx->check_healthy_timer_id) {
+            if (expired_timer_id == master_ctx->check_healthy_timer_id.id) {
                 double ch = worker_check_healthy_us();
-                status_t chst = htw_add_event(&master_ctx->timer, master_ctx->check_healthy_timer_id, ch);
+                status_t chst = htw_add_event(&master_ctx->timer, &master_ctx->check_healthy_timer_id.event, master_ctx->check_healthy_timer_id.id, ch);
                 if (chst != SUCCESS) {
                     LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
                     master_ctx->shutdown_requested = 1;

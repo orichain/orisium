@@ -12,8 +12,6 @@
 #include "orilink.h"
 #include "stdbool.h"
 #include "orilink/heartbeat_ack.h"
-#include "timer.h"
-#include "constants.h"
 
 static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsession, orilink_protocol_type_t orilink_protocol) {
     worker_type_t wot = *worker_ctx->wot;
@@ -24,6 +22,7 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
             orilink_security_t *security = &session->security;
 //======================================================================
             double hb_interval = node_hb_interval_with_jitter_us(session->rtt.value_prediction, session->retry.value_prediction);
+            session->last_send_heartbeat_interval = hb_interval;
 //======================================================================
             uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
             if (current_time.status != SUCCESS) {
@@ -91,14 +90,6 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
             session->heartbeat.sent = true;
             session->heartbeat.ack_rcvd = false;
             session->heartbeat_ack.rcvd = false;
-//----------------------------------------------------------------------
-// Allow Heartbeat Base On Schedule
-//----------------------------------------------------------------------
-            status_t otmr = htw_add_event(&worker_ctx->timer, session->heartbeat_openner_timer_id, hb_interval - (double)OPENNER_MARGIN_US);
-            if (otmr != SUCCESS) {
-                return FAILURE;
-            }
-//----------------------------------------------------------------------
             break;
         }
         case SIO: {
@@ -107,6 +98,7 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
             orilink_security_t *security = &session->security;
 //======================================================================
             double hb_interval = node_hb_interval_with_jitter_us(session->rtt.value_prediction, session->retry.value_prediction);
+            session->last_send_heartbeat_interval = hb_interval;
 //======================================================================
             uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
             if (current_time.status != SUCCESS) {
@@ -174,14 +166,6 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
             session->heartbeat.sent = true;
             session->heartbeat.ack_rcvd = false;
             session->heartbeat_ack.rcvd = false;
-//----------------------------------------------------------------------
-// Allow Heartbeat Base On Schedule
-//----------------------------------------------------------------------
-            status_t otmr = htw_add_event(&worker_ctx->timer, session->heartbeat_openner_timer_id, hb_interval - (double)OPENNER_MARGIN_US);
-            if (otmr != SUCCESS) {
-                return FAILURE;
-            }
-//----------------------------------------------------------------------
             break;
         }
         default:

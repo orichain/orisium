@@ -5,7 +5,6 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
-#include <math.h>
 #include <sys/types.h>
 
 #include "log.h"
@@ -18,16 +17,6 @@
 #include "constants.h"
 #include "orilink/protocol.h"
 #include "stdbool.h"
-
-static inline status_t create_polling_1ms(worker_context_t *worker_ctx, control_packet_t *h, double total_polling_interval) {
-    double polling_interval = (double)1e3;
-    h->polling_1ms_max_cnt = (uint16_t)ceil(total_polling_interval/polling_interval);
-    status_t ctmr = htw_add_event(&worker_ctx->timer, h->polling_timer_id, polling_interval);
-    if (ctmr != SUCCESS) {
-        return FAILURE;
-    }
-    return SUCCESS;
-}
 
 static inline status_t retry_transmit(
     worker_context_t *worker_ctx, 
@@ -61,9 +50,6 @@ static inline status_t retry_transmit(
             }
             double try_count = (double)h->sent_try_count;
             calculate_retry(worker_ctx->label, session, c_wot, try_count);
-//----------------------------------------------------------------------            
-            double retry_timer_interval = retry_interval_with_jitter_us(session->retry.value_prediction);
-//----------------------------------------------------------------------
             if (retry_control_packet(
                     worker_ctx, 
                     identity, 
@@ -73,10 +59,6 @@ static inline status_t retry_transmit(
                 ) != SUCCESS
             )
             {
-                return FAILURE;
-            }
-            h->polling_1ms_cnt = (uint16_t)0;
-            if (create_polling_1ms(worker_ctx, h, retry_timer_interval) != SUCCESS) {
                 return FAILURE;
             }
             break;
@@ -104,9 +86,6 @@ static inline status_t retry_transmit(
             }
             double try_count = (double)h->sent_try_count;
             calculate_retry(worker_ctx->label, session, c_wot, try_count);
-//----------------------------------------------------------------------   
-            double retry_timer_interval = retry_interval_with_jitter_us(session->retry.value_prediction);
-//----------------------------------------------------------------------
             if (retry_control_packet(
                     worker_ctx, 
                     identity, 
@@ -117,85 +96,6 @@ static inline status_t retry_transmit(
             )
             {
                 return FAILURE;
-            }
-            h->polling_1ms_cnt = (uint16_t)0;
-            if (create_polling_1ms(worker_ctx, h, retry_timer_interval) != SUCCESS) {
-                return FAILURE;
-            }
-            break;
-        }
-        default:
-            return FAILURE;
-    }
-    return SUCCESS;
-}
-
-static inline status_t polling_1ms(
-    worker_context_t *worker_ctx, 
-    void *xsession, 
-    control_packet_t *h, 
-    orilink_protocol_type_t orilink_protocol
-)
-{
-    double polling_interval = (double)1e3;
-    if (h->udp_data.r_puint8_t != NULL) {
-        if (!h->ack_rcvd) {
-            h->polling_1ms_cnt++;
-            uint16_t polling_1ms_max_cnt = h->polling_1ms_max_cnt;
-            if (h->polling_1ms_cnt >= polling_1ms_max_cnt) {
-                retry_transmit(
-                    worker_ctx,
-                    xsession,
-                    h,
-                    orilink_protocol
-                );
-            } else {
-                htw_add_event(&worker_ctx->timer, h->polling_timer_id, polling_interval);
-            }
-        } else {
-            cleanup_control_packet(worker_ctx->label, &worker_ctx->timer, h, false, CDT_FREE);
-        }
-    }
-    return SUCCESS;
-}
-
-static inline status_t turns_to_polling_1ms(
-    worker_context_t *worker_ctx, 
-    void *xsession, 
-    orilink_protocol_type_t orilink_protocol
-)
-{
-    worker_type_t wot = *worker_ctx->wot;
-    switch (wot) {
-        case COW: {
-            cow_c_session_t *session = (cow_c_session_t *)xsession;
-            double polling_interval = (double)1e3;
-            if (!session->heartbeat.ack_rcvd) {
-                htw_add_event(&worker_ctx->timer, session->heartbeat_sender_timer_id, polling_interval);
-            } else {
-                if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
-                    session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
-                    send_heartbeat(worker_ctx, xsession, orilink_protocol);
-                } else {
-                    session->heartbeat_sender_polling_1ms_cnt++;
-                    htw_add_event(&worker_ctx->timer, session->heartbeat_sender_timer_id, polling_interval);
-                }
-            }
-            break;
-        }
-        case SIO: {
-            sio_c_session_t *session = (sio_c_session_t *)xsession;
-            double polling_interval = (double)1e3;
-            if (!session->heartbeat.ack_rcvd) {
-                htw_add_event(&worker_ctx->timer, session->heartbeat_sender_timer_id, polling_interval);
-            } else {
-                if (session->heartbeat_sender_polling_1ms_cnt >= (uint16_t)session->heartbeat.polling_1ms_last_cnt) {
-                    session->heartbeat_sender_polling_1ms_cnt = (uint16_t)0;
-                    send_heartbeat(worker_ctx, xsession, orilink_protocol);
-                } else {
-                    session->heartbeat_sender_polling_1ms_cnt++;
-                    htw_add_event(&worker_ctx->timer, session->heartbeat_sender_timer_id, polling_interval);
-                }
             }
             break;
         }
@@ -213,19 +113,28 @@ static inline status_t handle_worker_session_timer_event(worker_context_t *worke
             for (uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
                 cow_c_session_t *session;
                 session = &c_sessions[i];
-                if (*timer_id == session->hello1.polling_timer_id) {
-                    return polling_1ms(worker_ctx, session, &session->hello1, ORILINK_HELLO1);
-                } else if (*timer_id == session->hello2.polling_timer_id) {
-                    return polling_1ms(worker_ctx, session, &session->hello2, ORILINK_HELLO2);
-                } else if (*timer_id == session->hello3.polling_timer_id) {
-                    return polling_1ms(worker_ctx, session, &session->hello3, ORILINK_HELLO3);
-                } else if (*timer_id == session->hello4.polling_timer_id) {
-                    return polling_1ms(worker_ctx, session, &session->hello4, ORILINK_HELLO4);
-                } else if (*timer_id == session->heartbeat.polling_timer_id) {
-                    return polling_1ms(worker_ctx, session, &session->heartbeat, ORILINK_HEARTBEAT);
-                } else if (*timer_id == session->heartbeat_sender_timer_id) {
-                    return turns_to_polling_1ms(worker_ctx, session, ORILINK_HEARTBEAT);
-                } else if (*timer_id == session->heartbeat_openner_timer_id) {
+                if (*timer_id == session->hello1.retry_timer_id.id) {
+                    return retry_transmit(worker_ctx, session, &session->hello1, ORILINK_HELLO1);
+                } else if (*timer_id == session->hello2.retry_timer_id.id) {
+                    return retry_transmit(worker_ctx, session, &session->hello2, ORILINK_HELLO2);
+                } else if (*timer_id == session->hello3.retry_timer_id.id) {
+                    return retry_transmit(worker_ctx, session, &session->hello3, ORILINK_HELLO3);
+                } else if (*timer_id == session->hello4.retry_timer_id.id) {
+                    return retry_transmit(worker_ctx, session, &session->hello4, ORILINK_HELLO4);
+                } else if (*timer_id == session->heartbeat.retry_timer_id.id) {
+                    return retry_transmit(worker_ctx, session, &session->heartbeat, ORILINK_HEARTBEAT);
+                } else if (*timer_id == session->heartbeat_sender_timer_id.id) {
+                    if (!session->heartbeat.ack_rcvd) {
+                        double timer_interval = session->heartbeat_interval;
+                        status_t chst = htw_add_event(&worker_ctx->timer, &session->heartbeat_sender_timer_id.event, session->heartbeat_sender_timer_id.id, timer_interval);
+                        if (chst != SUCCESS) {
+                            return FAILURE;
+                        }
+                    } else {
+                        send_heartbeat(worker_ctx, session, ORILINK_HEARTBEAT);
+                    }
+                    return SUCCESS;
+                } else if (*timer_id == session->heartbeat_openner_timer_id.id) {
                     session->heartbeat_ack.ack_sent = true;
                     return SUCCESS;
                 }
@@ -237,11 +146,20 @@ static inline status_t handle_worker_session_timer_event(worker_context_t *worke
             for (uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
                 sio_c_session_t *session;
                 session = &c_sessions[i];
-                if (*timer_id == session->heartbeat.polling_timer_id) {
-                    return polling_1ms(worker_ctx, session, &session->heartbeat, ORILINK_HEARTBEAT);
-                } else if (*timer_id == session->heartbeat_sender_timer_id) {
-                    return turns_to_polling_1ms(worker_ctx, session, ORILINK_HEARTBEAT);
-                } else if (*timer_id == session->heartbeat_openner_timer_id) {
+                if (*timer_id == session->heartbeat.retry_timer_id.id) {
+                    return retry_transmit(worker_ctx, session, &session->heartbeat, ORILINK_HEARTBEAT);
+                } else if (*timer_id == session->heartbeat_sender_timer_id.id) {
+                    if (!session->heartbeat.ack_rcvd) {
+                        double timer_interval = session->heartbeat_interval;
+                        status_t chst = htw_add_event(&worker_ctx->timer, &session->heartbeat_sender_timer_id.event, session->heartbeat_sender_timer_id.id, timer_interval);
+                        if (chst != SUCCESS) {
+                            return FAILURE;
+                        }
+                    } else {
+                        send_heartbeat(worker_ctx, session, ORILINK_HEARTBEAT);
+                    }
+                    return SUCCESS;
+                } else if (*timer_id == session->heartbeat_openner_timer_id.id) {
                     session->heartbeat_ack.ack_sent = true;
                     return SUCCESS;
                 }
@@ -306,9 +224,9 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
         while (current_event != NULL) {
             timer_event_t *next = current_event->next;
             uint64_t expired_timer_id = current_event->timer_id;
-            if (expired_timer_id == worker_ctx->heartbeat_timer_id) {
+            if (expired_timer_id == worker_ctx->heartbeat_timer_id.id) {
                 double new_heartbeat_interval_double = worker_hb_interval_with_jitter_us();
-                status_t chst = htw_add_event(&worker_ctx->timer, worker_ctx->heartbeat_timer_id, new_heartbeat_interval_double);
+                status_t chst = htw_add_event(&worker_ctx->timer, &worker_ctx->heartbeat_timer_id.event, worker_ctx->heartbeat_timer_id.id, new_heartbeat_interval_double);
                 if (chst != SUCCESS) {
                     LOG_ERROR("%sWorker error htw_add_event for heartbeat.", worker_ctx->label);
                     handler_result = FAILURE;

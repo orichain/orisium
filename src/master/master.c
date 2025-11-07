@@ -76,9 +76,10 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
 	master_ctx->master_pid = 0;
 	master_ctx->shutdown_event_fd = -1;
     master_ctx->udp_sock = -1;
-    if (generate_uint64_t_id(label, &master_ctx->check_healthy_timer_id) != SUCCESS) {
-        return FAILURE;
-    }
+//----------------------------------------------------------------------
+    generate_uint64_t_id(label, &master_ctx->check_healthy_timer_id.id);
+    master_ctx->check_healthy_timer_id.event = NULL;
+//----------------------------------------------------------------------
     master_ctx->master_async.async_fd = -1;
     master_ctx->master_pid = getpid();
 //======================================================================
@@ -132,6 +133,15 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     CLOSE_FD(&master_ctx->udp_sock);
     async_delete_event(label, &master_ctx->master_async, &master_ctx->shutdown_event_fd);
     CLOSE_FD(&master_ctx->shutdown_event_fd);
+//----------------------------------------------------------------------
+    if (master_ctx->check_healthy_timer_id.event) {
+        if (master_ctx->check_healthy_timer_id.event->prev_next_ptr != NULL) {
+            htw_remove_event(&master_ctx->timer, master_ctx->check_healthy_timer_id.event);
+        }
+        master_ctx->check_healthy_timer_id.event = NULL;
+        master_ctx->check_healthy_timer_id.id = 0ULL;
+    }
+//----------------------------------------------------------------------
     htw_cleanup(label, &master_ctx->master_async, &master_ctx->timer);
     CLOSE_FD(&master_ctx->master_async.async_fd);
     master_ctx->listen_port = (uint16_t)0;
@@ -312,7 +322,7 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                     metrics->sum_hb_interval = metrics->hb_interval;
                                 }
                                 double ch = worker_check_healthy_us();
-                                status_t chst = htw_add_event(&master_ctx->timer, master_ctx->check_healthy_timer_id, ch);
+                                status_t chst = htw_add_event(&master_ctx->timer, &master_ctx->check_healthy_timer_id.event, master_ctx->check_healthy_timer_id.id, ch);
                                 if (chst != SUCCESS) {
                                     LOG_INFO("%sGagal async_create_timerfd hb checker. Initiating graceful shutdown...", label);
                                     master_ctx->shutdown_requested = 1;

@@ -26,6 +26,11 @@ typedef struct timer_event_t timer_event_t;
 typedef struct hierarchical_timer_wheel_t hierarchical_timer_wheel_t;
 
 typedef struct {
+    timer_event_t *event;
+    uint64_t id;
+} timer_id_t;
+
+typedef struct {
     uint64_t expiration_tick;
     uint16_t bucket_index;
 } min_heap_node_t;
@@ -221,9 +226,11 @@ static inline timer_event_t *htw_pool_alloc(hierarchical_timer_wheel_t *timer) {
 
 static inline void htw_pool_free(hierarchical_timer_wheel_t *timer, timer_event_t *event) {
     if (!event) return;
+    event->expiration_tick = 0; 
+    event->prev_next_ptr = NULL; 
+    event->timer_id = 0; 
     event->next = timer->event_pool_head;
     timer->event_pool_head = event;
-    event->prev_next_ptr = NULL;
 }
 
 static inline void free_linked_list_internal(timer_event_t *head) {
@@ -248,45 +255,48 @@ static inline bool htw_find_earliest_event(hierarchical_timer_wheel_t *timer, ui
 }
 
 static inline status_t htw_remove_event(hierarchical_timer_wheel_t *timer, timer_event_t *event_to_remove) {
-    if (!event_to_remove || event_to_remove->prev_next_ptr == NULL || event_to_remove->level_index >= MAX_TIMER_LEVELS) {
-        return FAILURE; 
+    if (!event_to_remove) {
+        return FAILURE;
     }
-    *(event_to_remove->prev_next_ptr) = event_to_remove->next;
-    if (event_to_remove->next != NULL) {
-        event_to_remove->next->prev_next_ptr = event_to_remove->prev_next_ptr;
+    if (event_to_remove->level_index >= MAX_TIMER_LEVELS) {
     }
-    timer_wheel_level_t *level = &timer->levels[event_to_remove->level_index];
-    timer_bucket_t *bucket = &level->buckets[event_to_remove->slot_index];
-    if (event_to_remove == bucket->tail) {
+    if (event_to_remove->prev_next_ptr != NULL) {
+        timer_wheel_level_t *level = &timer->levels[event_to_remove->level_index];
+        timer_bucket_t *bucket = &level->buckets[event_to_remove->slot_index];
+        *(event_to_remove->prev_next_ptr) = event_to_remove->next;
+        if (event_to_remove->next != NULL) {
+            event_to_remove->next->prev_next_ptr = event_to_remove->prev_next_ptr;
+        }
         if (bucket->head == NULL) {
             bucket->tail = NULL;
-        } else {
-            if (bucket->head == NULL) { 
-                 bucket->tail = NULL;
+        } 
+        if (event_to_remove->expiration_tick == bucket->min_expiration) {
+            uint64_t new_min = ULLONG_MAX;
+            timer_event_t *cur = bucket->head;
+            while (cur != NULL) {
+                if (cur->expiration_tick < new_min) {
+                    new_min = cur->expiration_tick;
+                }
+                cur = cur->next;
+            }
+            bucket->min_expiration = new_min;
+            min_heap_update(&level->min_heap, event_to_remove->slot_index, new_min);
+            global_min_heap_update(&timer->global_min_heap, 
+                                   event_to_remove->level_index, 
+                                   min_heap_get_min(&level->min_heap));
+            if (event_to_remove->expiration_tick == timer->next_expiration_tick) {
+                htw_find_earliest_event(timer, NULL);
             }
         }
-    }
-    if (event_to_remove->expiration_tick == bucket->min_expiration) {
-        uint64_t new_min = ULLONG_MAX;
-        timer_event_t *cur = bucket->head;
-        while (cur != NULL) {
-            if (cur->expiration_tick < new_min) {
-                new_min = cur->expiration_tick;
-            }
-            cur = cur->next;
-        }
-        bucket->min_expiration = new_min;
-        min_heap_update(&level->min_heap, event_to_remove->slot_index, new_min);
-        global_min_heap_update(&timer->global_min_heap, event_to_remove->level_index, min_heap_get_min(&level->min_heap));
-        if (event_to_remove->expiration_tick == timer->next_expiration_tick) {
-            htw_find_earliest_event(timer, NULL);
-        }
+        event_to_remove->prev_next_ptr = NULL;
     }
     htw_pool_free(timer, event_to_remove);
     return SUCCESS;
 }
 
-static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, uint64_t timer_id, double double_delay_us) {
+static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, timer_event_t **new_event_out, uint64_t timer_id, double double_delay_us) {
+    if (!new_event_out) return FAILURE;
+    *new_event_out = NULL;
     uint64_t delay_us = (uint64_t)ceil(double_delay_us);
     if (delay_us == 0 && double_delay_us > 0.0) {
         delay_us = 1;
@@ -320,6 +330,7 @@ static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, uint64_t
         timer->new_event_queue_tail->next = new_event;
         timer->new_event_queue_tail = new_event;
     }
+    *new_event_out = new_event;
     if (should_trigger_write) {
         uint64_t val = 1ULL;
         ssize_t w;
