@@ -96,9 +96,7 @@ void cleanup_worker(worker_context_t *ctx) {
     CLOSE_FD(ctx->master_uds_fd);
 //----------------------------------------------------------------------
     if (ctx->heartbeat_timer_id.event) {
-        if (ctx->heartbeat_timer_id.event->prev_next_ptr != NULL) {
-            htw_remove_event(&ctx->timer, ctx->heartbeat_timer_id.event);
-        }
+        htw_queue_remove_event(&ctx->timer, ctx->heartbeat_timer_id.event);
         ctx->heartbeat_timer_id.event = NULL;
         ctx->heartbeat_timer_id.id = 0ULL;
     }

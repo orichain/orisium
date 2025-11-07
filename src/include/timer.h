@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "async.h"
 #include "constants.h"
@@ -59,6 +60,9 @@ struct timer_event_t {
     timer_event_t **prev_next_ptr;
     uint8_t level_index;
     uint16_t slot_index;
+    bool queued_for_removal;
+    bool removed;
+    bool collected_for_cleanup;
 };
 
 typedef struct {
@@ -80,10 +84,13 @@ struct hierarchical_timer_wheel_t {
     global_min_heap_t global_min_heap;
     int tick_event_fd;
     int add_event_fd;
+    int remove_event_fd;
     int timeout_event_fd;
     timer_event_t *new_event_queue_head;
     timer_event_t *new_event_queue_tail;
     uint64_t new_event_queue_min_exp;
+    timer_event_t *remove_queue_head;
+    timer_event_t *remove_queue_tail;
     timer_event_t *ready_queue_head;
     timer_event_t *ready_queue_tail;
     uint64_t global_current_tick;
@@ -220,25 +227,49 @@ static inline timer_event_t *htw_pool_alloc(hierarchical_timer_wheel_t *timer) {
     event->prev_next_ptr = NULL;
     event->level_index = (uint8_t)MAX_TIMER_LEVELS;
     event->slot_index = WHEEL_SIZE;
-
+    event->expiration_tick = 0;
+    event->timer_id = 0;
+    event->queued_for_removal = false;
+    event->removed = false;
+    event->collected_for_cleanup = false;
     return event;
 }
 
 static inline void htw_pool_free(hierarchical_timer_wheel_t *timer, timer_event_t *event) {
     if (!event) return;
-    event->expiration_tick = 0; 
-    event->prev_next_ptr = NULL; 
-    event->timer_id = 0; 
+    event->expiration_tick = 0;
+    event->prev_next_ptr = NULL;
+    event->timer_id = 0;
+    event->queued_for_removal = false;
+    event->removed = false;
+    event->collected_for_cleanup = false;
     event->next = timer->event_pool_head;
     timer->event_pool_head = event;
 }
 
-static inline void free_linked_list_internal(timer_event_t *head) {
-    timer_event_t *cur = head;
+static inline void htw_collect_list_for_cleanup(timer_event_t **list_head_ptr, timer_event_t **collector_head) {
+    timer_event_t *cur = *list_head_ptr;
     while (cur != NULL) {
-        timer_event_t *n = cur->next;
+        timer_event_t *next = cur->next;
+        if (!cur->collected_for_cleanup) {
+            cur->collected_for_cleanup = true;
+            cur->next = *collector_head;
+            *collector_head = cur;
+        }
+        cur = next;
+    }
+    *list_head_ptr = NULL;
+}
+
+static inline void htw_free_collector(timer_event_t *collector_head) {
+    timer_event_t *cur = collector_head;
+    while (cur != NULL) {
+        timer_event_t *next = cur->next;
+        cur->next = NULL;
+        cur->prev_next_ptr = NULL;
+        cur->collected_for_cleanup = false;
         free(cur);
-        cur = n;
+        cur = next;
     }
 }
 
@@ -254,43 +285,160 @@ static inline bool htw_find_earliest_event(hierarchical_timer_wheel_t *timer, ui
     return true;
 }
 
+static inline status_t htw_reschedule_main_timer(
+    const char *label, async_type_t *async, hierarchical_timer_wheel_t *timer
+)
+{
+    if (timer->new_event_queue_head) {
+        //LOG_DEVEL_DEBUG("%sSkip reschedule: new_event_queue still pending", label);
+        return SUCCESS;
+    }
+    uint64_t next_expiration_tick;
+    bool earliest_event_found = htw_find_earliest_event(timer, &next_expiration_tick);
+    if (earliest_event_found && next_expiration_tick > timer->global_current_tick) {
+        uint64_t delay_tick = next_expiration_tick - timer->global_current_tick;
+        double delay_us = (double)delay_tick;
+        double delay_s = delay_us / 1e6;
+        timer->last_delay_us = delay_us;
+        timer->next_expiration_tick = next_expiration_tick;
+        if (create_timer_oneshot(label, async, &timer->tick_event_fd, delay_s) != SUCCESS) {
+            LOG_ERROR("%sFailed to re-arm main tick timer (delay_us=%.2f).", label, delay_us);
+            return FAILURE;
+        }
+        //LOG_DEVEL_DEBUG("%sRescheduled main timer: delay_us=%.2f next_tick=%" PRIu64, label, delay_us, next_expiration_tick);
+    } else {
+        timer->last_delay_us = 0.0;
+        timer->next_expiration_tick = ULLONG_MAX;
+        if (timer->tick_event_fd != -1) {
+            if (update_timer_oneshot(label, &timer->tick_event_fd, 0.0) != SUCCESS) {
+                LOG_ERROR("%sFailed to disarm main tick timer.", label);
+                return FAILURE;
+            }
+        }
+        //LOG_DEVEL_DEBUG("%sMain timer disarmed (no future event).", label);
+    }
+    return SUCCESS;
+}
+
+// FIX: Memperbaiki logika pembaruan bucket->tail dan bucket->min_expiration
 static inline status_t htw_remove_event(hierarchical_timer_wheel_t *timer, timer_event_t *event_to_remove) {
-    if (!event_to_remove) {
-        return FAILURE;
+    if (!event_to_remove) return SUCCESS;
+    
+    if (event_to_remove->timer_id == 0) {
+        LOG_WARN("htw_remove_event: Detected stale pointer (event id=0). Freeing event to pool without wheel removal.");
+        event_to_remove->removed = true;
+        event_to_remove->queued_for_removal = false;
+        event_to_remove->next = NULL;
+        event_to_remove->prev_next_ptr = NULL;
+        htw_pool_free(timer, event_to_remove);
+        return SUCCESS;
+    }
+    if (event_to_remove->removed) {
+        return SUCCESS;
     }
     if (event_to_remove->level_index >= MAX_TIMER_LEVELS) {
-    }
-    if (event_to_remove->prev_next_ptr != NULL) {
-        timer_wheel_level_t *level = &timer->levels[event_to_remove->level_index];
-        timer_bucket_t *bucket = &level->buckets[event_to_remove->slot_index];
-        *(event_to_remove->prev_next_ptr) = event_to_remove->next;
-        if (event_to_remove->next != NULL) {
-            event_to_remove->next->prev_next_ptr = event_to_remove->prev_next_ptr;
-        }
-        if (bucket->head == NULL) {
-            bucket->tail = NULL;
-        } 
-        if (event_to_remove->expiration_tick == bucket->min_expiration) {
-            uint64_t new_min = ULLONG_MAX;
-            timer_event_t *cur = bucket->head;
-            while (cur != NULL) {
-                if (cur->expiration_tick < new_min) {
-                    new_min = cur->expiration_tick;
-                }
-                cur = cur->next;
-            }
-            bucket->min_expiration = new_min;
-            min_heap_update(&level->min_heap, event_to_remove->slot_index, new_min);
-            global_min_heap_update(&timer->global_min_heap, 
-                                   event_to_remove->level_index, 
-                                   min_heap_get_min(&level->min_heap));
-            if (event_to_remove->expiration_tick == timer->next_expiration_tick) {
-                htw_find_earliest_event(timer, NULL);
-            }
-        }
+        event_to_remove->removed = true;
+        event_to_remove->queued_for_removal = false;
+        event_to_remove->next = NULL;
         event_to_remove->prev_next_ptr = NULL;
+        htw_pool_free(timer, event_to_remove);
+        return SUCCESS;
     }
+    timer_wheel_level_t *level = &timer->levels[event_to_remove->level_index];
+    timer_bucket_t *bucket = &level->buckets[event_to_remove->slot_index];
+    *(event_to_remove->prev_next_ptr) = event_to_remove->next;
+    if (event_to_remove->next) event_to_remove->next->prev_next_ptr = event_to_remove->prev_next_ptr;
+    
+    if (bucket->head == NULL) {
+        bucket->tail = NULL;
+        bucket->min_expiration = ULLONG_MAX;
+    } else {
+        uint64_t new_min = ULLONG_MAX;
+        timer_event_t *current_tail = NULL;
+
+        // Scan the list (after removal) to find the new minimum expiration and the correct tail
+        for (timer_event_t *it = bucket->head; it; it = it->next) {
+            if (it->expiration_tick < new_min) {
+                new_min = it->expiration_tick;
+            }
+            current_tail = it; // The last node encountered is the new tail
+        }
+
+        bucket->min_expiration = new_min;
+        bucket->tail = current_tail;
+    }
+
+    min_heap_update(&level->min_heap, event_to_remove->slot_index, bucket->min_expiration);
+    global_min_heap_update(&timer->global_min_heap,
+                           event_to_remove->level_index,
+                           min_heap_get_min(&level->min_heap)
+    );
+    if (event_to_remove->expiration_tick == timer->next_expiration_tick) htw_find_earliest_event(timer, NULL);
+    event_to_remove->prev_next_ptr = NULL;
+    event_to_remove->next = NULL;
+    event_to_remove->queued_for_removal = false;
+    event_to_remove->removed = true;
+    event_to_remove->level_index = MAX_TIMER_LEVELS;
+    event_to_remove->slot_index = 0;
     htw_pool_free(timer, event_to_remove);
+    return SUCCESS;
+}
+
+static inline status_t htw_process_remove_queue(hierarchical_timer_wheel_t *timer) {
+    if (!timer->remove_queue_head) {
+        return SUCCESS;
+    }
+    timer_event_t *current = timer->remove_queue_head;
+    timer->remove_queue_head = NULL;
+    timer->remove_queue_tail = NULL;
+    while (current != NULL) {
+        timer_event_t *next = current->next;
+        current->next = NULL;
+        if (current->queued_for_removal) {
+            current->queued_for_removal = false;
+            htw_remove_event(timer, current);
+        }
+        current = next;
+    }
+    return SUCCESS;
+}
+
+static inline status_t htw_queue_remove_event(
+    hierarchical_timer_wheel_t *timer,
+    timer_event_t *event_to_remove
+)
+{
+    if (!event_to_remove) return SUCCESS;
+    if (event_to_remove->removed) {
+        //LOG_DEVEL_DEBUG("htw_queue_remove_event: event id=%" PRIu64 " already removed, skipping", event_to_remove->timer_id);
+        return SUCCESS;
+    }
+    if (event_to_remove->queued_for_removal) return SUCCESS;
+    event_to_remove->queued_for_removal = true;
+    event_to_remove->next = NULL;
+    if (timer->remove_queue_head == NULL) {
+        timer->remove_queue_head = event_to_remove;
+        timer->remove_queue_tail = event_to_remove;
+    } else {
+        timer->remove_queue_tail->next = event_to_remove;
+        timer->remove_queue_tail = event_to_remove;
+    }
+    uint64_t val = 1ULL;
+    ssize_t w;
+    do { w = write(timer->remove_event_fd, &val, sizeof(uint64_t)); }
+    while (w == -1 && errno == EINTR);
+    if (w == -1) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            LOG_WARN("htw_queue_remove_event: eventfd write would block (EAGAIN)");
+            return SUCCESS;
+        }
+        LOG_ERROR("htw_queue_remove_event: write to remove_event_fd failed: %s", strerror(errno));
+        return FAILURE;
+    }
+    if (w != sizeof(uint64_t)) {
+        LOG_ERROR("htw_queue_remove_event: partial write to remove_event_fd: %zd", w);
+        return FAILURE;
+    }
     return SUCCESS;
 }
 
@@ -300,13 +448,17 @@ static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, timer_ev
     uint64_t delay_us = (uint64_t)ceil(double_delay_us);
     if (delay_us == 0 && double_delay_us > 0.0) {
         delay_us = 1;
-    }   
+    }
     timer_event_t *new_event = htw_pool_alloc(timer);
     if (!new_event) {
         return FAILURE_NOMEM;
     }
-    uint64_t expire = timer->global_current_tick + delay_us;
-    if (expire < timer->global_current_tick) expire = ULLONG_MAX;
+    uint64_t expire;
+    if (UINT64_MAX - timer->global_current_tick < delay_us) {
+        expire = UINT64_MAX;
+    } else {
+        expire = timer->global_current_tick + delay_us;
+    }
     new_event->expiration_tick = expire;
     new_event->timer_id = timer_id;
     new_event->next = NULL;
@@ -314,7 +466,7 @@ static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, timer_ev
     bool should_trigger_write = false;
     if (was_empty) {
         timer->new_event_queue_min_exp = expire;
-        should_trigger_write = true; 
+        should_trigger_write = true;
     } else {
         if (expire < timer->new_event_queue_min_exp) {
             timer->new_event_queue_min_exp = expire;
@@ -337,13 +489,19 @@ static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, timer_ev
         do {
             w = write(timer->add_event_fd, &val, sizeof(uint64_t));
         } while (w == -1 && errno == EINTR);
+
         if (w == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                LOG_WARN("htw_add_event: eventfd write would block (EAGAIN) -- removed queued but worker may not be notified immediately.");
                 return SUCCESS;
             }
+            LOG_ERROR("htw_add_event: write to remove_event_fd failed: %s", strerror(errno));
             return FAILURE;
         }
-        if (w != sizeof(uint64_t)) return FAILURE;
+        if (w != sizeof(uint64_t)) {
+            LOG_ERROR("htw_add_event: partial write to remove_event_fd: %zd", w);
+            return FAILURE;
+        }
     }
     return SUCCESS;
 }
@@ -363,11 +521,16 @@ static inline void htw_calculate_level_and_slot(
     uint64_t delta_tick = expiration_tick - timer->global_current_tick;
     uint64_t current_tick_factor = timer->levels[0].tick_factor;
     for (uint32_t level = 0; level < MAX_TIMER_LEVELS; ++level) {
-        uint64_t wheel_span = current_tick_factor * WHEEL_SIZE;
+        uint64_t wheel_span;
+        if (current_tick_factor > ULLONG_MAX / WHEEL_SIZE) {
+            wheel_span = ULLONG_MAX;
+        } else {
+            wheel_span = current_tick_factor * WHEEL_SIZE;
+        }
         if (delta_tick < wheel_span) {
             *level_index = level;
             uint64_t abs_slot_index = expiration_tick / current_tick_factor;
-            *slot_index = (uint32_t)(abs_slot_index & WHEEL_MASK); 
+            *slot_index = (uint32_t)(abs_slot_index & WHEEL_MASK);
             return;
         }
         if (level < MAX_TIMER_LEVELS - 1) {
@@ -379,50 +542,48 @@ static inline void htw_calculate_level_and_slot(
 }
 
 static inline status_t htw_move_queue_to_wheel(hierarchical_timer_wheel_t *timer) {
+    if (timer->remove_queue_head == NULL) {
+        //LOG_DEVEL_DEBUG("htw_move_queue_to_wheel: remove_queue empty before insert processing");
+    } else {
+        size_t count = 0;
+        for (timer_event_t *it = timer->remove_queue_head; it && count < 10; it = it->next)
+            ++count;
+        LOG_WARN("htw_move_queue_to_wheel: remove_queue still has %zu pending events", count);
+    }
     timer_event_t *temp_head = timer->new_event_queue_head;
     timer->new_event_queue_head = NULL;
     timer->new_event_queue_tail = NULL;
     timer->new_event_queue_min_exp = ULLONG_MAX;
-    if (temp_head == NULL) {
-        return SUCCESS;
-    }
+    if (temp_head == NULL) return SUCCESS;
     timer_event_t *current = temp_head;
-    timer_event_t *next_node = NULL;
-    while (current != NULL) {
-        next_node = current->next;
+    while (current) {
+        timer_event_t *next_node = current->next;
         uint32_t level_index;
         uint32_t slot_index;
-        htw_calculate_level_and_slot(
-            timer,
-            current->expiration_tick,
-            &level_index,
-            &slot_index
-        );
+        htw_calculate_level_and_slot(timer, current->expiration_tick, &level_index, &slot_index);
         timer_wheel_level_t *level = &timer->levels[level_index];
         timer_bucket_t *bucket = &level->buckets[slot_index];
-        
         current->level_index = (uint8_t)level_index;
         current->slot_index = (uint16_t)slot_index;
         current->next = bucket->head;
-        if (bucket->head != NULL) {
+        if (bucket->head)
             bucket->head->prev_next_ptr = &current->next;
-        } else {
+        else
             bucket->tail = current;
-        }
+
         current->prev_next_ptr = &bucket->head;
         bucket->head = current;
-        if (current->expiration_tick < timer->next_expiration_tick) {
+        if (current->expiration_tick < timer->next_expiration_tick)
             timer->next_expiration_tick = current->expiration_tick;
-        }
         if (current->expiration_tick < bucket->min_expiration) {
             bucket->min_expiration = current->expiration_tick;
             min_heap_update(&level->min_heap, (uint16_t)slot_index, bucket->min_expiration);
-            if (bucket->min_expiration < global_min_heap_get_min(&timer->global_min_heap)) {
-                global_min_heap_update(&timer->global_min_heap, (uint8_t)level_index, bucket->min_expiration);
-            }
+            global_min_heap_update(&timer->global_min_heap, (uint8_t)level_index,
+                                   min_heap_get_min(&level->min_heap));
         }
         current = next_node;
     }
+    //LOG_DEVEL_DEBUG("htw_move_queue_to_wheel done");
     return SUCCESS;
 }
 
@@ -557,7 +718,7 @@ static inline status_t htw_advance_time_and_process_expired(const char *label, h
             for (uint32_t level = 1; level < MAX_TIMER_LEVELS && carry > 0; ++level) {
                 timer_wheel_level_t *lvl = &timer->levels[level];
                 uint64_t sum = (uint64_t)lvl->current_index + carry;
-                uint32_t new_index = (uint32_t)(sum & WHEEL_MASK); 
+                uint32_t new_index = (uint32_t)(sum & WHEEL_MASK);
                 carry = sum / WHEEL_SIZE;
                 lvl->current_index = (uint16_t)new_index;
                 timer_bucket_t *bucket_to_cascade = &timer->levels[level].buckets[new_index];
@@ -577,40 +738,15 @@ static inline status_t htw_advance_time_and_process_expired(const char *label, h
     return SUCCESS;
 }
 
-static inline status_t htw_reschedule_main_timer(const char *label, async_type_t *async, hierarchical_timer_wheel_t *timer) {
-    uint64_t next_expiration_tick = timer->next_expiration_tick;
-    bool earliest_event_found = true;
-    if (next_expiration_tick == ULLONG_MAX || next_expiration_tick <= timer->global_current_tick) {
-        earliest_event_found = htw_find_earliest_event(timer, &next_expiration_tick);
-    }
-    if (next_expiration_tick > timer->global_current_tick && earliest_event_found) {
-        uint64_t delay_tick = next_expiration_tick - timer->global_current_tick;
-        double delay_us = (double)delay_tick;
-        double delay_s = delay_us / (double)1e6;
-        timer->last_delay_us = delay_us;
-        if (create_timer_oneshot(label, async, &timer->tick_event_fd, delay_s) != SUCCESS) {
-            LOG_ERROR("%sFailed to re-arm main tick timer.", label);
-            return FAILURE;
-        }
-    } else {
-        timer->last_delay_us = 0.0;
-        timer->next_expiration_tick = ULLONG_MAX;
-        if (timer->tick_event_fd != -1) {
-            if (update_timer_oneshot(label, &timer->tick_event_fd, (double)0.0) != SUCCESS) {
-                LOG_ERROR("%sFailed to disarm main tick timer.", label);
-                return FAILURE;
-            }
-        }
-    }
-    return SUCCESS;
-}
-
 static inline status_t htw_setup(const char *label, async_type_t *async, hierarchical_timer_wheel_t *timer) {
     timer->add_event_fd = -1;
+    timer->remove_event_fd = -1;
     timer->tick_event_fd = -1;
     timer->timeout_event_fd = -1;
     timer->new_event_queue_head = NULL;
     timer->new_event_queue_tail = NULL;
+    timer->remove_queue_head = NULL;
+    timer->remove_queue_tail = NULL;
     timer->ready_queue_head = NULL;
     timer->ready_queue_tail = NULL;
     timer->global_current_tick = 0;
@@ -628,7 +764,7 @@ static inline status_t htw_setup(const char *label, async_type_t *async, hierarc
         for (uint32_t s = 0; s < WHEEL_SIZE; ++s) {
             level->buckets[s].head = NULL;
             level->buckets[s].tail = NULL;
-            level->buckets[s].min_expiration = ULLONG_MAX; 
+            level->buckets[s].min_expiration = ULLONG_MAX;
         }
         global_min_heap_update(&timer->global_min_heap, (uint8_t)l, ULLONG_MAX);
         if (l < MAX_TIMER_LEVELS - 1) {
@@ -639,6 +775,10 @@ static inline status_t htw_setup(const char *label, async_type_t *async, hierarc
     if (async_create_incoming_event(label, async, &timer->add_event_fd) != SUCCESS) {
         return FAILURE;
     }
+    if (async_create_event(label, &timer->remove_event_fd) != SUCCESS) return FAILURE;
+    if (async_create_incoming_event(label, async, &timer->remove_event_fd) != SUCCESS) {
+        return FAILURE;
+    }
     if (async_create_event(label, &timer->timeout_event_fd) != SUCCESS) return FAILURE;
     if (async_create_incoming_event(label, async, &timer->timeout_event_fd) != SUCCESS) {
         return FAILURE;
@@ -647,31 +787,42 @@ static inline status_t htw_setup(const char *label, async_type_t *async, hierarc
 }
 
 static inline void htw_cleanup(const char *label, async_type_t *async, hierarchical_timer_wheel_t *timer) {
+    if (!timer) return;
+    timer_event_t *collector_head = NULL;
     for (uint32_t l = 0; l < MAX_TIMER_LEVELS; ++l) {
         timer_wheel_level_t *level = &timer->levels[l];
         for (uint32_t s = 0; s < WHEEL_SIZE; ++s) {
             timer_bucket_t *bucket = &level->buckets[s];
-            free_linked_list_internal(bucket->head);
-            bucket->head = NULL;
+            htw_collect_list_for_cleanup(&bucket->head, &collector_head);
             bucket->tail = NULL;
             bucket->min_expiration = ULLONG_MAX;
         }
+        for (uint32_t i = 0; i < level->min_heap.size; ++i) {
+            level->min_heap.nodes[i].expiration_tick = ULLONG_MAX;
+        }
     }
-    free_linked_list_internal(timer->new_event_queue_head);
-    timer->new_event_queue_head = NULL;
+    htw_collect_list_for_cleanup(&timer->new_event_queue_head, &collector_head);
     timer->new_event_queue_tail = NULL;
     timer->new_event_queue_min_exp = ULLONG_MAX;
-    free_linked_list_internal(timer->ready_queue_head);
-    timer->ready_queue_head = NULL;
+    htw_collect_list_for_cleanup(&timer->remove_queue_head, &collector_head);
+    timer->remove_queue_tail = NULL;
+    htw_collect_list_for_cleanup(&timer->ready_queue_head, &collector_head);
     timer->ready_queue_tail = NULL;
-    free_linked_list_internal(timer->event_pool_head);
+    htw_collect_list_for_cleanup(&timer->event_pool_head, &collector_head);
     timer->event_pool_head = NULL;
+    for (uint32_t i = 0; i < timer->global_min_heap.size; ++i) {
+        timer->global_min_heap.nodes[i].expiration_tick = ULLONG_MAX;
+    }
+    htw_free_collector(collector_head);
     timer->global_current_tick = 0;
     timer->next_expiration_tick = ULLONG_MAX;
+    timer->last_delay_us = 0.0;
     async_delete_event(label, async, &timer->tick_event_fd);
     CLOSE_FD(&timer->tick_event_fd);
     async_delete_event(label, async, &timer->add_event_fd);
     CLOSE_FD(&timer->add_event_fd);
+    async_delete_event(label, async, &timer->remove_event_fd);
+    CLOSE_FD(&timer->remove_event_fd);
     async_delete_event(label, async, &timer->timeout_event_fd);
     CLOSE_FD(&timer->timeout_event_fd);
 }

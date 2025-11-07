@@ -1079,7 +1079,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
     printf("%s%s - RTT Heartbeat = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 ", trycount %d\n", worker_ctx->label, timebuf, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr, trycount);
 //======================================================================
     session->heartbeat.ack_rcvd = true;
-    cleanup_control_packet(worker_ctx->label, &worker_ctx->timer, &session->heartbeat, false, CDT_FREE);
+    cleanup_control_packet(&worker_ctx->timer, &session->heartbeat, false, CDT_FREE);
 //======================================================================
     //session->metrics.last_ack = current_time.r_uint64_t;
     //session->metrics.count_ack += (double)1;
@@ -2590,7 +2590,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
     printf("%s%s - RTT Heartbeat = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 ", trycount %d\n", worker_ctx->label, timebuf, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr, trycount);
 //======================================================================
     session->heartbeat.ack_rcvd = true;
-    cleanup_control_packet(worker_ctx->label, &worker_ctx->timer, &session->heartbeat, false, CDT_FREE);
+    cleanup_control_packet(&worker_ctx->timer, &session->heartbeat, false, CDT_FREE);
 //======================================================================
     //session->metrics.last_ack = current_time.r_uint64_t;
     //session->metrics.count_ack += (double)1;
@@ -3096,7 +3096,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
 //======================================================================
     session->heartbeat.sent = true;
     session->heartbeat.ack_rcvd = false;
-    cleanup_control_packet(worker_ctx->label, &worker_ctx->timer, &session->hello4, false, CDT_FREE);
+    cleanup_control_packet(&worker_ctx->timer, &session->hello4, false, CDT_FREE);
 //======================================================================
 // Heartbeat Security 1 & Security 2 Open
 //======================================================================
@@ -3352,7 +3352,7 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     printf("%sRTT Hello-3 = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
 //======================================================================
     session->hello3.ack_rcvd = true;
-    cleanup_control_packet(worker_ctx->label, &worker_ctx->timer, &session->hello3, false, CDT_FREE);
+    cleanup_control_packet(&worker_ctx->timer, &session->hello3, false, CDT_FREE);
 //======================================================================
     session->hello4.sent = true;
 //======================================================================
@@ -3503,7 +3503,7 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
     printf("%sRTT Hello-2 = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
 //======================================================================
     session->hello2.ack_rcvd = true;
-    cleanup_control_packet(worker_ctx->label, &worker_ctx->timer, &session->hello2, false, CDT_FREE);
+    cleanup_control_packet(&worker_ctx->timer, &session->hello2, false, CDT_FREE);
 //======================================================================
     session->hello3.sent = true;
 //======================================================================
@@ -3659,7 +3659,7 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
     printf("%sRTT Hello-1 = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
 //======================================================================
     session->hello1.ack_rcvd = true;
-    cleanup_control_packet(worker_ctx->label, &worker_ctx->timer, &session->hello1, false, CDT_FREE);
+    cleanup_control_packet(&worker_ctx->timer, &session->hello1, false, CDT_FREE);
 //======================================================================
     session->hello2.sent = true;
 //======================================================================

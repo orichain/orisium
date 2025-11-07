@@ -114,15 +114,35 @@ static inline status_t handle_worker_session_timer_event(worker_context_t *worke
                 cow_c_session_t *session;
                 session = &c_sessions[i];
                 if (*timer_id == session->hello1.retry_timer_id.id) {
-                    return retry_transmit(worker_ctx, session, &session->hello1, ORILINK_HELLO1);
+                    status_t result = retry_transmit(worker_ctx, session, &session->hello1, ORILINK_HELLO1);
+//----------------------------------------------------------------------
+                    session->hello1.retry_timer_id.event = NULL;
+//----------------------------------------------------------------------
+                    return result;
                 } else if (*timer_id == session->hello2.retry_timer_id.id) {
-                    return retry_transmit(worker_ctx, session, &session->hello2, ORILINK_HELLO2);
+                    status_t result = retry_transmit(worker_ctx, session, &session->hello2, ORILINK_HELLO2);
+//----------------------------------------------------------------------
+                    session->hello2.retry_timer_id.event = NULL;
+//----------------------------------------------------------------------
+                    return result;
                 } else if (*timer_id == session->hello3.retry_timer_id.id) {
-                    return retry_transmit(worker_ctx, session, &session->hello3, ORILINK_HELLO3);
+                    status_t result = retry_transmit(worker_ctx, session, &session->hello3, ORILINK_HELLO3);
+//----------------------------------------------------------------------
+                    session->hello3.retry_timer_id.event = NULL;
+//----------------------------------------------------------------------
+                    return result;
                 } else if (*timer_id == session->hello4.retry_timer_id.id) {
-                    return retry_transmit(worker_ctx, session, &session->hello4, ORILINK_HELLO4);
+                    status_t result = retry_transmit(worker_ctx, session, &session->hello4, ORILINK_HELLO4);
+//----------------------------------------------------------------------
+                    session->hello4.retry_timer_id.event = NULL;
+//----------------------------------------------------------------------
+                    return result;
                 } else if (*timer_id == session->heartbeat.retry_timer_id.id) {
-                    return retry_transmit(worker_ctx, session, &session->heartbeat, ORILINK_HEARTBEAT);
+                    status_t result = retry_transmit(worker_ctx, session, &session->heartbeat, ORILINK_HEARTBEAT);
+//----------------------------------------------------------------------
+                    session->heartbeat.retry_timer_id.event = NULL;
+//----------------------------------------------------------------------
+                    return result;
                 } else if (*timer_id == session->heartbeat_sender_timer_id.id) {
                     if (!session->heartbeat.ack_rcvd) {
                         double timer_interval = session->heartbeat_interval;
@@ -132,10 +152,16 @@ static inline status_t handle_worker_session_timer_event(worker_context_t *worke
                         }
                     } else {
                         send_heartbeat(worker_ctx, session, ORILINK_HEARTBEAT);
+//----------------------------------------------------------------------
+                        session->heartbeat_sender_timer_id.event = NULL;
+//----------------------------------------------------------------------
                     }
                     return SUCCESS;
                 } else if (*timer_id == session->heartbeat_openner_timer_id.id) {
                     session->heartbeat_ack.ack_sent = true;
+//----------------------------------------------------------------------
+                    session->heartbeat_openner_timer_id.event = NULL;
+//----------------------------------------------------------------------
                     return SUCCESS;
                 }
             }
@@ -147,7 +173,11 @@ static inline status_t handle_worker_session_timer_event(worker_context_t *worke
                 sio_c_session_t *session;
                 session = &c_sessions[i];
                 if (*timer_id == session->heartbeat.retry_timer_id.id) {
-                    return retry_transmit(worker_ctx, session, &session->heartbeat, ORILINK_HEARTBEAT);
+                    status_t result = retry_transmit(worker_ctx, session, &session->heartbeat, ORILINK_HEARTBEAT);
+//----------------------------------------------------------------------
+                    session->heartbeat.retry_timer_id.event = NULL;
+//----------------------------------------------------------------------
+                    return result;
                 } else if (*timer_id == session->heartbeat_sender_timer_id.id) {
                     if (!session->heartbeat.ack_rcvd) {
                         double timer_interval = session->heartbeat_interval;
@@ -157,10 +187,16 @@ static inline status_t handle_worker_session_timer_event(worker_context_t *worke
                         }
                     } else {
                         send_heartbeat(worker_ctx, session, ORILINK_HEARTBEAT);
+//----------------------------------------------------------------------
+                        session->heartbeat_sender_timer_id.event = NULL;
+//----------------------------------------------------------------------
                     }
                     return SUCCESS;
                 } else if (*timer_id == session->heartbeat_openner_timer_id.id) {
                     session->heartbeat_ack.ack_sent = true;
+//----------------------------------------------------------------------
+                    session->heartbeat_openner_timer_id.event = NULL;
+//----------------------------------------------------------------------
                     return SUCCESS;
                 }
             }
@@ -176,12 +212,13 @@ static inline status_t drain_event_fd(const char *label, int fd) {
     uint64_t u;
     while (true) {
         ssize_t r = read(fd, &u, sizeof(uint64_t));
-        if (r == sizeof(uint64_t)) continue;
+        if (r == (ssize_t)sizeof(uint64_t)) continue;
         if (r == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) return SUCCESS;
         if (r == -1) {
             LOG_ERROR("%sFailed to read event_fd %d: %s", label, fd, strerror(errno));
             return FAILURE;
         }
+        LOG_WARN("%sUnexpected read from event_fd %d: returned %zd bytes", label, fd, r);
         break;
     }
     return SUCCESS;
@@ -192,6 +229,7 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
     if (*current_fd == timer->add_event_fd) {
         if (drain_event_fd(worker_ctx->label, timer->add_event_fd) != SUCCESS) return FAILURE;
         if (htw_move_queue_to_wheel(timer) != SUCCESS) return FAILURE;
+        //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
         return htw_reschedule_main_timer(worker_ctx->label, &worker_ctx->async, timer);
     } else if (*current_fd == timer->tick_event_fd) {
         if (drain_event_fd(worker_ctx->label, timer->tick_event_fd) != SUCCESS) return FAILURE;
@@ -214,7 +252,13 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
             LOG_ERROR("%sPartial write to timeout_event_fd: %zd bytes", worker_ctx->label, w);
             return FAILURE;
         }
+        //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
         return SUCCESS;
+    } else if (*current_fd == timer->remove_event_fd) {
+        if (drain_event_fd(worker_ctx->label, timer->remove_event_fd) != SUCCESS) return FAILURE;
+        if (htw_process_remove_queue(timer) != SUCCESS) return FAILURE;
+        //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
+        return htw_reschedule_main_timer(worker_ctx->label, &worker_ctx->async, timer);
     } else if (*current_fd == timer->timeout_event_fd) {
         if (drain_event_fd(worker_ctx->label, timer->timeout_event_fd) != SUCCESS) return FAILURE;
         timer_event_t *current_event = timer->ready_queue_head;
@@ -230,20 +274,25 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
                 if (chst != SUCCESS) {
                     LOG_ERROR("%sWorker error htw_add_event for heartbeat.", worker_ctx->label);
                     handler_result = FAILURE;
+                    break;
                 }
                 if (worker_master_heartbeat(worker_ctx, new_heartbeat_interval_double) != SUCCESS) {
                     handler_result = FAILURE;
+                    break;
                 }
             } else {
                 if (worker_sessions != NULL) {
                     handler_result = handle_worker_session_timer_event(worker_ctx, worker_sessions, &expired_timer_id);
+                    if (handler_result != SUCCESS) break;
                 } else {
                     handler_result = FAILURE;
+                    break;
                 }
             }
             htw_pool_free(timer, current_event);
             current_event = next;
         }
+        //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
         return handler_result;
     } else {
         return FAILURE;

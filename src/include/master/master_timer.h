@@ -20,12 +20,13 @@ static inline status_t drain_event_fd(const char *label, int fd) {
     uint64_t u;
     while (true) {
         ssize_t r = read(fd, &u, sizeof(uint64_t));
-        if (r == sizeof(uint64_t)) continue;
+        if (r == (ssize_t)sizeof(uint64_t)) continue;
         if (r == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) return SUCCESS;
         if (r == -1) {
             LOG_ERROR("%sFailed to read event_fd %d: %s", label, fd, strerror(errno));
             return FAILURE;
         }
+        LOG_WARN("%sUnexpected read from event_fd %d: returned %zd bytes", label, fd, r);
         break;
     }
     return SUCCESS;
@@ -36,6 +37,7 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
     if (*current_fd == timer->add_event_fd) {
         if (drain_event_fd(label, timer->add_event_fd) != SUCCESS) return FAILURE;
         if (htw_move_queue_to_wheel(timer) != SUCCESS) return FAILURE;
+        //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
         return htw_reschedule_main_timer(label, &master_ctx->master_async, timer);
     } else if (*current_fd == timer->tick_event_fd) {
         if (drain_event_fd(label, timer->tick_event_fd) != SUCCESS) return FAILURE;
@@ -58,7 +60,13 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
             LOG_ERROR("%sPartial write to timeout_event_fd: %zd bytes", label, w);
             return FAILURE;
         }
+        //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
         return SUCCESS;
+    } else if (*current_fd == timer->remove_event_fd) {
+        if (drain_event_fd(label, timer->remove_event_fd) != SUCCESS) return FAILURE;
+        if (htw_process_remove_queue(timer) != SUCCESS) return FAILURE;
+        //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
+        return htw_reschedule_main_timer(label, &master_ctx->master_async, timer);
     } else if (*current_fd == timer->timeout_event_fd) {
         if (drain_event_fd(label, timer->timeout_event_fd) != SUCCESS) return FAILURE;
         timer_event_t *current_event = timer->ready_queue_head;
@@ -76,22 +84,27 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                     master_ctx->shutdown_requested = 1;
                     master_workers_info(label, master_ctx, IT_SHUTDOWN);
                     handler_result = FAILURE;
+                    break;
                 }
                 master_ctx->hb_check_times++;
                 if (master_ctx->hb_check_times >= REKEYING_HB_TIMES) {
                     master_ctx->hb_check_times = (uint16_t)0;
                     master_ctx->is_rekeying = true;
                     master_ctx->all_workers_is_ready = false;
-                    master_workers_info(label, master_ctx, IT_REKEYING);
+                    handler_result = master_workers_info(label, master_ctx, IT_REKEYING);
+                    if (handler_result != SUCCESS) break;
                 } else {
-                    check_workers_healthy(label, master_ctx);
+                    handler_result = check_workers_healthy(label, master_ctx);
+                    if (handler_result != SUCCESS) break;
                 }
             } else {
                 handler_result = FAILURE;
+                break;
             }
             htw_pool_free(timer, current_event);
             current_event = next;
         }
+        //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
         return handler_result;
     } else {
         return FAILURE;

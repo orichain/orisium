@@ -135,9 +135,7 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     CLOSE_FD(&master_ctx->shutdown_event_fd);
 //----------------------------------------------------------------------
     if (master_ctx->check_healthy_timer_id.event) {
-        if (master_ctx->check_healthy_timer_id.event->prev_next_ptr != NULL) {
-            htw_remove_event(&master_ctx->timer, master_ctx->check_healthy_timer_id.event);
-        }
+        htw_queue_remove_event(&master_ctx->timer, master_ctx->check_healthy_timer_id.event);
         master_ctx->check_healthy_timer_id.event = NULL;
         master_ctx->check_healthy_timer_id.id = 0ULL;
     }
