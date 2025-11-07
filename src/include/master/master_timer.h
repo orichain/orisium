@@ -84,6 +84,8 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                     master_ctx->shutdown_requested = 1;
                     master_workers_info(label, master_ctx, IT_SHUTDOWN);
                     handler_result = FAILURE;
+                    htw_pool_free(timer, current_event);
+                    current_event = next;
                     break;
                 }
                 master_ctx->hb_check_times++;
@@ -92,13 +94,23 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                     master_ctx->is_rekeying = true;
                     master_ctx->all_workers_is_ready = false;
                     handler_result = master_workers_info(label, master_ctx, IT_REKEYING);
-                    if (handler_result != SUCCESS) break;
+                    if (handler_result != SUCCESS) {
+                        htw_pool_free(timer, current_event);
+                        current_event = next;
+                        break;
+                    }
                 } else {
                     handler_result = check_workers_healthy(label, master_ctx);
-                    if (handler_result != SUCCESS) break;
+                    if (handler_result != SUCCESS) {
+                        htw_pool_free(timer, current_event);
+                        current_event = next;
+                        break;
+                    }
                 }
             } else {
                 handler_result = FAILURE;
+                htw_pool_free(timer, current_event);
+                current_event = next;
                 break;
             }
             htw_pool_free(timer, current_event);

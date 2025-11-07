@@ -274,18 +274,28 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
                 if (chst != SUCCESS) {
                     LOG_ERROR("%sWorker error htw_add_event for heartbeat.", worker_ctx->label);
                     handler_result = FAILURE;
+                    htw_pool_free(timer, current_event);
+                    current_event = next;
                     break;
                 }
                 if (worker_master_heartbeat(worker_ctx, new_heartbeat_interval_double) != SUCCESS) {
                     handler_result = FAILURE;
+                    htw_pool_free(timer, current_event);
+                    current_event = next;
                     break;
                 }
             } else {
                 if (worker_sessions != NULL) {
                     handler_result = handle_worker_session_timer_event(worker_ctx, worker_sessions, &expired_timer_id);
-                    if (handler_result != SUCCESS) break;
+                    if (handler_result != SUCCESS) {
+                        htw_pool_free(timer, current_event);
+                        current_event = next;
+                        break;
+                    }
                 } else {
                     handler_result = FAILURE;
+                    htw_pool_free(timer, current_event);
+                    current_event = next;
                     break;
                 }
             }

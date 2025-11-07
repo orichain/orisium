@@ -88,7 +88,6 @@ struct hierarchical_timer_wheel_t {
     int timeout_event_fd;
     timer_event_t *new_event_queue_head;
     timer_event_t *new_event_queue_tail;
-    uint64_t new_event_queue_min_exp;
     timer_event_t *remove_queue_head;
     timer_event_t *remove_queue_tail;
     timer_event_t *ready_queue_head;
@@ -464,12 +463,11 @@ static inline status_t htw_add_event(hierarchical_timer_wheel_t *timer, timer_ev
     new_event->next = NULL;
     bool was_empty = (timer->new_event_queue_head == NULL);
     bool should_trigger_write = false;
+    uint64_t current_global_min = global_min_heap_get_min(&timer->global_min_heap);
     if (was_empty) {
-        timer->new_event_queue_min_exp = expire;
         should_trigger_write = true;
     } else {
-        if (expire < timer->new_event_queue_min_exp) {
-            timer->new_event_queue_min_exp = expire;
+        if (expire < current_global_min) {
             should_trigger_write = true;
         }
     }
@@ -542,29 +540,31 @@ static inline void htw_calculate_level_and_slot(
 }
 
 static inline status_t htw_move_queue_to_wheel(hierarchical_timer_wheel_t *timer) {
-    if (timer->remove_queue_head == NULL) {
-        //LOG_DEVEL_DEBUG("htw_move_queue_to_wheel: remove_queue empty before insert processing");
-    } else {
-        size_t count = 0;
-        for (timer_event_t *it = timer->remove_queue_head; it && count < 10; it = it->next)
-            ++count;
-        LOG_WARN("htw_move_queue_to_wheel: remove_queue still has %zu pending events", count);
-    }
+    if (!timer->new_event_queue_head) return SUCCESS;
+
     timer_event_t *temp_head = timer->new_event_queue_head;
     timer->new_event_queue_head = NULL;
     timer->new_event_queue_tail = NULL;
-    timer->new_event_queue_min_exp = ULLONG_MAX;
-    if (temp_head == NULL) return SUCCESS;
+
     timer_event_t *current = temp_head;
     while (current) {
         timer_event_t *next_node = current->next;
-        uint32_t level_index;
-        uint32_t slot_index;
+
+        // Skip event jika sudah dihapus atau dikoleksi
+        if (current->queued_for_removal || current->removed || current->collected_for_cleanup) {
+            current = next_node;
+            continue;
+        }
+
+        uint32_t level_index, slot_index;
         htw_calculate_level_and_slot(timer, current->expiration_tick, &level_index, &slot_index);
+
         timer_wheel_level_t *level = &timer->levels[level_index];
         timer_bucket_t *bucket = &level->buckets[slot_index];
+
         current->level_index = (uint8_t)level_index;
         current->slot_index = (uint16_t)slot_index;
+
         current->next = bucket->head;
         if (bucket->head)
             bucket->head->prev_next_ptr = &current->next;
@@ -573,34 +573,47 @@ static inline status_t htw_move_queue_to_wheel(hierarchical_timer_wheel_t *timer
 
         current->prev_next_ptr = &bucket->head;
         bucket->head = current;
+
         if (current->expiration_tick < timer->next_expiration_tick)
             timer->next_expiration_tick = current->expiration_tick;
+
         if (current->expiration_tick < bucket->min_expiration) {
             bucket->min_expiration = current->expiration_tick;
             min_heap_update(&level->min_heap, (uint16_t)slot_index, bucket->min_expiration);
             global_min_heap_update(&timer->global_min_heap, (uint8_t)level_index,
                                    min_heap_get_min(&level->min_heap));
         }
+
         current = next_node;
     }
-    //LOG_DEVEL_DEBUG("htw_move_queue_to_wheel done");
     return SUCCESS;
 }
 
 static inline status_t htw_cascading_events(hierarchical_timer_wheel_t *timer, uint32_t source_level_index, uint32_t target_slot_index) {
     if (source_level_index >= MAX_TIMER_LEVELS) return SUCCESS;
+
     timer_wheel_level_t *source_level = &timer->levels[source_level_index];
     timer_bucket_t *source_bucket = &source_level->buckets[target_slot_index];
-    if (source_bucket->head == NULL) return SUCCESS;
+    if (!source_bucket->head) return SUCCESS;
+
     timer_event_t *current = source_bucket->head;
     timer_event_t *next_node = NULL;
+
     source_bucket->head = NULL;
     source_bucket->tail = NULL;
     source_bucket->min_expiration = ULLONG_MAX;
     min_heap_update(&source_level->min_heap, (uint16_t)target_slot_index, ULLONG_MAX);
     global_min_heap_update(&timer->global_min_heap, (uint8_t)source_level_index, min_heap_get_min(&source_level->min_heap));
-    while (current != NULL) {
+
+    while (current) {
         next_node = current->next;
+
+        // Skip event jika sudah dihapus atau dikoleksi
+        if (current->queued_for_removal || current->removed || current->collected_for_cleanup) {
+            current = next_node;
+            continue;
+        }
+
         if (current->expiration_tick <= timer->global_current_tick) {
             current->next = NULL;
             if (timer->ready_queue_tail) {
@@ -613,29 +626,27 @@ static inline status_t htw_cascading_events(hierarchical_timer_wheel_t *timer, u
                 current->prev_next_ptr = &timer->ready_queue_head;
             }
         } else {
-            uint32_t new_level_index;
-            uint32_t new_slot_index;
-            htw_calculate_level_and_slot(
-                timer,
-                current->expiration_tick,
-                &new_level_index,
-                &new_slot_index
-            );
+            uint32_t new_level_index, new_slot_index;
+            htw_calculate_level_and_slot(timer, current->expiration_tick, &new_level_index, &new_slot_index);
+
             timer_wheel_level_t *target_level = &timer->levels[new_level_index];
             timer_bucket_t *target_bucket = &target_level->buckets[new_slot_index];
+
             current->level_index = (uint8_t)new_level_index;
             current->slot_index = (uint16_t)new_slot_index;
+
             current->next = target_bucket->head;
-            if (target_bucket->head != NULL) {
+            if (target_bucket->head) {
                 target_bucket->head->prev_next_ptr = &current->next;
             } else {
                 target_bucket->tail = current;
             }
             current->prev_next_ptr = &target_bucket->head;
             target_bucket->head = current;
-            if (current->expiration_tick < timer->next_expiration_tick) {
+
+            if (current->expiration_tick < timer->next_expiration_tick)
                 timer->next_expiration_tick = current->expiration_tick;
-            }
+
             if (current->expiration_tick < target_bucket->min_expiration) {
                 target_bucket->min_expiration = current->expiration_tick;
                 min_heap_update(&target_level->min_heap, (uint16_t)new_slot_index, target_bucket->min_expiration);
@@ -644,6 +655,7 @@ static inline status_t htw_cascading_events(hierarchical_timer_wheel_t *timer, u
                 }
             }
         }
+
         current = next_node;
     }
     return SUCCESS;
@@ -661,6 +673,10 @@ static inline status_t htw_process_expired_l0(hierarchical_timer_wheel_t *timer,
         uint64_t new_min_exp = ULLONG_MAX;
         while (cur) {
             next_event = cur->next;
+            if (cur->queued_for_removal || cur->removed || cur->collected_for_cleanup) {
+                cur = next_event;
+                continue;
+            }
             if (cur->expiration_tick <= timer->global_current_tick) {
                 cur->next = NULL;
                 if (timer->ready_queue_tail) {
@@ -803,7 +819,6 @@ static inline void htw_cleanup(const char *label, async_type_t *async, hierarchi
     }
     htw_collect_list_for_cleanup(&timer->new_event_queue_head, &collector_head);
     timer->new_event_queue_tail = NULL;
-    timer->new_event_queue_min_exp = ULLONG_MAX;
     htw_collect_list_for_cleanup(&timer->remove_queue_head, &collector_head);
     timer->remove_queue_tail = NULL;
     htw_collect_list_for_cleanup(&timer->ready_queue_head, &collector_head);
