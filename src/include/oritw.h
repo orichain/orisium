@@ -81,7 +81,6 @@ typedef struct {
     double last_delay_us;
     uint64_t next_expiration_tick;
     timer_event_t *event_pool_head;
-    uint32_t event_count;
 } ori_timer_wheel_t;
 
 typedef ori_timer_wheel_t *ori_timer_wheels_t[MAX_TIMER_LEVELS];
@@ -260,10 +259,20 @@ static inline status_t oritw_reschedule_main_timer(
     return SUCCESS;
 }
 
+/**
+ * @brief Removes an event from the timer wheel bucket and updates min-heap.
+ * * This function incorporates the critical safety fixes suggested by ChatGPT, 
+ * focusing on correct head/tail handling and optimized min_expiration recomputation.
+ */
 static inline status_t oritw_remove_event(ori_timer_wheel_t *timer, timer_event_t *event_to_remove) {
     if (!event_to_remove) return SUCCESS;
-    if (event_to_remove->timer_id == 0) {
-        LOG_WARN("oritw_remove_event: Detected stale pointer (event id=0). Freeing event to pool without wheel removal.");
+
+    // Sanity checks: check if the event is already handled/invalid
+    if (event_to_remove->timer_id == 0 || event_to_remove->removed) {
+        if (event_to_remove->timer_id == 0) {
+             LOG_WARN("oritw_remove_event: Detected stale pointer (event id=0). Freeing event to pool without wheel removal.");
+        }
+        // If already removed or invalid, tidy up (if needed) and free, then return.
         event_to_remove->removed = true;
         event_to_remove->queued_for_removal = false;
         event_to_remove->next = NULL;
@@ -271,10 +280,9 @@ static inline status_t oritw_remove_event(ori_timer_wheel_t *timer, timer_event_
         oritw_pool_free_internal(timer, event_to_remove);
         return SUCCESS;
     }
-    if (event_to_remove->removed) {
-        return SUCCESS;
-    }
-    if (event_to_remove->slot_index >= WHEEL_SIZE) { 
+    
+    // If slot_index is invalid (WHEEL_SIZE), it means it's likely in the new/remove queue or pool.
+    if (event_to_remove->slot_index >= WHEEL_SIZE) {
         event_to_remove->removed = true;
         event_to_remove->queued_for_removal = false;
         event_to_remove->next = NULL;
@@ -282,33 +290,64 @@ static inline status_t oritw_remove_event(ori_timer_wheel_t *timer, timer_event_
         oritw_pool_free_internal(timer, event_to_remove);
         return SUCCESS;
     }
+    
     timer_wheel_t *timer_wheel = &timer->timer_wheel;
     timer_bucket_t *bucket = &timer_wheel->buckets[event_to_remove->slot_index];
+
+    /* SAVE facts BEFORE unlinking */
+    bool was_tail = (bucket->tail == event_to_remove);
+    uint64_t removed_exp = event_to_remove->expiration_tick;
+
+    /* 1. Unlink node from bucket */
     *(event_to_remove->prev_next_ptr) = event_to_remove->next;
-    if (event_to_remove->next) event_to_remove->next->prev_next_ptr = event_to_remove->prev_next_ptr;
+    if (event_to_remove->next) {
+        event_to_remove->next->prev_next_ptr = event_to_remove->prev_next_ptr;
+    }
+
+    /* 2. Update head/tail pointers and check for empty bucket */
+    if (bucket->head == event_to_remove) {
+        // If we removed the head (which is true if prev_next_ptr pointed to &bucket->head)
+        // bucket->head is already updated by the unlink operation above.
+    }
+    
     if (bucket->head == NULL) {
+        // Bucket is empty
         bucket->tail = NULL;
         bucket->min_expiration = ULLONG_MAX;
-    } else {
+    } else if (was_tail) {
+        // If we removed the tail, we must recompute the new tail (O(N) scan required)
+        timer_event_t *it = bucket->head;
+        timer_event_t *last = NULL;
+        while (it) {
+            last = it;
+            it = it->next;
+        }
+        bucket->tail = last;
+    }
+    // Note: No need to check for 'was_head' because the unlink operation handles the head pointer.
+
+    /* 3. Recompute min_expiration only if the removed event was the minimum */
+    if (bucket->head != NULL && removed_exp == bucket->min_expiration) {
         uint64_t new_min = ULLONG_MAX;
-        timer_event_t *current_tail = NULL;
         for (timer_event_t *it = bucket->head; it; it = it->next) {
-            if (it->expiration_tick < new_min) {
-                new_min = it->expiration_tick;
-            }
-            current_tail = it;
+            if (it->expiration_tick < new_min) new_min = it->expiration_tick;
         }
         bucket->min_expiration = new_min;
-        bucket->tail = current_tail;
     }
+    // If bucket->head is NULL, bucket->min_expiration is already ULLONG_MAX from step 2.
+
+    /* 4. Update min-heap and global earliest expiration */
     min_heap_update(&timer_wheel->min_heap, event_to_remove->slot_index, bucket->min_expiration);
-    if (event_to_remove->expiration_tick == timer->next_expiration_tick) oritw_find_earliest_event(timer, NULL);
+    oritw_find_earliest_event(timer, NULL);
+
+    /* 5. Tidy up event and free to pool */
     event_to_remove->prev_next_ptr = NULL;
     event_to_remove->next = NULL;
     event_to_remove->queued_for_removal = false;
     event_to_remove->removed = true;
-    event_to_remove->slot_index = 0;
+    event_to_remove->slot_index = WHEEL_SIZE; /* mark invalid */
     oritw_pool_free_internal(timer, event_to_remove);
+
     return SUCCESS;
 }
 
@@ -350,7 +389,6 @@ static inline status_t oritw_queue_remove_event(
     ori_timer_wheel_t *timer = timers[event_to_remove->level_index];
     if (!timer) return FAILURE;
     event_to_remove->queued_for_removal = true;
-    if (timer->event_count > 0) timer->event_count--;
     event_to_remove->next = NULL;
     if (timer->remove_queue_head == NULL) {
         timer->remove_queue_head = event_to_remove;
@@ -417,6 +455,10 @@ static inline void oritw_calculate_slot(
     }
 }
 
+/**
+ * @brief Moves events from the new_event_queue into the wheel bucket.
+ * * Uses O(1) min_heap_get_min for global expiration update (Koreksi A).
+ */
 static inline status_t oritw_move_queue_to_wheel(ori_timer_wheels_t timers, uint32_t level) {
     ori_timer_wheel_t *timer = timers[level];
     if (!timer->new_event_queue_head) return SUCCESS;
@@ -429,7 +471,7 @@ static inline status_t oritw_move_queue_to_wheel(ori_timer_wheels_t timers, uint
     while (current) {
         timer_event_t *next_node = current->next;
 
-        // Skip event yang tidak valid
+        // Skip event yang tidak valid (karena dihapus sebelum sempat masuk wheel)
         if (current->queued_for_removal || current->removed || current->collected_for_cleanup) {
             current = next_node;
             continue;
@@ -464,20 +506,17 @@ static inline status_t oritw_move_queue_to_wheel(ori_timer_wheels_t timers, uint
         current = next_node;
     }
 
-    // Update next_expiration_tick secara global
-    uint64_t min_tick = UINT64_MAX;
-    timer_wheel_t *wheel = &timer->timer_wheel;
-    for (uint32_t s = 0; s < WHEEL_SIZE; ++s) {
-        if (wheel->buckets[s].min_expiration < min_tick) {
-            min_tick = wheel->buckets[s].min_expiration;
-        }
-    }
-    timer->next_expiration_tick = min_tick;
+    // Update next_expiration_tick secara global (O(1) dari min_heap)
+    timer->next_expiration_tick = min_heap_get_min(&timer->timer_wheel.min_heap);
 
     return SUCCESS;
 }
 
 
+/**
+ * @brief Adds a new timer event to the new event queue.
+ * * Checks for immediate expiration update possibility to trigger add_event_fd.
+ */
 static inline status_t oritw_add_event(ori_timer_wheels_t timers, timer_id_t *timer_id, double double_delay_us) {
     if (!timer_id) return FAILURE;
     timer_id->event = NULL;
@@ -522,7 +561,13 @@ static inline status_t oritw_add_event(ori_timer_wheels_t timers, timer_id_t *ti
         timer->new_event_queue_tail = new_event;
     }
     timer_id->event = new_event;
-    timer->event_count++;
+    
+    /*
+     * NOTE ON CONCURRENCY:
+     * The path using oritw_move_queue_to_wheel is a SYNC path assumed to be 
+     * safe in a single-threaded/event-loop environment per process.
+     * For multi-threaded use, this path requires a lock or lock-free design.
+     */
     if (should_trigger_write) {
         uint64_t val = 1ULL;
         ssize_t w;
@@ -532,7 +577,7 @@ static inline status_t oritw_add_event(ori_timer_wheels_t timers, timer_id_t *ti
 
         if (w == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                LOG_WARN("oritw_add_event: eventfd write would block (EAGAIN) -- removed queued but worker may not be notified immediately.");
+                LOG_WARN("oritw_add_event: eventfd write would block (EAGAIN) -- event queued but worker may not be notified immediately.");
                 return SUCCESS;
             }
             LOG_ERROR("oritw_add_event: write to remove_event_fd failed: %s", strerror(errno));
@@ -543,6 +588,7 @@ static inline status_t oritw_add_event(ori_timer_wheels_t timers, timer_id_t *ti
             return FAILURE;
         }
     } else {
+        // Synchronous move to wheel (if not triggering an async event)
         if (oritw_move_queue_to_wheel(timers, level_index) != SUCCESS) {
             return FAILURE;
         }
@@ -638,8 +684,6 @@ static inline status_t oritw_setup(const char *label, async_type_t *async, ori_t
 
         ori_timer_wheel_t *tw = timers[llv];
         
-        tw->event_count = 0UL;
-
         // Inisialisasi file descriptors
         tw->add_event_fd = -1;
         tw->remove_event_fd = -1;
@@ -688,8 +732,6 @@ static inline void oritw_cleanup(const char *label, async_type_t *async, ori_tim
         ori_timer_wheel_t *tw = timers[llv];
         if (!tw) continue; // skip jika malloc gagal
         
-        tw->event_count = 0UL;
-
         timer_event_t *collector_head = NULL;
         timer_wheel_t *wheel = &tw->timer_wheel;
 

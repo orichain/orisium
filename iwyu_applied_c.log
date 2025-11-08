@@ -1,4 +1,0 @@
->>> Fixing #includes in 'src/master/workers.c'
-IWYU edited 1 files on your behalf.
-
-🔧 FIX applied to ./src/master/workers.c
