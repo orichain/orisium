@@ -111,7 +111,7 @@ typedef struct {
     master_sio_c_session_t *sio_c_session;
     master_cow_c_session_t *cow_c_session;
 //----------------------------------------------------------------------
-    ori_timer_wheel_t timer;
+    ori_timer_wheels_t timer;
 } master_context_t;
 
 static inline master_worker_session_t *get_master_worker_session(master_context_t *master_context, worker_type_t wot, uint8_t index) {

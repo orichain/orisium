@@ -32,6 +32,14 @@
 #include "pqc.h"
 #include "types.h"
 
+static inline int cmp_uint64_t_valueindex(const void *a, const void *b) {
+    uint64_t va = ((uint64_t_value_index_t *)a)->value;
+    uint64_t vb = ((uint64_t_value_index_t *)b)->value;
+    if (va < vb) return -1;
+    else if (va > vb) return 1;
+    else return 0;
+}
+
 static inline void get_time_str(char *buf, size_t len) {
     time_t t = time(NULL);
     struct tm tm_info;

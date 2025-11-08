@@ -153,7 +153,7 @@ typedef struct {
     bool hello2_ack_rcvd;
     bool is_rekeying;
     ipc_protocol_queue_t *rekeying_queue;
-    ori_timer_wheel_t timer;
+    ori_timer_wheels_t timer;
 } worker_context_t;
 
 status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *wot, uint8_t *index, int *master_uds_fd);
@@ -237,7 +237,7 @@ static inline void calculate_rtt(const char *label, void *void_session, worker_t
     }
 }
 
-static inline void cleanup_control_packet(ori_timer_wheel_t *timer, control_packet_t *h, bool clean_state, clean_data_type_t clean_data) {
+static inline void cleanup_control_packet(ori_timer_wheels_t timer, control_packet_t *h, bool clean_state, clean_data_type_t clean_data) {
     if (clean_state) {
         h->sent = false;
         h->sent_time = (uint64_t)0;
@@ -381,22 +381,22 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
 
 static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *single_session) {
 //----------------------------------------------------------------------
-    cleanup_control_packet(&ctx->timer, &single_session->hello1, true, CDT_FREE);
-    cleanup_control_packet(&ctx->timer, &single_session->hello2, true, CDT_FREE);
-    cleanup_control_packet(&ctx->timer, &single_session->hello3, true, CDT_FREE);
-    cleanup_control_packet(&ctx->timer, &single_session->hello4, true, CDT_FREE);
-    cleanup_control_packet(&ctx->timer, &single_session->heartbeat, true, CDT_FREE);
+    cleanup_control_packet(ctx->timer, &single_session->hello1, true, CDT_FREE);
+    cleanup_control_packet(ctx->timer, &single_session->hello2, true, CDT_FREE);
+    cleanup_control_packet(ctx->timer, &single_session->hello3, true, CDT_FREE);
+    cleanup_control_packet(ctx->timer, &single_session->hello4, true, CDT_FREE);
+    cleanup_control_packet(ctx->timer, &single_session->heartbeat, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->heartbeat_ack, true, CDT_FREE);
     single_session->heartbeat_interval = (double)0;
     single_session->last_send_heartbeat_interval = (double)0;
 //----------------------------------------------------------------------
     if (single_session->heartbeat_sender_timer_id.event) {
-        oritw_queue_remove_event(&ctx->timer, single_session->heartbeat_sender_timer_id.event);
+        oritw_queue_remove_event(ctx->timer, single_session->heartbeat_sender_timer_id.event);
         single_session->heartbeat_sender_timer_id.event = NULL;
         single_session->heartbeat_sender_timer_id.id = 0ULL;
     }
     if (single_session->heartbeat_openner_timer_id.event) {
-        oritw_queue_remove_event(&ctx->timer, single_session->heartbeat_openner_timer_id.event);
+        oritw_queue_remove_event(ctx->timer, single_session->heartbeat_openner_timer_id.event);
         single_session->heartbeat_openner_timer_id.event = NULL;
         single_session->heartbeat_openner_timer_id.id = 0ULL;
     }
@@ -496,19 +496,19 @@ static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *s
     cleanup_control_packet_ack(&single_session->hello2_ack, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->hello3_ack, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->hello4_ack, true, CDT_FREE);
-    cleanup_control_packet(&ctx->timer, &single_session->heartbeat, true, CDT_FREE);
+    cleanup_control_packet(ctx->timer, &single_session->heartbeat, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->heartbeat_ack, true, CDT_FREE);
     single_session->heartbeat_interval = (double)0;
     single_session->last_send_heartbeat_interval = (double)0;
     single_session->heartbeat_cnt = 0x00;
 //----------------------------------------------------------------------
     if (single_session->heartbeat_sender_timer_id.event) {
-        oritw_queue_remove_event(&ctx->timer, single_session->heartbeat_sender_timer_id.event);
+        oritw_queue_remove_event(ctx->timer, single_session->heartbeat_sender_timer_id.event);
         single_session->heartbeat_sender_timer_id.event = NULL;
         single_session->heartbeat_sender_timer_id.id = 0ULL;
     }
     if (single_session->heartbeat_openner_timer_id.event) {
-        oritw_queue_remove_event(&ctx->timer, single_session->heartbeat_openner_timer_id.event);
+        oritw_queue_remove_event(ctx->timer, single_session->heartbeat_openner_timer_id.event);
         single_session->heartbeat_openner_timer_id.event = NULL;
         single_session->heartbeat_openner_timer_id.id = 0ULL;
     }

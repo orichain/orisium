@@ -62,7 +62,7 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
 	if (async_create(ctx->label, &ctx->async) != SUCCESS) return FAILURE;
 	if (async_create_incoming_event(ctx->label, &ctx->async, ctx->master_uds_fd) != SUCCESS) return FAILURE;
 //----------------------------------------------------------------------
-    if (oritw_setup(ctx->label, &ctx->async, &ctx->timer) != SUCCESS) return FAILURE;
+    if (oritw_setup(ctx->label, &ctx->async, ctx->timer) != SUCCESS) return FAILURE;
 //----------------------------------------------------------------------
     return SUCCESS;
 }
@@ -96,12 +96,12 @@ void cleanup_worker(worker_context_t *ctx) {
     CLOSE_FD(ctx->master_uds_fd);
 //----------------------------------------------------------------------
     if (ctx->heartbeat_timer_id.event) {
-        oritw_queue_remove_event(&ctx->timer, ctx->heartbeat_timer_id.event);
+        oritw_queue_remove_event(ctx->timer, ctx->heartbeat_timer_id.event);
         ctx->heartbeat_timer_id.event = NULL;
         ctx->heartbeat_timer_id.id = 0ULL;
     }
 //----------------------------------------------------------------------
-    oritw_cleanup(ctx->label, &ctx->async, &ctx->timer);
+    oritw_cleanup(ctx->label, &ctx->async, ctx->timer);
 //----------------------------------------------------------------------
     CLOSE_FD(&ctx->async.async_fd);
     free(ctx->label);
