@@ -1,0 +1,44 @@
+❌ IWYU error in ./src/master/workers.c
+In file included from ./src/master/workers.c:15:
+./src/include/workers/workers.h:208:5: error: label at end of compound statement is a C23 extension [-Werror,-Wc23-extensions]
+  208 |     }
+      |     ^
+./src/include/workers/workers.h:237:5: error: label at end of compound statement is a C23 extension [-Werror,-Wc23-extensions]
+  237 |     }
+      |     ^
+./src/include/workers/workers.h:263:5: error: label at end of compound statement is a C23 extension [-Werror,-Wc23-extensions]
+  263 |     }
+      |     ^
+./src/include/workers/workers.h:312:5: error: label at end of compound statement is a C23 extension [-Werror,-Wc23-extensions]
+  312 |     }
+      |     ^
+
+src/master/workers.c should add these lines:
+
+src/master/workers.c should remove these lines:
+- #include <math.h>  // lines 9-9
+
+The full include-list for src/master/workers.c:
+#include <errno.h>                       // for errno
+#include <stdbool.h>                     // for false, true, bool
+#include <stdint.h>                      // for uint8_t, uint64_t, uint32_t
+#include <stdio.h>                       // for NULL, snprintf
+#include <stdlib.h>                      // for free, calloc, exit, EXIT_SUC...
+#include <string.h>                      // for memset, strerror
+#include <sys/socket.h>                  // for socketpair, AF_UNIX, SOCK_ST...
+#include <unistd.h>                      // for fork
+#include "async.h"                       // for async_create_incoming_event
+#include "constants.h"                   // for AES_NONCE_BYTES, HASHES_BYTES
+#include "ipc.h"                         // for ipc_cleanup_protocol_queue
+#include "kalman.h"                      // for calculate_oricle_double, cal...
+#include "log.h"                         // for LOG_DEBUG, LOG_ERROR, LOG_INFO
+#include "master/ipc/worker_ipc_cmds.h"  // for master_worker_info
+#include "master/master.h"               // for get_master_worker_session
+#include "master/worker_metrics.h"       // for initialize_metrics
+#include "master/workers.h"              // for calculate_avgtt, check_worke...
+#include "pqc.h"                         // for KEM_CIPHERTEXT_BYTES, KEM_PU...
+#include "types.h"                       // for FAILURE, SUCCESS, COW, SIO, DBR
+#include "utilities.h"                   // for CLOSE_UDS, get_monotonic_tim...
+#include "workers/workers.h"             // for run_cow_worker, run_dbr_worker
+---
+

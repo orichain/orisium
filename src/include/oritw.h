@@ -81,6 +81,7 @@ typedef struct {
     double last_delay_us;
     uint64_t next_expiration_tick;
     timer_event_t *event_pool_head;
+    uint32_t event_count;
 } ori_timer_wheel_t;
 
 typedef ori_timer_wheel_t *ori_timer_wheels_t[MAX_TIMER_LEVELS];
@@ -346,9 +347,11 @@ static inline status_t oritw_queue_remove_event(
         return SUCCESS;
     }
     if (event_to_remove->queued_for_removal) return SUCCESS;
-    event_to_remove->queued_for_removal = true;
-    event_to_remove->next = NULL;
     ori_timer_wheel_t *timer = timers[event_to_remove->level_index];
+    if (!timer) return FAILURE;
+    event_to_remove->queued_for_removal = true;
+    if (timer->event_count > 0) timer->event_count--;
+    event_to_remove->next = NULL;
     if (timer->remove_queue_head == NULL) {
         timer->remove_queue_head = event_to_remove;
         timer->remove_queue_tail = event_to_remove;
@@ -381,65 +384,20 @@ static inline void oritw_calculate_level(
     uint32_t *level_index
 )
 {
-    uint64_t_value_index_t gct_index[MAX_TIMER_LEVELS];
-    uint32_t sort_index[MAX_TIMER_LEVELS];
-    for (uint32_t llv = 0; llv < MAX_TIMER_LEVELS; ++llv) {
-        gct_index[llv].value = timers[llv]->global_current_tick;
-        gct_index[llv].index = llv;
+    if (delay_us < 100000ULL) {
+        *level_index = 0;
+        return;
     }
-    qsort(gct_index, MAX_TIMER_LEVELS, sizeof(uint64_t_value_index_t), cmp_uint64_t_valueindex);
-    for (uint32_t llv = 0; llv < MAX_TIMER_LEVELS; ++llv) {
-        sort_index[gct_index[llv].index] = llv;
+    if (delay_us < 1000000ULL) {
+        *level_index = 1;
+        return;
     }
-    uint64_t cumulative_tick_factor[MAX_TIMER_LEVELS];
-    cumulative_tick_factor[0] = timers[0]->timer_wheel.tick_factor;
-    for (uint32_t llv = 1; llv < MAX_TIMER_LEVELS; ++llv) {
-        cumulative_tick_factor[llv] = cumulative_tick_factor[llv - 1] * WHEEL_SIZE;
+    if (delay_us < 5000000ULL) {
+        *level_index = 2;
+        return;
     }
-    for (uint32_t llv = 0; llv < MAX_TIMER_LEVELS; ++llv) {
-        ori_timer_wheel_t *timer = timers[sort_index[llv]];
-        uint64_t expire = (UINT64_MAX - timer->global_current_tick < delay_us)
-                          ? UINT64_MAX
-                          : timer->global_current_tick + delay_us;
-        if (expire <= timer->global_current_tick) {
-            *level_index = sort_index[llv];
-            return;
-        }
-    }
-    uint32_t candidate_levels[MAX_TIMER_LEVELS];
-    uint32_t candidate_count = 0;
-    for (uint32_t llv = 0; llv < MAX_TIMER_LEVELS; ++llv) {
-        ori_timer_wheel_t *timer = timers[sort_index[llv]];
-        uint64_t expire = (UINT64_MAX - timer->global_current_tick < delay_us)
-                          ? UINT64_MAX
-                          : timer->global_current_tick + delay_us;
-        uint64_t delta_tick = expire - timer->global_current_tick;
-
-        for (uint32_t lvl = 0; lvl < MAX_TIMER_LEVELS; ++lvl) {
-            if (delta_tick < cumulative_tick_factor[lvl] * WHEEL_SIZE) {
-                candidate_levels[candidate_count++] = lvl;
-                break;
-            }
-        }
-    }
-    if (candidate_count > 0) {
-        uint32_t best_level = candidate_levels[0];
-        uint32_t min_load = UINT32_MAX;
-        for (uint32_t i = 0; i < candidate_count; ++i) {
-            uint32_t lvl = candidate_levels[i];
-            ori_timer_wheel_t *timer = timers[lvl];
-            uint32_t load = 0;
-            for (timer_event_t *ev = timer->new_event_queue_head; ev; ev = ev->next) load++;
-            for (timer_event_t *ev = timer->ready_queue_head; ev; ev = ev->next) load++;
-            for (uint32_t s = 0; s < WHEEL_SIZE; ++s) {
-                for (timer_event_t *ev = timer->timer_wheel.buckets[s].head; ev; ev = ev->next) load++;
-            }
-            if (load < min_load) {
-                min_load = load;
-                best_level = lvl;
-            }
-        }
-        *level_index = best_level;
+    if (delay_us < 15000000ULL) {
+        *level_index = 3;
         return;
     }
     *level_index = MAX_TIMER_LEVELS - 1;
@@ -564,6 +522,7 @@ static inline status_t oritw_add_event(ori_timer_wheels_t timers, timer_id_t *ti
         timer->new_event_queue_tail = new_event;
     }
     timer_id->event = new_event;
+    timer->event_count++;
     if (should_trigger_write) {
         uint64_t val = 1ULL;
         ssize_t w;
@@ -678,6 +637,8 @@ static inline status_t oritw_setup(const char *label, async_type_t *async, ori_t
         if (!timers[llv]) return FAILURE;
 
         ori_timer_wheel_t *tw = timers[llv];
+        
+        tw->event_count = 0UL;
 
         // Inisialisasi file descriptors
         tw->add_event_fd = -1;
@@ -726,6 +687,8 @@ static inline void oritw_cleanup(const char *label, async_type_t *async, ori_tim
     for (uint32_t llv = 0; llv < MAX_TIMER_LEVELS; ++llv) {
         ori_timer_wheel_t *tw = timers[llv];
         if (!tw) continue; // skip jika malloc gagal
+        
+        tw->event_count = 0UL;
 
         timer_event_t *collector_head = NULL;
         timer_wheel_t *wheel = &tw->timer_wheel;

@@ -32,12 +32,28 @@
 #include "pqc.h"
 #include "types.h"
 
-static inline int cmp_uint64_t_valueindex(const void *a, const void *b) {
-    uint64_t va = ((uint64_t_value_index_t *)a)->value;
-    uint64_t vb = ((uint64_t_value_index_t *)b)->value;
-    if (va < vb) return -1;
-    else if (va > vb) return 1;
-    else return 0;
+static inline void sort_uint64_value_index(uint64_t_value_index_t *arr, size_t n) {
+    for (size_t i = 1; i < n; ++i) {
+        uint64_t_value_index_t key = arr[i];
+        size_t j = i;
+        while (j > 0 && arr[j - 1].value > key.value) {
+            arr[j] = arr[j - 1];
+            --j;
+        }
+        arr[j] = key;
+    }
+}
+
+static inline void sort_uint32_value_index(uint32_t_value_index_t *arr, size_t n) {
+    for (size_t i = 1; i < n; ++i) {
+        uint32_t_value_index_t key = arr[i];
+        size_t j = i;
+        while (j > 0 && arr[j - 1].value > key.value) {
+            arr[j] = arr[j - 1];
+            --j;
+        }
+        arr[j] = key;
+    }
 }
 
 static inline void get_time_str(char *buf, size_t len) {

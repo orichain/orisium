@@ -28,12 +28,14 @@
 #define MAX_RETRY_CNT 5
 #define MIN_RETRY_SEC 1
 //----------------------------------------------------------------------
-#define NODE_HEARTBEAT_INTERVAL 5
+#define NODE_HEARTBEAT_INTERVAL 0.020
 #define NODE_CHECK_HEALTHY_X 3
 //----------------------------------------------------------------------
 #define NODE_CHECK_HEALTHY NODE_CHECK_HEALTHY_X * 2 * NODE_HEARTBEAT_INTERVAL
 //----------------------------------------------------------------------
-#define WORKER_HEARTBEAT_INTERVAL 3
+// !!!!!!!!!!!!!!!!!!!!!!!!! Heartbeat Minimal is 7s. Timer Wheel Level 3 !!!!!!!!!!!!!!!!!!!!!!!!! 
+//----------------------------------------------------------------------
+#define WORKER_HEARTBEAT_INTERVAL 7
 #define WORKER_CHECK_HEALTHY_X 3
 #define WORKER_CHECK_HEALTHY WORKER_CHECK_HEALTHY_X * WORKER_HEARTBEAT_INTERVAL
 //----------------------------------------------------------------------

@@ -120,4 +120,9 @@ typedef struct {
     int index;
 } uint64_t_value_index_t;
 
+typedef struct {
+    uint32_t value;
+    int index;
+} uint32_t_value_index_t;
+
 #endif
