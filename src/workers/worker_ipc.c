@@ -452,9 +452,9 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
         worker_ctx->label,
         0x01,
 //----------------------------------------------------------------------
-        //identity->remote_wot,
-        //identity->remote_index,
-        //identity->remote_session_index,
+// Hello1 remote and local wot, index and session index is the same
+// Hello1 Don't know remote wot, index and session index
+//----------------------------------------------------------------------
         identity->local_wot,
         identity->local_index,
         identity->local_session_index,
@@ -1869,9 +1869,14 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
         CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     } else {
-        remote_wot = oudp_datao->local_wot;
-        remote_index = oudp_datao->local_index;
-        remote_session_index = oudp_datao->local_session_index;
+//----------------------------------------------------------------------
+// Hello1 remote and local wot, index, session index is the same
+// Hello1 Don't know remote wot, index and session index
+//----------------------------------------------------------------------
+        remote_wot = oudp_datao->remote_wot;
+        remote_index = oudp_datao->remote_index;
+        remote_session_index = oudp_datao->remote_session_index;
+//----------------------------------------------------------------------        
         rcvd_id_connection = oudp_datao->id_connection;
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
         CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
