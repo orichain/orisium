@@ -274,7 +274,7 @@ static inline orilink_raw_protocol_t *orilink_raw_protocol_pool_alloc(orilink_ra
 
 static inline void orilink_raw_protocol_pool_free(orilink_raw_protocol_pool_t *pool, orilink_raw_protocol_t *orp) {
     if (!orp) return;
-    memset(orp, 0, sizeof(orilink_raw_protocol_pool_t));
+    memset(orp, 0, sizeof(orilink_raw_protocol_t));
     orp->next = pool->head;
     pool->head = orp;
 }
