@@ -14,7 +14,7 @@
 #include "utilities.h"
 #include "workers/workers.h"
 #include "workers/worker_ipc.h"
-#include "workers/heartbeat.h"
+#include "workers/worker_ipc_heartbeat.h"
 #include "constants.h"
 #include "orilink/protocol.h"
 #include "stdbool.h"
@@ -22,7 +22,7 @@
 static inline status_t retry_transmit(
     worker_context_t *worker_ctx, 
     void *xsession, 
-    control_packet_t *h, 
+    packet_t *h, 
     orilink_protocol_type_t orilink_protocol
 )
 {
@@ -138,30 +138,30 @@ static inline status_t handle_worker_session_timer_event(worker_context_t *worke
                     session->hello4.retry_timer_id.event = NULL;
 //----------------------------------------------------------------------
                     return result;
-                } else if (*timer_id == session->heartbeat.retry_timer_id.id) {
-                    status_t result = retry_transmit(worker_ctx, session, &session->heartbeat, ORILINK_HEARTBEAT);
+                } else if (*timer_id == session->heartbeat.heartbeat.retry_timer_id.id) {
+                    status_t result = retry_transmit(worker_ctx, session, &session->heartbeat.heartbeat, ORILINK_HEARTBEAT);
 //----------------------------------------------------------------------
-                    session->heartbeat.retry_timer_id.event = NULL;
+                    session->heartbeat.heartbeat.retry_timer_id.event = NULL;
 //----------------------------------------------------------------------
                     return result;
-                } else if (*timer_id == session->heartbeat_sender_timer_id.id) {
-                    if (!session->heartbeat.ack_rcvd) {
-                        double timer_interval = session->heartbeat_interval;
-                        status_t chst = oritw_add_event(worker_ctx->timer, &session->heartbeat_sender_timer_id, timer_interval);
+                } else if (*timer_id == session->heartbeat.heartbeat_sender_timer_id.id) {
+                    if (!session->heartbeat.heartbeat.ack_rcvd) {
+                        double timer_interval = session->heartbeat.heartbeat_interval;
+                        status_t chst = oritw_add_event(worker_ctx->timer, &session->heartbeat.heartbeat_sender_timer_id, timer_interval);
                         if (chst != SUCCESS) {
                             return FAILURE;
                         }
                     } else {
                         send_heartbeat(worker_ctx, session, ORILINK_HEARTBEAT);
 //----------------------------------------------------------------------
-                        session->heartbeat_sender_timer_id.event = NULL;
+                        session->heartbeat.heartbeat_sender_timer_id.event = NULL;
 //----------------------------------------------------------------------
                     }
                     return SUCCESS;
-                } else if (*timer_id == session->heartbeat_openner_timer_id.id) {
-                    session->heartbeat_ack.ack_sent = true;
+                } else if (*timer_id == session->heartbeat.heartbeat_openner_timer_id.id) {
+                    session->heartbeat.heartbeat_ack.ack_sent = true;
 //----------------------------------------------------------------------
-                    session->heartbeat_openner_timer_id.event = NULL;
+                    session->heartbeat.heartbeat_openner_timer_id.event = NULL;
 //----------------------------------------------------------------------
                     return SUCCESS;
                 } else {
@@ -176,30 +176,30 @@ static inline status_t handle_worker_session_timer_event(worker_context_t *worke
             for (uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
                 sio_c_session_t *session;
                 session = &c_sessions[i];
-                if (*timer_id == session->heartbeat.retry_timer_id.id) {
-                    status_t result = retry_transmit(worker_ctx, session, &session->heartbeat, ORILINK_HEARTBEAT);
+                if (*timer_id == session->heartbeat.heartbeat.retry_timer_id.id) {
+                    status_t result = retry_transmit(worker_ctx, session, &session->heartbeat.heartbeat, ORILINK_HEARTBEAT);
 //----------------------------------------------------------------------
-                    session->heartbeat.retry_timer_id.event = NULL;
+                    session->heartbeat.heartbeat.retry_timer_id.event = NULL;
 //----------------------------------------------------------------------
                     return result;
-                } else if (*timer_id == session->heartbeat_sender_timer_id.id) {
-                    if (!session->heartbeat.ack_rcvd) {
-                        double timer_interval = session->heartbeat_interval;
-                        status_t chst = oritw_add_event(worker_ctx->timer, &session->heartbeat_sender_timer_id, timer_interval);
+                } else if (*timer_id == session->heartbeat.heartbeat_sender_timer_id.id) {
+                    if (!session->heartbeat.heartbeat.ack_rcvd) {
+                        double timer_interval = session->heartbeat.heartbeat_interval;
+                        status_t chst = oritw_add_event(worker_ctx->timer, &session->heartbeat.heartbeat_sender_timer_id, timer_interval);
                         if (chst != SUCCESS) {
                             return FAILURE;
                         }
                     } else {
                         send_heartbeat(worker_ctx, session, ORILINK_HEARTBEAT);
 //----------------------------------------------------------------------
-                        session->heartbeat_sender_timer_id.event = NULL;
+                        session->heartbeat.heartbeat_sender_timer_id.event = NULL;
 //----------------------------------------------------------------------
                     }
                     return SUCCESS;
-                } else if (*timer_id == session->heartbeat_openner_timer_id.id) {
-                    session->heartbeat_ack.ack_sent = true;
+                } else if (*timer_id == session->heartbeat.heartbeat_openner_timer_id.id) {
+                    session->heartbeat.heartbeat_ack.ack_sent = true;
 //----------------------------------------------------------------------
-                    session->heartbeat_openner_timer_id.event = NULL;
+                    session->heartbeat.heartbeat_openner_timer_id.event = NULL;
 //----------------------------------------------------------------------
                     return SUCCESS;
                 } else {

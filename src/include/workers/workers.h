@@ -39,7 +39,7 @@ typedef struct {
     bool ack_rcvd;
     uint64_t ack_rcvd_time;
     puint8_t_size_t_status_t udp_data;
-} control_packet_t;
+} packet_t;
 
 typedef struct {
     bool rcvd;
@@ -49,7 +49,42 @@ typedef struct {
     uint64_t ack_sent_time;
     uint8_t last_trycount;
     puint8_t_size_t_status_t udp_data;
-} control_packet_ack_t;
+} packet_ack_t;
+
+typedef struct {
+    packet_t heartbeat;
+    packet_ack_t heartbeat_ack;
+    double heartbeat_interval;
+    double last_send_heartbeat_interval;
+    uint8_t heartbeat_cnt;
+    timer_id_t heartbeat_sender_timer_id;
+    timer_id_t heartbeat_openner_timer_id;
+} packet_heartbeat_t;
+
+typedef struct {
+    packet_t data;
+    packet_ack_t data_ack;
+    double data_interval;
+    double last_send_data_interval;
+    timer_id_t data_sender_timer_id;
+    timer_id_t data_openner_timer_id;
+} packet_data_sender_t;
+
+typedef struct {
+    packet_t clrbuff;
+    packet_ack_t clrbuff_ack;
+    double clrbuff_interval;
+    double last_send_clrbuff_interval;
+    timer_id_t clrbuff_sender_timer_id;
+    timer_id_t clrbuff_openner_timer_id;
+} packet_data_receiver_t;
+
+typedef struct {
+    packet_data_sender_t sender;
+    packet_data_receiver_t receiver;
+} packet_data_t;
+
+typedef packet_data_t packet_datas_t[PARALLEL_DATA_WINDOW_SIZE];
 
 typedef struct {
 //======================================================================
@@ -60,27 +95,18 @@ typedef struct {
 //======================================================================
 // HELLO
 //======================================================================
-    control_packet_ack_t hello1_ack;
-    control_packet_ack_t hello2_ack;
-    control_packet_ack_t hello3_ack;
-    control_packet_ack_t hello4_ack;
+    packet_ack_t hello1_ack;
+    packet_ack_t hello2_ack;
+    packet_ack_t hello3_ack;
+    packet_ack_t hello4_ack;
 //======================================================================
 // HEARTBEAT
 //======================================================================
-    control_packet_t heartbeat;
-    control_packet_ack_t heartbeat_ack;
-    double heartbeat_interval;
-    double last_send_heartbeat_interval;
-    uint8_t heartbeat_cnt;
-    timer_id_t heartbeat_sender_timer_id;
-    timer_id_t heartbeat_openner_timer_id;
-//----------------------------------------------------------------------
-    int test_drop_hello1_ack;
-    int test_drop_hello2_ack;
-    int test_drop_hello3_ack;
-    int test_drop_hello4_ack;
-    int test_drop_heartbeat_ack;
-    int test_double_heartbeat;
+    packet_heartbeat_t heartbeat;
+//======================================================================
+// DATA
+//======================================================================
+    packet_datas_t data;
 //----------------------------------------------------------------------
     node_metrics_t metrics;
 //======================================================================
@@ -103,22 +129,18 @@ typedef struct {
 //======================================================================
 // HELLO
 //======================================================================
-    control_packet_t hello1;
-    control_packet_t hello2;
-    control_packet_t hello3;
-    control_packet_t hello4;
+    packet_t hello1;
+    packet_t hello2;
+    packet_t hello3;
+    packet_t hello4;
 //======================================================================
 // HEARTBEAT
 //======================================================================
-    control_packet_t heartbeat;
-    control_packet_ack_t heartbeat_ack;
-    double heartbeat_interval;
-    double last_send_heartbeat_interval;
-    timer_id_t heartbeat_sender_timer_id;
-    timer_id_t heartbeat_openner_timer_id;
-//----------------------------------------------------------------------
-    int test_drop_heartbeat_ack;
-    int test_double_heartbeat;
+    packet_heartbeat_t heartbeat;
+//======================================================================
+// DATA
+//======================================================================
+    packet_datas_t data;
 //----------------------------------------------------------------------
     node_metrics_t metrics;
 //======================================================================
@@ -241,7 +263,7 @@ static inline void calculate_rtt(const char *label, void *void_session, worker_t
     }
 }
 
-static inline void cleanup_control_packet(ori_timer_wheels_t timer, control_packet_t *h, bool clean_state, clean_data_type_t clean_data) {
+static inline void cleanup_control_packet(ori_timer_wheels_t timer, packet_t *h, bool clean_state, clean_data_type_t clean_data) {
     if (clean_state) {
         h->sent = false;
         h->sent_time = (uint64_t)0;
@@ -277,7 +299,7 @@ static inline void cleanup_control_packet(ori_timer_wheels_t timer, control_pack
     }
 }
 
-static inline void setup_control_packet(const char *label, control_packet_t *h) {
+static inline void setup_control_packet(const char *label, packet_t *h) {
     h->sent = false;
     h->sent_time = (uint64_t)0;
     h->ack_rcvd_time = (uint64_t)0;
@@ -289,7 +311,7 @@ static inline void setup_control_packet(const char *label, control_packet_t *h) 
     h->retry_timer_id.event = NULL;
 }
 
-static inline void cleanup_control_packet_ack(control_packet_ack_t *h, bool clean_state, clean_data_type_t clean_data) {
+static inline void cleanup_control_packet_ack(packet_ack_t *h, bool clean_state, clean_data_type_t clean_data) {
     if (clean_state) {
         h->rcvd = false;
         h->rcvd_time = (uint64_t)0;
@@ -318,7 +340,7 @@ static inline void cleanup_control_packet_ack(control_packet_ack_t *h, bool clea
     h->last_trycount = (uint8_t)0;
 }
 
-static inline void setup_control_packet_ack(control_packet_ack_t *h) {
+static inline void setup_control_packet_ack(packet_ack_t *h) {
     h->rcvd = false;
     h->rcvd_time = (uint64_t)0;
     h->ack_sent_time = (uint64_t)0;
@@ -333,22 +355,20 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
 //----------------------------------------------------------------------
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
-    single_session->test_drop_heartbeat_ack = 0;
-    single_session->test_double_heartbeat = 0;
-//----------------------------------------------------------------------
     setup_control_packet(label, &single_session->hello1);
     setup_control_packet(label, &single_session->hello2);
     setup_control_packet(label, &single_session->hello3);
     setup_control_packet(label, &single_session->hello4);
-    setup_control_packet(label, &single_session->heartbeat);
-    setup_control_packet_ack(&single_session->heartbeat_ack);
-    single_session->heartbeat_interval = (double)0;
-    single_session->last_send_heartbeat_interval = (double)0;
 //----------------------------------------------------------------------
-    generate_uint64_t_id(label, &single_session->heartbeat_sender_timer_id.id);
-    single_session->heartbeat_sender_timer_id.event = NULL;
-    generate_uint64_t_id(label, &single_session->heartbeat_openner_timer_id.id);
-    single_session->heartbeat_openner_timer_id.event = NULL;
+    setup_control_packet(label, &single_session->heartbeat.heartbeat);
+    setup_control_packet_ack(&single_session->heartbeat.heartbeat_ack);
+    single_session->heartbeat.heartbeat_interval = (double)0;
+    single_session->heartbeat.last_send_heartbeat_interval = (double)0;
+    single_session->heartbeat.heartbeat_cnt = 0x00;
+    generate_uint64_t_id(label, &single_session->heartbeat.heartbeat_sender_timer_id.id);
+    single_session->heartbeat.heartbeat_sender_timer_id.event = NULL;
+    generate_uint64_t_id(label, &single_session->heartbeat.heartbeat_openner_timer_id.id);
+    single_session->heartbeat.heartbeat_openner_timer_id.event = NULL;
 //----------------------------------------------------------------------
     setup_oricle_double(&single_session->retry, (double)0);
     setup_oricle_double(&single_session->rtt, (double)0);
@@ -390,20 +410,21 @@ static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *s
     cleanup_control_packet(ctx->timer, &single_session->hello2, true, CDT_FREE);
     cleanup_control_packet(ctx->timer, &single_session->hello3, true, CDT_FREE);
     cleanup_control_packet(ctx->timer, &single_session->hello4, true, CDT_FREE);
-    cleanup_control_packet(ctx->timer, &single_session->heartbeat, true, CDT_FREE);
-    cleanup_control_packet_ack(&single_session->heartbeat_ack, true, CDT_FREE);
-    single_session->heartbeat_interval = (double)0;
-    single_session->last_send_heartbeat_interval = (double)0;
 //----------------------------------------------------------------------
-    if (single_session->heartbeat_sender_timer_id.event) {
-        oritw_queue_remove_event(ctx->timer, single_session->heartbeat_sender_timer_id.event);
-        single_session->heartbeat_sender_timer_id.event = NULL;
-        single_session->heartbeat_sender_timer_id.id = 0ULL;
+    cleanup_control_packet(ctx->timer, &single_session->heartbeat.heartbeat, true, CDT_FREE);
+    cleanup_control_packet_ack(&single_session->heartbeat.heartbeat_ack, true, CDT_FREE);
+    single_session->heartbeat.heartbeat_interval = (double)0;
+    single_session->heartbeat.last_send_heartbeat_interval = (double)0;
+    single_session->heartbeat.heartbeat_cnt = 0x00;
+    if (single_session->heartbeat.heartbeat_sender_timer_id.event) {
+        oritw_queue_remove_event(ctx->timer, single_session->heartbeat.heartbeat_sender_timer_id.event);
+        single_session->heartbeat.heartbeat_sender_timer_id.event = NULL;
+        single_session->heartbeat.heartbeat_sender_timer_id.id = 0ULL;
     }
-    if (single_session->heartbeat_openner_timer_id.event) {
-        oritw_queue_remove_event(ctx->timer, single_session->heartbeat_openner_timer_id.event);
-        single_session->heartbeat_openner_timer_id.event = NULL;
-        single_session->heartbeat_openner_timer_id.id = 0ULL;
+    if (single_session->heartbeat.heartbeat_openner_timer_id.event) {
+        oritw_queue_remove_event(ctx->timer, single_session->heartbeat.heartbeat_openner_timer_id.event);
+        single_session->heartbeat.heartbeat_openner_timer_id.event = NULL;
+        single_session->heartbeat.heartbeat_openner_timer_id.id = 0ULL;
     }
 //----------------------------------------------------------------------
     cleanup_oricle_double(&single_session->retry);
@@ -449,27 +470,20 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
 //----------------------------------------------------------------------
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
-    single_session->test_drop_hello1_ack = 0;
-    single_session->test_drop_hello2_ack = 0;
-    single_session->test_drop_hello3_ack = 0;
-    single_session->test_drop_hello4_ack = 0;
-    single_session->test_drop_heartbeat_ack = 0;
-    single_session->test_double_heartbeat = 0;
-//----------------------------------------------------------------------
     setup_control_packet_ack(&single_session->hello1_ack);
     setup_control_packet_ack(&single_session->hello2_ack);
     setup_control_packet_ack(&single_session->hello3_ack);
     setup_control_packet_ack(&single_session->hello4_ack);
-    setup_control_packet(label, &single_session->heartbeat);
-    setup_control_packet_ack(&single_session->heartbeat_ack);
-    single_session->heartbeat_interval = (double)0;
-    single_session->last_send_heartbeat_interval = (double)0;
-    single_session->heartbeat_cnt = 0x00;
 //----------------------------------------------------------------------
-    generate_uint64_t_id(label, &single_session->heartbeat_sender_timer_id.id);
-    single_session->heartbeat_sender_timer_id.event = NULL;
-    generate_uint64_t_id(label, &single_session->heartbeat_openner_timer_id.id);
-    single_session->heartbeat_openner_timer_id.event = NULL;
+    setup_control_packet(label, &single_session->heartbeat.heartbeat);
+    setup_control_packet_ack(&single_session->heartbeat.heartbeat_ack);
+    single_session->heartbeat.heartbeat_interval = (double)0;
+    single_session->heartbeat.last_send_heartbeat_interval = (double)0;
+    single_session->heartbeat.heartbeat_cnt = 0x00;
+    generate_uint64_t_id(label, &single_session->heartbeat.heartbeat_sender_timer_id.id);
+    single_session->heartbeat.heartbeat_sender_timer_id.event = NULL;
+    generate_uint64_t_id(label, &single_session->heartbeat.heartbeat_openner_timer_id.id);
+    single_session->heartbeat.heartbeat_openner_timer_id.event = NULL;
 //----------------------------------------------------------------------
     setup_oricle_double(&single_session->retry, (double)0);
     setup_oricle_double(&single_session->rtt, (double)0);
@@ -505,21 +519,21 @@ static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *s
     cleanup_control_packet_ack(&single_session->hello2_ack, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->hello3_ack, true, CDT_FREE);
     cleanup_control_packet_ack(&single_session->hello4_ack, true, CDT_FREE);
-    cleanup_control_packet(ctx->timer, &single_session->heartbeat, true, CDT_FREE);
-    cleanup_control_packet_ack(&single_session->heartbeat_ack, true, CDT_FREE);
-    single_session->heartbeat_interval = (double)0;
-    single_session->last_send_heartbeat_interval = (double)0;
-    single_session->heartbeat_cnt = 0x00;
 //----------------------------------------------------------------------
-    if (single_session->heartbeat_sender_timer_id.event) {
-        oritw_queue_remove_event(ctx->timer, single_session->heartbeat_sender_timer_id.event);
-        single_session->heartbeat_sender_timer_id.event = NULL;
-        single_session->heartbeat_sender_timer_id.id = 0ULL;
+    cleanup_control_packet(ctx->timer, &single_session->heartbeat.heartbeat, true, CDT_FREE);
+    cleanup_control_packet_ack(&single_session->heartbeat.heartbeat_ack, true, CDT_FREE);
+    single_session->heartbeat.heartbeat_interval = (double)0;
+    single_session->heartbeat.last_send_heartbeat_interval = (double)0;
+    single_session->heartbeat.heartbeat_cnt = 0x00;
+    if (single_session->heartbeat.heartbeat_sender_timer_id.event) {
+        oritw_queue_remove_event(ctx->timer, single_session->heartbeat.heartbeat_sender_timer_id.event);
+        single_session->heartbeat.heartbeat_sender_timer_id.event = NULL;
+        single_session->heartbeat.heartbeat_sender_timer_id.id = 0ULL;
     }
-    if (single_session->heartbeat_openner_timer_id.event) {
-        oritw_queue_remove_event(ctx->timer, single_session->heartbeat_openner_timer_id.event);
-        single_session->heartbeat_openner_timer_id.event = NULL;
-        single_session->heartbeat_openner_timer_id.id = 0ULL;
+    if (single_session->heartbeat.heartbeat_openner_timer_id.event) {
+        oritw_queue_remove_event(ctx->timer, single_session->heartbeat.heartbeat_openner_timer_id.event);
+        single_session->heartbeat.heartbeat_openner_timer_id.event = NULL;
+        single_session->heartbeat.heartbeat_openner_timer_id.id = 0ULL;
     }
 //----------------------------------------------------------------------
     cleanup_oricle_double(&single_session->retry);
