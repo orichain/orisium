@@ -2,7 +2,6 @@
 	"node_name": "Node1",
 	"listen_port": 8443,
 	"bootstrap_nodes": [
-		{ "ip": "127.0.0.1", "port": 8443 },
-        { "ip": "127.0.0.1", "port": 8444 }
+		{ "ip": "127.0.0.1", "port": 8443 }
 	]
 }
