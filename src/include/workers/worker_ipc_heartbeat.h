@@ -4,6 +4,9 @@
 #include <inttypes.h>
 #include <stdio.h>
 
+#include "constants.h"
+#include "ipc/protocol.h"
+#include "log.h"
 #include "types.h"
 #include "workers/workers.h"
 #include "workers/worker_ipc.h"
@@ -13,9 +16,6 @@
 #include "orilink.h"
 #include "stdbool.h"
 #include "orilink/heartbeat_ack.h"
-#include "constants.h"
-#include "ipc/protocol.h"
-#include "log.h"
 
 struct sockaddr_in6;
 

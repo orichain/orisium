@@ -1,4 +1,0 @@
->>> Fixing #includes in 'src/include/workers/worker_ipc_heartbeat.h'
-IWYU edited 1 files on your behalf.
-
-🔧 FIX applied to ./src/include/workers/worker_ipc_heartbeat.h
