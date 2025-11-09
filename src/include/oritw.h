@@ -340,42 +340,58 @@ static inline void oritw_calculate_level(
     uint32_t *level_index
 )
 {
-    if (delay_us < 30000ULL) {
+    // Level 0: Ultra Low Latency (10 ms)
+    if (delay_us < 10000ULL) {
         *level_index = 0;
         return;
     }
+    // Level 1: Low Latency (50 ms)
     if (delay_us < 50000ULL) {
         *level_index = 1;
         return;
     }
-    if (delay_us < 100000ULL) {
+    // Level 2: Sub-Second (250 ms)
+    if (delay_us < 250000ULL) {
         *level_index = 2;
         return;
     }
-    if (delay_us < 500000ULL) {
+    // Level 3: 1 Second
+    if (delay_us < 1000000ULL) {
         *level_index = 3;
         return;
     }
-    if (delay_us < 1000000ULL) {
+    // Level 4: 3 Seconds
+    if (delay_us < 3000000ULL) {
         *level_index = 4;
         return;
     }
-    if (delay_us < 3000000ULL) {
+    // Level 5: 6 Seconds
+    if (delay_us < 6000000ULL) {
         *level_index = 5;
         return;
     }
-    if (delay_us < 5000000ULL) {
+    // Level 6: 10 Seconds
+    if (delay_us < 10000000ULL) {
         *level_index = 6;
         return;
     }
-    if (delay_us < 7000000ULL) {
+    // Level 7: 15 Seconds
+    if (delay_us < 15000000ULL) {
         *level_index = 7;
         return;
     }
-    if (delay_us < 9000000ULL) {
+    // Level 8: 25 Seconds
+    if (delay_us < 25000000ULL) {
         *level_index = 8;
         return;
     }
+    // Level 9: 30 Seconds
+    if (delay_us < 30000000ULL) {
+        *level_index = 9;
+        return;
+    }
+    
+    // Level MAX_TIMER_LEVELS - 1: Default untuk semua delay > 30 detik.
     *level_index = MAX_TIMER_LEVELS - 1;
 }
 
