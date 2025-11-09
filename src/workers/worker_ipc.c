@@ -3007,7 +3007,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
 //======================================================================
     double hb_interval = node_hb_interval_with_jitter_us(session->rtt.value_prediction, session->retry.value_prediction);
     session->last_send_heartbeat_interval = hb_interval;
-    printf("%sSend HB Interval %f ms\n", worker_ctx->label, hb_interval);
+    printf("%sSend HB Interval %f us\n", worker_ctx->label, hb_interval);
 //======================================================================
     l_inc_ctr = 0x01;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_heartbeat(
