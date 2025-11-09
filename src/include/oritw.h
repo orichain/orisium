@@ -32,9 +32,10 @@ typedef struct {
 
 typedef struct timer_event_t {
     struct timer_event_t *next;
+    struct timer_event_t *prev;
     uint64_t expiration_tick;
     uint64_t timer_id;
-    struct timer_event_t **prev_next_ptr;
+    struct timer_event_t **prev_next_ptr;   
     uint32_t level_index;
     uint16_t slot_index;
     bool removed;
@@ -83,18 +84,27 @@ static inline void min_heap_swap(min_heap_node_t *a, min_heap_node_t *b, min_hea
 }
 
 static inline void min_heapify_down(min_heap_t *heap, uint32_t i) {
-    uint32_t smallest = i;
-    uint32_t left = 2 * i + 1;
-    uint32_t right = 2 * i + 2;
-    if (left < heap->size && heap->nodes[left].expiration_tick < heap->nodes[smallest].expiration_tick) {
-        smallest = left;
-    }
-    if (right < heap->size && heap->nodes[right].expiration_tick < heap->nodes[smallest].expiration_tick) {
-        smallest = right;
-    }
-    if (smallest != i) {
-        min_heap_swap(&heap->nodes[i], &heap->nodes[smallest], heap);
-        min_heapify_down(heap, smallest);
+    uint32_t current = i; 
+    uint32_t smallest;
+    
+    while (true) {
+        smallest = current;
+        uint32_t left = 2 * current + 1;
+        uint32_t right = 2 * current + 2;
+
+        if (left < heap->size && heap->nodes[left].expiration_tick < heap->nodes[smallest].expiration_tick) {
+            smallest = left;
+        }
+        if (right < heap->size && heap->nodes[right].expiration_tick < heap->nodes[smallest].expiration_tick) {
+            smallest = right;
+        }
+        
+        if (smallest != current) {
+            min_heap_swap(&heap->nodes[current], &heap->nodes[smallest], heap);
+            current = smallest; 
+        } else {
+            break; 
+        }
     }
 }
 
@@ -127,7 +137,7 @@ static inline void min_heap_update(min_heap_t *heap, uint16_t bucket_index, uint
 }
 
 static inline uint64_t min_heap_get_min(min_heap_t *heap) {
-    return heap->nodes[0].expiration_tick;
+    return (heap->size > 0) ? heap->nodes[0].expiration_tick : ULLONG_MAX;
 }
 
 static inline timer_event_t *oritw_pool_alloc(ori_timer_wheel_t *timer) {
@@ -143,6 +153,7 @@ static inline timer_event_t *oritw_pool_alloc(ori_timer_wheel_t *timer) {
         }
     }
     event->next = NULL;
+    event->prev = NULL;
     event->prev_next_ptr = NULL;
     event->slot_index = WHEEL_SIZE;
     event->level_index = MAX_TIMER_LEVELS;
@@ -156,6 +167,7 @@ static inline timer_event_t *oritw_pool_alloc(ori_timer_wheel_t *timer) {
 static inline void oritw_pool_free_internal(ori_timer_wheel_t *timer, timer_event_t *event) {
     if (!event) return;
     event->expiration_tick = 0;
+    event->prev = NULL;
     event->prev_next_ptr = NULL;
     event->timer_id = 0;
     event->removed = false;
@@ -188,6 +200,7 @@ static inline void oritw_free_collector(timer_event_t *collector_head) {
     while (cur != NULL) {
         timer_event_t *next = cur->next;
         cur->next = NULL;
+        cur->prev = NULL;
         cur->prev_next_ptr = NULL;
         cur->collected_for_cleanup = false;
         free(cur);
@@ -197,14 +210,16 @@ static inline void oritw_free_collector(timer_event_t *collector_head) {
 
 static inline bool oritw_find_earliest_event(ori_timer_wheel_t *timer, uint64_t *out_expiration) {
     uint64_t min_abs_expiration = min_heap_get_min(&timer->timer_wheel.min_heap);
-    if (min_abs_expiration == ULLONG_MAX || min_abs_expiration <= timer->global_current_tick) {
+
+    if (min_abs_expiration == ULLONG_MAX) {
         timer->next_expiration_tick = ULLONG_MAX;
         if (out_expiration) *out_expiration = ULLONG_MAX;
         return false;
     }
+
     timer->next_expiration_tick = min_abs_expiration;
     if (out_expiration) *out_expiration = min_abs_expiration;
-    return true;
+    return true; 
 }
 
 static inline status_t oritw_reschedule_main_timer(
@@ -217,8 +232,12 @@ static inline status_t oritw_reschedule_main_timer(
     ori_timer_wheel_t *timer = timers[level];
     uint64_t next_expiration_tick;
     bool earliest_event_found = oritw_find_earliest_event(timer, &next_expiration_tick);
-    if (earliest_event_found && next_expiration_tick > timer->global_current_tick) {
-        uint64_t delay_tick = next_expiration_tick - timer->global_current_tick;
+
+    if (earliest_event_found) {
+        uint64_t delay_tick = 0;
+        if (next_expiration_tick > timer->global_current_tick) {
+            delay_tick = next_expiration_tick - timer->global_current_tick;
+        } 
         double delay_us = (double)delay_tick;
         double delay_s = delay_us / 1e6;
         timer->last_delay_us = delay_us;
@@ -227,7 +246,6 @@ static inline status_t oritw_reschedule_main_timer(
             LOG_ERROR("%sFailed to re-arm main tick timer (delay_us=%.2f).", label, delay_us);
             return FAILURE;
         }
-        //LOG_DEVEL_DEBUG("%sRescheduled main timer: delay_us=%.2f next_tick=%" PRIu64, label, delay_us, next_expiration_tick);
     } else {
         timer->last_delay_us = 0.0;
         timer->next_expiration_tick = ULLONG_MAX;
@@ -237,60 +255,51 @@ static inline status_t oritw_reschedule_main_timer(
                 return FAILURE;
             }
         }
-        //LOG_DEVEL_DEBUG("%sMain timer disarmed (no future event).", label);
     }
     return SUCCESS;
 }
 
 static inline status_t oritw_remove_event_internal(ori_timer_wheel_t *timer, timer_event_t *event_to_remove) {
     if (!event_to_remove) return SUCCESS;
-    if (event_to_remove->timer_id == 0 || event_to_remove->removed) {
+    if (event_to_remove->timer_id == 0 || event_to_remove->removed || event_to_remove->slot_index >= WHEEL_SIZE) {
         if (event_to_remove->timer_id == 0) {
              LOG_WARN("oritw_remove_event_internal: Detected stale pointer (event id=0). Freeing event to pool without wheel removal.");
         }
         event_to_remove->removed = true;
         event_to_remove->next = NULL;
+        event_to_remove->prev = NULL;
         event_to_remove->prev_next_ptr = NULL;
         oritw_pool_free_internal(timer, event_to_remove);
         return SUCCESS;
-    }
-    if (event_to_remove->slot_index >= WHEEL_SIZE) {
-        event_to_remove->removed = true;
-        event_to_remove->next = NULL;
-        event_to_remove->prev_next_ptr = NULL;
-        oritw_pool_free_internal(timer, event_to_remove);
-        return SUCCESS;
-    }
+    }    
     timer_wheel_t *timer_wheel = &timer->timer_wheel;
     timer_bucket_t *bucket = &timer_wheel->buckets[event_to_remove->slot_index];
-    bool was_tail = (bucket->tail == event_to_remove);
     uint64_t removed_exp = event_to_remove->expiration_tick;
-    *(event_to_remove->prev_next_ptr) = event_to_remove->next;
+    if (bucket->tail == event_to_remove)
+        bucket->tail = event_to_remove->prev;
+    if (event_to_remove->prev_next_ptr)
+        *(event_to_remove->prev_next_ptr) = event_to_remove->next;
     if (event_to_remove->next) {
         event_to_remove->next->prev_next_ptr = event_to_remove->prev_next_ptr;
+        event_to_remove->next->prev = event_to_remove->prev;
     }
+    if (event_to_remove->prev)
+        event_to_remove->prev->next = event_to_remove->next;
     if (bucket->head == NULL) {
         bucket->tail = NULL;
-        bucket->min_expiration = ULLONG_MAX;
-    } else if (was_tail) {
-        timer_event_t *it = bucket->head;
-        timer_event_t *last = NULL;
-        while (it) {
-            last = it;
-            it = it->next;
-        }
-        bucket->tail = last;
-    }
-    if (bucket->head != NULL && removed_exp == bucket->min_expiration) {
+        bucket->min_expiration = ULLONG_MAX; 
+    } else if (removed_exp == bucket->min_expiration) {
         uint64_t new_min = ULLONG_MAX;
         for (timer_event_t *it = bucket->head; it; it = it->next) {
-            if (it->expiration_tick < new_min) new_min = it->expiration_tick;
+            if (it->expiration_tick < new_min) {
+                new_min = it->expiration_tick;
+            }
         }
         bucket->min_expiration = new_min;
     }
     min_heap_update(&timer_wheel->min_heap, event_to_remove->slot_index, bucket->min_expiration);
-    oritw_find_earliest_event(timer, NULL);
     event_to_remove->prev_next_ptr = NULL;
+    event_to_remove->prev = NULL;
     event_to_remove->next = NULL;
     event_to_remove->removed = true;
     event_to_remove->slot_index = WHEEL_SIZE;
@@ -307,20 +316,18 @@ static inline status_t oritw_remove_event(
 {
     if (!event_to_remove) return SUCCESS;
     if (event_to_remove->removed) {
-        //LOG_DEVEL_DEBUG("oritw_queue_remove_event: event id=%" PRIu64 " already removed, skipping", event_to_remove->timer_id);
         return SUCCESS;
     }
     uint32_t level_index = event_to_remove->level_index;
     ori_timer_wheel_t *timer = timers[level_index];
     if (!timer) return FAILURE;
-    event_to_remove->next = NULL;
+    
     uint64_t expire = event_to_remove->expiration_tick;
     uint64_t current_min_exp = min_heap_get_min(&timer->timer_wheel.min_heap);
-    bool should_reschedule = false;
-    if (expire <= current_min_exp) {
-        should_reschedule = true;
-    }
+    bool should_reschedule = (expire <= current_min_exp);
+    
     if (oritw_remove_event_internal(timer, event_to_remove) != SUCCESS) return FAILURE;
+    
     if (should_reschedule) {
         if (oritw_reschedule_main_timer(label, async, timers, level_index) != SUCCESS) return FAILURE;
     }
@@ -417,6 +424,7 @@ static inline status_t oritw_add_event(
     new_event->timer_id = timer_id->id;
     new_event->level_index = level_index;
     new_event->next = NULL;
+    new_event->prev = NULL; 
     bool should_reschedule = false;
     uint64_t current_min_exp = min_heap_get_min(&timer->timer_wheel.min_heap);
     if (expire < current_min_exp) {
@@ -428,21 +436,23 @@ static inline status_t oritw_add_event(
     timer_wheel_t *wheel = &timer->timer_wheel;
     timer_bucket_t *bucket = &wheel->buckets[slot_index];
     new_event->slot_index = (uint16_t)slot_index;
-    new_event->next = NULL;
     if (bucket->tail) {
         bucket->tail->next = new_event;
         new_event->prev_next_ptr = &bucket->tail->next;
+        new_event->prev = bucket->tail;     
         bucket->tail = new_event;
     } else {
         bucket->head = new_event;
         bucket->tail = new_event;
         new_event->prev_next_ptr = &bucket->head;
+        new_event->prev = NULL;             
     }
     if (new_event->expiration_tick < bucket->min_expiration) {
         bucket->min_expiration = new_event->expiration_tick;
         min_heap_update(&wheel->min_heap, (uint16_t)slot_index, bucket->min_expiration);
     }
     timer->next_expiration_tick = min_heap_get_min(&timer->timer_wheel.min_heap);
+    
     if (should_reschedule) {
         if (oritw_reschedule_main_timer(label, async, timers, level_index) != SUCCESS) return FAILURE;
     }
@@ -466,6 +476,7 @@ static inline status_t oritw_process_expired_l0(ori_timer_wheel_t *timer, uint32
                 continue;
             }
             if (cur->expiration_tick <= timer->global_current_tick) {
+                cur->prev = NULL;             
                 cur->next = NULL;
                 if (timer->ready_queue_tail) {
                     cur->prev_next_ptr = &timer->ready_queue_tail->next;
@@ -481,9 +492,11 @@ static inline status_t oritw_process_expired_l0(ori_timer_wheel_t *timer, uint32
                     bucket->head = cur;
                     bucket->tail = cur;
                     cur->next = NULL;
+                    cur->prev = NULL;           
                     cur->prev_next_ptr = &bucket->head;
                 } else {
                     cur->prev_next_ptr = &bucket->tail->next;
+                    cur->prev = bucket->tail;   
                     bucket->tail->next = cur;
                     bucket->tail = cur;
                     cur->next = NULL;
@@ -528,6 +541,7 @@ static inline status_t oritw_advance_time_and_process_expired(
         }
         remaining_ticks -= chunk_advance;
     }
+    
     return oritw_reschedule_main_timer(label, async, timers, level);
 }
 
