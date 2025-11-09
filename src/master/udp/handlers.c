@@ -26,6 +26,8 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
     while (true) {
         orilink_raw_protocol_t_status_t orcvdo = receive_orilink_raw_protocol_packet(
             label,
+            &master_ctx->orilink_raw_protocol_pool,
+            &master_ctx->udp_packet_pool,
             &master_ctx->udp_sock,
             &remote_addr
         );
@@ -40,20 +42,20 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                               );
             if (getname_res != 0) {
                 LOG_ERROR("%sgetnameinfo failed. %s", label, strerror(errno));
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                 return FAILURE;
             }
             size_t host_str_len = strlen(host_str);
             if (host_str_len >= INET6_ADDRSTRLEN) {
                 LOG_ERROR("%sKoneksi ditolak dari IP %s. IP terlalu panjang.", label, host_str);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                 return FAILURE_IVLDIP;
             }
             char *endptr;
             long port_num = strtol(port_str, &endptr, 10);
             if (*endptr != '\0' || port_num <= 0 || port_num > 65535) {
                 LOG_ERROR("%sKoneksi ditolak dari IP %s. PORT di luar rentang (1-65535).", label, host_str);
-                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                 return FAILURE_IVLDPORT;
             }
             orilink_protocol_type_t orilink_protocol = orcvdo.r_orilink_raw_protocol_t->type;
@@ -69,12 +71,12 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                         if(c_session->in_use && c_session->in_secure) {
                             if (sockaddr_equal((const struct sockaddr *)&remote_addr, (const struct sockaddr *)&c_session->remote_addr)) {
                                 LOG_ERROR("%sConnection From Ip Address %s Port %s Already Exist.", label, host_str, port_str);
-                                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                                CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                                 return FAILURE;
                             }
                             if (c_session->id_connection == id_connection) {
                                 LOG_ERROR("%sId Connection %" PRIu64 " Already Exist.", label, c_session->id_connection);
-                                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                                CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                                 return FAILURE;
                             }
                         }
@@ -87,7 +89,7 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                         worker_index = select_best_worker(label, master_ctx, SIO);
                         if (worker_index == 0xff) {
                             LOG_ERROR("%sFailed to select an SIO worker for new task.", label);
-                            CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                            CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                             return FAILURE;
                         }
                         for(uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
@@ -101,12 +103,12 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                         }
                         if (session_index == 0xff) {
                             LOG_ERROR("%sWARNING: No free session slots in sio-%d sessions.", label, worker_index);
-                            CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                            CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                             return FAILURE;
                         }
                         if (new_task_metrics(label, master_ctx, SIO, worker_index) != SUCCESS) {
                             LOG_ERROR("%sFailed to input new task in COW %d metrics.", label, worker_index);
-                            CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                            CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                             return FAILURE;
                         }
                         c_session = &master_ctx->sio_c_session[(worker_index * MAX_CONNECTION_PER_SIO_WORKER) + session_index];
@@ -118,12 +120,12 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                         c_session = &master_ctx->sio_c_session[worker_index];
                         if (!sockaddr_equal((const struct sockaddr *)&remote_addr, (const struct sockaddr *)&c_session->remote_addr)) {
                             LOG_ERROR("%sDiferent Connection From Ip Address %s Port %s.", label, host_str, port_str);
-                            CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                            CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                             return FAILURE;
                         }
                         if (c_session->id_connection != id_connection) {
                             LOG_ERROR("%sDiferent Id Connection %" PRIu64 ".", label, c_session->id_connection);
-                            CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                            CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                             return FAILURE;
                         }
                     }
@@ -140,10 +142,10 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                         ) != SUCCESS
                     )
                     {
-                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                        CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                         return FAILURE;
                     }
-                    CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                     break;
                 }
                 case ORILINK_HELLO1_ACK:
@@ -167,11 +169,11 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                     switch (wot) {
                         case SIO: {
                             if (worker_index > MAX_SIO_WORKERS) {
-                                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                                CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                                 return FAILURE;
                             }
                             if (session_index > MAX_CONNECTION_PER_SIO_WORKER) {
-                                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                                CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                                 return FAILURE;
                             }
                             bool not_exist = true;
@@ -190,18 +192,18 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                             }
                             if (not_exist) {
                                 LOG_ERROR("%sNo Connection Exist From Ip Address %s Port %s Id Connection %" PRIu64 ".", label, host_str, port_str, id_connection);
-                                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                                CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                                 return FAILURE;
                             }
                             break;
                         }
                         case COW: {
                             if (worker_index > MAX_COW_WORKERS) {
-                                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                                CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                                 return FAILURE;
                             }
                             if (session_index > MAX_CONNECTION_PER_COW_WORKER) {
-                                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                                CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                                 return FAILURE;
                             }
                             bool not_exist = true;
@@ -220,13 +222,13 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                             }
                             if (not_exist) {
                                 LOG_ERROR("%sNo Connection Exist From Ip Address %s Port %s Id Connection %" PRIu64 ".", label, host_str, port_str, id_connection);
-                                CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                                CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                                 return FAILURE;
                             }
                             break;
                         }
                         default:
-                            CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                            CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                             return FAILURE;
                     }
 //======================================================================
@@ -243,15 +245,15 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                         ) != SUCCESS
                     )
                     {
-                        CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                        CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                         return FAILURE;
                     }
-                    CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
                     break;
                 }
                 default:
                     LOG_ERROR("%sUnknown ORILINK protocol type %d from %s:%s. Ignoring.", label, orilink_protocol, host_str, port_str);
-                    CLOSE_ORILINK_RAW_PROTOCOL(&orcvdo.r_orilink_raw_protocol_t);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->orilink_raw_protocol_pool, &master_ctx->udp_packet_pool, &orcvdo.r_orilink_raw_protocol_t);
             }
         }
     }

@@ -115,14 +115,4 @@ typedef struct {
 	status_t status;
 } uint64_t_status_t;
 
-typedef struct {
-    uint64_t value;
-    int index;
-} uint64_t_value_index_t;
-
-typedef struct {
-    uint32_t value;
-    int index;
-} uint32_t_value_index_t;
-
 #endif

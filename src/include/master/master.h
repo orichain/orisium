@@ -13,7 +13,8 @@
 #include "kalman.h"
 #include "node.h"
 #include "types.h" 
-#include "oritw.h" 
+#include "oritw.h"
+#include "orilink/protocol.h"
 
 typedef struct {
     double hb_interval;
@@ -112,6 +113,9 @@ typedef struct {
     master_cow_c_session_t *cow_c_session;
 //----------------------------------------------------------------------
     ori_timer_wheels_t timer;
+//----------------------------------------------------------------------
+    udp_packet_pool_t udp_packet_pool;
+    orilink_raw_protocol_pool_t orilink_raw_protocol_pool;
 } master_context_t;
 
 static inline master_worker_session_t *get_master_worker_session(master_context_t *master_context, worker_type_t wot, uint8_t index) {

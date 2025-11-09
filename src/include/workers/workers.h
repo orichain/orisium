@@ -89,6 +89,9 @@ typedef struct {
 	oricle_double_t rtt;
     oricle_double_t retry;
     oricle_double_t healthy;
+//----------------------------------------------------------------------
+    udp_packet_pool_t udp_packet_pool;
+    orilink_raw_protocol_pool_t orilink_raw_protocol_pool;
 } sio_c_session_t; //Server
 
 typedef struct {
@@ -126,6 +129,9 @@ typedef struct {
     oricle_double_t retry;
     oricle_double_t healthy;
     oricle_long_double_t avgtt;
+//----------------------------------------------------------------------
+    udp_packet_pool_t udp_packet_pool;
+    orilink_raw_protocol_pool_t orilink_raw_protocol_pool;
 } cow_c_session_t; //Client
 
 typedef struct {
@@ -376,6 +382,8 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
         LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", label);
         return FAILURE;
     }
+    single_session->udp_packet_pool.head = NULL;
+    single_session->orilink_raw_protocol_pool.head = NULL;
     return SUCCESS;
 }
 
@@ -435,6 +443,10 @@ static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *s
     free(security->mac_key);
     free(security->local_nonce);
     free(security->remote_nonce);
+//----------------------------------------------------------------------
+    udp_packet_free(&single_session->udp_packet_pool.head);
+    orilink_raw_protocol_free(&single_session->orilink_raw_protocol_pool.head);
+//----------------------------------------------------------------------
 }
 
 static inline status_t setup_sio_session(const char *label, sio_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
@@ -487,6 +499,8 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     security->remote_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
     security->local_ctr = (uint32_t)0;
     security->remote_ctr = (uint32_t)0;
+    single_session->udp_packet_pool.head = NULL;
+    single_session->orilink_raw_protocol_pool.head = NULL;
     return SUCCESS;
 }
 
@@ -544,6 +558,10 @@ static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *s
     free(security->mac_key);
     free(security->local_nonce);
     free(security->remote_nonce);
+//----------------------------------------------------------------------
+    udp_packet_free(&single_session->udp_packet_pool.head);
+    orilink_raw_protocol_free(&single_session->orilink_raw_protocol_pool.head);
+//----------------------------------------------------------------------
 }
 
 #endif
