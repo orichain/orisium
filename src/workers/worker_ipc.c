@@ -759,46 +759,6 @@ void handle_workers_ipc_closed_event(worker_context_t *worker_ctx) {
     worker_ctx->shutdown_requested = 1;
 }
 
-status_t first_heartbeat_finalization(worker_context_t *worker_ctx, sio_c_session_t *session, orilink_identity_t *identity, uint8_t *trycount) {
-	if (session->heartbeat.heartbeat_cnt == 0x00) {
-		uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
-		if (current_time.status != SUCCESS) {
-            LOG_ERROR("%sError get_monotonic_time_ns.", worker_ctx->label);
-			return FAILURE;
-		}
-		session->heartbeat.heartbeat_ack.rcvd_time = current_time.r_uint64_t;
-		uint64_t interval_ull;
-		uint8_t strycount;
-		if (!session->heartbeat.heartbeat_ack.rcvd) {
-			session->heartbeat.heartbeat_ack.rcvd = true;
-			interval_ull = session->heartbeat.heartbeat_ack.rcvd_time - session->hello4_ack.ack_sent_time;
-			session->heartbeat.heartbeat_ack.ack_sent_time = session->hello4_ack.ack_sent_time;
-			strycount = session->hello4_ack.ack_sent_try_count;
-		} else {
-			interval_ull = session->heartbeat.heartbeat_ack.rcvd_time - session->heartbeat.heartbeat_ack.ack_sent_time;
-			strycount = session->heartbeat.heartbeat_ack.ack_sent_try_count;
-		}
-		if (strycount > (uint8_t)0) {
-			double try_count = (double)strycount-(double)1;
-			calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
-		}
-		double rtt_value = (double)interval_ull;
-        calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
-        printf("%sRTT Hello-4 Ack = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
-//----------------------------------------------------------------------
-		session->heartbeat.heartbeat_ack.ack_sent_time = current_time.r_uint64_t;
-		session->heartbeat.heartbeat_cnt += 0x01;
-//----------------------------------------------------------------------
-		session->hello4_ack.ack_sent = true;
-//----------------------------------------------------------------------
-// Set session->heartbeat.heartbeat_ack.ack_sent = true; In Heartbeat Openner
-//----------------------------------------------------------------------
-        session->heartbeat.heartbeat_ack.ack_sent = false;
-//----------------------------------------------------------------------
-	}
-    return SUCCESS;
-}
-
 status_t retry_control_packet_ack(
     worker_context_t *worker_ctx, 
     orilink_identity_t *identity, 
@@ -3080,17 +3040,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
         }
         case ORILINK_HEARTBEAT: {
 //----------------------------------------------------------------------
-// Allow Heartbeat Base On Schedule
-//----------------------------------------------------------------------
-            session->heartbeat.heartbeat_ack.ack_sent = false;
-            double hb_interval = session->heartbeat.last_send_heartbeat_interval - (double)OPENNER_MARGIN_US;
-            if (hb_interval < (double)1e3) {
-                hb_interval = (double)1e3;
-            }
-            status_t otmr = oritw_add_event(worker_ctx->label, &worker_ctx->async, worker_ctx->timer, &session->heartbeat.heartbeat_openner_timer_id, hb_interval);
-            if (otmr != SUCCESS) {
-                return FAILURE;
-            }
+            session->heartbeat.heartbeat_ack.ack_sent = true;
 //======================================================================
             status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->async, worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id, retry_timer_interval);
             if (chst != SUCCESS) {
@@ -3148,17 +3098,7 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
         }
         case ORILINK_HEARTBEAT: {
 //----------------------------------------------------------------------
-// Allow Heartbeat Base On Schedule
-//----------------------------------------------------------------------
-            session->heartbeat.heartbeat_ack.ack_sent = false;
-            double hb_interval = session->heartbeat.last_send_heartbeat_interval - (double)OPENNER_MARGIN_US;
-            if (hb_interval < (double)1e3) {
-                hb_interval = (double)1e3;
-            }
-            status_t otmr = oritw_add_event(worker_ctx->label, &worker_ctx->async, worker_ctx->timer, &session->heartbeat.heartbeat_openner_timer_id, hb_interval);
-            if (otmr != SUCCESS) {
-                return FAILURE;
-            }
+            session->heartbeat.heartbeat_ack.ack_sent = true;
 //======================================================================
             status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->async, worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id, retry_timer_interval);
             if (chst != SUCCESS) {

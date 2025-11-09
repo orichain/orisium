@@ -5,5 +5,8 @@ logs/
 test/
 /orisium
 database/*.key
-iwyu_applied.log
-iwyu_failed.log
+iwyu_applied_c.log
+iwyu_failed_c.log
+iwyu_applied_h.log
+iwyu_failed_h.log
+config.json

@@ -41,7 +41,6 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
 status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_protocol_t_status_t *ircvdi);
 status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_protocol_t_status_t *ircvdi);
 void handle_workers_ipc_closed_event(worker_context_t *worker_ctx);
-status_t first_heartbeat_finalization(worker_context_t *worker_ctx, sio_c_session_t *session, orilink_identity_t *identity, uint8_t *trycount);
 status_t retry_control_packet_ack(
     worker_context_t *worker_ctx, 
     orilink_identity_t *identity, 
