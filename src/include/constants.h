@@ -23,7 +23,7 @@
 
 #define MAX_TIMER_LEVELS 10
 #define WHEEL_SIZE 256
-#define HTW_SAVE_MARGIN_US 5000
+#define OPENNER_MARGIN_US 100000
 //----------------------------------------------------------------------
 #define KALMAN_CALIBRATION_SAMPLES 50
 //----------------------------------------------------------------------
