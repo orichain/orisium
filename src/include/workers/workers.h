@@ -63,18 +63,18 @@ typedef struct {
 
 typedef struct {
     packet_t data;
-    packet_ack_t data_ack;
-    double data_interval;
-    double last_send_data_interval;
+    packet_ack_t clrbuff_ack;
+    double interval;
+    double last_send_interval;
     timer_id_t data_sender_timer_id;
     timer_id_t data_openner_timer_id;
 } packet_data_sender_t;
 
 typedef struct {
     packet_t clrbuff;
-    packet_ack_t clrbuff_ack;
-    double clrbuff_interval;
-    double last_send_clrbuff_interval;
+    packet_ack_t data_ack;
+    double interval;
+    double last_send_interval;
     timer_id_t clrbuff_sender_timer_id;
     timer_id_t clrbuff_openner_timer_id;
 } packet_data_receiver_t;
