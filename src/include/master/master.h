@@ -114,7 +114,6 @@ typedef struct {
 //----------------------------------------------------------------------
     ori_timer_wheels_t timer;
 //----------------------------------------------------------------------
-    udp_packet_pool_t udp_packet_pool;
     orilink_raw_protocol_pool_t orilink_raw_protocol_pool;
 } master_context_t;
 

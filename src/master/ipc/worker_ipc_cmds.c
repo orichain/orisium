@@ -261,7 +261,7 @@ status_t master_worker_udp_data(
         trycount,
         addr,
         r->n,
-        r->recv_buffer->data
+        r->recv_buffer
     );
     if (cmd_result.status != SUCCESS) {
         return FAILURE;

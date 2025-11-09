@@ -957,10 +957,10 @@ static inline status_t orilink_check_mac(const char *label, uint8_t* key_mac, or
         ) != 0
     )
     {
-        uint8_t *data_4mac = r->recv_buffer->data;
+        uint8_t *data_4mac = r->recv_buffer;
         const size_t data_offset = AES_TAG_BYTES;
         size_t data_len = r->n - AES_TAG_BYTES;
-        uint8_t *data = r->recv_buffer->data + data_offset;
+        uint8_t *data = r->recv_buffer + data_offset;
         if (compare_mac(
                 key_mac,
                 data,
@@ -988,7 +988,7 @@ static inline status_t orilink_read_header(
 {
     size_t current_offset = 0;
     size_t total_buffer_len = (size_t)r->n;
-    uint8_t *cursor = r->recv_buffer->data + current_offset;
+    uint8_t *cursor = r->recv_buffer + current_offset;
     #if defined(ORILINK_DECRYPT_HEADER)
         uint8_t *key0 = (uint8_t *)calloc(1, HASHES_BYTES * sizeof(uint8_t));
         if (memcmp(
@@ -1166,7 +1166,7 @@ static inline status_t orilink_read_cleartext_header(
 {
     size_t current_offset = 0;
     size_t total_buffer_len = (size_t)r->n;
-    uint8_t *cursor = r->recv_buffer->data + current_offset;
+    uint8_t *cursor = r->recv_buffer + current_offset;
 //----------------------------------------------------------------------    
 // Mac
 //----------------------------------------------------------------------    
@@ -1298,21 +1298,19 @@ static inline status_t orilink_read_cleartext_header(
 static inline orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packet(
     const char *label, 
     orilink_raw_protocol_pool_t *orp_pool,
-    udp_packet_pool_t *up_pool,
     int *sock_fd,
     struct sockaddr_in6 *source_addr
 )
 {
     orilink_raw_protocol_t_status_t result;
     result.status = FAILURE;
-    result.r_orilink_raw_protocol_t = NULL;
-    udp_packet_t *full_orilink_payload_buffer = udp_packet_pool_alloc(up_pool);
-    if (!full_orilink_payload_buffer) {
+    result.r_orilink_raw_protocol_t = orilink_raw_protocol_pool_alloc(orp_pool);
+    if (!result.r_orilink_raw_protocol_t) {
         result.status = FAILURE_NOMEM;
         return result;
     }
     socklen_t source_addr_len = sizeof(struct sockaddr_in6);
-    ssize_t bytes_read_payload = recvfrom(*sock_fd, full_orilink_payload_buffer->data, ORILINK_MAX_PACKET_SIZE, 0, (struct sockaddr * restrict)source_addr, &source_addr_len);
+    ssize_t bytes_read_payload = recvfrom(*sock_fd, result.r_orilink_raw_protocol_t->recv_buffer, ORILINK_MAX_PACKET_SIZE, 0, (struct sockaddr * restrict)source_addr, &source_addr_len);
     const size_t min_size = AES_TAG_BYTES + 
                             sizeof(uint32_t) + 
                             ORILINK_VERSION_BYTES + 
@@ -1330,59 +1328,43 @@ static inline orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packe
                             sizeof(uint8_t);
     if (bytes_read_payload < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-			udp_packet_pool_free(up_pool, full_orilink_payload_buffer);
+			orilink_raw_protocol_pool_free(orp_pool, result.r_orilink_raw_protocol_t);
             result.status = FAILURE_EAGNEWBLK;
             return result;
         } else {
             LOG_ERROR("%sreceive_orilink_raw_protocol_packet failed: %s", label, strerror(errno));
-            udp_packet_pool_free(up_pool, full_orilink_payload_buffer);
+            orilink_raw_protocol_pool_free(orp_pool, result.r_orilink_raw_protocol_t);
             result.status = FAILURE;
             return result;
         }
     } else if (bytes_read_payload < (ssize_t)min_size) {
         LOG_ERROR("%sreceive_orilink_raw_protocol_packet received invalid size(min size) orilink packet.", label);
-        udp_packet_pool_free(up_pool, full_orilink_payload_buffer);
+        orilink_raw_protocol_pool_free(orp_pool, result.r_orilink_raw_protocol_t);
         result.status = FAILURE_OOBUF;
         return result;
     } else if (bytes_read_payload > (ssize_t)ORILINK_MAX_PACKET_SIZE) {
         LOG_ERROR("%sreceive_orilink_raw_protocol_packet received invalid size(max size) orilink packet.", label);
-        udp_packet_pool_free(up_pool, full_orilink_payload_buffer);
+        orilink_raw_protocol_pool_free(orp_pool, result.r_orilink_raw_protocol_t);
         result.status = FAILURE_OOBUF;
         return result;
     }
-    orilink_raw_protocol_t *r = orilink_raw_protocol_pool_alloc(orp_pool);
-    if (!r) {
-        LOG_ERROR("%sFailed to allocate orilink_raw_protocol_t. %s", label, strerror(errno));
-        udp_packet_pool_free(up_pool, full_orilink_payload_buffer);
-        result.status = FAILURE_NOMEM;
-        return result;
-    }
-    r->recv_buffer = full_orilink_payload_buffer;
-    r->n = (uint16_t)bytes_read_payload;
-    full_orilink_payload_buffer = NULL;
-    bytes_read_payload = 0;
-    if (orilink_read_cleartext_header(label, r) != SUCCESS) {
-        udp_packet_pool_free(up_pool, r->recv_buffer);
-        r->n = (uint16_t)0;
+    result.r_orilink_raw_protocol_t->n = (uint16_t)bytes_read_payload;
+    bytes_read_payload = (ssize_t)0;
+    if (orilink_read_cleartext_header(label, result.r_orilink_raw_protocol_t) != SUCCESS) {
+        orilink_raw_protocol_pool_free(orp_pool, result.r_orilink_raw_protocol_t);
+        result.r_orilink_raw_protocol_t->n = (uint16_t)0;
         result.status = FAILURE;
         return result;
     }
-    result.r_orilink_raw_protocol_t = r;
-    r = NULL;
     result.status = SUCCESS;
     return result;
 }
 
-static inline status_t udp_data_to_orilink_raw_protocol_packet(const char *label, udp_packet_pool_t *up_pool, ipc_udp_data_t *iudp_datai, orilink_raw_protocol_t *oudp_datao) {
-    oudp_datao->recv_buffer = udp_packet_pool_alloc(up_pool);
-    if (!oudp_datao->recv_buffer) {
-        LOG_ERROR("%sFailed to allocate orilink_raw_protocol_t buffer. %s", label, strerror(errno));
-        return FAILURE_NOMEM;
-    }
+static inline status_t udp_data_to_orilink_raw_protocol_packet(const char *label, orilink_raw_protocol_pool_t *orp_pool, ipc_udp_data_t *iudp_datai, orilink_raw_protocol_t *oudp_datao) {
     memcpy(oudp_datao->recv_buffer, iudp_datai->data, iudp_datai->len);
     oudp_datao->n = iudp_datai->len;
     if (orilink_read_cleartext_header(label, oudp_datao) != SUCCESS) {
-        udp_packet_pool_free(up_pool, oudp_datao->recv_buffer);
+        orilink_raw_protocol_pool_free(orp_pool, oudp_datao);
         oudp_datao->n = (uint16_t)0;
         return FAILURE;
     }

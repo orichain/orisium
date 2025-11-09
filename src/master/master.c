@@ -97,7 +97,6 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
 	}
     shutdown_event_fd = &master_ctx->shutdown_event_fd;
     if (oritw_setup(label, &master_ctx->master_async, master_ctx->timer) != SUCCESS) return FAILURE;
-    master_ctx->udp_packet_pool.head = NULL;
     master_ctx->orilink_raw_protocol_pool.head = NULL;
     return SUCCESS;
 }
@@ -148,7 +147,6 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     master_ctx->listen_port = (uint16_t)0;
     memset(&master_ctx->bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
 //----------------------------------------------------------------------
-    udp_packet_free(&master_ctx->udp_packet_pool.head);
     orilink_raw_protocol_free(&master_ctx->orilink_raw_protocol_pool.head);
 //----------------------------------------------------------------------
 }

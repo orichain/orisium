@@ -231,50 +231,8 @@ static inline void CLOSE_ORILINK_PROTOCOL(orilink_protocol_t **protocol_ptr) {
     }
 }
 
-typedef struct udp_packet_t {
-    uint8_t data[ORILINK_MAX_PACKET_SIZE];
-    struct udp_packet_t *next;
-} udp_packet_t;
-
-typedef struct {
-    udp_packet_t *head;
-} udp_packet_pool_t;
-
-static inline udp_packet_t *udp_packet_pool_alloc(udp_packet_pool_t *pool) {
-    udp_packet_t *packet;
-    if (pool->head != NULL) {
-        packet = pool->head;
-        pool->head = packet->next;
-    } else {
-        packet = calloc(1, sizeof(udp_packet_t));
-        if (packet == NULL) {
-            return NULL;
-        }
-    }
-    packet->next = NULL;
-    return packet;
-}
-
-static inline void udp_packet_pool_free(udp_packet_pool_t *pool, udp_packet_t *packet) {
-    if (!packet) return;
-    memset(packet, 0, sizeof(udp_packet_t));
-    packet->next = pool->head;
-    pool->head = packet;
-}
-
-static inline void udp_packet_free(udp_packet_t **head) {
-    udp_packet_t *current = *head;
-    udp_packet_t *next;
-    while (current != NULL) {
-        next = current->next;
-        free(current);
-        current = next;
-    }
-    *head = NULL;
-}
-
 typedef struct orilink_raw_protocol_t {
-    udp_packet_t *recv_buffer;
+    uint8_t recv_buffer[ORILINK_MAX_PACKET_SIZE];
     uint16_t n;
     uint8_t mac[AES_TAG_BYTES];
     uint32_t ctr;
@@ -333,11 +291,9 @@ static inline void orilink_raw_protocol_free(orilink_raw_protocol_t **head) {
 }
 
 //Huruf_besar biar selalu ingat karena akan sering digunakan
-static inline void CLOSE_ORILINK_RAW_PROTOCOL(orilink_raw_protocol_pool_t *orp_pool, udp_packet_pool_t *up_pool, orilink_raw_protocol_t **protocol_ptr) {
+static inline void CLOSE_ORILINK_RAW_PROTOCOL(orilink_raw_protocol_pool_t *orp_pool, orilink_raw_protocol_t **protocol_ptr) {
     if (protocol_ptr != NULL && *protocol_ptr != NULL) {
         orilink_raw_protocol_t *x = *protocol_ptr;
-        udp_packet_pool_free(up_pool, x->recv_buffer);
-        x->recv_buffer = NULL;
         orilink_raw_protocol_pool_free(orp_pool, x);
         *protocol_ptr = NULL;
     }

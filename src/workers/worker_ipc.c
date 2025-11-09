@@ -968,7 +968,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -976,14 +976,14 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
     if (!session->heartbeat.sent) {
         LOG_ERROR("%sReceive Heartbeat_Ack But This Worker Session Is Never Sending Heartbeat.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
     if (session->heartbeat.ack_rcvd) {
         LOG_ERROR("%sHeartbeat_Ack Received Already.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //======================================================================
@@ -991,7 +991,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
     if (_1l_) {
         LOG_ERROR("%sPeer's Counter Is Lower. Try Count %d", worker_ctx->label, trycount);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     } else {
         bool _same_ = is_equal_ctr(worker_ctx->label, (uint8_t*)oudp_datao->recv_buffer, security->mac_key, security->remote_nonce, &security->remote_ctr);
@@ -1000,12 +1000,12 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
             if (_1g_) {
                 LOG_ERROR("%sPeer's Counter Is Greater.", worker_ctx->label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                 return FAILURE;
             } else {
                 LOG_ERROR("%sCounter Invalid.", worker_ctx->label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                 return FAILURE;
             }
         }
@@ -1014,7 +1014,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
     status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
     if (rhd != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -1027,14 +1027,14 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_context_t *worker_
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         if (inc_ctr != 0xFF) {
             decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_heartbeat_ack_t *oheartbeat_ack = received_orilink_protocol->payload.orilink_heartbeat_ack;
@@ -1100,7 +1100,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         LOG_ERROR("%sError orilink_check_mac.", worker_ctx->label);
         return FAILURE;
     }
@@ -1110,13 +1110,13 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         if (trycount > (uint8_t)MAX_RETRY_CNT) {
             LOG_ERROR("%sHeartbeat Max Retry.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
             return FAILURE_MAXTRY;
         }
         if (trycount <= session->heartbeat_ack.last_trycount) {
             LOG_ERROR("%sHeartbeat Try Count Invalid Last: %d, Rcvd: %d.", worker_ctx->label, session->heartbeat_ack.last_trycount, trycount);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
             return FAILURE_IVLDTRY;
         }
         bool _1l_ = is_1lower_ctr(worker_ctx->label, (uint8_t*)oudp_datao->recv_buffer, security->mac_key, security->remote_nonce, &security->remote_ctr);
@@ -1130,12 +1130,12 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
                 if (_1g_) {
                     LOG_ERROR("%sCounter Is Greater.", worker_ctx->label);
                     CLOSE_IPC_PROTOCOL(&received_protocol);
-                    CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                     return FAILURE;
                 } else {
                     LOG_ERROR("%sCounter Invalid.", worker_ctx->label);
                     CLOSE_IPC_PROTOCOL(&received_protocol);
-                    CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                     return FAILURE;
                 }
             } else {
@@ -1149,7 +1149,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
             if (current_time.status != SUCCESS) {
                 CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                 LOG_ERROR("%sError get_monotonic_time_ns.", worker_ctx->label);
                 return FAILURE;
             }
@@ -1165,14 +1165,14 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             if (!session->hello4_ack.ack_sent) {
                 LOG_ERROR("%sHeartbeat Not Openned Yet.", worker_ctx->label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                 return FAILURE;
             }
         } else {
             if (!session->heartbeat_ack.ack_sent) {
                 LOG_ERROR("%sHeartbeat Not Openned Yet.", worker_ctx->label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                 return FAILURE;
             }
         }
@@ -1180,7 +1180,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
         if (_1l_) {
             LOG_ERROR("%sHeartbeat With Lower Counter.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
             return FAILURE;
         } else {
             bool _same_ = is_equal_ctr(worker_ctx->label, (uint8_t*)oudp_datao->recv_buffer, security->mac_key, security->remote_nonce, &security->remote_ctr);
@@ -1189,12 +1189,12 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
                 if (_1g_) {
                     LOG_ERROR("%sHeartbeat With Greater Counter.", worker_ctx->label);
                     CLOSE_IPC_PROTOCOL(&received_protocol);
-                    CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                     return FAILURE;
                 } else {
                     LOG_ERROR("%sCounter Invalid.", worker_ctx->label);
                     CLOSE_IPC_PROTOCOL(&received_protocol);
-                    CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                     return FAILURE;
                 }
             }
@@ -1204,7 +1204,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
     if (rhd != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         LOG_ERROR("%sError orilink_read_header.", worker_ctx->label);
         return FAILURE;
     }
@@ -1224,13 +1224,13 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
             )
             {
                 CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                 LOG_ERROR("%sError retry_control_packet_ack.", worker_ctx->label);
                 return FAILURE;
             }
         }
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return first_heartbeat_finalization(
             worker_ctx, 
             session, 
@@ -1242,7 +1242,7 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     if (!session->heartbeat.ack_rcvd) {
         LOG_ERROR("%sTry Again Until My Previous Heartbeat Ack Received.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //======================================================================
@@ -1253,14 +1253,14 @@ status_t handle_workers_ipc_udp_data_cow_heartbeat(worker_context_t *worker_ctx,
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         if (inc_ctr != 0xFF) {
             decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_heartbeat_t *oheartbeat = received_orilink_protocol->payload.orilink_heartbeat;
@@ -1339,7 +1339,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -1348,13 +1348,13 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         if (trycount > (uint8_t)MAX_RETRY_CNT) {
             LOG_ERROR("%sHello4 Max Retry.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
             return FAILURE_MAXTRY;
         }
         if (trycount <= session->hello4_ack.last_trycount) {
             LOG_ERROR("%sHello4 Try Count Invalid.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
             return FAILURE_IVLDTRY;
         }
         isretry = true;
@@ -1367,7 +1367,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         if (!session->hello3_ack.ack_sent) {
             LOG_ERROR("%sReceive Hello4 But This Worker Session Is Never Sending Hello3_Ack.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
             return FAILURE;
         }
     }
@@ -1385,12 +1385,12 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
             )
             {
                 CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                 return FAILURE;
             }
         }
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
 //======================================================================
         memcpy(security->aes_key, aes_key, HASHES_BYTES);
         memcpy(security->remote_nonce, remote_nonce, AES_NONCE_BYTES);
@@ -1411,11 +1411,11 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello4_t *ohello4 = received_orilink_protocol->payload.orilink_hello4;
@@ -1777,7 +1777,7 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -1786,13 +1786,13 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
         if (trycount > (uint8_t)MAX_RETRY_CNT) {
             LOG_ERROR("%sHello3 Max Retry.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
             return FAILURE_MAXTRY;
         }
         if (trycount <= session->hello3_ack.last_trycount) {
             LOG_ERROR("%sHello3 Try Count Invalid.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
             return FAILURE_IVLDTRY;
         }
         isretry = true;
@@ -1805,7 +1805,7 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
         if (!session->hello2_ack.ack_sent) {
             LOG_ERROR("%sReceive Hello2 But This Worker Session Is Never Sending Hello3_Ack.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
             return FAILURE;
         }
     }
@@ -1823,12 +1823,12 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
             )
             {
                 CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                 return FAILURE;
             }
         }
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
 //======================================================================
         memcpy(security->local_nonce, tmp_local_nonce, AES_NONCE_BYTES);
         memset(tmp_local_nonce, 0, AES_NONCE_BYTES);
@@ -1846,11 +1846,11 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello3_t *ohello3 = received_orilink_protocol->payload.orilink_hello3;
@@ -2030,7 +2030,7 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -2039,13 +2039,13 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
         if (trycount > (uint8_t)MAX_RETRY_CNT) {
             LOG_ERROR("%sHello2 Max Retry.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
             return FAILURE_MAXTRY;
         }
         if (trycount <= session->hello2_ack.last_trycount) {
             LOG_ERROR("%sHello2 Try Count Invalid.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
             return FAILURE_IVLDTRY;
         }
         isretry = true;
@@ -2058,7 +2058,7 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
         if (!session->hello1_ack.ack_sent) {
             LOG_ERROR("%sReceive Hello2 But This Worker Session Is Never Sending Hello1_Ack.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
             return FAILURE;
         }
     }
@@ -2076,12 +2076,12 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
             )
             {
                 CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                 return FAILURE;
             }
         }
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return SUCCESS;
     }
 //======================================================================
@@ -2092,11 +2092,11 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello2_t *ohello2 = received_orilink_protocol->payload.orilink_hello2;
@@ -2276,7 +2276,7 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -2285,13 +2285,13 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
         if (trycount > (uint8_t)MAX_RETRY_CNT) {
             LOG_ERROR("%sHello1 Max Retry.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
             return FAILURE_MAXTRY;
         }
         if (trycount <= session->hello1_ack.last_trycount) {
             LOG_ERROR("%sHello1 Try Count Invalid.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
             return FAILURE_IVLDTRY;
         }
         isretry = true;
@@ -2312,12 +2312,12 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
             )
             {
                 CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                 return FAILURE;
             }
         }
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
 //----------------------------------------------------------------------
         session->hello1_ack.ack_sent = true;
 //----------------------------------------------------------------------
@@ -2335,7 +2335,7 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     } else {
         remote_wot = oudp_datao->local_wot;
@@ -2343,7 +2343,7 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
         remote_session_index = oudp_datao->local_session_index;
         rcvd_id_connection = oudp_datao->id_connection;
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello1_t *ohello1 = received_orilink_protocol->payload.orilink_hello1;
@@ -2480,7 +2480,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -2488,14 +2488,14 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
     if (!session->heartbeat.sent) {
         LOG_ERROR("%sReceive Heartbeat_Ack But This Worker Session Is Never Sending Heartbeat.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
     if (session->heartbeat.ack_rcvd) {
         LOG_ERROR("%sHeartbeat_Ack Received Already.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //======================================================================
@@ -2503,7 +2503,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
     if (_1l_) {
         LOG_ERROR("%sPeer's Counter Is Lower. Try Count %d", worker_ctx->label, trycount);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     } else {
         bool _same_ = is_equal_ctr(worker_ctx->label, (uint8_t*)oudp_datao->recv_buffer, security->mac_key, security->remote_nonce, &security->remote_ctr);
@@ -2512,12 +2512,12 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
             if (_1g_) {
                 LOG_ERROR("%sPeer's Counter Is Greater.", worker_ctx->label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                 return FAILURE;
             } else {
                 LOG_ERROR("%sCounter Invalid.", worker_ctx->label);
                 CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                 return FAILURE;
             }
         }
@@ -2526,7 +2526,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
     status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
     if (rhd != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -2539,14 +2539,14 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_context_t *worker_
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         if (inc_ctr != 0xFF) {
             decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_heartbeat_ack_t *oheartbeat_ack = received_orilink_protocol->payload.orilink_heartbeat_ack;
@@ -2611,7 +2611,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         LOG_ERROR("%sError orilink_check_mac.", worker_ctx->label);
         return FAILURE;
     }
@@ -2621,13 +2621,13 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
         if (trycount > (uint8_t)MAX_RETRY_CNT) {
             LOG_ERROR("%sHeartbeat Max Retry.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
             return FAILURE_MAXTRY;
         }
         if (trycount <= session->heartbeat_ack.last_trycount) {
             LOG_ERROR("%sHeartbeat Try Count Invalid Last: %d, Rcvd: %d.", worker_ctx->label, session->heartbeat_ack.last_trycount, trycount);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
             return FAILURE_IVLDTRY;
         }
         bool _1l_ = is_1lower_ctr(worker_ctx->label, (uint8_t*)oudp_datao->recv_buffer, security->mac_key, security->remote_nonce, &security->remote_ctr);
@@ -2641,12 +2641,12 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
                 if (_1g_) {
                     LOG_ERROR("%sCounter Is Greater.", worker_ctx->label);
                     CLOSE_IPC_PROTOCOL(&received_protocol);
-                    CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                     return FAILURE;
                 } else {
                     LOG_ERROR("%sCounter Invalid.", worker_ctx->label);
                     CLOSE_IPC_PROTOCOL(&received_protocol);
-                    CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                     return FAILURE;
                 }
             } else {
@@ -2662,14 +2662,14 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
         if (!session->heartbeat_ack.ack_sent) {
             LOG_ERROR("%sHeartbeat Not Openned Yet.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
             return FAILURE;
         }
         bool _1l_ = is_1lower_ctr(worker_ctx->label, (uint8_t*)oudp_datao->recv_buffer, security->mac_key, security->remote_nonce, &security->remote_ctr);
         if (_1l_) {
             LOG_ERROR("%sHeartbeat With Lower Counter.", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
             return FAILURE;
         } else {
             bool _same_ = is_equal_ctr(worker_ctx->label, (uint8_t*)oudp_datao->recv_buffer, security->mac_key, security->remote_nonce, &security->remote_ctr);
@@ -2678,12 +2678,12 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
                 if (_1g_) {
                     LOG_ERROR("%sHeartbeat With Greater Counter.", worker_ctx->label);
                     CLOSE_IPC_PROTOCOL(&received_protocol);
-                    CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                     return FAILURE;
                 } else {
                     LOG_ERROR("%sCounter Invalid.", worker_ctx->label);
                     CLOSE_IPC_PROTOCOL(&received_protocol);
-                    CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                    CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                     return FAILURE;
                 }
             }
@@ -2693,7 +2693,7 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
     status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
     if (rhd != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         LOG_ERROR("%sError orilink_read_header.", worker_ctx->label);
         return FAILURE;
     }
@@ -2713,20 +2713,20 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
             )
             {
                 CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
                 LOG_ERROR("%sError retry_control_packet_ack.", worker_ctx->label);
                 return FAILURE;
             }
         }
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return SUCCESS;
     }
 //======================================================================
     if (!session->heartbeat.ack_rcvd) {
         LOG_ERROR("%sTry Again Until My Previous Heartbeat Ack Received.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //======================================================================
@@ -2737,14 +2737,14 @@ status_t handle_workers_ipc_udp_data_sio_heartbeat(worker_context_t *worker_ctx,
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         if (inc_ctr != 0xFF) {
             decrement_ctr(&security->remote_ctr, security->remote_nonce);
         }
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_heartbeat_t *oheartbeat = received_orilink_protocol->payload.orilink_heartbeat;
@@ -2793,7 +2793,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -2801,21 +2801,21 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     if (!session->hello4.sent) {
         LOG_ERROR("%sReceive Hello4_Ack But This Worker Session Is Never Sending Hello4.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
     if (session->hello4.ack_rcvd) {
         LOG_ERROR("%sHello4_Ack Received Already.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
     status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
     if (rhd != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //======================================================================
@@ -2826,11 +2826,11 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello4_ack_t *ohello4_ack = received_orilink_protocol->payload.orilink_hello4_ack;
@@ -3114,7 +3114,7 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -3122,21 +3122,21 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     if (!session->hello3.sent) {
         LOG_ERROR("%sReceive Hello3_Ack But This Worker Session Is Never Sending Hello3.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
     if (session->hello3.ack_rcvd) {
         LOG_ERROR("%sHello3_Ack Received Already.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
     status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
     if (rhd != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //======================================================================
@@ -3147,11 +3147,11 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello3_ack_t *ohello3_ack = received_orilink_protocol->payload.orilink_hello3_ack;
@@ -3367,7 +3367,7 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -3375,21 +3375,21 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
     if (!session->hello2.sent) {
         LOG_ERROR("%sReceive Hello2_Ack But This Worker Session Is Never Sending Hello2.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
     if (session->hello2.ack_rcvd) {
         LOG_ERROR("%sHello2_Ack Received Already.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
     status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
     if (rhd != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //======================================================================
@@ -3400,11 +3400,11 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello2_ack_t *ohello2_ack = received_orilink_protocol->payload.orilink_hello2_ack;
@@ -3518,7 +3518,7 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -3526,21 +3526,21 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
     if (!session->hello1.sent) {
         LOG_ERROR("%sReceive Hello1_Ack But This Worker Session Is Never Sending Hello1.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
     if (session->hello1.ack_rcvd) {
         LOG_ERROR("%sHello1_Ack Received Already.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
     status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
     if (rhd != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
 //======================================================================
@@ -3554,14 +3554,14 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     } else {
         remote_wot = oudp_datao->local_wot;
         remote_index = oudp_datao->local_index;
         remote_session_index = oudp_datao->local_session_index;
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello1_ack_t *ohello1_ack = received_orilink_protocol->payload.orilink_hello1_ack;
@@ -3683,9 +3683,9 @@ status_t handle_workers_ipc_udp_data_sio(worker_context_t *worker_ctx, void *wor
         CLOSE_IPC_PROTOCOL(&received_protocol);
         return FAILURE_NOMEM;
     }
-    if (udp_data_to_orilink_raw_protocol_packet(worker_ctx->label, &session->udp_packet_pool, iudp_datai, oudp_datao) != SUCCESS) {
+    if (udp_data_to_orilink_raw_protocol_packet(worker_ctx->label, &session->orilink_raw_protocol_pool, iudp_datai, oudp_datao) != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
     switch (oudp_datao->type) {
@@ -3728,7 +3728,7 @@ status_t handle_workers_ipc_udp_data_sio(worker_context_t *worker_ctx, void *wor
         default:
             LOG_ERROR("%sUnknown ORILINK protocol type %d from Remote SIO-%d[%d]. Ignoring.", worker_ctx->label, oudp_datao->type, oudp_datao->local_index, oudp_datao->local_session_index);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
     }
     return SUCCESS;
 }
@@ -3750,9 +3750,9 @@ status_t handle_workers_ipc_udp_data_cow(worker_context_t *worker_ctx, void *wor
         CLOSE_IPC_PROTOCOL(&received_protocol);
         return FAILURE_NOMEM;
     }
-    if (udp_data_to_orilink_raw_protocol_packet(worker_ctx->label, &session->udp_packet_pool, iudp_datai, oudp_datao) != SUCCESS) {
+    if (udp_data_to_orilink_raw_protocol_packet(worker_ctx->label, &session->orilink_raw_protocol_pool, iudp_datai, oudp_datao) != SUCCESS) {
         CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
         return FAILURE;
     }
     switch (oudp_datao->type) {
@@ -3795,7 +3795,7 @@ status_t handle_workers_ipc_udp_data_cow(worker_context_t *worker_ctx, void *wor
         default:
             LOG_ERROR("%sUnknown ORILINK protocol type %d from Remote COW-%d[%d]. Ignoring.", worker_ctx->label, oudp_datao->type, oudp_datao->local_index, oudp_datao->local_session_index);
             CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &session->udp_packet_pool, &oudp_datao);
+            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
     }
     return SUCCESS;
 }
