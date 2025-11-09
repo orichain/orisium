@@ -164,9 +164,6 @@ static inline status_t handle_worker_session_timer_event(worker_context_t *worke
                     session->heartbeat.heartbeat_openner_timer_id.event = NULL;
 //----------------------------------------------------------------------
                     return SUCCESS;
-                } else {
-                    printf("COWWWWWW Sinnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnni\n");
-                    return SUCCESS;
                 }
             }
             break;
@@ -201,9 +198,6 @@ static inline status_t handle_worker_session_timer_event(worker_context_t *worke
 //----------------------------------------------------------------------
                     session->heartbeat.heartbeat_openner_timer_id.event = NULL;
 //----------------------------------------------------------------------
-                    return SUCCESS;
-                } else {
-                    printf("SIOOOOOO Sinnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnni\n");
                     return SUCCESS;
                 }
             }

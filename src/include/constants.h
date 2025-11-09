@@ -32,7 +32,7 @@
 //----------------------------------------------------------------------
 // !!!!!!!!!!!!!!!!!!!!!!!!! Heartbeat Minimal is 7s. Timer Wheel Level 3 !!!!!!!!!!!!!!!!!!!!!!!!! 
 //----------------------------------------------------------------------
-#define NODE_HEARTBEAT_INTERVAL 9
+#define NODE_HEARTBEAT_INTERVAL 0.015
 #define NODE_CHECK_HEALTHY_X 3
 //----------------------------------------------------------------------
 #define NODE_CHECK_HEALTHY NODE_CHECK_HEALTHY_X * 2 * NODE_HEARTBEAT_INTERVAL

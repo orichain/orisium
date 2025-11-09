@@ -3030,75 +3030,66 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
     double retry_timer_interval = retry_interval_with_jitter_us(session->retry.value_prediction);
     switch ((orilink_protocol_type_t)iudp_data_acki->orilink_protocol) {
         case ORILINK_HELLO1: {
-            if (iudp_data_acki->trycount == (uint8_t)1) {
 //======================================================================
-                status_t chst = oritw_add_event(worker_ctx->timer, &session->hello1.retry_timer_id, retry_timer_interval);
-                if (chst != SUCCESS) {
-                    CLOSE_IPC_PROTOCOL(&received_protocol);
-                    return FAILURE;
-                }
-//======================================================================
+            status_t chst = oritw_add_event(worker_ctx->timer, &session->hello1.retry_timer_id, retry_timer_interval);
+            if (chst != SUCCESS) {
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
             }
+//======================================================================
             CLOSE_IPC_PROTOCOL(&received_protocol);
             break;
         }
         case ORILINK_HELLO2: {
-            if (iudp_data_acki->trycount == (uint8_t)1) {
 //======================================================================
-                status_t chst = oritw_add_event(worker_ctx->timer, &session->hello2.retry_timer_id, retry_timer_interval);
-                if (chst != SUCCESS) {
-                    CLOSE_IPC_PROTOCOL(&received_protocol);
-                    return FAILURE;
-                }
-//======================================================================
+            status_t chst = oritw_add_event(worker_ctx->timer, &session->hello2.retry_timer_id, retry_timer_interval);
+            if (chst != SUCCESS) {
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
             }
+//======================================================================
             CLOSE_IPC_PROTOCOL(&received_protocol);
             break;
         }
         case ORILINK_HELLO3: {
-            if (iudp_data_acki->trycount == (uint8_t)1) {
 //======================================================================
-                status_t chst = oritw_add_event(worker_ctx->timer, &session->hello3.retry_timer_id, retry_timer_interval);
-                if (chst != SUCCESS) {
-                    CLOSE_IPC_PROTOCOL(&received_protocol);
-                    return FAILURE;
-                }
-//======================================================================
+            status_t chst = oritw_add_event(worker_ctx->timer, &session->hello3.retry_timer_id, retry_timer_interval);
+            if (chst != SUCCESS) {
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
             }
+//======================================================================
             CLOSE_IPC_PROTOCOL(&received_protocol);
             break;
         }
         case ORILINK_HELLO4: {
-            if (iudp_data_acki->trycount == (uint8_t)1) {
 //======================================================================
-                status_t chst = oritw_add_event(worker_ctx->timer, &session->hello4.retry_timer_id, retry_timer_interval);
-                if (chst != SUCCESS) {
-                    CLOSE_IPC_PROTOCOL(&received_protocol);
-                    return FAILURE;
-                }
-//======================================================================
+            status_t chst = oritw_add_event(worker_ctx->timer, &session->hello4.retry_timer_id, retry_timer_interval);
+            if (chst != SUCCESS) {
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
             }
+//======================================================================
             CLOSE_IPC_PROTOCOL(&received_protocol);
             break;
         }
         case ORILINK_HEARTBEAT: {
-            if (iudp_data_acki->trycount == (uint8_t)1) {
 //----------------------------------------------------------------------
 // Allow Heartbeat Base On Schedule
 //----------------------------------------------------------------------
-                double hb_interval = session->heartbeat.last_send_heartbeat_interval - (double)HTW_SAVE_MARGIN_US;
-                status_t otmr = oritw_add_event(worker_ctx->timer, &session->heartbeat.heartbeat_openner_timer_id, hb_interval);
-                if (otmr != SUCCESS) {
-                    return FAILURE;
-                }
-//======================================================================
-                status_t chst = oritw_add_event(worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id, retry_timer_interval);
-                if (chst != SUCCESS) {
-                    CLOSE_IPC_PROTOCOL(&received_protocol);
-                    return FAILURE;
-                }
-//======================================================================
+            session->heartbeat.heartbeat_ack.ack_sent = false;
+            double hb_interval = session->heartbeat.last_send_heartbeat_interval - (double)HTW_SAVE_MARGIN_US;
+            status_t otmr = oritw_add_event(worker_ctx->timer, &session->heartbeat.heartbeat_openner_timer_id, hb_interval);
+            if (otmr != SUCCESS) {
+                return FAILURE;
             }
+//======================================================================
+            status_t chst = oritw_add_event(worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id, retry_timer_interval);
+            if (chst != SUCCESS) {
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+//======================================================================
             CLOSE_IPC_PROTOCOL(&received_protocol);
             break;
         }
@@ -3148,23 +3139,22 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
             break;
         }
         case ORILINK_HEARTBEAT: {
-            if (iudp_data_acki->trycount == (uint8_t)1) {
 //----------------------------------------------------------------------
 // Allow Heartbeat Base On Schedule
 //----------------------------------------------------------------------
-                double hb_interval = session->heartbeat.last_send_heartbeat_interval - (double)HTW_SAVE_MARGIN_US;
-                status_t otmr = oritw_add_event(worker_ctx->timer, &session->heartbeat.heartbeat_openner_timer_id, hb_interval);
-                if (otmr != SUCCESS) {
-                    return FAILURE;
-                }
-//======================================================================
-                status_t chst = oritw_add_event(worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id, retry_timer_interval);
-                if (chst != SUCCESS) {
-                    CLOSE_IPC_PROTOCOL(&received_protocol);
-                    return FAILURE;
-                }
-//======================================================================
+            session->heartbeat.heartbeat_ack.ack_sent = false;
+            double hb_interval = session->heartbeat.last_send_heartbeat_interval - (double)HTW_SAVE_MARGIN_US;
+            status_t otmr = oritw_add_event(worker_ctx->timer, &session->heartbeat.heartbeat_openner_timer_id, hb_interval);
+            if (otmr != SUCCESS) {
+                return FAILURE;
             }
+//======================================================================
+            status_t chst = oritw_add_event(worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id, retry_timer_interval);
+            if (chst != SUCCESS) {
+                CLOSE_IPC_PROTOCOL(&received_protocol);
+                return FAILURE;
+            }
+//======================================================================
             CLOSE_IPC_PROTOCOL(&received_protocol);
             break;
         }
