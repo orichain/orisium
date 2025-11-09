@@ -1,5 +1,5 @@
-#ifndef MASTER_WORKERS_H
-#define MASTER_WORKERS_H
+#ifndef MASTER_MASTER_WORKERS_H
+#define MASTER_MASTER_WORKERS_H
 
 #include <stdint.h>
 

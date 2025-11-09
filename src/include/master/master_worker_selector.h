@@ -1,5 +1,5 @@
-#ifndef MASTER_WORKER_SELECTOR_H
-#define MASTER_WORKER_SELECTOR_H
+#ifndef MASTER_MASTER_WORKER_SELECTOR_H
+#define MASTER_MASTER_WORKER_SELECTOR_H
 
 #include "master/master.h"
 #include "types.h"

@@ -34,8 +34,9 @@ status_t handle_master_ipc_heartbeat(const char *label, master_context_t *master
     LOG_DEBUG("%s%s %d set last_ack to %llu.", label, worker_name, rcvd_index, rt.r_uint64_t);
     session->metrics.last_ack = rt.r_uint64_t;
     session->metrics.count_ack += (double)1;
-    session->metrics.sum_hb_interval += iheartbeati->hb_interval;
-    session->metrics.hb_interval = iheartbeati->hb_interval;
+    double hb_interval = iheartbeati->hb_interval / (double)1e3;
+    session->metrics.sum_hb_interval += hb_interval;
+    session->metrics.hb_interval = hb_interval;
     CLOSE_IPC_PROTOCOL(&received_protocol);
     return SUCCESS;
 }

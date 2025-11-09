@@ -4,7 +4,7 @@
 #include "ipc.h"
 #include "types.h"
 #include "master/master.h"
-#include "master/workers.h"
+#include "master/master_workers.h"
 #include "master/ipc/handlers.h"
 #include "constants.h"
 #include "stdbool.h"
