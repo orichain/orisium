@@ -21,7 +21,7 @@
 #define ORILINK_DECRYPT_HEADER
 //#undef ORILINK_DECRYPT_HEADER
 
-#define MAX_TIMER_LEVELS 5
+#define MAX_TIMER_LEVELS 10
 #define WHEEL_SIZE 256
 #define HTW_SAVE_MARGIN_US 5000
 //----------------------------------------------------------------------
@@ -30,14 +30,10 @@
 #define MAX_RETRY_CNT 5
 #define MIN_RETRY_SEC 1
 //----------------------------------------------------------------------
-// !!!!!!!!!!!!!!!!!!!!!!!!! Heartbeat Minimal is 7s. Timer Wheel Level 3 !!!!!!!!!!!!!!!!!!!!!!!!! 
-//----------------------------------------------------------------------
-#define NODE_HEARTBEAT_INTERVAL 9
+#define NODE_HEARTBEAT_INTERVAL 0.015
 #define NODE_CHECK_HEALTHY_X 3
 //----------------------------------------------------------------------
 #define NODE_CHECK_HEALTHY NODE_CHECK_HEALTHY_X * 2 * NODE_HEARTBEAT_INTERVAL
-//----------------------------------------------------------------------
-// !!!!!!!!!!!!!!!!!!!!!!!!! Heartbeat Minimal is 7s. Timer Wheel Level 3 !!!!!!!!!!!!!!!!!!!!!!!!! 
 //----------------------------------------------------------------------
 #define WORKER_HEARTBEAT_INTERVAL 7
 #define WORKER_CHECK_HEALTHY_X 3

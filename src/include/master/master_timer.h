@@ -35,16 +35,10 @@ static inline status_t drain_event_fd(const char *label, int fd) {
 static inline status_t handle_master_timer_event(const char *label, master_context_t *master_ctx, int *current_fd) {
     for (uint32_t llv = 0; llv < MAX_TIMER_LEVELS; ++llv) {
         ori_timer_wheel_t *timer = master_ctx->timer[llv];
-        if (*current_fd == timer->add_event_fd) {
-            if (drain_event_fd(label, timer->add_event_fd) != SUCCESS) return FAILURE;
-            if (oritw_move_queue_to_wheel(master_ctx->timer, llv) != SUCCESS) return FAILURE;
-            //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
-            return oritw_reschedule_main_timer(label, &master_ctx->master_async, master_ctx->timer, llv);
-        } else if (*current_fd == timer->tick_event_fd) {
+        if (*current_fd == timer->tick_event_fd) {
             if (drain_event_fd(label, timer->tick_event_fd) != SUCCESS) return FAILURE;
             uint64_t advance_ticks = (uint64_t)(timer->last_delay_us);
-            if (oritw_advance_time_and_process_expired(label, master_ctx->timer, llv, advance_ticks) != SUCCESS) return FAILURE;
-            if (oritw_reschedule_main_timer(label, &master_ctx->master_async, master_ctx->timer, llv) != SUCCESS) return FAILURE;
+            if (oritw_advance_time_and_process_expired(label, &master_ctx->master_async, master_ctx->timer, llv, advance_ticks) != SUCCESS) return FAILURE;
             uint64_t val = 1ULL;
             ssize_t w;
             do {
@@ -63,11 +57,6 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
             }
             //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
             return SUCCESS;
-        } else if (*current_fd == timer->remove_event_fd) {
-            if (drain_event_fd(label, timer->remove_event_fd) != SUCCESS) return FAILURE;
-            if (oritw_process_remove_queue(master_ctx->timer, llv) != SUCCESS) return FAILURE;
-            //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
-            return oritw_reschedule_main_timer(label, &master_ctx->master_async, master_ctx->timer, llv);
         } else if (*current_fd == timer->timeout_event_fd) {
             if (drain_event_fd(label, timer->timeout_event_fd) != SUCCESS) return FAILURE;
             timer_event_t *current_event = timer->ready_queue_head;
@@ -79,7 +68,7 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                 uint64_t expired_timer_id = current_event->timer_id;
                 if (expired_timer_id == master_ctx->check_healthy_timer_id.id) {
                     double ch = worker_check_healthy_us();
-                    status_t chst = oritw_add_event(master_ctx->timer, &master_ctx->check_healthy_timer_id, ch);
+                    status_t chst = oritw_add_event(label, &master_ctx->master_async, master_ctx->timer, &master_ctx->check_healthy_timer_id, ch);
                     if (chst != SUCCESS) {
                         LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
                         master_ctx->shutdown_requested = 1;

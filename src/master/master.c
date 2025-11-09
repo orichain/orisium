@@ -137,7 +137,7 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     CLOSE_FD(&master_ctx->shutdown_event_fd);
 //----------------------------------------------------------------------
     if (master_ctx->check_healthy_timer_id.event) {
-        oritw_queue_remove_event(master_ctx->timer, master_ctx->check_healthy_timer_id.event);
+        oritw_remove_event(label, &master_ctx->master_async, master_ctx->timer, master_ctx->check_healthy_timer_id.event);
         master_ctx->check_healthy_timer_id.event = NULL;
         master_ctx->check_healthy_timer_id.id = 0ULL;
     }
@@ -325,7 +325,7 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                     metrics->sum_hb_interval = metrics->hb_interval;
                                 }
                                 double ch = worker_check_healthy_us();
-                                status_t chst = oritw_add_event(master_ctx->timer, &master_ctx->check_healthy_timer_id, ch);
+                                status_t chst = oritw_add_event(label, &master_ctx->master_async, master_ctx->timer, &master_ctx->check_healthy_timer_id, ch);
                                 if (chst != SUCCESS) {
                                     LOG_INFO("%sGagal async_create_timerfd hb checker. Initiating graceful shutdown...", label);
                                     master_ctx->shutdown_requested = 1;

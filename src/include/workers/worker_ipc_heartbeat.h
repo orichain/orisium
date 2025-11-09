@@ -680,7 +680,7 @@ static inline status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_cont
     printf("%s%s - RTT Heartbeat = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 ", trycount %d\n", worker_ctx->label, timebuf, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr, trycount);
 //======================================================================
     session->heartbeat.heartbeat.ack_rcvd = true;
-    cleanup_control_packet(worker_ctx->timer, &session->heartbeat.heartbeat, false, CDT_FREE);
+    cleanup_control_packet(worker_ctx, &session->heartbeat.heartbeat, false, CDT_FREE);
 //======================================================================
     //session->metrics.last_ack = current_time.r_uint64_t;
     //session->metrics.count_ack += (double)1;
@@ -994,7 +994,7 @@ static inline status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_cont
     printf("%s%s - RTT Heartbeat = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 ", trycount %d\n", worker_ctx->label, timebuf, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr, trycount);
 //======================================================================
     session->heartbeat.heartbeat.ack_rcvd = true;
-    cleanup_control_packet(worker_ctx->timer, &session->heartbeat.heartbeat, false, CDT_FREE);
+    cleanup_control_packet(worker_ctx, &session->heartbeat.heartbeat, false, CDT_FREE);
 //======================================================================
     //session->metrics.last_ack = current_time.r_uint64_t;
     //session->metrics.count_ack += (double)1;
