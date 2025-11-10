@@ -24,7 +24,6 @@
 #define MAX_TIMER_LEVELS 10
 #define WHEEL_SIZE 256
 #define MIN_GAP_US 1000
-#define OPENNER_MARGIN_US 100000
 //----------------------------------------------------------------------
 #define KALMAN_CALIBRATION_SAMPLES 50
 //----------------------------------------------------------------------

@@ -158,12 +158,6 @@ static inline status_t handle_worker_session_timer_event(worker_context_t *worke
 //----------------------------------------------------------------------
                     }
                     return SUCCESS;
-                } else if (*timer_id == session->heartbeat.heartbeat_openner_timer_id.id) {
-                    session->heartbeat.heartbeat_ack.ack_sent = true;
-//----------------------------------------------------------------------
-                    session->heartbeat.heartbeat_openner_timer_id.event = NULL;
-//----------------------------------------------------------------------
-                    return SUCCESS;
                 }
             }
             break;
@@ -192,12 +186,6 @@ static inline status_t handle_worker_session_timer_event(worker_context_t *worke
                         session->heartbeat.heartbeat_sender_timer_id.event = NULL;
 //----------------------------------------------------------------------
                     }
-                    return SUCCESS;
-                } else if (*timer_id == session->heartbeat.heartbeat_openner_timer_id.id) {
-                    session->heartbeat.heartbeat_ack.ack_sent = true;
-//----------------------------------------------------------------------
-                    session->heartbeat.heartbeat_openner_timer_id.event = NULL;
-//----------------------------------------------------------------------
                     return SUCCESS;
                 }
             }
