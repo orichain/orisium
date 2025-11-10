@@ -23,18 +23,20 @@
 
 #define MAX_TIMER_LEVELS 10
 #define WHEEL_SIZE 256
+#define MIN_GAP_US 1000
+#define OPENNER_MARGIN_US 100000
 //----------------------------------------------------------------------
 #define KALMAN_CALIBRATION_SAMPLES 50
 //----------------------------------------------------------------------
 #define MAX_RETRY_CNT 5
 #define MIN_RETRY_SEC 1
 //----------------------------------------------------------------------
-#define NODE_HEARTBEAT_INTERVAL 9
+#define NODE_HEARTBEAT_INTERVAL 5
 #define NODE_CHECK_HEALTHY_X 3
 //----------------------------------------------------------------------
 #define NODE_CHECK_HEALTHY NODE_CHECK_HEALTHY_X * 2 * NODE_HEARTBEAT_INTERVAL
 //----------------------------------------------------------------------
-#define WORKER_HEARTBEAT_INTERVAL 5
+#define WORKER_HEARTBEAT_INTERVAL 3
 #define WORKER_CHECK_HEALTHY_X 3
 #define WORKER_CHECK_HEALTHY WORKER_CHECK_HEALTHY_X * WORKER_HEARTBEAT_INTERVAL
 //----------------------------------------------------------------------

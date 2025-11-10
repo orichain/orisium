@@ -457,7 +457,11 @@ static inline double retry_interval_with_jitter_us(double retry_value_prediction
     retry_interval = pow((double)2, retry_interval);
     if (retry_interval < (double)MIN_RETRY_SEC) retry_interval = (double)MIN_RETRY_SEC;
     retry_interval *= (double)1e6;
-    return add_jitter(retry_interval);
+    retry_interval = add_jitter(retry_interval);
+    if (retry_interval < (double)MIN_GAP_US) {
+        retry_interval = (double)MIN_GAP_US;
+    }
+    return retry_interval;
 }
 
 static inline double retry_interval_us(double retry_value_prediction) {
@@ -465,6 +469,9 @@ static inline double retry_interval_us(double retry_value_prediction) {
     retry_interval = pow((double)2, retry_interval);
     if (retry_interval < (double)MIN_RETRY_SEC) retry_interval = (double)MIN_RETRY_SEC;
     retry_interval *= (double)1e6;
+    if (retry_interval < (double)MIN_GAP_US) {
+        retry_interval = (double)MIN_GAP_US;
+    }
     return retry_interval;
 }
 
@@ -473,6 +480,9 @@ static inline double node_hb_interval_with_jitter_us(double rtt_value_prediction
     hb_interval *= (double)1e6;
     hb_interval = add_jitter(hb_interval);
     hb_interval += rtt_value_prediction / (double)1e3;
+    if (hb_interval < (double)MIN_GAP_US) {
+        hb_interval = (double)MIN_GAP_US;
+    }
     return hb_interval;
 }
 
@@ -480,18 +490,27 @@ static inline double worker_hb_interval_with_jitter_us() {
     double hb_interval = (double)WORKER_HEARTBEAT_INTERVAL;
     hb_interval *= (double)1e6;
     hb_interval = add_jitter(hb_interval);
+    if (hb_interval < (double)MIN_GAP_US) {
+        hb_interval = (double)MIN_GAP_US;
+    }
     return hb_interval;
 }
 
 static inline double worker_hb_interval_us() {
     double hb_interval = (double)WORKER_HEARTBEAT_INTERVAL;
     hb_interval *= (double)1e6;
+    if (hb_interval < (double)MIN_GAP_US) {
+        hb_interval = (double)MIN_GAP_US;
+    }
     return hb_interval;
 }
 
 static inline double worker_check_healthy_us() {
     double hb_interval = (double)WORKER_CHECK_HEALTHY;
     hb_interval *= (double)1e6;
+    if (hb_interval < (double)MIN_GAP_US) {
+        hb_interval = (double)MIN_GAP_US;
+    }
     return hb_interval;
 }
 
