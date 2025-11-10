@@ -296,7 +296,7 @@ static inline void cleanup_control_packet(worker_context_t *ctx, packet_t *h, bo
     }
 }
 
-static inline void setup_control_packet(const char *label, packet_t *h) {
+static inline void setup_control_packet(const char *label, uint8_t session_index, packet_t *h) {
     h->sent = false;
     h->sent_time = (uint64_t)0;
     h->ack_rcvd_time = (uint64_t)0;
@@ -304,7 +304,7 @@ static inline void setup_control_packet(const char *label, packet_t *h) {
     h->sent_try_count = 0x00;
     h->udp_data.r_puint8_t = NULL;
     h->udp_data.r_size_t = (size_t)0;
-    generate_uint64_t_id(label, &h->retry_timer_id.id);
+    generate_si_id(label, session_index, &h->retry_timer_id.id);
     h->retry_timer_id.event = NULL;
 }
 
@@ -352,17 +352,17 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
 //----------------------------------------------------------------------
     initialize_node_metrics(label, &single_session->metrics);
 //----------------------------------------------------------------------
-    setup_control_packet(label, &single_session->hello1);
-    setup_control_packet(label, &single_session->hello2);
-    setup_control_packet(label, &single_session->hello3);
-    setup_control_packet(label, &single_session->hello4);
+    setup_control_packet(label, session_index, &single_session->hello1);
+    setup_control_packet(label, session_index, &single_session->hello2);
+    setup_control_packet(label, session_index, &single_session->hello3);
+    setup_control_packet(label, session_index, &single_session->hello4);
 //----------------------------------------------------------------------
-    setup_control_packet(label, &single_session->heartbeat.heartbeat);
+    setup_control_packet(label, session_index, &single_session->heartbeat.heartbeat);
     setup_control_packet_ack(&single_session->heartbeat.heartbeat_ack);
     single_session->heartbeat.heartbeat_interval = (double)0;
     single_session->heartbeat.last_send_heartbeat_interval = (double)0;
     single_session->heartbeat.heartbeat_cnt = 0x00;
-    generate_uint64_t_id(label, &single_session->heartbeat.heartbeat_sender_timer_id.id);
+    generate_si_id(label, session_index, &single_session->heartbeat.heartbeat_sender_timer_id.id);
     single_session->heartbeat.heartbeat_sender_timer_id.event = NULL;
 //----------------------------------------------------------------------
     setup_oricle_double(&single_session->retry, (double)0);
@@ -465,12 +465,12 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     setup_control_packet_ack(&single_session->hello3_ack);
     setup_control_packet_ack(&single_session->hello4_ack);
 //----------------------------------------------------------------------
-    setup_control_packet(label, &single_session->heartbeat.heartbeat);
+    setup_control_packet(label, session_index, &single_session->heartbeat.heartbeat);
     setup_control_packet_ack(&single_session->heartbeat.heartbeat_ack);
     single_session->heartbeat.heartbeat_interval = (double)0;
     single_session->heartbeat.last_send_heartbeat_interval = (double)0;
     single_session->heartbeat.heartbeat_cnt = 0x00;
-    generate_uint64_t_id(label, &single_session->heartbeat.heartbeat_sender_timer_id.id);
+    generate_si_id(label, session_index, &single_session->heartbeat.heartbeat_sender_timer_id.id);
     single_session->heartbeat.heartbeat_sender_timer_id.event = NULL;
 //----------------------------------------------------------------------
     setup_oricle_double(&single_session->retry, (double)0);

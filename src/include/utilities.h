@@ -596,6 +596,37 @@ static inline status_t generate_uint64_t_id(const char* label, uint64_t *out_id)
     return SUCCESS;
 }
 
+static inline status_t generate_si_id(const char* label, uint8_t session_index, uint64_t *out_id) {
+    if (out_id == NULL) {
+        LOG_ERROR("%sError: out_id cannot be NULL.", label);
+        return FAILURE;
+    }
+    uint8_t output[8];
+    uint64_t output_be;
+    uint8_t output_rand[7];
+    if (randombytes(output_rand, 7) != 0) {
+        LOG_ERROR("%sError: randombytes.", label);
+        return FAILURE;
+    }
+    output[0] = session_index;
+    memcpy(output + 1, output_rand, 7);
+    memcpy(&output_be, output, 8);
+    *out_id = be64toh(output_be);
+    return SUCCESS;
+}
+
+static inline status_t read_id_si(const char* label, uint64_t id, uint8_t *session_index) {
+    if (session_index == NULL) {
+        LOG_ERROR("%sError: si cannot be NULL.", label);
+        return FAILURE;
+    }
+    uint8_t output[8];
+    uint64_t output_be = htobe64(id);
+    memcpy(output, &output_be, sizeof(uint64_t));
+    *session_index = output[0];
+    return SUCCESS;
+}
+
 static inline status_t set_nonblocking(const char* label, int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags == -1) {
