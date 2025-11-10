@@ -58,6 +58,7 @@ typedef struct {
     double last_send_heartbeat_interval;
     uint8_t heartbeat_cnt;
     timer_id_t heartbeat_sender_timer_id;
+    //timer_id_t heartbeat_openner_timer_id;
 } packet_heartbeat_t;
 
 typedef struct {
@@ -364,6 +365,8 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
     single_session->heartbeat.heartbeat_cnt = 0x00;
     generate_si_id(label, session_index, &single_session->heartbeat.heartbeat_sender_timer_id.id);
     single_session->heartbeat.heartbeat_sender_timer_id.event = NULL;
+    //generate_si_id(label, session_index, &single_session->heartbeat.heartbeat_openner_timer_id.id);
+    //single_session->heartbeat.heartbeat_openner_timer_id.event = NULL;
 //----------------------------------------------------------------------
     setup_oricle_double(&single_session->retry, (double)0);
     setup_oricle_double(&single_session->rtt, (double)0);
@@ -416,6 +419,13 @@ static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *s
         single_session->heartbeat.heartbeat_sender_timer_id.event = NULL;
         single_session->heartbeat.heartbeat_sender_timer_id.id = 0ULL;
     }
+    /*
+    if (single_session->heartbeat.heartbeat_openner_timer_id.event) {
+        oritw_remove_event(ctx->label, &ctx->async, ctx->timer, single_session->heartbeat.heartbeat_openner_timer_id.event);
+        single_session->heartbeat.heartbeat_openner_timer_id.event = NULL;
+        single_session->heartbeat.heartbeat_openner_timer_id.id = 0ULL;
+    }
+    */
 //----------------------------------------------------------------------
     cleanup_oricle_double(&single_session->retry);
     cleanup_oricle_double(&single_session->rtt);
@@ -472,6 +482,8 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     single_session->heartbeat.heartbeat_cnt = 0x00;
     generate_si_id(label, session_index, &single_session->heartbeat.heartbeat_sender_timer_id.id);
     single_session->heartbeat.heartbeat_sender_timer_id.event = NULL;
+    //generate_si_id(label, session_index, &single_session->heartbeat.heartbeat_openner_timer_id.id);
+    //single_session->heartbeat.heartbeat_openner_timer_id.event = NULL;
 //----------------------------------------------------------------------
     setup_oricle_double(&single_session->retry, (double)0);
     setup_oricle_double(&single_session->rtt, (double)0);
@@ -518,6 +530,13 @@ static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *s
         single_session->heartbeat.heartbeat_sender_timer_id.event = NULL;
         single_session->heartbeat.heartbeat_sender_timer_id.id = 0ULL;
     }
+    /*
+    if (single_session->heartbeat.heartbeat_openner_timer_id.event) {
+        oritw_remove_event(ctx->label, &ctx->async, ctx->timer, single_session->heartbeat.heartbeat_openner_timer_id.event);
+        single_session->heartbeat.heartbeat_openner_timer_id.event = NULL;
+        single_session->heartbeat.heartbeat_openner_timer_id.id = 0ULL;
+    }
+    */
 //----------------------------------------------------------------------
     cleanup_oricle_double(&single_session->retry);
     cleanup_oricle_double(&single_session->rtt);

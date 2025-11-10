@@ -58,7 +58,6 @@ typedef struct {
     timer_bucket_t buckets[WHEEL_SIZE];
     uint16_t current_index;
     uint64_t tick_factor;
-    uint64_t current_tick_count;
     min_heap_t min_heap;
 } timer_wheel_t;
 
@@ -69,6 +68,7 @@ typedef struct {
     timer_event_t *ready_queue_head;
     timer_event_t *ready_queue_tail;
     uint64_t global_current_tick;
+    uint64_t initial_system_tick;
     double last_delay_us;
     uint64_t next_expiration_tick;
     timer_event_t *event_pool_head;
@@ -262,7 +262,7 @@ static inline status_t oritw_reschedule_main_timer(
         uint64_t delay_tick = 0;
         if (next_expiration_tick > timer->global_current_tick) {
             delay_tick = next_expiration_tick - timer->global_current_tick;
-        } 
+        }
         double delay_us = (double)delay_tick;
         double delay_s = delay_us / 1e6;
         timer->last_delay_us = delay_us;
@@ -494,6 +494,15 @@ static inline status_t oritw_add_event(
     }
     timer->next_expiration_tick = min_heap_get_min(&timer->timer_wheel.min_heap);
     if (should_reschedule) {
+//----------------------------------------------------------------------
+        uint64_t_status_t system_tick = get_monotonic_time_ns(label);
+        if (system_tick.status != SUCCESS) {
+            return FAILURE;
+        }
+        double double_system_tick = (double)system_tick.r_uint64_t / (double)1e3;
+        uint64_t ull_system_tick = (uint64_t)ceil(double_system_tick);
+        timer->initial_system_tick = ull_system_tick;
+//----------------------------------------------------------------------
         if (oritw_reschedule_main_timer(label, async, timers, level_index) != SUCCESS) return FAILURE;
     }
     return SUCCESS;
@@ -557,7 +566,7 @@ static inline status_t oritw_process_expired_l0(ori_timer_wheel_t *timer, uint32
     return SUCCESS;
 }
 
-static inline status_t oritw_advance_time_and_process_expired(
+static inline status_t oritw_advance_time_and_process_expired_internal(
     const char *label, 
     async_type_t *async, 
     ori_timer_wheels_t timers, 
@@ -565,9 +574,7 @@ static inline status_t oritw_advance_time_and_process_expired(
     uint64_t ticks_to_advance
 )
 {
-    if (ticks_to_advance == 0) return SUCCESS;
     ori_timer_wheel_t *timer = timers[level];
-    if (!timer || timer->cleanup) return FAILURE;
     uint64_t remaining_ticks = ticks_to_advance;
     while (remaining_ticks > 0) {
         uint32_t l0_start_index = timer->timer_wheel.current_index;
@@ -582,6 +589,37 @@ static inline status_t oritw_advance_time_and_process_expired(
         }
         remaining_ticks -= chunk_advance;
     }
+    return SUCCESS;
+}
+
+static inline status_t oritw_advance_time_and_process_expired(
+    const char *label, 
+    async_type_t *async, 
+    ori_timer_wheels_t timers, 
+    uint32_t level,
+    uint64_t ticks_to_advance
+)
+{
+    if (ticks_to_advance == 0) return SUCCESS;
+    ori_timer_wheel_t *timer = timers[level];
+    if (!timer || timer->cleanup) return FAILURE;
+    if (oritw_advance_time_and_process_expired_internal(label, async, timers, level, ticks_to_advance) != SUCCESS) return FAILURE;
+//----------------------------------------------------------------------
+    uint64_t min_abs_expiration = min_heap_get_min(&timer->timer_wheel.min_heap);
+    if (min_abs_expiration != ULLONG_MAX) {
+        uint64_t_status_t system_tick = get_monotonic_time_ns(label);
+        if (system_tick.status != SUCCESS) {
+            return FAILURE;
+        }
+        double double_system_tick = (double)system_tick.r_uint64_t / (double)1e3;
+        uint64_t ull_system_tick = (uint64_t)ceil(double_system_tick);
+        ull_system_tick -= timer->initial_system_tick;
+        if (ull_system_tick > timer->global_current_tick) {
+            uint64_t tta_plus = ull_system_tick - timer->global_current_tick;
+            if (oritw_advance_time_and_process_expired_internal(label, async, timers, level, tta_plus) != SUCCESS) return FAILURE;
+        }
+    }
+//----------------------------------------------------------------------
     return oritw_reschedule_main_timer(label, async, timers, level);
 }
 
@@ -596,13 +634,15 @@ static inline status_t oritw_setup(const char *label, async_type_t *async, ori_t
         tw->ready_queue_head = NULL;
         tw->ready_queue_tail = NULL;
         tw->event_pool_head = NULL;
+        
+        tw->initial_system_tick = 0ULL;
+        
         tw->global_current_tick = 0;
         tw->last_delay_us = 0.0;
         tw->next_expiration_tick = ULLONG_MAX;
         timer_wheel_t *wheel = &tw->timer_wheel;
         wheel->current_index = 0;
         wheel->tick_factor = 1;
-        wheel->current_tick_count = 0;
         min_heap_init(&wheel->min_heap);
         for (uint32_t s = 0; s < WHEEL_SIZE; ++s) {
             wheel->buckets[s].head = NULL;
@@ -618,6 +658,7 @@ static inline void oritw_cleanup(const char *label, async_type_t *async, ori_tim
         ori_timer_wheel_t *tw = timers[llv];
         if (!tw) continue;
         tw->cleanup = true;
+        tw->initial_system_tick = 0ULL;
         timer_event_t *collector_head = NULL;
         timer_wheel_t *wheel = &tw->timer_wheel;
         for (uint32_t s = 0; s < WHEEL_SIZE; ++s) {
