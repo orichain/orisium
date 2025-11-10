@@ -99,6 +99,8 @@
 #define RTO_MIN   0.2
 #define RTO_MAX   60.0
 //======================================================================
+#define ORISORT_THRESHOLD_INSERTION 16
+#define ORISORT_THRESHOLD_SHELL 100
 
 #define NODE_VERSION 1
 #define NODE_FILE_MAGIC "NODEKEYS"

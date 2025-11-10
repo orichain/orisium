@@ -32,6 +32,79 @@
 #include "pqc.h"
 #include "types.h"
 
+static inline void insertion_sort_uint64(uint64_t *arr, size_t n) {
+    for (size_t i = 1; i < n; ++i) {
+        uint64_t key = arr[i];
+        size_t j = i;
+        while (j > 0 && arr[j - 1] > key) {
+            arr[j] = arr[j - 1];
+            --j;
+        }
+        arr[j] = key;
+    }
+}
+
+static inline void shell_sort_uint64(uint64_t *arr, size_t n) {
+    size_t h = 1;
+    while (h < n / 3) {
+        h = h * 3 + 1;
+    }
+    while (h >= 1) {
+        for (size_t i = h; i < n; i++) {
+            uint64_t temp = arr[i];
+            size_t j;
+            for (j = i; j >= h && arr[j - h] > temp; j -= h) {
+                arr[j] = arr[j - h];
+            }
+            arr[j] = temp;
+        }
+        h /= 3;
+    }
+}
+
+static inline size_t quick_sort_partition(uint64_t *arr, size_t low, size_t high) {
+    uint64_t pivot = arr[high];
+    size_t i = low;
+    uint64_t tmp;    
+    for (size_t j = low; j < high; ++j) {
+        if (arr[j] < pivot) {
+            tmp = arr[i];
+            arr[i] = arr[j];
+            arr[j] = tmp;
+            i++;
+        }
+    }
+    tmp = arr[i];
+    arr[i] = arr[high];
+    arr[high] = tmp;
+    return i;
+}
+
+static inline void quick_sort_uint64_recursive(uint64_t *arr, size_t low, size_t high) {
+    if (high - low < ORISORT_THRESHOLD_INSERTION) {
+        insertion_sort_uint64(arr + low, high - low + 1);
+        return;
+    }
+    if (low < high) {
+        size_t pi = quick_sort_partition(arr, low, high);
+        if (pi > 0) quick_sort_uint64_recursive(arr, low, pi - 1);
+        quick_sort_uint64_recursive(arr, pi + 1, high);
+    }
+}
+
+static inline void ori_sort_uint64(uint64_t *arr, size_t n) {
+    if (n <= 1) {
+        return;
+    }
+    if (n <= ORISORT_THRESHOLD_INSERTION) {
+        insertion_sort_uint64(arr, n);
+    } else if (n <= ORISORT_THRESHOLD_SHELL) {
+        shell_sort_uint64(arr, n);
+    } else {
+        quick_sort_uint64_recursive(arr, 0, n - 1);
+    }
+}
+
 static inline void get_time_str(char *buf, size_t len) {
     time_t t = time(NULL);
     struct tm tm_info;

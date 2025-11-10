@@ -18,7 +18,7 @@
 #error "WHEEL_SIZE must be a power of 2 for optimal performance."
 #endif
 #define WHEEL_MASK (WHEEL_SIZE - 1)
-#define ORITW_MAX_CANDIDATES 16
+#define ORITW_MAX_CANDIDATES 256
 
 typedef struct {
     uint64_t expiration_tick;
@@ -357,18 +357,13 @@ static inline uint32_t min_heap_collect_candidates(min_heap_t *heap, uint64_t ou
     uint32_t count = 0;
     for (uint32_t i = 0; i < limit; i++) {
         uint64_t t = heap->nodes[i].expiration_tick;
-        if (t != ULLONG_MAX)
-            out[count++] = t;
+        if (t != ULLONG_MAX) {
+            out[count] = t;
+            count++;
+        }
     }
-    for (uint32_t i = 0; i + 1 < count; i++) {
-        uint32_t min_i = i;
-        for (uint32_t j = i + 1; j < count; j++)
-            if (out[j] < out[min_i])
-                min_i = j;
-        uint64_t tmp = out[i];
-        out[i] = out[min_i];
-        out[min_i] = tmp;
-    }
+    if (count == 0) return 0;
+    ori_sort_uint64(out, count);
     return count;
 }
 
