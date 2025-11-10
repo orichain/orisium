@@ -396,7 +396,8 @@ static inline bool oritw_validate_min_gap_and_long_jump(
     uint64_t first_exp = heap_candidates[0];
     if (first_exp >= expire)
         return false;
-    for (uint32_t i = 0; i < count && i < ORITW_MAX_CANDIDATES; i++) {
+    uint32_t i = 0;
+    for (i = 0; i < count && i < ORITW_MAX_CANDIDATES; i++) {
         uint64_t exp_i = heap_candidates[i];
         if (exp_i == ULLONG_MAX) break;
         if (exp_i >= expire) break;
@@ -404,6 +405,9 @@ static inline bool oritw_validate_min_gap_and_long_jump(
         if (diff < min_gap_us) {
             return false;
         }
+    }
+    if (i == ORITW_MAX_CANDIDATES) {
+        return false;
     }
     return true;
 }
