@@ -436,13 +436,22 @@ static inline bool oritw_validate_min_gap_and_long_jump(
     }
     *reschedule = false;
     uint64_t first_exp = heap_candidates[0];
-    if (first_exp > expire) {
-        return false;
-    }
     if (first_exp == expire) {
         return true;
     }
-    uint64_t diff = expire - first_exp;
+    uint64_t diff;
+    if (first_exp > expire) {
+        if (expire <= timer->global_current_tick) {
+            return false;
+        }
+        diff = expire - timer->global_current_tick;
+        if (diff < min_gap_us) {
+            return false;
+        }
+        *reschedule = true;
+        return true;
+    }
+    diff = expire - first_exp;
     if (diff < min_gap_us) {
         return false;
     }
