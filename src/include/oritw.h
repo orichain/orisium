@@ -389,22 +389,36 @@ static inline bool oritw_validate_min_gap_and_long_jump(
     }
     *reschedule = false;
     uint64_t first_exp = heap_candidates[0];
-    if (first_exp >= expire)
+    if (first_exp > expire) {
         return false;
-    uint32_t i = 0;
-    for (i = 0; i < count && i < ORITW_MAX_CANDIDATES; i++) {
-        uint64_t exp_i = heap_candidates[i];
+    }
+    if (first_exp == expire) {
+        return true;
+    }
+    uint64_t diff = expire - first_exp;
+    if (diff < min_gap_us) {
+        return false;
+    }
+    uint32_t i;
+    uint64_t exp_i;
+    for (i = 1; i < count && i < ORITW_MAX_CANDIDATES; i++) {
+        exp_i = heap_candidates[i];
         if (exp_i == ULLONG_MAX) break;
-        if (exp_i >= expire) break;
-        uint64_t diff = expire - exp_i;
+        if (exp_i == expire) {
+            return true;
+        }
+        if (exp_i > expire) {
+            diff = exp_i - expire;
+            if (diff >= min_gap_us) {
+                return true;
+            }
+        }
+        diff = expire - exp_i;
         if (diff < min_gap_us) {
             return false;
         }
     }
-    if (i == ORITW_MAX_CANDIDATES) {
-        return false;
-    }
-    return true;
+    return i < ORITW_MAX_CANDIDATES;
 }
 
 static inline void oritw_calculate_level(
@@ -429,11 +443,11 @@ static inline void oritw_calculate_slot(
     uint32_t *slot_index
 )
 {
-    timer_wheel_t *l0 = &timer->timer_wheel;
-    uint64_t abs_slot_index = expiration_tick / l0->tick_factor;
+    timer_wheel_t *level = &timer->timer_wheel;
+    uint64_t abs_slot_index = expiration_tick / level->tick_factor;
     *slot_index = (uint32_t)(abs_slot_index & WHEEL_MASK);
     if (expiration_tick <= timer->global_current_tick) {
-        *slot_index = l0->current_index;
+        *slot_index = level->current_index;
     }
 }
 
@@ -508,11 +522,11 @@ static inline status_t oritw_add_event(
     return SUCCESS;
 }
 
-static inline status_t oritw_process_expired_l0(ori_timer_wheel_t *timer, uint32_t start_index, uint32_t end_index) {
+static inline status_t oritw_process_expired_level(ori_timer_wheel_t *timer, uint32_t start_index, uint32_t end_index) {
     uint32_t current_slot_index = start_index;
-    timer_wheel_t *l0 = &timer->timer_wheel;
+    timer_wheel_t *level = &timer->timer_wheel;
     while (true) {
-        timer_bucket_t *bucket = &l0->buckets[current_slot_index];
+        timer_bucket_t *bucket = &level->buckets[current_slot_index];
         timer_event_t *cur = bucket->head;
         timer_event_t *next_event = NULL;
         bucket->head = NULL;
@@ -558,7 +572,7 @@ static inline status_t oritw_process_expired_l0(ori_timer_wheel_t *timer, uint32
             cur = next_event;
         }
         bucket->min_expiration = new_min_exp;
-        min_heap_update(&l0->min_heap, (uint16_t)current_slot_index, new_min_exp);
+        min_heap_update(&level->min_heap, (uint16_t)current_slot_index, new_min_exp);
         if (current_slot_index == end_index) break;
         current_slot_index = (current_slot_index + 1) & WHEEL_MASK;
     }
@@ -577,14 +591,14 @@ static inline status_t oritw_advance_time_and_process_expired_internal(
     ori_timer_wheel_t *timer = timers[level];
     uint64_t remaining_ticks = ticks_to_advance;
     while (remaining_ticks > 0) {
-        uint32_t l0_start_index = timer->timer_wheel.current_index;
-        uint64_t slots_until_wrap = WHEEL_SIZE - l0_start_index;
+        uint32_t level_start_index = timer->timer_wheel.current_index;
+        uint64_t slots_until_wrap = WHEEL_SIZE - level_start_index;
         uint64_t chunk_advance = remaining_ticks < slots_until_wrap ? remaining_ticks : slots_until_wrap;
         if (chunk_advance == 0) break;
-        uint32_t l0_end_index = (l0_start_index + (uint32_t)chunk_advance) & WHEEL_MASK;
-        timer->timer_wheel.current_index = (uint16_t)l0_end_index;
+        uint32_t level_end_index = (level_start_index + (uint32_t)chunk_advance) & WHEEL_MASK;
+        timer->timer_wheel.current_index = (uint16_t)level_end_index;
         timer->global_current_tick += chunk_advance;
-        if (oritw_process_expired_l0(timer, l0_start_index, l0_end_index) != SUCCESS) {
+        if (oritw_process_expired_level(timer, level_start_index, level_end_index) != SUCCESS) {
             return FAILURE;
         }
         remaining_ticks -= chunk_advance;
