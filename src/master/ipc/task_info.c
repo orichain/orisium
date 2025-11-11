@@ -66,6 +66,11 @@ status_t handle_master_ipc_task_info(const char *label, master_context_t *master
             }
             break;
         }
+        case TIT_WAKEUP: {
+            LOG_INFO("%sTIT_WAKEUP received...", label);
+            CLOSE_IPC_PROTOCOL(&received_protocol);
+            break;
+        }
         default:
             CLOSE_IPC_PROTOCOL(&received_protocol);
             return FAILURE;

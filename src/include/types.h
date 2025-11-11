@@ -69,7 +69,9 @@ typedef enum {
 
 typedef enum {
     TIT_SECURE = (uint8_t)0x00,
-	TIT_TIMEOUT = (uint8_t)0xff
+	TIT_TIMEOUT = (uint8_t)0x01,
+    
+    TIT_WAKEUP = (uint8_t)0xff
 } task_info_type_t;
 
 typedef enum {

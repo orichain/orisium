@@ -36,6 +36,7 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
 //----------------------------------------------------------------------
     generate_uint64_t_id(ctx->label, &ctx->heartbeat_timer_id.id);
     ctx->heartbeat_timer_id.event = NULL;
+    ctx->heartbeat_timer_id.delay_us = 0.0;
 //----------------------------------------------------------------------
 // Setup IPC security
 //----------------------------------------------------------------------
@@ -57,12 +58,13 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
 // Setup IPC rekeying
 //----------------------------------------------------------------------
     ctx->is_rekeying = false;
-    ctx->rekeying_queue = NULL;
+    ctx->rekeying_queue_head = NULL;
+    ctx->rekeying_queue_tail = NULL;
 //----------------------------------------------------------------------
 	if (async_create(ctx->label, &ctx->async) != SUCCESS) return FAILURE;
 	if (async_create_incoming_event(ctx->label, &ctx->async, ctx->master_uds_fd) != SUCCESS) return FAILURE;
 //----------------------------------------------------------------------
-    if (oritw_setup(ctx->label, &ctx->async, ctx->timer) != SUCCESS) return FAILURE;
+    if (oritw_setup(ctx->label, &ctx->async, &ctx->timer) != SUCCESS) return FAILURE;
 //----------------------------------------------------------------------
     return SUCCESS;
 }
@@ -91,17 +93,18 @@ void cleanup_worker(worker_context_t *ctx) {
     ctx->hello2_sent = false;
     ctx->hello2_ack_rcvd = false;
     ctx->is_rekeying = false;
-    ipc_cleanup_protocol_queue(&ctx->rekeying_queue);
+    ipc_cleanup_protocol_queue(&ctx->rekeying_queue_head, &ctx->rekeying_queue_tail);
     async_delete_event(ctx->label, &ctx->async, ctx->master_uds_fd);
     CLOSE_FD(ctx->master_uds_fd);
 //----------------------------------------------------------------------
     if (ctx->heartbeat_timer_id.event) {
-        oritw_remove_event(ctx->label, &ctx->async, ctx->timer, ctx->heartbeat_timer_id.event);
+        oritw_remove_event(ctx->label, &ctx->async, &ctx->timer, ctx->heartbeat_timer_id.event);
         ctx->heartbeat_timer_id.event = NULL;
         ctx->heartbeat_timer_id.id = 0ULL;
+        ctx->heartbeat_timer_id.delay_us = 0.0;
     }
 //----------------------------------------------------------------------
-    oritw_cleanup(ctx->label, &ctx->async, ctx->timer);
+    oritw_cleanup(ctx->label, &ctx->async, &ctx->timer);
 //----------------------------------------------------------------------
     CLOSE_FD(&ctx->async.async_fd);
     free(ctx->label);

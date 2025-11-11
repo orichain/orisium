@@ -55,7 +55,7 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
     security->hello2_rcvd = false;
     security->hello2_ack_sent = false;
     rekeying->is_rekeying = false;
-    ipc_cleanup_protocol_queue(&rekeying->rekeying_queue);
+    ipc_cleanup_protocol_queue(&rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail);
     async_delete_event(label, &master_ctx->master_async, &upp->uds[0]);
     CLOSE_UDS(&upp->uds[0]);
     CLOSE_UDS(&upp->uds[1]);
@@ -93,7 +93,8 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
     security->hello2_rcvd = false;
     security->hello2_ack_sent = false;
     rekeying->is_rekeying = false;
-    rekeying->rekeying_queue = NULL;
+    rekeying->rekeying_queue_head = NULL;
+    rekeying->rekeying_queue_tail = NULL;
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, upp->uds) == -1) {
         LOG_ERROR("%ssocketpair (%s) creation failed: %s", label, worker_name, strerror(errno));
         return FAILURE;

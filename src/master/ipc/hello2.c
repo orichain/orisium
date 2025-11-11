@@ -172,29 +172,31 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
 //----------------------------------------------------------------------
 //----------------------------------------------------------------------
     rekeying->is_rekeying = false;
-    ipc_protocol_queue_t *current = rekeying->rekeying_queue;
-    ipc_protocol_queue_t *next;
-    while (current != NULL) {
-        next = current->next;
+    ipc_protocol_queue_t *current_pqueue;
+    do {
+        current_pqueue = ipc_pop_protocol_queue(&rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail);
+        if (current_pqueue == NULL) {
+            break;
+        }
         ssize_t_status_t send_result = send_ipc_protocol_message(
             label, 
             security->aes_key,
             security->mac_key,
             security->local_nonce,
             &security->local_ctr,
-            current->uds_fd,
-            current->p
+            current_pqueue->uds_fd,
+            current_pqueue->p
         );
         if (send_result.status != SUCCESS) {
             LOG_DEBUG("%sFailed to sent rekeying queue data to Worker.", label);
         } else {
             LOG_DEBUG("%sSent rekeying queue data to Worker.", label);
         }
-        CLOSE_IPC_PROTOCOL(&current->p);
-        free(current);
-        current = next;
-    }
-    rekeying->rekeying_queue = NULL;
+        CLOSE_IPC_PROTOCOL(&current_pqueue->p);
+        free(current_pqueue);
+    } while (current_pqueue != NULL);
+    rekeying->rekeying_queue_head = NULL;
+    rekeying->rekeying_queue_tail = NULL;
 //----------------------------------------------------------------------
     if (!master_ctx->all_workers_is_ready) {
         master_ctx->all_workers_is_ready = true;

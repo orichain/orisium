@@ -20,10 +20,9 @@
 
 #define ORILINK_DECRYPT_HEADER
 //#undef ORILINK_DECRYPT_HEADER
-
-#define MAX_TIMER_LEVELS 10
+#define MAX_TIMER_LEVELS 20
 #define WHEEL_SIZE 256
-#define MIN_GAP_US 1000
+#define MIN_GAP_US 5000
 //----------------------------------------------------------------------
 #define KALMAN_CALIBRATION_SAMPLES 50
 //----------------------------------------------------------------------
@@ -44,9 +43,9 @@
 #define INITIAL_MILISECONDS_PER_UNIT 5
 //----------------------------------------------------------------------
 // rekeying tiap 24 jam
-// berdasarkan hb timer (9 detik) * 9600 = 86400 detik = 24 jam
+// berdasarkan hb timer (15 detik) * 5760 = 86400 detik = 24 jam
 //----------------------------------------------------------------------
-#define REKEYING_HB_TIMES 9600
+#define REKEYING_HB_TIMES 5760
 //----------------------------------------------------------------------
 #define WORKER_RECREATE_SEC 1
 

@@ -52,7 +52,8 @@ typedef struct {
 
 typedef struct {
     bool is_rekeying;
-    ipc_protocol_queue_t *rekeying_queue;
+    ipc_protocol_queue_t *rekeying_queue_head;
+    ipc_protocol_queue_t *rekeying_queue_tail;
 } worker_rekeying_t;
 
 typedef struct {

@@ -105,7 +105,6 @@ typedef struct {
 } ipc_protocol_t;
 
 typedef struct ipc_protocol_queue_t {
-    uint64_t queue_id;
     worker_type_t wot;
     uint8_t index;
     int *uds_fd;

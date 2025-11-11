@@ -80,6 +80,7 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
 //----------------------------------------------------------------------
     generate_uint64_t_id(label, &master_ctx->check_healthy_timer_id.id);
     master_ctx->check_healthy_timer_id.event = NULL;
+    master_ctx->check_healthy_timer_id.delay_us = 0.0;
 //----------------------------------------------------------------------
     master_ctx->master_async.async_fd = -1;
     master_ctx->master_pid = getpid();
@@ -96,7 +97,7 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
         return FAILURE;
 	}
     shutdown_event_fd = &master_ctx->shutdown_event_fd;
-    if (oritw_setup(label, &master_ctx->master_async, master_ctx->timer) != SUCCESS) return FAILURE;
+    if (oritw_setup(label, &master_ctx->master_async, &master_ctx->timer) != SUCCESS) return FAILURE;
     master_ctx->orilink_raw_protocol_pool.head = NULL;
     return SUCCESS;
 }
@@ -137,12 +138,14 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     CLOSE_FD(&master_ctx->shutdown_event_fd);
 //----------------------------------------------------------------------
     if (master_ctx->check_healthy_timer_id.event) {
-        oritw_remove_event(label, &master_ctx->master_async, master_ctx->timer, master_ctx->check_healthy_timer_id.event);
+        oritw_remove_event(label, &master_ctx->master_async, &master_ctx->timer, master_ctx->check_healthy_timer_id.event);
         master_ctx->check_healthy_timer_id.event = NULL;
         master_ctx->check_healthy_timer_id.id = 0ULL;
+        master_ctx->check_healthy_timer_id.delay_us = 0.0;
     }
 //----------------------------------------------------------------------
-    oritw_cleanup(label, &master_ctx->master_async, master_ctx->timer);
+    oritw_cleanup(label, &master_ctx->master_async, &master_ctx->timer);
+//----------------------------------------------------------------------
     CLOSE_FD(&master_ctx->master_async.async_fd);
     master_ctx->listen_port = (uint16_t)0;
     memset(&master_ctx->bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
@@ -324,8 +327,8 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                     metrics->hb_interval = (double)0;
                                     metrics->sum_hb_interval = metrics->hb_interval;
                                 }
-                                double ch = worker_check_healthy_us();
-                                status_t chst = oritw_add_event(label, &master_ctx->master_async, master_ctx->timer, &master_ctx->check_healthy_timer_id, ch);
+                                master_ctx->check_healthy_timer_id.delay_us = worker_check_healthy_us();
+                                status_t chst = oritw_add_event(label, &master_ctx->master_async, &master_ctx->timer, &master_ctx->check_healthy_timer_id);
                                 if (chst != SUCCESS) {
                                     LOG_INFO("%sGagal async_create_timerfd hb checker. Initiating graceful shutdown...", label);
                                     master_ctx->shutdown_requested = 1;
