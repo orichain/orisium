@@ -82,7 +82,6 @@ typedef struct timer_id_t {
 } timer_id_t;
 
 typedef struct {
-    int testxxx;
     int add_event_fd;
     timer_id_t *add_queue_head;
     timer_id_t *add_queue_tail;
@@ -479,11 +478,6 @@ static inline void oritw_calculate_level(
     bool *reschedule
 )
 {
-    timers->testxxx++;
-    if (timers->testxxx == 3) {
-        *level_index = 0xffffffff;
-        return;
-    }
     for (uint16_t llvl=0;llvl<MAX_TIMER_LEVELS;++llvl) {
         if (oritw_validate_min_gap_and_long_jump(timers, delay_us, llvl, reschedule)) {
             *level_index = llvl;
@@ -731,7 +725,6 @@ static inline status_t oritw_setup(const char *label, async_type_t *async, ori_t
     timers->add_event_fd = -1;
     timers->add_queue_head = NULL;
     timers->add_queue_tail = NULL;
-    timers->testxxx = 0;
     for (uint32_t llv = 0; llv < MAX_TIMER_LEVELS; ++llv) {
         timers->timer[llv] = (ori_timer_wheel_t *)calloc(1, sizeof(ori_timer_wheel_t));
         if (!timers->timer[llv]) return FAILURE_NOMEM;
