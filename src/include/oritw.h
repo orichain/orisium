@@ -22,7 +22,6 @@
 #error "WHEEL_SIZE must be a power of 2 for optimal performance."
 #endif
 #define WHEEL_MASK (WHEEL_SIZE - 1)
-#define ORITW_MAX_CANDIDATES 8
 
 typedef struct {
     uint64_t expiration_tick;
@@ -410,7 +409,7 @@ static inline uint32_t min_heap_collect_candidates(min_heap_t *heap, uint64_t ou
         }
     }
     if (count == 0) return 0;
-    ori_sort_uint64(out, count);
+    oritw_sort_uint64(out, count);
     return count;
 }
 

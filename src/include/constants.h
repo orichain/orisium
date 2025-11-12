@@ -20,16 +20,19 @@
 
 #define ORILINK_DECRYPT_HEADER
 //#undef ORILINK_DECRYPT_HEADER
+#define ACCRCY_TEST
+
 #define MAX_TIMER_LEVELS 20
 #define WHEEL_SIZE 256
 #define MIN_GAP_US 5000
+#define ORITW_MAX_CANDIDATES 32
 //----------------------------------------------------------------------
 #define KALMAN_CALIBRATION_SAMPLES 50
 //----------------------------------------------------------------------
 #define MAX_RETRY_CNT 5
 #define MIN_RETRY_SEC 1
 //----------------------------------------------------------------------
-#define NODE_HEARTBEAT_INTERVAL 7
+#define NODE_HEARTBEAT_INTERVAL 0.020
 #define NODE_CHECK_HEALTHY_X 3
 //----------------------------------------------------------------------
 #define NODE_CHECK_HEALTHY NODE_CHECK_HEALTHY_X * 2 * NODE_HEARTBEAT_INTERVAL
@@ -98,7 +101,7 @@
 #define RTO_MIN   0.2
 #define RTO_MAX   60.0
 //======================================================================
-#define ORISORT_THRESHOLD_INSERTION 16
+#define ORISORT_THRESHOLD_INSERTION 32
 #define ORISORT_THRESHOLD_SHELL 100
 
 #define NODE_VERSION 1

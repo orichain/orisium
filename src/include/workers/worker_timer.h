@@ -165,7 +165,7 @@ static inline status_t handle_worker_session_timer_event(
                 }
                 return SUCCESS;
             }
-            /*
+            #if defined(ACCRCY_TEST)
             else if (*timer_id == session->heartbeat.heartbeat_openner_timer_id.id) {
                 session->heartbeat.heartbeat_ack.ack_sent = true;
 //----------------------------------------------------------------------
@@ -173,7 +173,7 @@ static inline status_t handle_worker_session_timer_event(
 //----------------------------------------------------------------------
                 return SUCCESS;
             }
-            */
+            #endif
             break;
         }
         case SIO: {
@@ -201,7 +201,7 @@ static inline status_t handle_worker_session_timer_event(
                 }
                 return SUCCESS;
             }
-            /*
+            #if defined(ACCRCY_TEST)
             else if (*timer_id == session->heartbeat.heartbeat_openner_timer_id.id) {
                 session->heartbeat.heartbeat_ack.ack_sent = true;
 //----------------------------------------------------------------------
@@ -209,7 +209,7 @@ static inline status_t handle_worker_session_timer_event(
 //----------------------------------------------------------------------
                 return SUCCESS;
             }
-            */
+            #endif
             break;
         }
         default:

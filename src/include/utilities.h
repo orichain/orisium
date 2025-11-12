@@ -92,17 +92,17 @@ static inline void quick_sort_uint64_recursive(uint64_t *arr, size_t low, size_t
     }
 }
 
-static inline void ori_sort_uint64(uint64_t *arr, size_t n) {
+static inline void oritw_sort_uint64(uint64_t *arr, size_t n) {
     if (n <= 1) {
         return;
     }
-    if (n <= ORISORT_THRESHOLD_INSERTION) {
-        insertion_sort_uint64(arr, n);
-    } else if (n <= ORISORT_THRESHOLD_SHELL) {
-        shell_sort_uint64(arr, n);
-    } else {
-        quick_sort_uint64_recursive(arr, 0, n - 1);
-    }
+    #if ORITW_MAX_CANDIDATES <= ORISORT_THRESHOLD_INSERTION
+    insertion_sort_uint64(arr, n);
+    #elif ORITW_MAX_CANDIDATES <= ORISORT_THRESHOLD_SHELL
+    shell_sort_uint64(arr, n);
+    #else
+    quick_sort_uint64_recursive(arr, 0, n - 1);
+    #endif
 }
 
 static inline void get_time_str(char *buf, size_t len) {

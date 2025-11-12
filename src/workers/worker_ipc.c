@@ -3043,18 +3043,16 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
             break;
         }
         case ORILINK_HEARTBEAT: {
-            session->heartbeat.heartbeat_ack.ack_sent = true;
-//----------------------------------------------------------------------
-//--- [ORITW]: For Acuracy Testing
-//----------------------------------------------------------------------
-            /*
+            #if defined(ACCRCY_TEST)
             session->heartbeat.heartbeat_ack.ack_sent = false;
             session->heartbeat.heartbeat_openner_timer_id.delay_us = session->heartbeat.last_send_heartbeat_interval;
             status_t otmr = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_openner_timer_id);
             if (otmr != SUCCESS) {
                 return FAILURE;
             }
-            */
+            #else
+            session->heartbeat.heartbeat_ack.ack_sent = true;
+            #endif
 //======================================================================
             session->heartbeat.heartbeat.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
             status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id);
@@ -3111,18 +3109,16 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
             break;
         }
         case ORILINK_HEARTBEAT: {
-            session->heartbeat.heartbeat_ack.ack_sent = true;
-//----------------------------------------------------------------------
-//--- [ORITW]: For Acuracy Testing
-//----------------------------------------------------------------------
-            /*
+            #if defined(ACCRCY_TEST)
             session->heartbeat.heartbeat_ack.ack_sent = false;
             session->heartbeat.heartbeat_openner_timer_id.delay_us = session->heartbeat.last_send_heartbeat_interval;
             status_t otmr = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_openner_timer_id);
             if (otmr != SUCCESS) {
                 return FAILURE;
             }
-            */
+            #else
+            session->heartbeat.heartbeat_ack.ack_sent = true;
+            #endif
 //======================================================================
             session->heartbeat.heartbeat.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
             status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id);
