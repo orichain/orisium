@@ -33,7 +33,7 @@
 #define MAX_RETRY_CNT 5
 #define MIN_RETRY_SEC 1
 //----------------------------------------------------------------------
-#define NODE_HEARTBEAT_INTERVAL 0.020
+#define NODE_HEARTBEAT_INTERVAL 7
 #define NODE_CHECK_HEALTHY_X 3
 //----------------------------------------------------------------------
 #define NODE_CHECK_HEALTHY NODE_CHECK_HEALTHY_X * 2 * NODE_HEARTBEAT_INTERVAL
