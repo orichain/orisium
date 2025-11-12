@@ -56,7 +56,7 @@ status_t master_worker_info(const char *label, master_context_t *master_ctx, wor
         return FAILURE;
     }
     if (rekeying->is_rekeying) {
-        if (ipc_add_protocol_queue(label, wot, index, &upp->uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
+        if (ipc_add_tail_protocol_queue(label, wot, index, &upp->uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
@@ -117,7 +117,7 @@ status_t master_cow_connect(const char *label, master_context_t *master_ctx, str
         return FAILURE;
     }
     if (rekeying->is_rekeying) {
-        if (ipc_add_protocol_queue(label, COW, index, &master_ctx->cow_session[index].upp.uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
+        if (ipc_add_tail_protocol_queue(label, COW, index, &master_ctx->cow_session[index].upp.uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
@@ -275,7 +275,7 @@ status_t master_worker_udp_data(
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
-        if (ipc_add_protocol_queue(label, wot, index, &upp->uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
+        if (ipc_add_tail_protocol_queue(label, wot, index, &upp->uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
@@ -389,7 +389,7 @@ status_t master_worker_udp_data_ack(
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
-        if (ipc_add_protocol_queue(label, wot, index, &upp->uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
+        if (ipc_add_tail_protocol_queue(label, wot, index, &upp->uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }

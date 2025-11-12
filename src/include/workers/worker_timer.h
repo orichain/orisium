@@ -19,6 +19,7 @@
 #include "constants.h"
 #include "orilink/protocol.h"
 #include "stdbool.h"
+#include "oritw/timer_event.h"
 
 static inline status_t retry_transmit(
     worker_context_t *worker_ctx, 
@@ -240,7 +241,7 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
         timer_id_t *current_add;
         status_t handler_result = SUCCESS;
         do {
-            current_add = pop_timer_id_queue(&worker_ctx->timer);
+            current_add = oritw_pop_timer_id_queue(&worker_ctx->timer);
             if (current_add == NULL) {
                 handler_result = FAILURE;
                 break;

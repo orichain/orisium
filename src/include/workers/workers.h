@@ -408,6 +408,7 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
         return FAILURE;
     }
     single_session->orilink_raw_protocol_pool.head = NULL;
+    single_session->orilink_raw_protocol_pool.tail = NULL;
     return SUCCESS;
 }
 
@@ -473,7 +474,7 @@ static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *s
     free(security->local_nonce);
     free(security->remote_nonce);
 //----------------------------------------------------------------------
-    orilink_raw_protocol_free(&single_session->orilink_raw_protocol_pool.head);
+    orilink_raw_protocol_cleanup(&single_session->orilink_raw_protocol_pool.head, &single_session->orilink_raw_protocol_pool.tail);
 //----------------------------------------------------------------------
 }
 
@@ -525,6 +526,7 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     security->local_ctr = (uint32_t)0;
     security->remote_ctr = (uint32_t)0;
     single_session->orilink_raw_protocol_pool.head = NULL;
+    single_session->orilink_raw_protocol_pool.tail = NULL;
     return SUCCESS;
 }
 
@@ -587,7 +589,7 @@ static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *s
     free(security->local_nonce);
     free(security->remote_nonce);
 //----------------------------------------------------------------------
-    orilink_raw_protocol_free(&single_session->orilink_raw_protocol_pool.head);
+    orilink_raw_protocol_cleanup(&single_session->orilink_raw_protocol_pool.head, &single_session->orilink_raw_protocol_pool.tail);
 //----------------------------------------------------------------------
 }
 

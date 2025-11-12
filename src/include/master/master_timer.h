@@ -17,6 +17,7 @@
 #include "master/ipc/worker_ipc_cmds.h"
 #include "constants.h"
 #include "stdbool.h"
+#include "oritw/timer_event.h"
 
 static inline status_t drain_event_fd(const char *label, int fd) {
     uint64_t u;
@@ -40,7 +41,7 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
         timer_id_t *current_add;
         status_t handler_result = SUCCESS;
         do {
-            current_add = pop_timer_id_queue(&master_ctx->timer);
+            current_add = oritw_pop_timer_id_queue(&master_ctx->timer);
             if (current_add == NULL) {
                 handler_result = FAILURE;
                 break;

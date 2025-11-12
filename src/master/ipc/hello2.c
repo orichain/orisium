@@ -174,7 +174,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
     rekeying->is_rekeying = false;
     ipc_protocol_queue_t *current_pqueue;
     do {
-        current_pqueue = ipc_pop_protocol_queue(&rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail);
+        current_pqueue = ipc_pop_head_protocol_queue(&rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail);
         if (current_pqueue == NULL) {
             break;
         }

@@ -47,7 +47,7 @@ status_t worker_master_heartbeat(worker_context_t *ctx, double new_heartbeat_int
         return FAILURE;
     }
     if (ctx->is_rekeying) {
-        if (ipc_add_protocol_queue(ctx->label, *ctx->wot, *ctx->index, ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &ctx->rekeying_queue_head, &ctx->rekeying_queue_tail) != SUCCESS) {
+        if (ipc_add_tail_protocol_queue(ctx->label, *ctx->wot, *ctx->index, ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &ctx->rekeying_queue_head, &ctx->rekeying_queue_tail) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
@@ -166,7 +166,7 @@ status_t worker_master_udp_data_ack_send_ipc(
         return FAILURE;
     }
     if (worker_ctx->is_rekeying) {
-        if (ipc_add_protocol_queue(worker_ctx->label, *worker_ctx->wot, *worker_ctx->index, worker_ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &worker_ctx->rekeying_queue_head, &worker_ctx->rekeying_queue_tail) != SUCCESS) {
+        if (ipc_add_tail_protocol_queue(worker_ctx->label, *worker_ctx->wot, *worker_ctx->index, worker_ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &worker_ctx->rekeying_queue_head, &worker_ctx->rekeying_queue_tail) != SUCCESS) {
             memset(h->udp_data.r_puint8_t, 0, h->udp_data.r_size_t);
             free(h->udp_data.r_puint8_t);
             h->udp_data.r_puint8_t = NULL;
@@ -230,7 +230,7 @@ status_t worker_master_udp_data_send_ipc(
         return FAILURE;
     }
     if (worker_ctx->is_rekeying) {
-        if (ipc_add_protocol_queue(worker_ctx->label, *worker_ctx->wot, *worker_ctx->index, worker_ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &worker_ctx->rekeying_queue_head, &worker_ctx->rekeying_queue_tail) != SUCCESS) {
+        if (ipc_add_tail_protocol_queue(worker_ctx->label, *worker_ctx->wot, *worker_ctx->index, worker_ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &worker_ctx->rekeying_queue_head, &worker_ctx->rekeying_queue_tail) != SUCCESS) {
             memset(h->udp_data.r_puint8_t, 0, h->udp_data.r_size_t);
             free(h->udp_data.r_puint8_t);
             h->udp_data.r_puint8_t = NULL;
@@ -275,7 +275,7 @@ status_t worker_master_task_info(worker_context_t *ctx, uint8_t session_index, t
         return FAILURE;
     }
     if (ctx->is_rekeying) {
-        if (ipc_add_protocol_queue(ctx->label, *ctx->wot, *ctx->index, ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &ctx->rekeying_queue_head, &ctx->rekeying_queue_tail) != SUCCESS) {
+        if (ipc_add_tail_protocol_queue(ctx->label, *ctx->wot, *ctx->index, ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &ctx->rekeying_queue_head, &ctx->rekeying_queue_tail) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
@@ -726,7 +726,7 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
         worker_ctx->is_rekeying = false;
         ipc_protocol_queue_t *current_pqueue;
         do {
-            current_pqueue = ipc_pop_protocol_queue(&worker_ctx->rekeying_queue_head, &worker_ctx->rekeying_queue_tail);
+            current_pqueue = ipc_pop_head_protocol_queue(&worker_ctx->rekeying_queue_head, &worker_ctx->rekeying_queue_tail);
             if (current_pqueue == NULL) {
                 break;
             }

@@ -251,43 +251,65 @@ typedef struct orilink_raw_protocol_t {
     uint8_t trycount;
     
     struct orilink_raw_protocol_t *next;
+    struct orilink_raw_protocol_t *prev;
 } orilink_raw_protocol_t;
 
 typedef struct {
     orilink_raw_protocol_t *head;
+    orilink_raw_protocol_t *tail;
 } orilink_raw_protocol_pool_t;
+
+static inline void orilink_add_head_orilink_raw_protocol(orilink_raw_protocol_t **head, orilink_raw_protocol_t **tail, orilink_raw_protocol_t *orp) {
+    orp->prev = NULL;
+    orp->next = *head;
+    if (*head) {
+        (*head)->prev = orp;
+    } else {
+        *tail = orp;
+    }
+    *head = orp;
+}
+
+static inline orilink_raw_protocol_t *orilink_pop_head_orilink_raw_protocol(orilink_raw_protocol_t **head, orilink_raw_protocol_t **tail) {
+    if (!(*head)) return NULL;
+    orilink_raw_protocol_t *orp = *head;
+    *head = orp->next;
+    if (*head)
+        (*head)->prev = NULL;
+    else
+        *tail = NULL;
+    orp->next = orp->prev = NULL;
+    return orp;
+}
 
 static inline orilink_raw_protocol_t *orilink_raw_protocol_pool_alloc(orilink_raw_protocol_pool_t *pool) {
     orilink_raw_protocol_t *orp;
-    if (pool->head != NULL) {
-        orp = pool->head;
-        pool->head = orp->next;
-    } else {
+    orp = orilink_pop_head_orilink_raw_protocol(&pool->head, &pool->tail); 
+    if (orp == NULL) {
         orp = calloc(1, sizeof(orilink_raw_protocol_t));
         if (orp == NULL) {
             return NULL;
         }
     }
     orp->next = NULL;
+    orp->prev = NULL;
     return orp;
 }
 
 static inline void orilink_raw_protocol_pool_free(orilink_raw_protocol_pool_t *pool, orilink_raw_protocol_t *orp) {
     if (!orp) return;
     memset(orp, 0, sizeof(orilink_raw_protocol_t));
-    orp->next = pool->head;
-    pool->head = orp;
+    orilink_add_head_orilink_raw_protocol(&pool->head, &pool->tail, orp);
 }
 
-static inline void orilink_raw_protocol_free(orilink_raw_protocol_t **head) {
-    orilink_raw_protocol_t *current = *head;
-    orilink_raw_protocol_t *next;
-    while (current != NULL) {
-        next = current->next;
-        free(current);
-        current = next;
+static inline void orilink_raw_protocol_cleanup(orilink_raw_protocol_t **head, orilink_raw_protocol_t **tail) {
+    orilink_raw_protocol_t *cur = *head;
+    while (cur) {
+        orilink_raw_protocol_t *next = cur->next;
+        free(cur);
+        cur = next;
     }
-    *head = NULL;
+    *head = *tail = NULL;
 }
 
 //Huruf_besar biar selalu ingat karena akan sering digunakan

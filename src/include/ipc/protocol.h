@@ -110,6 +110,7 @@ typedef struct ipc_protocol_queue_t {
     int *uds_fd;
     ipc_protocol_t *p;
     struct ipc_protocol_queue_t *next;
+    struct ipc_protocol_queue_t *prev;
 } ipc_protocol_queue_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan
 static inline void CLOSE_IPC_PAYLOAD(void **ptr) {
