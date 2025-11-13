@@ -254,10 +254,24 @@ typedef struct orilink_raw_protocol_t {
     struct orilink_raw_protocol_t *prev;
 } orilink_raw_protocol_t;
 
+typedef struct p8zs_t {
+    size_t len;
+	uint8_t data[ORILINK_MAX_PACKET_SIZE];
+	status_t status;
+    
+    struct p8zs_t *next;
+    struct p8zs_t *prev;
+} p8zs_t;
+
 typedef struct {
     orilink_raw_protocol_t *head;
     orilink_raw_protocol_t *tail;
 } orilink_raw_protocol_pool_t;
+
+typedef struct {
+    p8zs_t *head;
+    p8zs_t *tail;
+} p8zs_pool_t;
 
 static inline void orilink_add_head_orilink_raw_protocol(orilink_raw_protocol_t **head, orilink_raw_protocol_t **tail, orilink_raw_protocol_t *orp) {
     orp->prev = NULL;
@@ -296,27 +310,83 @@ static inline orilink_raw_protocol_t *orilink_raw_protocol_pool_alloc(orilink_ra
     return orp;
 }
 
-static inline void orilink_raw_protocol_pool_free(orilink_raw_protocol_pool_t *pool, orilink_raw_protocol_t *orp) {
-    if (!orp) return;
+static inline orilink_raw_protocol_t *orilink_raw_protocol_pool_free(orilink_raw_protocol_pool_t *pool, orilink_raw_protocol_t *orp) {
+    if (!orp) return NULL;
     memset(orp, 0, sizeof(orilink_raw_protocol_t));
     orilink_add_head_orilink_raw_protocol(&pool->head, &pool->tail, orp);
+    return NULL;
 }
 
 static inline void orilink_raw_protocol_cleanup(orilink_raw_protocol_t **head, orilink_raw_protocol_t **tail) {
     orilink_raw_protocol_t *cur = *head;
     while (cur) {
         orilink_raw_protocol_t *next = cur->next;
+        memset(cur, 0, sizeof(orilink_raw_protocol_t));
         free(cur);
         cur = next;
     }
     *head = *tail = NULL;
 }
 
+static inline void orilink_add_head_p8zs(p8zs_t **head, p8zs_t **tail, p8zs_t *p8zs) {
+    p8zs->prev = NULL;
+    p8zs->next = *head;
+    if (*head) {
+        (*head)->prev = p8zs;
+    } else {
+        *tail = p8zs;
+    }
+    *head = p8zs;
+}
+
+static inline p8zs_t *orilink_pop_head_p8zs(p8zs_t **head, p8zs_t **tail) {
+    if (!(*head)) return NULL;
+    p8zs_t *p8zs = *head;
+    *head = p8zs->next;
+    if (*head)
+        (*head)->prev = NULL;
+    else
+        *tail = NULL;
+    p8zs->next = p8zs->prev = NULL;
+    return p8zs;
+}
+
+static inline p8zs_t *orilink_p8zs_pool_alloc(p8zs_pool_t *pool) {
+    p8zs_t *p8zs;
+    p8zs = orilink_pop_head_p8zs(&pool->head, &pool->tail); 
+    if (p8zs == NULL) {
+        p8zs = calloc(1, sizeof(p8zs_t));
+        if (p8zs == NULL) {
+            return NULL;
+        }
+    }
+    p8zs->next = NULL;
+    p8zs->prev = NULL;
+    return p8zs;
+}
+
+static inline p8zs_t *orilink_p8zs_pool_free(p8zs_pool_t *pool, p8zs_t *p8zs) {
+    if (!p8zs) return NULL;
+    memset(p8zs, 0, sizeof(p8zs_t));
+    orilink_add_head_p8zs(&pool->head, &pool->tail, p8zs);
+    return NULL;
+}
+
+static inline void orilink_p8zs_cleanup(p8zs_t **head, p8zs_t **tail) {
+    p8zs_t *cur = *head;
+    while (cur) {
+        p8zs_t *next = cur->next;
+        memset(cur, 0, sizeof(p8zs_t));
+        free(cur);
+        cur = next;
+    }
+    *head = *tail = NULL;
+}
 //Huruf_besar biar selalu ingat karena akan sering digunakan
 static inline void CLOSE_ORILINK_RAW_PROTOCOL(orilink_raw_protocol_pool_t *orp_pool, orilink_raw_protocol_t **protocol_ptr) {
     if (protocol_ptr != NULL && *protocol_ptr != NULL) {
         orilink_raw_protocol_t *x = *protocol_ptr;
-        orilink_raw_protocol_pool_free(orp_pool, x);
+        x = orilink_raw_protocol_pool_free(orp_pool, x);
         *protocol_ptr = NULL;
     }
 }

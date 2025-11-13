@@ -1,22 +1,11 @@
 #ifndef ORITW_TIMER_EVENT_H
 #define ORITW_TIMER_EVENT_H
 
-#include <limits.h>
-#include <math.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/types.h>
-#include <unistd.h>
 
-#include "async.h"
 #include "constants.h"
-#include "log.h"
-#include "types.h"
-#include "utilities.h"
 
 typedef struct timer_event_t {
     struct timer_event_t *next;

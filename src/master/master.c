@@ -100,6 +100,8 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
     if (oritw_setup(label, &master_ctx->master_async, &master_ctx->timer) != SUCCESS) return FAILURE;
     master_ctx->orilink_raw_protocol_pool.head = NULL;
     master_ctx->orilink_raw_protocol_pool.tail = NULL;
+    master_ctx->orilink_p8zs_pool.head = NULL;
+    master_ctx->orilink_p8zs_pool.tail = NULL;
     return SUCCESS;
 }
 
@@ -139,8 +141,7 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     CLOSE_FD(&master_ctx->shutdown_event_fd);
 //----------------------------------------------------------------------
     if (master_ctx->check_healthy_timer_id.event) {
-        oritw_remove_event(label, &master_ctx->master_async, &master_ctx->timer, master_ctx->check_healthy_timer_id.event);
-        master_ctx->check_healthy_timer_id.event = NULL;
+        master_ctx->check_healthy_timer_id.event = oritw_remove_eventX(label, &master_ctx->master_async, &master_ctx->timer, master_ctx->check_healthy_timer_id.event);
         master_ctx->check_healthy_timer_id.id = 0ULL;
         master_ctx->check_healthy_timer_id.delay_us = 0.0;
     }
@@ -152,6 +153,7 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     memset(&master_ctx->bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
 //----------------------------------------------------------------------
     orilink_raw_protocol_cleanup(&master_ctx->orilink_raw_protocol_pool.head, &master_ctx->orilink_raw_protocol_pool.tail);
+    orilink_p8zs_cleanup(&master_ctx->orilink_p8zs_pool.head, &master_ctx->orilink_p8zs_pool.tail);
 //----------------------------------------------------------------------
 }
 

@@ -19,6 +19,7 @@
 #include "utilities.h"
 #include "types.h"
 #include "oritw.h"
+#include "oritw/timer_id.h"
 
 typedef struct {
     double hb_interval;
@@ -38,7 +39,7 @@ typedef struct {
     timer_id_t retry_timer_id;
     bool ack_rcvd;
     uint64_t ack_rcvd_time;
-    puint8_t_size_t_status_t udp_data;
+    p8zs_t *udp_data;
 } packet_t;
 
 typedef struct {
@@ -48,7 +49,7 @@ typedef struct {
     uint8_t ack_sent_try_count;
     uint64_t ack_sent_time;
     uint8_t last_trycount;
-    puint8_t_size_t_status_t udp_data;
+    p8zs_t *udp_data;
 } packet_ack_t;
 
 typedef struct {
@@ -117,6 +118,7 @@ typedef struct {
     oricle_double_t healthy;
 //----------------------------------------------------------------------
     orilink_raw_protocol_pool_t orilink_raw_protocol_pool;
+    p8zs_pool_t orilink_p8zs_pool;
 } sio_c_session_t; //Server
 
 typedef struct {
@@ -152,6 +154,7 @@ typedef struct {
     oricle_long_double_t avgtt;
 //----------------------------------------------------------------------
     orilink_raw_protocol_pool_t orilink_raw_protocol_pool;
+    p8zs_pool_t orilink_p8zs_pool;
 } cow_c_session_t; //Client
 
 typedef struct {
@@ -264,34 +267,19 @@ static inline void calculate_rtt(const char *label, void *void_session, worker_t
     }
 }
 
-static inline void cleanup_control_packet(worker_context_t *ctx, packet_t *h, bool clean_state, clean_data_type_t clean_data) {
+static inline void cleanup_control_packet(worker_context_t *ctx, p8zs_pool_t *pool, packet_t *h, bool clean_state, bool clean_data) {
     if (clean_state) {
         h->sent = false;
         h->sent_time = (uint64_t)0;
         h->ack_rcvd_time = (uint64_t)0;
         h->ack_rcvd = false;
     }
-    switch (clean_data) {
-        case CDT_RESET: {
-            memset(h->udp_data.r_puint8_t, 0, h->udp_data.r_size_t);
-            h->udp_data.r_size_t = (size_t)0;
-            break;
-        }
-        case CDT_FREE: {
-            if (h->udp_data.r_puint8_t) {
-                memset(h->udp_data.r_puint8_t, 0, h->udp_data.r_size_t);
-                free(h->udp_data.r_puint8_t);
-                h->udp_data.r_puint8_t = NULL;
-            }
-            h->udp_data.r_size_t = (size_t)0;
-            break;
-        }
-        default:
+    if (clean_data) {
+        h->udp_data = orilink_p8zs_pool_free(pool, h->udp_data);
     }
     h->sent_try_count = 0x00;
     if (h->retry_timer_id.event) {
-        oritw_remove_event(ctx->label, &ctx->async, &ctx->timer, h->retry_timer_id.event);
-        h->retry_timer_id.event = NULL;
+        h->retry_timer_id.event = oritw_remove_eventX(ctx->label, &ctx->async, &ctx->timer, h->retry_timer_id.event);
         h->retry_timer_id.delay_us = 0.0;
 //----------------------------------------------------------------------
 // Reuse Old Id
@@ -307,14 +295,13 @@ static inline void setup_control_packet(const char *label, uint8_t session_index
     h->ack_rcvd_time = (uint64_t)0;
     h->ack_rcvd = false;
     h->sent_try_count = 0x00;
-    h->udp_data.r_puint8_t = NULL;
-    h->udp_data.r_size_t = (size_t)0;
+    h->udp_data = NULL;
     generate_si_id(label, session_index, &h->retry_timer_id.id);
     h->retry_timer_id.delay_us = 0.0;
     h->retry_timer_id.event = NULL;
 }
 
-static inline void cleanup_control_packet_ack(packet_ack_t *h, bool clean_state, clean_data_type_t clean_data) {
+static inline void cleanup_control_packet_ack(p8zs_pool_t *pool, packet_ack_t *h, bool clean_state, bool clean_data) {
     if (clean_state) {
         h->rcvd = false;
         h->rcvd_time = (uint64_t)0;
@@ -322,22 +309,8 @@ static inline void cleanup_control_packet_ack(packet_ack_t *h, bool clean_state,
         h->ack_sent = false;
     }
     //----------------------------------------------------------------------
-    switch (clean_data) {
-        case CDT_RESET: {
-            memset(h->udp_data.r_puint8_t, 0, h->udp_data.r_size_t);
-            h->udp_data.r_size_t = (size_t)0;
-            break;
-        }
-        case CDT_FREE: {
-            if (h->udp_data.r_puint8_t) {
-                memset(h->udp_data.r_puint8_t, 0, h->udp_data.r_size_t);
-                free(h->udp_data.r_puint8_t);
-                h->udp_data.r_puint8_t = NULL;
-            }
-            h->udp_data.r_size_t = (size_t)0;
-            break;
-        }
-        default:
+    if (clean_data) {
+        h->udp_data = orilink_p8zs_pool_free(pool, h->udp_data);
     }
     h->ack_sent_try_count = 0x00;
     h->last_trycount = (uint8_t)0;
@@ -349,8 +322,7 @@ static inline void setup_control_packet_ack(packet_ack_t *h) {
     h->ack_sent_time = (uint64_t)0;
     h->ack_sent = false;
     h->ack_sent_try_count = 0x00;
-    h->udp_data.r_puint8_t = NULL;
-    h->udp_data.r_size_t = (size_t)0;
+    h->udp_data = NULL;
     h->last_trycount = (uint8_t)0;
 }
 
@@ -409,31 +381,31 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
     }
     single_session->orilink_raw_protocol_pool.head = NULL;
     single_session->orilink_raw_protocol_pool.tail = NULL;
+    single_session->orilink_p8zs_pool.head = NULL;
+    single_session->orilink_p8zs_pool.tail = NULL;
     return SUCCESS;
 }
 
 static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *single_session) {
 //----------------------------------------------------------------------
-    cleanup_control_packet(ctx, &single_session->hello1, true, CDT_FREE);
-    cleanup_control_packet(ctx, &single_session->hello2, true, CDT_FREE);
-    cleanup_control_packet(ctx, &single_session->hello3, true, CDT_FREE);
-    cleanup_control_packet(ctx, &single_session->hello4, true, CDT_FREE);
+    cleanup_control_packet(ctx, &single_session->orilink_p8zs_pool, &single_session->hello1, true, true);
+    cleanup_control_packet(ctx, &single_session->orilink_p8zs_pool, &single_session->hello2, true, true);
+    cleanup_control_packet(ctx, &single_session->orilink_p8zs_pool, &single_session->hello3, true, true);
+    cleanup_control_packet(ctx, &single_session->orilink_p8zs_pool, &single_session->hello4, true, true);
 //----------------------------------------------------------------------
-    cleanup_control_packet(ctx, &single_session->heartbeat.heartbeat, true, CDT_FREE);
-    cleanup_control_packet_ack(&single_session->heartbeat.heartbeat_ack, true, CDT_FREE);
+    cleanup_control_packet(ctx, &single_session->orilink_p8zs_pool, &single_session->heartbeat.heartbeat, true, true);
+    cleanup_control_packet_ack(&single_session->orilink_p8zs_pool, &single_session->heartbeat.heartbeat_ack, true, true);
     single_session->heartbeat.heartbeat_interval = (double)0;
     single_session->heartbeat.last_send_heartbeat_interval = (double)0;
     single_session->heartbeat.heartbeat_cnt = 0x00;
     if (single_session->heartbeat.heartbeat_sender_timer_id.event) {
-        oritw_remove_event(ctx->label, &ctx->async, &ctx->timer, single_session->heartbeat.heartbeat_sender_timer_id.event);
-        single_session->heartbeat.heartbeat_sender_timer_id.event = NULL;
+        single_session->heartbeat.heartbeat_sender_timer_id.event = oritw_remove_eventX(ctx->label, &ctx->async, &ctx->timer, single_session->heartbeat.heartbeat_sender_timer_id.event);
         single_session->heartbeat.heartbeat_sender_timer_id.id = 0ULL;
         single_session->heartbeat.heartbeat_sender_timer_id.delay_us = 0.0;
     }
     #if defined(ACCRCY_TEST)
     if (single_session->heartbeat.heartbeat_openner_timer_id.event) {
-        oritw_remove_event(ctx->label, &ctx->async, &ctx->timer, single_session->heartbeat.heartbeat_openner_timer_id.event);
-        single_session->heartbeat.heartbeat_openner_timer_id.event = NULL;
+        single_session->heartbeat.heartbeat_openner_timer_id.event = oritw_remove_eventX(ctx->label, &ctx->async, &ctx->timer, single_session->heartbeat.heartbeat_openner_timer_id.event);
         single_session->heartbeat.heartbeat_openner_timer_id.id = 0ULL;
         single_session->heartbeat.heartbeat_openner_timer_id.delay_us = 0.0;
     }
@@ -475,6 +447,7 @@ static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *s
     free(security->remote_nonce);
 //----------------------------------------------------------------------
     orilink_raw_protocol_cleanup(&single_session->orilink_raw_protocol_pool.head, &single_session->orilink_raw_protocol_pool.tail);
+    orilink_p8zs_cleanup(&single_session->orilink_p8zs_pool.head, &single_session->orilink_p8zs_pool.tail);
 //----------------------------------------------------------------------
 }
 
@@ -527,31 +500,31 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     security->remote_ctr = (uint32_t)0;
     single_session->orilink_raw_protocol_pool.head = NULL;
     single_session->orilink_raw_protocol_pool.tail = NULL;
+    single_session->orilink_p8zs_pool.head = NULL;
+    single_session->orilink_p8zs_pool.tail = NULL;
     return SUCCESS;
 }
 
 static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *single_session) {
 //----------------------------------------------------------------------
-    cleanup_control_packet_ack(&single_session->hello1_ack, true, CDT_FREE);
-    cleanup_control_packet_ack(&single_session->hello2_ack, true, CDT_FREE);
-    cleanup_control_packet_ack(&single_session->hello3_ack, true, CDT_FREE);
-    cleanup_control_packet_ack(&single_session->hello4_ack, true, CDT_FREE);
+    cleanup_control_packet_ack(&single_session->orilink_p8zs_pool, &single_session->hello1_ack, true, true);
+    cleanup_control_packet_ack(&single_session->orilink_p8zs_pool, &single_session->hello2_ack, true, true);
+    cleanup_control_packet_ack(&single_session->orilink_p8zs_pool, &single_session->hello3_ack, true, true);
+    cleanup_control_packet_ack(&single_session->orilink_p8zs_pool, &single_session->hello4_ack, true, true);
 //----------------------------------------------------------------------
-    cleanup_control_packet(ctx, &single_session->heartbeat.heartbeat, true, CDT_FREE);
-    cleanup_control_packet_ack(&single_session->heartbeat.heartbeat_ack, true, CDT_FREE);
+    cleanup_control_packet(ctx, &single_session->orilink_p8zs_pool, &single_session->heartbeat.heartbeat, true, true);
+    cleanup_control_packet_ack(&single_session->orilink_p8zs_pool, &single_session->heartbeat.heartbeat_ack, true, true);
     single_session->heartbeat.heartbeat_interval = (double)0;
     single_session->heartbeat.last_send_heartbeat_interval = (double)0;
     single_session->heartbeat.heartbeat_cnt = 0x00;
     if (single_session->heartbeat.heartbeat_sender_timer_id.event) {
-        oritw_remove_event(ctx->label, &ctx->async, &ctx->timer, single_session->heartbeat.heartbeat_sender_timer_id.event);
-        single_session->heartbeat.heartbeat_sender_timer_id.event = NULL;
+        single_session->heartbeat.heartbeat_sender_timer_id.event = oritw_remove_eventX(ctx->label, &ctx->async, &ctx->timer, single_session->heartbeat.heartbeat_sender_timer_id.event);
         single_session->heartbeat.heartbeat_sender_timer_id.id = 0ULL;
         single_session->heartbeat.heartbeat_sender_timer_id.delay_us = 0.0;
     }
     #if defined(ACCRCY_TEST)
     if (single_session->heartbeat.heartbeat_openner_timer_id.event) {
-        oritw_remove_event(ctx->label, &ctx->async, &ctx->timer, single_session->heartbeat.heartbeat_openner_timer_id.event);
-        single_session->heartbeat.heartbeat_openner_timer_id.event = NULL;
+        single_session->heartbeat.heartbeat_openner_timer_id.event = oritw_remove_eventX(ctx->label, &ctx->async, &ctx->timer, single_session->heartbeat.heartbeat_openner_timer_id.event);
         single_session->heartbeat.heartbeat_openner_timer_id.id = 0ULL;
         single_session->heartbeat.heartbeat_openner_timer_id.delay_us = 0.0;
     }
@@ -590,6 +563,7 @@ static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *s
     free(security->remote_nonce);
 //----------------------------------------------------------------------
     orilink_raw_protocol_cleanup(&single_session->orilink_raw_protocol_pool.head, &single_session->orilink_raw_protocol_pool.tail);
+    orilink_p8zs_cleanup(&single_session->orilink_p8zs_pool.head, &single_session->orilink_p8zs_pool.tail);
 //----------------------------------------------------------------------
 }
 

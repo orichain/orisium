@@ -7,7 +7,6 @@
 #include <string.h>
 #include <sys/types.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "log.h"
 #include "oritw.h"
@@ -18,6 +17,7 @@
 #include "constants.h"
 #include "stdbool.h"
 #include "oritw/timer_event.h"
+#include "oritw/timer_id.h"
 
 static inline status_t drain_event_fd(const char *label, int fd) {
     uint64_t u;
@@ -47,7 +47,7 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                 break;
             }
             handler_result = oritw_add_event(label, &master_ctx->master_async, &master_ctx->timer, current_add);
-            free(current_add);
+            current_add = oritw_id_pool_free(&master_ctx->timer, current_add);
             if (handler_result != SUCCESS) {
                 break;
             }
@@ -94,6 +94,7 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                 }
                 uint64_t expired_timer_id = current_event->timer_id;
                 if (expired_timer_id == master_ctx->check_healthy_timer_id.id) {
+                    master_ctx->check_healthy_timer_id.event = oritw_pool_free(&master_ctx->timer, master_ctx->check_healthy_timer_id.event);
                     master_ctx->check_healthy_timer_id.delay_us = worker_check_healthy_us();
                     status_t chst = oritw_add_event(label, &master_ctx->master_async, &master_ctx->timer, &master_ctx->check_healthy_timer_id);
                     if (chst != SUCCESS) {
@@ -101,7 +102,6 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                         master_ctx->shutdown_requested = 1;
                         master_workers_info(label, master_ctx, IT_SHUTDOWN);
                         handler_result = FAILURE;
-                        oritw_pool_free(&master_ctx->timer, current_event);
                         break;
                     }
                     master_ctx->hb_check_times++;
@@ -111,7 +111,6 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                         master_ctx->all_workers_is_ready = false;
                         handler_result = master_workers_info(label, master_ctx, IT_REKEYING);
                         if (handler_result != SUCCESS) {
-                            oritw_pool_free(&master_ctx->timer, current_event);
                             break;
                         }
 //----------------------------------------------------------------------
@@ -120,19 +119,16 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                         /*
                         handler_result = master_workers_info(label, master_ctx, IT_WAKEUP);
                         if (handler_result != SUCCESS) {
-                            oritw_pool_free(&master_ctx->timer, current_event);
                             break;
                         }
                         
                         handler_result = master_workers_info(label, master_ctx, IT_WAKEUP);
                         if (handler_result != SUCCESS) {
-                            oritw_pool_free(&master_ctx->timer, current_event);
                             break;
                         }
                         
                         handler_result = master_workers_info(label, master_ctx, IT_WAKEUP);
                         if (handler_result != SUCCESS) {
-                            oritw_pool_free(&master_ctx->timer, current_event);
                             break;
                         }
                         */
@@ -140,7 +136,6 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                     } else {
                         handler_result = check_workers_healthy(label, master_ctx);
                         if (handler_result != SUCCESS) {
-                            oritw_pool_free(&master_ctx->timer, current_event);
                             break;
                         }
                     }
@@ -149,7 +144,6 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                     oritw_pool_free(&master_ctx->timer, current_event);
                     break;
                 }
-                oritw_pool_free(&master_ctx->timer, current_event);
             } while (current_event != NULL);
             if (handler_result == SUCCESS) {
                 timer->ready_queue_head = NULL;

@@ -311,10 +311,7 @@ static inline void decrement_ctr(uint32_t *ctr, uint8_t *nonce) {
 }
 
 static inline bool is_1greater_ctr(const char* label, uint8_t *data, uint8_t* key_mac, uint8_t *nonce, uint32_t *ctr) {
-    uint8_t *tmp_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-    if (!tmp_nonce) {
-        return false;
-    }
+    uint8_t tmp_nonce[AES_NONCE_BYTES];
     memcpy(tmp_nonce, nonce, AES_NONCE_BYTES);
     uint32_t tmp_ctr = *ctr;
 //----------------------------------------------------------------------
@@ -340,7 +337,6 @@ static inline bool is_1greater_ctr(const char* label, uint8_t *data, uint8_t* ke
         )
         {
             memset(tmp_nonce, 0, AES_NONCE_BYTES);
-            free(tmp_nonce);
             return false;
         }
     #else
@@ -352,15 +348,11 @@ static inline bool is_1greater_ctr(const char* label, uint8_t *data, uint8_t* ke
     bool islwr = (data_ctr == tmp_ctr);
 //----------------------------------------------------------------------    
     memset(tmp_nonce, 0, AES_NONCE_BYTES);
-    free(tmp_nonce);
     return islwr;
 }
 
 static inline bool is_1lower_equal_ctr(const char* label, uint8_t *data, uint8_t* key_mac, uint8_t *nonce, uint32_t *ctr) {
-    uint8_t *tmp_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-    if (!tmp_nonce) {
-        return false;
-    }
+    uint8_t tmp_nonce[AES_NONCE_BYTES];
     memcpy(tmp_nonce, nonce, AES_NONCE_BYTES);
     uint32_t tmp_ctr = *ctr;
 //----------------------------------------------------------------------
@@ -385,7 +377,6 @@ static inline bool is_1lower_equal_ctr(const char* label, uint8_t *data, uint8_t
         )
         {
             memset(tmp_nonce, 0, AES_NONCE_BYTES);
-            free(tmp_nonce);
             return false;
         }
     #else
@@ -397,7 +388,6 @@ static inline bool is_1lower_equal_ctr(const char* label, uint8_t *data, uint8_t
     bool issme = (data_ctr == tmp_ctr);
     if (issme) {
         memset(tmp_nonce, 0, AES_NONCE_BYTES);
-        free(tmp_nonce);
         return issme;
     }
     decrement_ctr(&tmp_ctr, tmp_nonce);
@@ -414,7 +404,6 @@ static inline bool is_1lower_equal_ctr(const char* label, uint8_t *data, uint8_t
         )
         {
             memset(tmp_nonce, 0, AES_NONCE_BYTES);
-            free(tmp_nonce);
             return false;
         }
     #else
@@ -425,15 +414,11 @@ static inline bool is_1lower_equal_ctr(const char* label, uint8_t *data, uint8_t
     bool islwr = (data_ctr == tmp_ctr);
 //----------------------------------------------------------------------    
     memset(tmp_nonce, 0, AES_NONCE_BYTES);
-    free(tmp_nonce);
     return islwr;
 }
 
 static inline bool is_equal_ctr(const char* label, uint8_t *data, uint8_t* key_mac, uint8_t *nonce, uint32_t *ctr) {
-    uint8_t *tmp_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-    if (!tmp_nonce) {
-        return false;
-    }
+    uint8_t tmp_nonce[AES_NONCE_BYTES];
     memcpy(tmp_nonce, nonce, AES_NONCE_BYTES);
     uint32_t tmp_ctr = *ctr;
 //----------------------------------------------------------------------
@@ -458,7 +443,6 @@ static inline bool is_equal_ctr(const char* label, uint8_t *data, uint8_t* key_m
         )
         {
             memset(tmp_nonce, 0, AES_NONCE_BYTES);
-            free(tmp_nonce);
             return false;
         }
     #else
@@ -470,15 +454,11 @@ static inline bool is_equal_ctr(const char* label, uint8_t *data, uint8_t* key_m
     bool issme = (data_ctr == tmp_ctr);
 //----------------------------------------------------------------------    
     memset(tmp_nonce, 0, AES_NONCE_BYTES);
-    free(tmp_nonce);
     return issme;
 }
 
 static inline bool is_gc_ctr(const char* label, uint8_t *data, uint8_t* key_mac, uint8_t *nonce) {
-    uint8_t *tmp_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-    if (!tmp_nonce) {
-        return false;
-    }
+    uint8_t tmp_nonce[AES_NONCE_BYTES];
     memcpy(tmp_nonce, nonce, AES_NONCE_BYTES);
     uint32_t tmp_ctr = 0xffffffff;
 //----------------------------------------------------------------------
@@ -503,7 +483,6 @@ static inline bool is_gc_ctr(const char* label, uint8_t *data, uint8_t* key_mac,
         )
         {
             memset(tmp_nonce, 0, AES_NONCE_BYTES);
-            free(tmp_nonce);
             return false;
         }
     #else
@@ -515,7 +494,6 @@ static inline bool is_gc_ctr(const char* label, uint8_t *data, uint8_t* key_mac,
     bool issme = (data_ctr == tmp_ctr);
 //----------------------------------------------------------------------    
     memset(tmp_nonce, 0, AES_NONCE_BYTES);
-    free(tmp_nonce);
     return issme;
 }
 
@@ -588,10 +566,7 @@ static inline double worker_check_healthy_us() {
 }
 
 static inline bool is_1lower_ctr(const char* label, uint8_t *data, uint8_t* key_mac, uint8_t *nonce, uint32_t *ctr) {
-    uint8_t *tmp_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-    if (!tmp_nonce) {
-        return false;
-    }
+    uint8_t tmp_nonce[AES_NONCE_BYTES];
     memcpy(tmp_nonce, nonce, AES_NONCE_BYTES);
     uint32_t tmp_ctr = *ctr;
 //----------------------------------------------------------------------
@@ -617,7 +592,6 @@ static inline bool is_1lower_ctr(const char* label, uint8_t *data, uint8_t* key_
         )
         {
             memset(tmp_nonce, 0, AES_NONCE_BYTES);
-            free(tmp_nonce);
             return false;
         }
     #else
@@ -629,7 +603,6 @@ static inline bool is_1lower_ctr(const char* label, uint8_t *data, uint8_t* key_
     bool islwr = (data_ctr == tmp_ctr);
 //----------------------------------------------------------------------    
     memset(tmp_nonce, 0, AES_NONCE_BYTES);
-    free(tmp_nonce);
     return islwr;
 }
 

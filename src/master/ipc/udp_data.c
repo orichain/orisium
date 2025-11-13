@@ -1,6 +1,5 @@
 #include <string.h>
 #include <stdint.h>
-#include <stdlib.h>
 
 #include "log.h"
 #include "ipc.h"
@@ -10,6 +9,7 @@
 #include "master/ipc/worker_ipc_cmds.h"
 #include "orilink.h"
 #include "ipc/protocol.h"
+#include "orilink/protocol.h"
 
 status_t handle_master_ipc_udp_data(const char *label, master_context_t *master_ctx, worker_security_t *security, ipc_raw_protocol_t_status_t *ircvdi) {
     worker_type_t rcvd_wot = ircvdi->r_ipc_raw_protocol_t->wot;
@@ -28,22 +28,22 @@ status_t handle_master_ipc_udp_data(const char *label, master_context_t *master_
     }           
     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
     ipc_udp_data_t *iudpi = received_protocol->payload.ipc_udp_data;
-    puint8_t_size_t_status_t orpp;
-    orpp.status = SUCCESS;
-    orpp.r_size_t = iudpi->len;
-    orpp.r_puint8_t = (uint8_t *)calloc(1, iudpi->len);
-    if (!orpp.r_puint8_t) {
+    p8zs_t *orpp = orilink_p8zs_pool_alloc(&master_ctx->orilink_p8zs_pool);
+    if (!orpp) {
         LOG_ERROR("%sFailed to preparing send_orilink_raw_protocol_packet.", label);
         CLOSE_IPC_PROTOCOL(&received_protocol);
         return FAILURE_NOMEM;
     }
-    memcpy(orpp.r_puint8_t, iudpi->data, iudpi->len);
+    orpp->status = SUCCESS;
+    orpp->len = iudpi->len;
+    memcpy(orpp->data, iudpi->data, iudpi->len);
     uint8_t session_index = iudpi->session_index;
     uint8_t orilink_protocol = iudpi->orilink_protocol;
     uint8_t trycount = iudpi->trycount;
     ssize_t_status_t send_result = send_orilink_raw_protocol_packet(
         label,
-        &orpp,
+        &master_ctx->orilink_p8zs_pool,
+        orpp,
         &master_ctx->udp_sock,
         &iudpi->remote_addr
     );

@@ -62,12 +62,6 @@ typedef enum {
 } info_type_t;
 
 typedef enum {
-    CDT_NOACTION = (uint8_t)0x00,
-    CDT_RESET = (uint8_t)0x01,
-    CDT_FREE = (uint8_t)0x02
-} clean_data_type_t;
-
-typedef enum {
     TIT_SECURE = (uint8_t)0x00,
 	TIT_TIMEOUT = (uint8_t)0x01,
     
@@ -100,12 +94,6 @@ typedef struct {
 	uint32_t r_uint32_t;
 	status_t status;
 } uint32_t_status_t;
-
-typedef struct {
-	uint8_t *r_puint8_t;
-    size_t r_size_t;
-	status_t status;
-} puint8_t_size_t_status_t;
 
 typedef struct {
 	int r_int;
