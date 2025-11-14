@@ -25,7 +25,7 @@
 
 #define MAX_TIMER_LEVELS 20
 #define WHEEL_SIZE 256
-#define MIN_GAP_US 5000
+#define MIN_GAP_US 1000
 //----------------------------------------------------------------------
 #define KALMAN_CALIBRATION_SAMPLES 50
 //----------------------------------------------------------------------

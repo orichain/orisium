@@ -268,6 +268,7 @@ static inline timer_event_t *oritw_validate_min_gap_and_long_jump(
     }
     uint64_t diff;
     if (first_exp > expire) {
+        /*
         if (expire <= timer->global_current_tick) {
             return NULL;
         }
@@ -288,6 +289,8 @@ static inline timer_event_t *oritw_validate_min_gap_and_long_jump(
         *reschedule = true;
         timer_event_sorting_insert_before(&timer->sorting_queue_head, &timer->sorting_queue_tail, timer->sorting_queue_head, new_event);
         return new_event;
+        */
+        return NULL;
     }
     diff = expire - first_exp;
     if (diff < min_gap_us) {
