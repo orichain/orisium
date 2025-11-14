@@ -1307,7 +1307,9 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     }
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    #if !defined(LONGINTV_TEST)
     printf("%sRTT Hello-3 Ack = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
+    #endif
 //======================================================================
     session->hello4_ack.ack_sent = true;
     session->heartbeat.heartbeat_cnt = 0x00;
@@ -1537,7 +1539,9 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
     }
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    #if !defined(LONGINTV_TEST)
     printf("%sRTT Hello-2 Ack = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
+    #endif
 //======================================================================
     session->hello3_ack.ack_sent = true;
 //======================================================================
@@ -1748,7 +1752,9 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
     }
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    #if !defined(LONGINTV_TEST)
     printf("%sRTT Hello-1 Ack = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
+    #endif
 //======================================================================
     session->hello2_ack.ack_sent = true;
 //======================================================================
@@ -2151,7 +2157,9 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
 //======================================================================
     double hb_interval = node_hb_interval_with_jitter_us(session->rtt.value_prediction, session->retry.value_prediction);
     session->heartbeat.last_send_heartbeat_interval = hb_interval;
+    #if !defined(LONGINTV_TEST)
     printf("%sSend HB Interval %f us\n", worker_ctx->label, hb_interval);
+    #endif
 //======================================================================
     l_inc_ctr = 0x01;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_heartbeat(
@@ -2234,7 +2242,9 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     uint64_t interval_ull = session->hello4.ack_rcvd_time - session->hello4.sent_time;
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    #if !defined(LONGINTV_TEST)
     printf("%sRTT Hello-4 = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
+    #endif
 //======================================================================
     session->hello4.ack_rcvd = true;
 //======================================================================
@@ -2497,7 +2507,9 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     uint64_t interval_ull = session->hello3.ack_rcvd_time - session->hello3.sent_time;
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    #if !defined(LONGINTV_TEST)
     printf("%sRTT Hello-3 = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
+    #endif
 //======================================================================
     session->hello3.ack_rcvd = true;
     cleanup_control_packet(worker_ctx, &session->orilink_p8zs_pool, &session->hello3, false, true);
@@ -2650,7 +2662,9 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
     uint64_t interval_ull = session->hello2.ack_rcvd_time - session->hello2.sent_time;
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    #if !defined(LONGINTV_TEST)
     printf("%sRTT Hello-2 = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
+    #endif
 //======================================================================
     session->hello2.ack_rcvd = true;
     cleanup_control_packet(worker_ctx, &session->orilink_p8zs_pool, &session->hello2, false, true);
@@ -2808,7 +2822,9 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
     uint64_t interval_ull = session->hello1.ack_rcvd_time - session->hello1.sent_time;
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    #if !defined(LONGINTV_TEST)
     printf("%sRTT Hello-1 = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
+    #endif
 //======================================================================
     session->hello1.ack_rcvd = true;
     cleanup_control_packet(worker_ctx, &session->orilink_p8zs_pool, &session->hello1, false, true);

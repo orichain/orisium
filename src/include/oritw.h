@@ -262,89 +262,25 @@ static inline timer_event_t *oritw_validate_min_gap_and_long_jump(
         return new_event;
     }
     *reschedule = false;
-    uint64_t first_exp = timer->sorting_queue_head->expiration_tick;
-    if (first_exp == expire) {
-        return NULL;
-    }
     uint64_t diff;
-    if (first_exp > expire) {
-        /*
-        if (expire <= timer->global_current_tick) {
-            return NULL;
-        }
-        diff = expire - timer->global_current_tick;
-        if (diff < min_gap_us) {
-            return NULL;
-        }
-        timer_event_t *new_event = oritw_pool_alloc(timer);
-        if (!new_event) {
-            return NULL;
-        }
-        new_event->expiration_tick = expire;
-        new_event->level_index = level;
-        new_event->next = NULL;
-        new_event->prev = NULL;
-        new_event->sorting_next = NULL;
-        new_event->sorting_prev = NULL;
-        *reschedule = true;
-        timer_event_sorting_insert_before(&timer->sorting_queue_head, &timer->sorting_queue_tail, timer->sorting_queue_head, new_event);
-        return new_event;
-        */
-        return NULL;
-    }
-    diff = expire - first_exp;
-    if (diff < min_gap_us) {
-        return NULL;
-    }
     uint64_t exp_i;
     uint32_t i = 0;
     timer_event_t *cur = timer->sorting_queue_head;
-    do {
+    while (cur) {
         if (i == WHEEL_SIZE) {
             return NULL;
         }
-        cur = cur->sorting_next;
-        if (!cur) {
-            timer_event_t *new_event = oritw_pool_alloc(timer);
-            if (!new_event) {
-                return NULL;
-            }
-            new_event->expiration_tick = expire;
-            new_event->level_index = level;
-            new_event->next = NULL;
-            new_event->prev = NULL;
-            new_event->sorting_next = NULL;
-            new_event->sorting_prev = NULL;
-            timer_event_sorting_add_tail(&timer->sorting_queue_head, &timer->sorting_queue_tail, new_event);
-            return new_event;
-        }
         exp_i = cur->expiration_tick;
-        if (exp_i == expire) {
+        if (exp_i >= expire) {
             return NULL;
-        }
-        if (exp_i > expire) {
-            diff = exp_i - expire;
-            if (diff >= min_gap_us) {
-                timer_event_t *new_event = oritw_pool_alloc(timer);
-                if (!new_event) {
-                    return NULL;
-                }
-                new_event->expiration_tick = expire;
-                new_event->level_index = level;
-                new_event->next = NULL;
-                new_event->prev = NULL;
-                new_event->sorting_next = NULL;
-                new_event->sorting_prev = NULL;
-                timer_event_sorting_insert_before(&timer->sorting_queue_head, &timer->sorting_queue_tail, cur, new_event);
-                return new_event;
-            }
         }
         diff = expire - exp_i;
         if (diff < min_gap_us) {
             return NULL;
         }
+        cur = cur->sorting_next;
         i++;
-    } while (cur);
+    }
     return NULL;
 }
 

@@ -392,6 +392,7 @@ static inline void calculate_oricle_double(const char *label, const char *desc, 
     LOG_DEBUG("%s[%s]Meas: %.2f -> Est: %.2f (Vel: %.2f)", label, desc, value, o->value_prediction, o->kalman_filter.value_velocity);
 }
 
+#if defined(LONGINTV_TEST)
 static inline void calculate_oricle_doubleX(const char *label, const char *desc, oricle_double_t *o, double value, double max_value) {
     uint64_t_status_t current_time = get_monotonic_time_ns(label);
     if (current_time.status != SUCCESS) {
@@ -451,6 +452,7 @@ static inline void calculate_oricle_doubleX(const char *label, const char *desc,
     }
     LOG_DEVEL_DEBUG("%s[%s]Meas: %.2f -> Est: %.2f (Vel: %.2f)", label, desc, value, o->value_prediction, o->kalman_filter.value_velocity);
 }
+#endif
 
 static inline void calculate_oricle_long_double(const char *label, const char *desc, oricle_long_double_t *o, long double value, long double max_value) {
     uint64_t_status_t current_time = get_monotonic_time_ns(label);

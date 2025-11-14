@@ -434,7 +434,11 @@ status_t calculate_healthy(const char* label, master_context_t *master_ctx, work
 	int needed = snprintf(NULL, 0, "ORICLE => HEALTHY %s-%d", worker_name, index);
 	desc = malloc(needed + 1);
 	snprintf(desc, needed + 1, "ORICLE => HEALTHY %s-%d", worker_name, index);
+    #if defined(LONGINTV_TEST)
+    calculate_oricle_doubleX(label, desc, oricle, current_health_measurement, (double)200);
+    #else
     calculate_oricle_double(label, desc, oricle, current_health_measurement, (double)200);
+    #endif
     free(desc);
     *ishealthy = (oricle->value_prediction >= HEALTHY_THRESHOLD);
     metrics->last_checkhealthy = now_ns;
