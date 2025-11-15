@@ -64,7 +64,7 @@ typedef struct {
     ori_timer_wheel_t *timer[MAX_TIMER_LEVELS];
 } ori_timer_wheels_t;
 
-static inline timer_id_t *oritw_id_pool_alloc(ori_timer_wheels_t *tws, uint64_t id, double delay_us) {
+static inline timer_id_t *oritw_id_pool_alloc(ori_timer_wheels_t *tws, uint64_t id, double delay_us, timer_event_type_t event_type) {
     timer_id_t *new_id;
     new_id = timer_id_pop_head(&tws->id_pool_head, &tws->id_pool_tail); 
     if (new_id == NULL) {
@@ -76,6 +76,7 @@ static inline timer_id_t *oritw_id_pool_alloc(ori_timer_wheels_t *tws, uint64_t 
     new_id->next = NULL;
     new_id->prev = NULL;
     new_id->delay_us = delay_us;
+    new_id->event_type = event_type;
     new_id->id = id;
     new_id->event = NULL;
     return new_id;
@@ -86,13 +87,14 @@ static inline timer_id_t *oritw_id_pool_free(ori_timer_wheels_t *tws, timer_id_t
     if (id->id == 0) return NULL;
     id->delay_us = 0;
     id->id = 0;
+    id->event_type = TE_UNKNOWN;
     timer_id_remove(&tws->add_queue_head, &tws->add_queue_tail, id);
     timer_id_add_head(&tws->id_pool_head, &tws->id_pool_tail, id);
     return NULL;
 }
 
-static inline void oritw_add_timer_id_queue(ori_timer_wheels_t *tws, uint64_t id, double delay_us) {
-    timer_id_t *new_id = oritw_id_pool_alloc(tws, id, delay_us);
+static inline void oritw_add_timer_id_queue(ori_timer_wheels_t *tws, uint64_t id, double delay_us, timer_event_type_t event_type) {
+    timer_id_t *new_id = oritw_id_pool_alloc(tws, id, delay_us, event_type);
     if (!new_id) return;
     timer_id_add_tail(&tws->add_queue_head, &tws->add_queue_tail, new_id);
 }
@@ -246,7 +248,7 @@ static inline timer_event_t *oritw_validate_min_gap_and_long_jump(
         expire = UINT64_MAX;
     else
         expire = timer->global_current_tick + delay_us;
-    if (!timer->sorting_queue_head) {
+    if (!timer->sorting_queue_tail) {
         timer_event_t *new_event = oritw_pool_alloc(timer);
         if (!new_event) {
             return NULL;
@@ -260,38 +262,62 @@ static inline timer_event_t *oritw_validate_min_gap_and_long_jump(
         *reschedule = true;
         timer_event_sorting_add_tail(&timer->sorting_queue_head, &timer->sorting_queue_tail, new_event);
         return new_event;
-    }
-    *reschedule = false;
-    uint64_t diff;
-    uint64_t exp_i;
-    uint32_t i = 0;
-    timer_event_t *cur = timer->sorting_queue_head;
-    while (cur) {
-        if (i == WHEEL_SIZE) {
-            return NULL;
-        }
-        exp_i = cur->expiration_tick;
+    } else {
+        uint64_t exp_i = timer->sorting_queue_tail->expiration_tick;
         if (exp_i >= expire) {
             return NULL;
         }
-        diff = expire - exp_i;
+        uint64_t diff = expire - exp_i;
         if (diff < min_gap_us) {
             return NULL;
         }
-        cur = cur->sorting_next;
-        i++;
+        timer_event_t *new_event = oritw_pool_alloc(timer);
+        if (!new_event) {
+            return NULL;
+        }
+        new_event->expiration_tick = expire;
+        new_event->level_index = level;
+        new_event->next = NULL;
+        new_event->prev = NULL;
+        new_event->sorting_next = NULL;
+        new_event->sorting_prev = NULL;
+        *reschedule = false;
+        timer_event_sorting_add_tail(&timer->sorting_queue_head, &timer->sorting_queue_tail, new_event);
+        return new_event;
     }
-    return NULL;
 }
 
 static inline timer_event_t *oritw_calculate_level(
     ori_timer_wheels_t *timers,
     uint64_t delay_us,
     uint32_t *level_index,
-    bool *reschedule
+    bool *reschedule,
+    timer_event_type_t event_type
 )
 {
-    for (uint16_t llvl=0;llvl<MAX_TIMER_LEVELS;++llvl) {
+    uint16_t llvl_min = 0;
+    uint16_t llvl_cnt = 0;
+    switch (event_type) {
+        case TE_CHECKHEALTHY: {
+            llvl_min = 0;
+            llvl_cnt = 1;
+            break;
+        }
+        case TE_HEARTBEAT: {
+            llvl_min = 0;
+            llvl_cnt = 1;
+            break;
+        }
+        case TE_GENERAL: {
+            llvl_min = 1;
+            llvl_cnt = 9;
+            break;
+        }
+        default:
+            LOG_ERROR("UNKNOWN TIMER _EVENT TYPE!!!");
+            return NULL;
+    }
+    for (uint16_t llvl=llvl_min;llvl<(llvl_min+llvl_cnt);++llvl) {
         timer_event_t *new_event = oritw_validate_min_gap_and_long_jump(timers, delay_us, llvl, reschedule);
         if (new_event) {
             *level_index = llvl;
@@ -316,7 +342,7 @@ static inline void oritw_calculate_slot(
     }
 }
 
-static inline status_t oritw_add_event(
+static inline status_t oritw_add_eventX(
     const char *label,
     async_type_t *async,
     ori_timer_wheels_t *timers,
@@ -331,9 +357,9 @@ static inline status_t oritw_add_event(
     }
     uint32_t level_index;
     bool should_reschedule = false;
-    timer_event_t *new_event = oritw_calculate_level(timers, delay_us, &level_index, &should_reschedule);
+    timer_event_t *new_event = oritw_calculate_level(timers, delay_us, &level_index, &should_reschedule, timer_id->event_type);
     if (new_event == NULL) {
-        oritw_add_timer_id_queue(timers, timer_id->id, timer_id->delay_us);
+        oritw_add_timer_id_queue(timers, timer_id->id, timer_id->delay_us, timer_id->event_type);
         if (timers->add_event_fd == -1) {
             if (async_create_event(label, &timers->add_event_fd) != SUCCESS) return FAILURE;
             if (async_create_incoming_event(label, async, &timers->add_event_fd) != SUCCESS) return FAILURE;
@@ -394,26 +420,23 @@ static inline status_t oritw_process_expired_level(
     while (true) {
         timer_bucket_t *bucket = &level->buckets[current_slot_index];
         timer_event_t *cur = bucket->head;
-        timer_event_t *remain_head = NULL;
-        timer_event_t *remain_tail = NULL;
         uint64_t new_min_exp = ULLONG_MAX;
         while (cur) {
             timer_event_t *next = cur->next;
-            cur->next = NULL;
-            cur->prev = NULL;
+            timer_event_remove(&bucket->head, &bucket->tail, cur);
             if (cur->expiration_tick <= timer->global_current_tick) {
                 timer_event_sorting_remove(&timer->sorting_queue_head, &timer->sorting_queue_tail, cur);
                 timer_event_add_tail(&timer->ready_queue_head, &timer->ready_queue_tail, cur);
             } else {
-                timer_event_add_tail(&remain_head, &remain_tail, cur);
+                timer_event_add_tail(&bucket->head, &bucket->tail, cur);
                 cur->slot_index = (uint16_t)current_slot_index;
-                if (cur->expiration_tick < new_min_exp) new_min_exp = cur->expiration_tick;
+                if (cur->expiration_tick < new_min_exp) {
+                    new_min_exp = cur->expiration_tick;
+                }
             }
             cur = next;
         }
-        bucket->head = remain_head;
-        bucket->tail = remain_tail;
-        bucket->min_expiration = (remain_head ? new_min_exp : ULLONG_MAX);
+        bucket->min_expiration = new_min_exp;
         min_heap_update(&level->min_heap, (uint16_t)current_slot_index, bucket->min_expiration);
         if (current_slot_index == end_index) break;
         current_slot_index = (current_slot_index + 1) & WHEEL_MASK;
@@ -523,11 +546,36 @@ static inline void oritw_cleanup(const char *label, async_type_t *async, ori_tim
         ori_timer_wheel_t *tw = timers->timer[llv];
         if (!tw) continue;
         tw->initial_system_tick = 0ULL;
+//----------------------------------------------------------------------
+//--- Clean Sorting Linked List
+//----------------------------------------------------------------------
+        timer_event_sorting_remove_all(
+            &tw->sorting_queue_head, 
+            &tw->sorting_queue_tail
+        );
+//----------------------------------------------------------------------
+//--- Give Back Ready Queue To Pool
+//----------------------------------------------------------------------
+        timer_event_remove_all(
+            &tw->event_pool_head, 
+            &tw->event_pool_tail, 
+            &tw->ready_queue_head, 
+            &tw->ready_queue_tail
+        );
+//----------------------------------------------------------------------
         timer_wheel_t *wheel = &tw->timer_wheel;
         for (uint32_t s = 0; s < WHEEL_SIZE; ++s) {
             timer_bucket_t *bucket = &wheel->buckets[s];
-            bucket->head = NULL;
-            bucket->tail = NULL;
+//----------------------------------------------------------------------
+//--- Give Back Bucket Event To Pool
+//----------------------------------------------------------------------
+            timer_event_remove_all(
+                &tw->event_pool_head, 
+                &tw->event_pool_tail, 
+                &bucket->head, 
+                &bucket->tail
+            );
+//----------------------------------------------------------------------
             bucket->min_expiration = ULLONG_MAX;
         }
         for (uint32_t i = 0; i < wheel->min_heap.size; ++i) {
@@ -537,7 +585,11 @@ static inline void oritw_cleanup(const char *label, async_type_t *async, ori_tim
         tw->sorting_queue_tail = NULL;
         tw->ready_queue_head = NULL;
         tw->ready_queue_tail = NULL;
+//----------------------------------------------------------------------
+//--- Cleanup Event Pool
+//----------------------------------------------------------------------
         timer_event_cleanup(&tw->event_pool_head, &tw->event_pool_tail);
+//----------------------------------------------------------------------
         tw->global_current_tick = 0;
         tw->next_expiration_tick = ULLONG_MAX;
         tw->last_delay_us = 0.0;

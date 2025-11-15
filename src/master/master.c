@@ -26,6 +26,7 @@
 #include "node.h"
 #include "oritw.h"
 #include "orilink/protocol.h"
+#include "oritw/timer_event.h"
 
 volatile sig_atomic_t shutdown_requested = 0;
 int *shutdown_event_fd = NULL;
@@ -81,6 +82,7 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
     generate_uint64_t_id(label, &master_ctx->check_healthy_timer_id.id);
     master_ctx->check_healthy_timer_id.event = NULL;
     master_ctx->check_healthy_timer_id.delay_us = 0.0;
+    master_ctx->check_healthy_timer_id.event_type = TE_CHECKHEALTHY;
 //----------------------------------------------------------------------
     master_ctx->master_async.async_fd = -1;
     master_ctx->master_pid = getpid();
@@ -144,6 +146,7 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
         master_ctx->check_healthy_timer_id.event = oritw_remove_eventX(label, &master_ctx->master_async, &master_ctx->timer, master_ctx->check_healthy_timer_id.event);
         master_ctx->check_healthy_timer_id.id = 0ULL;
         master_ctx->check_healthy_timer_id.delay_us = 0.0;
+        master_ctx->check_healthy_timer_id.event_type = TE_UNKNOWN;
     }
 //----------------------------------------------------------------------
     oritw_cleanup(label, &master_ctx->master_async, &master_ctx->timer);
@@ -331,7 +334,7 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                     metrics->sum_hb_interval = metrics->hb_interval;
                                 }
                                 master_ctx->check_healthy_timer_id.delay_us = worker_check_healthy_us();
-                                status_t chst = oritw_add_event(label, &master_ctx->master_async, &master_ctx->timer, &master_ctx->check_healthy_timer_id);
+                                status_t chst = oritw_add_eventX(label, &master_ctx->master_async, &master_ctx->timer, &master_ctx->check_healthy_timer_id);
                                 if (chst != SUCCESS) {
                                     LOG_INFO("%sGagal async_create_timerfd hb checker. Initiating graceful shutdown...", label);
                                     master_ctx->shutdown_requested = 1;

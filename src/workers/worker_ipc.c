@@ -695,9 +695,9 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
 // Aktifkan Heartbeat Karna security/Enkripsi Sudah Ready
 //---------------------------------------------------------------------- 
         worker_ctx->heartbeat_timer_id.delay_us = worker_hb_interval_us();
-        status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &worker_ctx->heartbeat_timer_id);
+        status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &worker_ctx->heartbeat_timer_id);
         if (chst != SUCCESS) {
-            LOG_ERROR("%sWorker error oritw_add_event...", worker_ctx->label);
+            LOG_ERROR("%sWorker error oritw_add_eventX...", worker_ctx->label);
             CLOSE_IPC_PROTOCOL(&received_protocol);
             return FAILURE;
         }
@@ -3021,7 +3021,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
         case ORILINK_HELLO1: {
 //======================================================================
             session->hello1.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
-            status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->hello1.retry_timer_id);
+            status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->hello1.retry_timer_id);
             if (chst != SUCCESS) {
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
@@ -3033,7 +3033,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
         case ORILINK_HELLO2: {
 //======================================================================
             session->hello2.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
-            status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->hello2.retry_timer_id);
+            status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->hello2.retry_timer_id);
             if (chst != SUCCESS) {
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
@@ -3045,7 +3045,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
         case ORILINK_HELLO3: {
 //======================================================================
             session->hello3.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
-            status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->hello3.retry_timer_id);
+            status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->hello3.retry_timer_id);
             if (chst != SUCCESS) {
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
@@ -3057,7 +3057,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
         case ORILINK_HELLO4: {
 //======================================================================
             session->hello4.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
-            status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->hello4.retry_timer_id);
+            status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->hello4.retry_timer_id);
             if (chst != SUCCESS) {
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
@@ -3070,7 +3070,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
             #if defined(ACCRCY_TEST)
             session->heartbeat.heartbeat_ack.ack_sent = false;
             session->heartbeat.heartbeat_openner_timer_id.delay_us = session->heartbeat.last_send_heartbeat_interval;
-            status_t otmr = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_openner_timer_id);
+            status_t otmr = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_openner_timer_id);
             if (otmr != SUCCESS) {
                 return FAILURE;
             }
@@ -3079,7 +3079,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
             #endif
 //======================================================================
             session->heartbeat.heartbeat.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
-            status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id);
+            status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id);
             if (chst != SUCCESS) {
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
@@ -3092,7 +3092,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
             if (iudp_data_acki->trycount == (uint8_t)1) {
                 session->heartbeat.heartbeat_sender_timer_id.delay_us = session->heartbeat.heartbeat_interval;
 //======================================================================
-                status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_sender_timer_id);
+                status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_sender_timer_id);
                 if (chst != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
                     return FAILURE;
@@ -3136,7 +3136,7 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
             #if defined(ACCRCY_TEST)
             session->heartbeat.heartbeat_ack.ack_sent = false;
             session->heartbeat.heartbeat_openner_timer_id.delay_us = session->heartbeat.last_send_heartbeat_interval;
-            status_t otmr = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_openner_timer_id);
+            status_t otmr = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_openner_timer_id);
             if (otmr != SUCCESS) {
                 return FAILURE;
             }
@@ -3145,7 +3145,7 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
             #endif
 //======================================================================
             session->heartbeat.heartbeat.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
-            status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id);
+            status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id);
             if (chst != SUCCESS) {
                 CLOSE_IPC_PROTOCOL(&received_protocol);
                 return FAILURE;
@@ -3158,7 +3158,7 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
             if (iudp_data_acki->trycount == (uint8_t)1) {
                 session->heartbeat.heartbeat_sender_timer_id.delay_us = session->heartbeat.heartbeat_interval;
 //======================================================================
-                status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_sender_timer_id);
+                status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_sender_timer_id);
                 if (chst != SUCCESS) {
                     CLOSE_IPC_PROTOCOL(&received_protocol);
                     return FAILURE;

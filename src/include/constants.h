@@ -25,7 +25,7 @@
 #define LONGINTV_TEST
 #undef LONGINTV_TEST
 
-#define MAX_TIMER_LEVELS 20
+#define MAX_TIMER_LEVELS 10
 #define WHEEL_SIZE 256
 #define MIN_GAP_US 1000
 //----------------------------------------------------------------------
@@ -34,7 +34,7 @@
 #define MAX_RETRY_CNT 5
 #define MIN_RETRY_SEC 1
 //----------------------------------------------------------------------
-#define NODE_HEARTBEAT_INTERVAL 7
+#define NODE_HEARTBEAT_INTERVAL 0.020
 #define NODE_CHECK_HEALTHY_X 3
 //----------------------------------------------------------------------
 #define NODE_CHECK_HEALTHY NODE_CHECK_HEALTHY_X * 2 * NODE_HEARTBEAT_INTERVAL

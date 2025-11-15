@@ -20,6 +20,7 @@
 #include "types.h"
 #include "oritw.h"
 #include "oritw/timer_id.h"
+#include "oritw/timer_event.h"
 
 typedef struct {
     double hb_interval;
@@ -282,8 +283,9 @@ static inline void cleanup_control_packet(worker_context_t *ctx, p8zs_pool_t *po
         h->retry_timer_id.event = oritw_remove_eventX(ctx->label, &ctx->async, &ctx->timer, h->retry_timer_id.event);
         h->retry_timer_id.delay_us = 0.0;
 //----------------------------------------------------------------------
-// Reuse Old Id
+// Reuse Old Id And Old Type
 //----------------------------------------------------------------------
+        //h->retry_timer_id.event_type = TE_UNKNOWN;
         //h->retry_timer_id.id = 0ULL;
 //----------------------------------------------------------------------
     }
@@ -298,6 +300,7 @@ static inline void setup_control_packet(const char *label, uint8_t session_index
     h->udp_data = NULL;
     generate_si_id(label, session_index, &h->retry_timer_id.id);
     h->retry_timer_id.delay_us = 0.0;
+    h->retry_timer_id.event_type = TE_GENERAL;
     h->retry_timer_id.event = NULL;
 }
 
@@ -343,10 +346,12 @@ static inline status_t setup_cow_session(const char *label, cow_c_session_t *sin
     generate_si_id(label, session_index, &single_session->heartbeat.heartbeat_sender_timer_id.id);
     single_session->heartbeat.heartbeat_sender_timer_id.event = NULL;
     single_session->heartbeat.heartbeat_sender_timer_id.delay_us = 0.0;
+    single_session->heartbeat.heartbeat_sender_timer_id.event_type = TE_GENERAL;
     #if defined(ACCRCY_TEST)
     generate_si_id(label, session_index, &single_session->heartbeat.heartbeat_openner_timer_id.id);
     single_session->heartbeat.heartbeat_openner_timer_id.event = NULL;
     single_session->heartbeat.heartbeat_openner_timer_id.delay_us = 0.0;
+    single_session->heartbeat.heartbeat_openner_timer_id.event_type = TE_GENERAL;
     #endif
 //----------------------------------------------------------------------
     setup_oricle_double(&single_session->retry, (double)0);
@@ -402,12 +407,14 @@ static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *s
         single_session->heartbeat.heartbeat_sender_timer_id.event = oritw_remove_eventX(ctx->label, &ctx->async, &ctx->timer, single_session->heartbeat.heartbeat_sender_timer_id.event);
         single_session->heartbeat.heartbeat_sender_timer_id.id = 0ULL;
         single_session->heartbeat.heartbeat_sender_timer_id.delay_us = 0.0;
+        single_session->heartbeat.heartbeat_sender_timer_id.event_type = TE_UNKNOWN;
     }
     #if defined(ACCRCY_TEST)
     if (single_session->heartbeat.heartbeat_openner_timer_id.event) {
         single_session->heartbeat.heartbeat_openner_timer_id.event = oritw_remove_eventX(ctx->label, &ctx->async, &ctx->timer, single_session->heartbeat.heartbeat_openner_timer_id.event);
         single_session->heartbeat.heartbeat_openner_timer_id.id = 0ULL;
         single_session->heartbeat.heartbeat_openner_timer_id.delay_us = 0.0;
+        single_session->heartbeat.heartbeat_openner_timer_id.event_type = TE_UNKNOWN;
     }
     #endif
 //----------------------------------------------------------------------
@@ -468,10 +475,12 @@ static inline status_t setup_sio_session(const char *label, sio_c_session_t *sin
     generate_si_id(label, session_index, &single_session->heartbeat.heartbeat_sender_timer_id.id);
     single_session->heartbeat.heartbeat_sender_timer_id.event = NULL;
     single_session->heartbeat.heartbeat_sender_timer_id.delay_us = 0.0;
+    single_session->heartbeat.heartbeat_sender_timer_id.event_type = TE_GENERAL;
     #if defined(ACCRCY_TEST)
     generate_si_id(label, session_index, &single_session->heartbeat.heartbeat_openner_timer_id.id);
     single_session->heartbeat.heartbeat_openner_timer_id.event = NULL;
     single_session->heartbeat.heartbeat_openner_timer_id.delay_us = 0.0;
+    single_session->heartbeat.heartbeat_openner_timer_id.event_type = TE_GENERAL;
     #endif
 //----------------------------------------------------------------------
     setup_oricle_double(&single_session->retry, (double)0);
@@ -527,6 +536,7 @@ static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *s
         single_session->heartbeat.heartbeat_openner_timer_id.event = oritw_remove_eventX(ctx->label, &ctx->async, &ctx->timer, single_session->heartbeat.heartbeat_openner_timer_id.event);
         single_session->heartbeat.heartbeat_openner_timer_id.id = 0ULL;
         single_session->heartbeat.heartbeat_openner_timer_id.delay_us = 0.0;
+        single_session->heartbeat.heartbeat_openner_timer_id.event_type = TE_UNKNOWN;
     }
     #endif
 //----------------------------------------------------------------------

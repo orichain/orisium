@@ -17,11 +17,13 @@
 #include "log.h"
 #include "types.h"
 #include "utilities.h"
+#include "oritw/timer_event.h"
 
 typedef struct timer_id_t {
     timer_event_t *event;
     uint64_t id;
     double delay_us;
+    timer_event_type_t event_type;
     struct timer_id_t *next;
     struct timer_id_t *prev;
 } timer_id_t;

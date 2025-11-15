@@ -18,6 +18,16 @@ typedef struct timer_event_t {
     uint16_t slot_index;
 } timer_event_t;
 
+typedef enum {
+    TE_UNKNOWN = (uint8_t)0x00,
+//----------------------------------------------------------------------    
+    TE_CHECKHEALTHY = (uint8_t)0x01,
+    TE_HEARTBEAT = (uint8_t)0x02,
+//----------------------------------------------------------------------
+    TE_GENERAL = (uint8_t)0x08
+//----------------------------------------------------------------------
+} timer_event_type_t;
+
 static inline void timer_event_add_tail(timer_event_t **head, timer_event_t **tail, timer_event_t *event) {
     event->next = NULL;
     event->prev = *tail;
@@ -173,6 +183,31 @@ static inline void timer_event_sorting_insert_after(timer_event_t **head, timer_
         *tail = new_event;
     }
     pos->sorting_next = new_event;
+}
+
+static inline void timer_event_sorting_remove_all(timer_event_t **head, timer_event_t **tail) {
+    timer_event_t *cur = *head;
+    while (cur) {
+        timer_event_t *next = cur->next;
+        timer_event_sorting_remove(head, tail, cur);
+        cur = next;
+    }
+    *head = *tail = NULL;
+}
+
+static inline void timer_event_remove_all(timer_event_t **pool_head, timer_event_t **pool_tail, timer_event_t **head, timer_event_t **tail) {
+    timer_event_t *cur = *head;
+    while (cur) {
+        timer_event_t *next = cur->next;
+        cur->expiration_tick = 0;
+        cur->timer_id = 0;
+        cur->slot_index = WHEEL_SIZE;
+        cur->level_index = MAX_TIMER_LEVELS;
+        timer_event_remove(head, tail, cur);
+        timer_event_add_head(pool_head, pool_tail, cur);
+        cur = next;
+    }
+    *head = *tail = NULL;
 }
 
 static inline void timer_event_cleanup(timer_event_t **head, timer_event_t **tail) {

@@ -148,7 +148,7 @@ static inline status_t handle_worker_session_timer_event(
                 session->heartbeat.heartbeat_sender_timer_id.event = oritw_pool_free(&worker_ctx->timer, session->heartbeat.heartbeat_sender_timer_id.event);
                 if (!session->heartbeat.heartbeat.ack_rcvd) {
                     session->heartbeat.heartbeat_sender_timer_id.delay_us = session->heartbeat.heartbeat_interval;
-                    status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_sender_timer_id);
+                    status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_sender_timer_id);
                     if (chst != SUCCESS) {
                         return FAILURE;
                     }
@@ -182,7 +182,7 @@ static inline status_t handle_worker_session_timer_event(
                 session->heartbeat.heartbeat_sender_timer_id.event = oritw_pool_free(&worker_ctx->timer, session->heartbeat.heartbeat_sender_timer_id.event);
                 if (!session->heartbeat.heartbeat.ack_rcvd) {
                     session->heartbeat.heartbeat_sender_timer_id.delay_us = session->heartbeat.heartbeat_interval;
-                    status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_sender_timer_id);
+                    status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_sender_timer_id);
                     if (chst != SUCCESS) {
                         return FAILURE;
                     }
@@ -237,7 +237,7 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
                 handler_result = FAILURE;
                 break;
             }
-            handler_result = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, current_add);
+            handler_result = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, current_add);
             current_add = oritw_id_pool_free(&worker_ctx->timer, current_add);
             if (handler_result != SUCCESS) {
                 break;
@@ -288,9 +288,9 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
                     worker_ctx->heartbeat_timer_id.event = oritw_pool_free(&worker_ctx->timer, worker_ctx->heartbeat_timer_id.event);
                     worker_ctx->heartbeat_timer_id.delay_us = worker_hb_interval_with_jitter_us();
                     double new_heartbeat_interval_double_ms = worker_ctx->heartbeat_timer_id.delay_us / (double)1e3;
-                    status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &worker_ctx->heartbeat_timer_id);
+                    status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &worker_ctx->heartbeat_timer_id);
                     if (chst != SUCCESS) {
-                        LOG_ERROR("%sWorker error oritw_add_event for heartbeat.", worker_ctx->label);
+                        LOG_ERROR("%sWorker error oritw_add_eventX for heartbeat.", worker_ctx->label);
                         handler_result = FAILURE;
                         break;
                     }

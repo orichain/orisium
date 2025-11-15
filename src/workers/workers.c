@@ -14,6 +14,7 @@
 #include "ipc.h"
 #include "workers/workers.h"
 #include "oritw.h"
+#include "oritw/timer_event.h"
 
 status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
     ctx->pid = getpid();
@@ -37,6 +38,7 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
     generate_uint64_t_id(ctx->label, &ctx->heartbeat_timer_id.id);
     ctx->heartbeat_timer_id.event = NULL;
     ctx->heartbeat_timer_id.delay_us = 0.0;
+    ctx->heartbeat_timer_id.event_type = TE_HEARTBEAT;
 //----------------------------------------------------------------------
 // Setup IPC security
 //----------------------------------------------------------------------
@@ -101,6 +103,7 @@ void cleanup_worker(worker_context_t *ctx) {
         ctx->heartbeat_timer_id.event = oritw_remove_eventX(ctx->label, &ctx->async, &ctx->timer, ctx->heartbeat_timer_id.event);
         ctx->heartbeat_timer_id.id = 0ULL;
         ctx->heartbeat_timer_id.delay_us = 0.0;
+        ctx->heartbeat_timer_id.event_type = TE_UNKNOWN;
     }
 //----------------------------------------------------------------------
     oritw_cleanup(ctx->label, &ctx->async, &ctx->timer);
