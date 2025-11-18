@@ -40,7 +40,7 @@ static inline status_t retry_transmit(
             if (h->sent_try_count > (uint8_t)MAX_RETRY_CNT) {
                 LOG_DEVEL_DEBUG("%sDisconnected => session_index %d, trycount %d.", worker_ctx->label, c_session_index, h->sent_try_count);
                 cleanup_cow_session(worker_ctx, session);
-                if (setup_cow_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
+                if (setup_cow_session(worker_ctx, session, c_wot, c_index, c_session_index) != SUCCESS) {
                     return FAILURE;
                 }
                 if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
@@ -52,7 +52,7 @@ static inline status_t retry_transmit(
                 return FAILURE;
             }
             double try_count = (double)h->sent_try_count;
-            calculate_retry(worker_ctx->label, session, c_wot, try_count);
+            calculate_retry(worker_ctx, session, c_wot, try_count);
             if (retry_control_packet(
                     worker_ctx, 
                     &session->orilink_p8zs_pool,
@@ -77,7 +77,7 @@ static inline status_t retry_transmit(
             if (h->sent_try_count > (uint8_t)MAX_RETRY_CNT) {
                 LOG_DEVEL_DEBUG("%sDisconnected => session_index %d, trycount %d.", worker_ctx->label, c_session_index, h->sent_try_count);
                 cleanup_sio_session(worker_ctx, session);
-                if (setup_sio_session(worker_ctx->label, session, c_wot, c_index, c_session_index) != SUCCESS) {
+                if (setup_sio_session(worker_ctx, session, c_wot, c_index, c_session_index) != SUCCESS) {
                     return FAILURE;
                 }
                 if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
@@ -89,7 +89,7 @@ static inline status_t retry_transmit(
                 return FAILURE;
             }
             double try_count = (double)h->sent_try_count;
-            calculate_retry(worker_ctx->label, session, c_wot, try_count);
+            calculate_retry(worker_ctx, session, c_wot, try_count);
             if (retry_control_packet(
                     worker_ctx, 
                     &session->orilink_p8zs_pool,

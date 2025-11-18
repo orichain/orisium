@@ -20,6 +20,7 @@
 #include "kalman.h"
 #include "pqc.h"
 #include "ipc.h"
+#include "oritlsf.h"
 
 status_t close_worker(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
     master_worker_session_t *session = get_master_worker_session(master_ctx, wot, index);
@@ -43,13 +44,13 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
     security->local_ctr = (uint32_t)0;
     memset(security->remote_nonce, 0, AES_NONCE_BYTES);
     security->remote_ctr = (uint32_t)0;
-    free(security->kem_publickey);
-    free(security->kem_ciphertext);
-    free(security->kem_sharedsecret);
-    free(security->aes_key);
-    free(security->mac_key);
-    free(security->local_nonce);
-    free(security->remote_nonce);
+    oritlsf_free(&master_ctx->oritlsf_pool, security->kem_publickey);
+    oritlsf_free(&master_ctx->oritlsf_pool, security->kem_ciphertext);
+    oritlsf_free(&master_ctx->oritlsf_pool, security->kem_sharedsecret);
+    oritlsf_free(&master_ctx->oritlsf_pool, security->aes_key);
+    oritlsf_free(&master_ctx->oritlsf_pool, security->mac_key);
+    oritlsf_free(&master_ctx->oritlsf_pool, security->local_nonce);
+    oritlsf_free(&master_ctx->oritlsf_pool, security->remote_nonce);
     security->hello1_rcvd = false;
     security->hello1_ack_sent = false;
     security->hello2_rcvd = false;
@@ -78,14 +79,42 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
     setup_oricle_double(&session->healthy, (double)100);
     session->isactive = true;
     session->ishealthy = true;        
-    session->isready = false;   
-    security->kem_publickey = (uint8_t *)calloc(1, KEM_PUBLICKEY_BYTES);
-    security->kem_ciphertext = (uint8_t *)calloc(1, KEM_CIPHERTEXT_BYTES);
-    security->kem_sharedsecret = (uint8_t *)calloc(1, KEM_SHAREDSECRET_BYTES);
-    security->aes_key = (uint8_t *)calloc(1, HASHES_BYTES);
-    security->mac_key = (uint8_t *)calloc(1, HASHES_BYTES);
-    security->local_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-    security->remote_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
+    session->isready = false;  
+    security->kem_publickey = (uint8_t *)oritlsf_calloc(
+        &master_ctx->oritlsf_pool,
+        KEM_PUBLICKEY_BYTES,
+        sizeof(uint8_t)
+    );
+    security->kem_ciphertext = (uint8_t *)oritlsf_calloc(
+        &master_ctx->oritlsf_pool,
+        KEM_CIPHERTEXT_BYTES,
+        sizeof(uint8_t)
+    );
+    security->kem_sharedsecret = (uint8_t *)oritlsf_calloc(
+        &master_ctx->oritlsf_pool,
+        KEM_SHAREDSECRET_BYTES,
+        sizeof(uint8_t)
+    );
+    security->aes_key = (uint8_t *)oritlsf_calloc(
+        &master_ctx->oritlsf_pool,
+        HASHES_BYTES,
+        sizeof(uint8_t)
+    );
+    security->mac_key = (uint8_t *)oritlsf_calloc(
+        &master_ctx->oritlsf_pool,
+        HASHES_BYTES,
+        sizeof(uint8_t)
+    );
+    security->local_nonce = (uint8_t *)oritlsf_calloc(
+        &master_ctx->oritlsf_pool,
+        AES_NONCE_BYTES,
+        sizeof(uint8_t)
+    );
+    security->remote_nonce = (uint8_t *)oritlsf_calloc(
+        &master_ctx->oritlsf_pool,
+        AES_NONCE_BYTES,
+        sizeof(uint8_t)
+    );
     security->local_ctr = (uint32_t)0;
     security->remote_ctr = (uint32_t)0;
     security->hello1_rcvd = false;
@@ -135,13 +164,13 @@ void close_master_resource(master_context_t *master_ctx, worker_type_t wot, uint
     security->local_ctr = (uint32_t)0;
     memset(security->remote_nonce, 0, AES_NONCE_BYTES);
     security->remote_ctr = (uint32_t)0;
-    free(security->kem_publickey);
-    free(security->kem_ciphertext);
-    free(security->kem_sharedsecret);
-    free(security->aes_key);
-    free(security->mac_key);
-    free(security->local_nonce);
-    free(security->remote_nonce);
+    oritlsf_free(&master_ctx->oritlsf_pool, security->kem_publickey);
+    oritlsf_free(&master_ctx->oritlsf_pool, security->kem_ciphertext);
+    oritlsf_free(&master_ctx->oritlsf_pool, security->kem_sharedsecret);
+    oritlsf_free(&master_ctx->oritlsf_pool, security->aes_key);
+    oritlsf_free(&master_ctx->oritlsf_pool, security->mac_key);
+    oritlsf_free(&master_ctx->oritlsf_pool, security->local_nonce);
+    oritlsf_free(&master_ctx->oritlsf_pool, security->remote_nonce);
 }
 
 status_t setup_fork_worker(const char* label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
@@ -397,10 +426,14 @@ status_t calculate_avgtt(const char *label, master_context_t *master_ctx, worker
     }
     char *desc;
 	int needed = snprintf(NULL, 0, "ORICLE => AVGTT %s-%d", worker_name, index);
-	desc = malloc(needed + 1);
+    desc = (char *)oritlsf_calloc(
+        &master_ctx->oritlsf_pool,
+        needed + 1,
+        sizeof(char)
+    );
 	snprintf(desc, needed + 1, "ORICLE => AVGTT %s-%d", worker_name, index);
     calculate_oricle_long_double(label, desc, oricle, current_avgtt_measurement, (long double)0);
-    free(desc);
+    oritlsf_free(&master_ctx->oritlsf_pool, desc);
     return SUCCESS;
 }
 
@@ -432,14 +465,18 @@ status_t calculate_healthy(const char* label, master_context_t *master_ctx, work
     current_health_measurement *= (double)100;    
     char *desc;
 	int needed = snprintf(NULL, 0, "ORICLE => HEALTHY %s-%d", worker_name, index);
-	desc = malloc(needed + 1);
+	desc = (char *)oritlsf_calloc(
+        &master_ctx->oritlsf_pool,
+        needed + 1,
+        sizeof(char)
+    );
 	snprintf(desc, needed + 1, "ORICLE => HEALTHY %s-%d", worker_name, index);
     #if defined(LONGINTV_TEST)
     calculate_oricle_doubleX(label, desc, oricle, current_health_measurement, (double)200);
     #else
     calculate_oricle_double(label, desc, oricle, current_health_measurement, (double)200);
     #endif
-    free(desc);
+    oritlsf_free(&master_ctx->oritlsf_pool, desc);
     *ishealthy = (oricle->value_prediction >= HEALTHY_THRESHOLD);
     metrics->last_checkhealthy = now_ns;
     metrics->count_ack = (double)0;

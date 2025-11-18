@@ -1303,10 +1303,10 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     }
     if (strycount > (uint8_t)0) {
         double try_count = (double)strycount-(double)1;
-        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+        calculate_retry(worker_ctx, session, identity->local_wot, try_count);
     }
     double rtt_value = (double)interval_ull;
-    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
     printf("%sRTT Hello-3 Ack = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
     #endif
@@ -1535,10 +1535,10 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
     }
     if (strycount > (uint8_t)0) {
         double try_count = (double)strycount-(double)1;
-        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+        calculate_retry(worker_ctx, session, identity->local_wot, try_count);
     }
     double rtt_value = (double)interval_ull;
-    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
     printf("%sRTT Hello-2 Ack = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
     #endif
@@ -1748,10 +1748,10 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
     }
     if (strycount > (uint8_t)0) {
         double try_count = (double)strycount-(double)1;
-        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+        calculate_retry(worker_ctx, session, identity->local_wot, try_count);
     }
     double rtt_value = (double)interval_ull;
-    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
     printf("%sRTT Hello-1 Ack = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
     #endif
@@ -2235,13 +2235,13 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
 //----------------------------------------------------------------------
     if (session->hello4.sent_try_count > (uint8_t)0) {
         double try_count = (double)session->hello4.sent_try_count-(double)1;
-        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+        calculate_retry(worker_ctx, session, identity->local_wot, try_count);
     }
 //======================================================================
     session->hello4.ack_rcvd_time = current_time.r_uint64_t;
     uint64_t interval_ull = session->hello4.ack_rcvd_time - session->hello4.sent_time;
     double rtt_value = (double)interval_ull;
-    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
     printf("%sRTT Hello-4 = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
     #endif
@@ -2500,13 +2500,13 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
 //----------------------------------------------------------------------
     if (session->hello3.sent_try_count > (uint8_t)0) {
         double try_count = (double)session->hello3.sent_try_count-(double)1;
-        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+        calculate_retry(worker_ctx, session, identity->local_wot, try_count);
     }
 //======================================================================
     session->hello3.ack_rcvd_time = current_time.r_uint64_t;
     uint64_t interval_ull = session->hello3.ack_rcvd_time - session->hello3.sent_time;
     double rtt_value = (double)interval_ull;
-    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
     printf("%sRTT Hello-3 = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
     #endif
@@ -2655,13 +2655,13 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
 //----------------------------------------------------------------------
     if (session->hello2.sent_try_count > (uint8_t)0) {
         double try_count = (double)session->hello2.sent_try_count-(double)1;
-        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+        calculate_retry(worker_ctx, session, identity->local_wot, try_count);
     }
 //======================================================================
     session->hello2.ack_rcvd_time = current_time.r_uint64_t;
     uint64_t interval_ull = session->hello2.ack_rcvd_time - session->hello2.sent_time;
     double rtt_value = (double)interval_ull;
-    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
     printf("%sRTT Hello-2 = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
     #endif
@@ -2815,13 +2815,13 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
 //----------------------------------------------------------------------
     if (session->hello1.sent_try_count > (uint8_t)0) {
         double try_count = (double)session->hello1.sent_try_count-(double)1;
-        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+        calculate_retry(worker_ctx, session, identity->local_wot, try_count);
     }
 //======================================================================
     session->hello1.ack_rcvd_time = current_time.r_uint64_t;
     uint64_t interval_ull = session->hello1.ack_rcvd_time - session->hello1.sent_time;
     double rtt_value = (double)interval_ull;
-    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
     printf("%sRTT Hello-1 = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
     #endif

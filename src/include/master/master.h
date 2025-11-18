@@ -14,8 +14,10 @@
 #include "node.h"
 #include "types.h"
 #include "oritw.h"
+#include "oritlsf.h"
 #include "orilink/protocol.h"
 #include "oritw/timer_id.h"
+#include "constants.h"
 
 typedef struct {
     double hb_interval;
@@ -118,6 +120,8 @@ typedef struct {
 //----------------------------------------------------------------------
     orilink_raw_protocol_pool_t orilink_raw_protocol_pool;
     p8zs_pool_t orilink_p8zs_pool;
+    uint8_t arena_buffer[ARENA_SIZE];
+    oritlsf_pool_t oritlsf_pool;
 } master_context_t;
 
 static inline master_worker_session_t *get_master_worker_session(master_context_t *master_context, worker_type_t wot, uint8_t index) {

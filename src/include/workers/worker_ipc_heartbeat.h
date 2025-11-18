@@ -254,7 +254,7 @@ static inline status_t send_heartbeat_ack(worker_context_t *worker_ctx, void *xs
             }
             if (session->heartbeat.heartbeat_ack.ack_sent_try_count > (uint8_t)0) {
                 double try_count = (double)session->heartbeat.heartbeat_ack.ack_sent_try_count-(double)1;
-                calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+                calculate_retry(worker_ctx, session, identity->local_wot, try_count);
             }
             //cleanup_control_packet_ack(&session->orilink_p8zs_pool, &session->heartbeat.heartbeat_ack, false, CDT_NOACTION);
             session->heartbeat.heartbeat.sent = false;
@@ -329,7 +329,7 @@ static inline status_t send_heartbeat_ack(worker_context_t *worker_ctx, void *xs
             if (session->heartbeat.heartbeat_cnt != 0x00) {
                 if (session->heartbeat.heartbeat_ack.ack_sent_try_count > (uint8_t)0) {
                     double try_count = (double)session->heartbeat.heartbeat_ack.ack_sent_try_count-(double)1;
-                    calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+                    calculate_retry(worker_ctx, session, identity->local_wot, try_count);
                 }
                 //cleanup_control_packet_ack(&session->orilink_p8zs_pool, &session->heartbeat.heartbeat_ack, false, CDT_NOACTION);
                 session->heartbeat.heartbeat.sent = false;
@@ -367,10 +367,10 @@ static inline status_t first_heartbeat_finalization(worker_context_t *worker_ctx
 		}
 		if (strycount > (uint8_t)0) {
 			double try_count = (double)strycount-(double)1;
-			calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+			calculate_retry(worker_ctx, session, identity->local_wot, try_count);
 		}
 		double rtt_value = (double)interval_ull;
-        calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+        calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
         #if !defined(LONGINTV_TEST)
         printf("%sRTT Hello-4 Ack = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
         #endif
@@ -712,7 +712,7 @@ static inline status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_cont
 //----------------------------------------------------------------------
     if (session->heartbeat.heartbeat.sent_try_count > (uint8_t)0) {
         double try_count = (double)session->heartbeat.heartbeat.sent_try_count-(double)1;
-        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+        calculate_retry(worker_ctx, session, identity->local_wot, try_count);
     }
 //======================================================================   
     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
@@ -723,7 +723,7 @@ static inline status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_cont
     session->heartbeat.heartbeat.ack_rcvd_time = current_time.r_uint64_t;
     uint64_t interval_ull = session->heartbeat.heartbeat.ack_rcvd_time - session->heartbeat.heartbeat.sent_time;
     double rtt_value = (double)interval_ull;
-    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     char timebuf[32];
     get_time_str(timebuf, sizeof(timebuf));
     #if !defined(LONGINTV_TEST)
@@ -1030,7 +1030,7 @@ static inline status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_cont
 //----------------------------------------------------------------------
     if (session->heartbeat.heartbeat.sent_try_count > (uint8_t)0) {
         double try_count = (double)session->heartbeat.heartbeat.sent_try_count-(double)1;
-        calculate_retry(worker_ctx->label, session, identity->local_wot, try_count);
+        calculate_retry(worker_ctx, session, identity->local_wot, try_count);
     }
 //======================================================================
     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
@@ -1040,7 +1040,7 @@ static inline status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_cont
     session->heartbeat.heartbeat.ack_rcvd_time = current_time.r_uint64_t;
     uint64_t interval_ull = session->heartbeat.heartbeat.ack_rcvd_time - session->heartbeat.heartbeat.sent_time;
     double rtt_value = (double)interval_ull;
-    calculate_rtt(worker_ctx->label, session, identity->local_wot, rtt_value);
+    calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     char timebuf[32];
     get_time_str(timebuf, sizeof(timebuf));
     #if !defined(LONGINTV_TEST)

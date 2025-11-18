@@ -21,7 +21,7 @@ static inline status_t setup_cow_worker(worker_context_t *worker_ctx, cow_c_sess
     for (uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
         cow_c_session_t *single_session;
         single_session = &sessions[i];
-        if (setup_cow_session(worker_ctx->label, single_session, *wot, *index, i) != SUCCESS) {
+        if (setup_cow_session(worker_ctx, single_session, *wot, *index, i) != SUCCESS) {
             return FAILURE;
         }
     }

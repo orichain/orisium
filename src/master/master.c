@@ -4,7 +4,6 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <signal.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -25,6 +24,7 @@
 #include "master/master_worker_selector.h"
 #include "node.h"
 #include "oritw.h"
+#include "oritlsf.h"
 #include "orilink/protocol.h"
 #include "oritw/timer_event.h"
 
@@ -43,13 +43,46 @@ void sigint_handler(int signum) {
 }
 
 status_t setup_master(const char *label, master_context_t *master_ctx) {
-    master_ctx->sio_session = (master_worker_session_t *)calloc(1, MAX_SIO_WORKERS * sizeof(master_worker_session_t));
-    master_ctx->logic_session = (master_worker_session_t *)calloc(1, MAX_LOGIC_WORKERS * sizeof(master_worker_session_t));
-    master_ctx->cow_session = (master_worker_session_t *)calloc(1, MAX_COW_WORKERS * sizeof(master_worker_session_t));
-    master_ctx->dbr_session = (master_worker_session_t *)calloc(1, MAX_DBR_WORKERS * sizeof(master_worker_session_t));
-    master_ctx->dbw_session = (master_worker_session_t *)calloc(1, MAX_DBW_WORKERS * sizeof(master_worker_session_t));
-    master_ctx->sio_c_session = (master_sio_c_session_t *)calloc(1, MAX_MASTER_SIO_SESSIONS * sizeof(master_sio_c_session_t));
-    master_ctx->cow_c_session = (master_cow_c_session_t *)calloc(1, MAX_MASTER_COW_SESSIONS * sizeof(master_cow_c_session_t));
+    int result = oritlsf_setup_pool(&master_ctx->oritlsf_pool, master_ctx->arena_buffer, ARENA_SIZE);
+    if (result != 0) {
+        LOG_ERROR("%sFailed To oritlsf_setup_pool", "[ORITLSF]: ");
+        return FAILURE;
+    }
+    master_ctx->sio_session = (master_worker_session_t *)oritlsf_calloc(
+        &master_ctx->oritlsf_pool,
+        MAX_SIO_WORKERS,
+        sizeof(master_worker_session_t)
+    );
+    master_ctx->logic_session = (master_worker_session_t *)oritlsf_calloc(
+        &master_ctx->oritlsf_pool,
+        MAX_LOGIC_WORKERS,
+        sizeof(master_worker_session_t)
+    );
+    master_ctx->cow_session = (master_worker_session_t *)oritlsf_calloc(
+        &master_ctx->oritlsf_pool,
+        MAX_COW_WORKERS,
+        sizeof(master_worker_session_t)
+    );
+    master_ctx->dbr_session = (master_worker_session_t *)oritlsf_calloc(
+        &master_ctx->oritlsf_pool,
+        MAX_DBR_WORKERS,
+        sizeof(master_worker_session_t)
+    );
+    master_ctx->dbw_session = (master_worker_session_t *)oritlsf_calloc(
+        &master_ctx->oritlsf_pool,
+        MAX_DBW_WORKERS,
+        sizeof(master_worker_session_t)
+    );
+    master_ctx->sio_c_session = (master_sio_c_session_t *)oritlsf_calloc(
+        &master_ctx->oritlsf_pool,
+        MAX_MASTER_SIO_SESSIONS,
+        sizeof(master_sio_c_session_t)
+    );
+    master_ctx->cow_c_session = (master_cow_c_session_t *)oritlsf_calloc(
+        &master_ctx->oritlsf_pool,
+        MAX_MASTER_COW_SESSIONS,
+        sizeof(master_cow_c_session_t)
+    );
 //----------------------------------------------------------------------
     for (uint8_t sio_worker_idx=0;sio_worker_idx<MAX_SIO_WORKERS; ++sio_worker_idx) {
         for(uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
@@ -108,11 +141,11 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
 }
 
 void cleanup_master(const char *label, master_context_t *master_ctx) {
-    free(master_ctx->sio_session);
-    free(master_ctx->logic_session);
-    free(master_ctx->cow_session);
-    free(master_ctx->dbr_session);
-    free(master_ctx->dbw_session);
+    oritlsf_free(&master_ctx->oritlsf_pool, master_ctx->sio_session);
+    oritlsf_free(&master_ctx->oritlsf_pool, master_ctx->logic_session);
+    oritlsf_free(&master_ctx->oritlsf_pool, master_ctx->cow_session);
+    oritlsf_free(&master_ctx->oritlsf_pool, master_ctx->dbr_session);
+    oritlsf_free(&master_ctx->oritlsf_pool, master_ctx->dbw_session);
     for (uint8_t sio_worker_idx=0;sio_worker_idx<MAX_SIO_WORKERS; ++sio_worker_idx) {
         for(uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
             master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].in_use = false;
@@ -129,8 +162,8 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
             master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].id_connection = 0xffffffffffffffff;
         }
     }
-    free(master_ctx->sio_c_session);
-    free(master_ctx->cow_c_session);
+    oritlsf_free(&master_ctx->oritlsf_pool, master_ctx->sio_c_session);
+    oritlsf_free(&master_ctx->oritlsf_pool, master_ctx->cow_c_session);
     master_ctx->shutdown_requested = 0;
     master_ctx->hb_check_times = (uint16_t)0;
     master_ctx->is_rekeying = false;
@@ -158,6 +191,10 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     orilink_raw_protocol_cleanup(&master_ctx->orilink_raw_protocol_pool.head, &master_ctx->orilink_raw_protocol_pool.tail);
     orilink_p8zs_cleanup(&master_ctx->orilink_p8zs_pool.head, &master_ctx->orilink_p8zs_pool.tail);
 //----------------------------------------------------------------------
+    void *reclaimed_buffer = oritlsf_cleanup_pool(&master_ctx->oritlsf_pool);
+    if (reclaimed_buffer != master_ctx->arena_buffer) {
+        LOG_ERROR("%sFailed To oritlsf_cleanup_pool.", "[ORITLSF]: ");
+    }
 }
 
 void run_master(const char *label, master_context_t *master_ctx) {

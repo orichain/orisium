@@ -21,7 +21,7 @@ status_t setup_sio_worker(worker_context_t *worker_ctx, sio_c_session_t *session
     for (uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
         sio_c_session_t *single_session;
         single_session = &sessions[i];
-        if (setup_sio_session(worker_ctx->label, single_session, *wot, *index, i) != SUCCESS) {
+        if (setup_sio_session(worker_ctx, single_session, *wot, *index, i) != SUCCESS) {
             return FAILURE;
         }
     }

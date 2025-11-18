@@ -15,8 +15,15 @@
 #include "workers/workers.h"
 #include "oritw.h"
 #include "oritw/timer_event.h"
+#include "log.h"
+#include "oritlsf.h"
 
 status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
+    int result = oritlsf_setup_pool(&ctx->oritlsf_pool, ctx->arena_buffer, ARENA_SIZE);
+    if (result != 0) {
+        LOG_ERROR("%sFailed To oritlsf_setup_pool", "[ORITLSF]: ");
+        return FAILURE;
+    }
     ctx->pid = getpid();
     ctx->shutdown_requested = 0;
     ctx->async.async_fd = -1;
@@ -32,7 +39,11 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
 // Setup label
 //----------------------------------------------------------------------
 	int needed = snprintf(NULL, 0, "[%s %d]: ", woname, *ctx->index);
-	ctx->label = malloc(needed + 1);
+    ctx->label = (char *)oritlsf_calloc(
+        &ctx->oritlsf_pool,
+        needed + 1,
+        sizeof(char)
+    );
 	snprintf(ctx->label, needed + 1, "[%s %d]: ", woname, *ctx->index);  
 //----------------------------------------------------------------------
     generate_uint64_t_id(ctx->label, &ctx->heartbeat_timer_id.id);
@@ -42,14 +53,46 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
 //----------------------------------------------------------------------
 // Setup IPC security
 //----------------------------------------------------------------------
-    ctx->kem_privatekey = (uint8_t *)calloc(1, KEM_PRIVATEKEY_BYTES);
-    ctx->kem_publickey = (uint8_t *)calloc(1, KEM_PUBLICKEY_BYTES);
-    ctx->kem_ciphertext = (uint8_t *)calloc(1, KEM_CIPHERTEXT_BYTES);
-    ctx->kem_sharedsecret = (uint8_t *)calloc(1, KEM_SHAREDSECRET_BYTES);
-    ctx->aes_key = (uint8_t *)calloc(1, HASHES_BYTES);
-    ctx->mac_key = (uint8_t *)calloc(1, HASHES_BYTES);
-    ctx->local_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
-    ctx->remote_nonce = (uint8_t *)calloc(1, AES_NONCE_BYTES);
+    ctx->kem_privatekey = (uint8_t *)oritlsf_calloc(
+        &ctx->oritlsf_pool,
+        KEM_PRIVATEKEY_BYTES,
+        sizeof(uint8_t)
+    );
+    ctx->kem_publickey = (uint8_t *)oritlsf_calloc(
+        &ctx->oritlsf_pool,
+        KEM_PUBLICKEY_BYTES,
+        sizeof(uint8_t)
+    );
+    ctx->kem_ciphertext = (uint8_t *)oritlsf_calloc(
+        &ctx->oritlsf_pool,
+        KEM_CIPHERTEXT_BYTES,
+        sizeof(uint8_t)
+    );
+    ctx->kem_sharedsecret = (uint8_t *)oritlsf_calloc(
+        &ctx->oritlsf_pool,
+        KEM_SHAREDSECRET_BYTES,
+        sizeof(uint8_t)
+    );
+    ctx->aes_key = (uint8_t *)oritlsf_calloc(
+        &ctx->oritlsf_pool,
+        HASHES_BYTES,
+        sizeof(uint8_t)
+    );
+    ctx->mac_key = (uint8_t *)oritlsf_calloc(
+        &ctx->oritlsf_pool,
+        HASHES_BYTES,
+        sizeof(uint8_t)
+    );
+    ctx->local_nonce = (uint8_t *)oritlsf_calloc(
+        &ctx->oritlsf_pool,
+        AES_NONCE_BYTES,
+        sizeof(uint8_t)
+    );
+    ctx->remote_nonce = (uint8_t *)oritlsf_calloc(
+        &ctx->oritlsf_pool,
+        AES_NONCE_BYTES,
+        sizeof(uint8_t)
+    );
     ctx->local_ctr = (uint32_t)0;
     ctx->remote_ctr = (uint32_t)0;
     ctx->hello1_sent = false;
@@ -82,14 +125,14 @@ void cleanup_worker(worker_context_t *ctx) {
     ctx->local_ctr = (uint32_t)0;
     memset(ctx->remote_nonce, 0, AES_NONCE_BYTES);
     ctx->remote_ctr = (uint32_t)0;
-    free(ctx->kem_privatekey);
-    free(ctx->kem_publickey);
-    free(ctx->kem_ciphertext);
-    free(ctx->kem_sharedsecret);
-    free(ctx->aes_key);
-    free(ctx->mac_key);
-    free(ctx->local_nonce);
-    free(ctx->remote_nonce);
+    oritlsf_free(&ctx->oritlsf_pool, ctx->kem_privatekey);
+    oritlsf_free(&ctx->oritlsf_pool, ctx->kem_publickey);
+    oritlsf_free(&ctx->oritlsf_pool, ctx->kem_ciphertext);
+    oritlsf_free(&ctx->oritlsf_pool, ctx->kem_sharedsecret);
+    oritlsf_free(&ctx->oritlsf_pool, ctx->aes_key);
+    oritlsf_free(&ctx->oritlsf_pool, ctx->mac_key);
+    oritlsf_free(&ctx->oritlsf_pool, ctx->local_nonce);
+    oritlsf_free(&ctx->oritlsf_pool, ctx->remote_nonce);
     ctx->hello1_sent = false;
     ctx->hello1_ack_rcvd = false;
     ctx->hello2_sent = false;
@@ -109,5 +152,10 @@ void cleanup_worker(worker_context_t *ctx) {
     oritw_cleanup(ctx->label, &ctx->async, &ctx->timer);
 //----------------------------------------------------------------------
     CLOSE_FD(&ctx->async.async_fd);
-    free(ctx->label);
+    oritlsf_free(&ctx->oritlsf_pool, ctx->label);
+//----------------------------------------------------------------------
+    void *reclaimed_buffer = oritlsf_cleanup_pool(&ctx->oritlsf_pool);
+    if (reclaimed_buffer != ctx->arena_buffer) {
+        LOG_ERROR("%sFailed To oritlsf_cleanup_pool.", "[ORITLSF]: ");
+    }
 }
