@@ -186,7 +186,7 @@ typedef struct {
     ipc_protocol_queue_t *rekeying_queue_head;
     ipc_protocol_queue_t *rekeying_queue_tail;
     ori_timer_wheels_t timer;
-    uint8_t arena_buffer[ARENA_SIZE];
+    uint8_t *arena_buffer;
     oritlsf_pool_t oritlsf_pool;
 } worker_context_t;
 

@@ -120,7 +120,7 @@ typedef struct {
 //----------------------------------------------------------------------
     orilink_raw_protocol_pool_t orilink_raw_protocol_pool;
     p8zs_pool_t orilink_p8zs_pool;
-    uint8_t arena_buffer[ARENA_SIZE];
+    uint8_t *arena_buffer;
     oritlsf_pool_t oritlsf_pool;
 } master_context_t;
 

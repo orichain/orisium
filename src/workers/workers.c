@@ -19,7 +19,8 @@
 #include "oritlsf.h"
 
 status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
-    int result = oritlsf_setup_pool(&ctx->oritlsf_pool, ctx->arena_buffer, ARENA_SIZE);
+    ctx->arena_buffer = (uint8_t *)calloc(1, WORKER_ARENA_SIZE);
+    int result = oritlsf_setup_pool(&ctx->oritlsf_pool, ctx->arena_buffer, WORKER_ARENA_SIZE);
     if (result != 0) {
         LOG_ERROR("%sFailed To oritlsf_setup_pool", "[ORITLSF]: ");
         return FAILURE;
@@ -158,4 +159,5 @@ void cleanup_worker(worker_context_t *ctx) {
     if (reclaimed_buffer != ctx->arena_buffer) {
         LOG_ERROR("%sFailed To oritlsf_cleanup_pool.", "[ORITLSF]: ");
     }
+    free(ctx->arena_buffer);
 }

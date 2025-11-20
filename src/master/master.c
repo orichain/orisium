@@ -7,6 +7,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <sys/types.h>
+#include <stdlib.h>
 
 #include "log.h"
 #include "constants.h"
@@ -43,7 +44,8 @@ void sigint_handler(int signum) {
 }
 
 status_t setup_master(const char *label, master_context_t *master_ctx) {
-    int result = oritlsf_setup_pool(&master_ctx->oritlsf_pool, master_ctx->arena_buffer, ARENA_SIZE);
+    master_ctx->arena_buffer = (uint8_t *)calloc(1, MASTER_ARENA_SIZE);
+    int result = oritlsf_setup_pool(&master_ctx->oritlsf_pool, master_ctx->arena_buffer, MASTER_ARENA_SIZE);
     if (result != 0) {
         LOG_ERROR("%sFailed To oritlsf_setup_pool", "[ORITLSF]: ");
         return FAILURE;
@@ -195,6 +197,7 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     if (reclaimed_buffer != master_ctx->arena_buffer) {
         LOG_ERROR("%sFailed To oritlsf_cleanup_pool.", "[ORITLSF]: ");
     }
+    free(master_ctx->arena_buffer);
 }
 
 void run_master(const char *label, master_context_t *master_ctx) {
