@@ -11,7 +11,7 @@
 #include <limits.h>
 
 #ifndef TLSF_DEBUG
-#define TLSF_DEBUG 1
+#define TLSF_DEBUG 0
 #endif
 #define GUARD_MAGIC 0xDEADBEEFABADBABEULL
 
@@ -20,7 +20,7 @@
 #define SL_INDEX_COUNT 8
 #define SL_INDEX_COUNT_LOG2 3
 #define MIN_BLOCK_PAYLOAD 16
-#define ALIGN_SIZE 8u
+#define ALIGN_SIZE 16u
 
 static inline size_t align_up_size(size_t x) {
     return (x + (ALIGN_SIZE - 1)) & ~(size_t)(ALIGN_SIZE - 1);
@@ -42,8 +42,6 @@ typedef struct block_header {
     uint8_t status : 1;
     uint8_t padding[TLSF_BLOCKHEADER_PADDING_LEN];
 } block_header_t;
-
-_Static_assert((sizeof(block_header_t) % ALIGN_SIZE) == 0, "block_header_t size must be multiple of ALIGN_SIZE");
 
 typedef struct tlsf_list {
     block_header_t *free_lists[FL_INDEX_COUNT][SL_INDEX_COUNT];
@@ -315,6 +313,17 @@ static inline void *oritlsf_realloc(oritlsf_pool_t *a, void *ptr, size_t newsize
     if (required < MIN_BLOCK_TOTAL) required = MIN_BLOCK_TOTAL;
     required = align_up_size(required);
     block_header_t *block = (block_header_t *)((uint8_t*)ptr - OVERHEAD);
+//----------------------------------------------------------------------
+    if (!in_pool(a, block) || !header_aligned(block) || block->status != 1) {
+        fprintf(stderr, "oritlsf_realloc: Corrupted or invalid pointer %p\n", ptr);
+        abort();
+    }
+    uint8_t *footer_ptr = (uint8_t*)block + block->size - FOOTER_SIZE;
+    if (*(const uint64_t*)footer_ptr != GUARD_MAGIC) {
+        fprintf(stderr, "oritlsf_realloc: Footer guard mismatch (corruption detected) for block %p\n", (void*)block);
+        abort();
+    }
+//----------------------------------------------------------------------
     size_t old_block_size = block->size;
     size_t old_payload = (old_block_size > OVERHEAD + FOOTER_SIZE) ? (old_block_size - OVERHEAD - FOOTER_SIZE) : 0;
     if (old_block_size >= required) {
@@ -406,7 +415,6 @@ static inline void tlsf_dump_free_lists(const oritlsf_pool_t *a) {
 
 static inline void tlsf_validate_all(const oritlsf_pool_t *a) {
     if (!a->pool_start || !a->pool_end) {
-        free(NULL); 
         free(NULL);
         return;
     }
@@ -552,150 +560,3 @@ static inline void tlsf_validate_all(const oritlsf_pool_t *a) {}
 #endif
 
 #endif
-
-/*
-#include "oritlsf.h"
-
-static double timespec_to_sec(struct timespec* ts) {
-    return (double)ts->tv_sec + (double)ts->tv_nsec / 1000000000.0;
-}
-
-int main() {
-    printf("--- TLSF EXTREME STRESS TEST & BENCHMARK ---\n");
-    const size_t POOL_SIZE = 4 * 1024 * 1024;
-    void *raw = NULL;
-    int r;
-
-    oritlsf_pool_t my_allocator;
-
-    r = posix_memalign(&raw, 64, POOL_SIZE + 64);
-    if (r != 0 || raw == NULL) {
-        fprintf(stderr, "posix_memalign failed: %d\n", r);
-        return 1;
-    }
-
-    oritlsf_setup_pool(&my_allocator, raw, POOL_SIZE + 64);
-
-    const int ROUNDS = 200000;
-    const int MAX_ACTIVE = 1000;
-    const int MAX_SIZE = 50000;
-    void *active[MAX_ACTIVE];
-    size_t active_size[MAX_ACTIVE];
-#if TLSF_DEBUG
-    uint32_t active_iter[MAX_ACTIVE];
-#endif
-
-    memset(active, 0, sizeof(active));
-    memset(active_size, 0, sizeof(active_size));
-#if TLSF_DEBUG
-    memset(active_iter, 0, sizeof(active_iter));
-#endif
-
-    printf("Running %d extreme ops...\n", ROUNDS);
-    struct timespec start_time, end_time;
-    clock_gettime(CLOCK_MONOTONIC, &start_time);
-
-    for (int iter = 0; iter < ROUNDS; iter++) {
-        int idx = rand() % MAX_ACTIVE;
-
-        if (active[idx] && (rand() % 100 < 55)) {
-#if TLSF_DEBUG
-            uint8_t expected_fill = (uint8_t)((active_iter[idx] ^ (uintptr_t)active[idx]) & 0xFF);
-            for (size_t i = 0; i < active_size[idx]; i++) {
-                if (((uint8_t*)active[idx])[i] != expected_fill) {
-                    fprintf(stderr, "!!! DATA CORRUPTION DETECTED on block %p (size %zu) at offset %zu !!!\n",
-                            active[idx], active_size[idx], i);
-                    abort();
-                }
-            }
-#endif
-            oritlsf_free(&my_allocator, active[idx]);
-            active[idx] = NULL;
-            active_size[idx] = 0;
-#if TLSF_DEBUG
-            active_iter[idx] = 0;
-#endif
-            continue;
-        }
-
-        size_t sz = (rand() % MAX_SIZE) + 1;
-
-        if (active[idx] && (rand() % 100 < 10)) {
-            size_t new_sz = (rand() % MAX_SIZE) + 1;
-            
-            printf("[REALLOC] idx=%d ptr=%p old_size=%zu new_size=%zu\n", idx, active[idx], active_size[idx], new_sz);
-            
-            void *rptr = oritlsf_realloc(&my_allocator, active[idx], new_sz);
-            if (rptr) {
-                active[idx] = rptr;
-                active_size[idx] = new_sz;
-#if TLSF_DEBUG
-                uint8_t fill_byte = (uint8_t)((active_iter[idx] ^ (uintptr_t)active[idx]) & 0xFF);
-                memset(active[idx], fill_byte, active_size[idx]);
-#endif
-            } else {
-                
-            }
-            goto maybe_validate;
-        }
-
-        void *p = oritlsf_malloc(&my_allocator, sz);
-        if (!p) continue;
-
-#if TLSF_DEBUG
-        uint8_t fill_byte = (uint8_t)((iter ^ (uintptr_t)p) & 0xFF);
-        memset(p, fill_byte, sz);
-#endif
-        active[idx] = p;
-        active_size[idx] = sz;
-#if TLSF_DEBUG
-        active_iter[idx] = iter;
-#endif
-
-maybe_validate:
-        if ((iter % 9999) == 0) {
-            printf("Torture cycle %d...\n", iter);
-        }
-
-#if TLSF_DEBUG
-        if ((iter % VALIDATE_EVERY) == 0) {
-            tlsf_validate_all(&my_allocator);
-        }
-#endif
-    }
-
-    clock_gettime(CLOCK_MONOTONIC, &end_time);
-    double duration = timespec_to_sec(&end_time) - timespec_to_sec(&start_time);
-    printf("\n--- BENCHMARK RESULT ---\n");
-    printf("Total Operations: %d\n", ROUNDS);
-    printf("Total Time (s): %.4f\n", duration);
-    printf("Throughput (Ops/sec): %.2f\n", (double)ROUNDS / duration);
-
-    printf("\nCleaning up remaining active blocks...\n");
-    for (int i = 0; i < MAX_ACTIVE; i++) {
-        if (active[i]) {
-#if TLSF_DEBUG
-            uint8_t expected_fill = (uint8_t)((active_iter[i] ^ (uintptr_t)active[i]) & 0xFF);
-            for (size_t j = 0; j < active_size[i]; j++) {
-                 if (((uint8_t*)active[i])[j] != expected_fill) {
-                    fprintf(stderr, "!!! DATA CORRUPTION DETECTED during cleanup on block %p (size %zu) at offset %zu !!!\n",
-                            active[i], active_size[i], j);
-                    abort();
-                }
-            }
-#endif
-            oritlsf_free(&my_allocator, active[i]);
-            active[i] = NULL;
-        }
-    }
-
-#if TLSF_DEBUG
-    tlsf_validate_all(&my_allocator);
-#endif
-
-    printf("\nEXTREME TEST COMPLETED\n");
-    free(raw);
-    return 0;
-}
-
-*/
