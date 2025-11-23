@@ -1,22 +1,10 @@
 #ifndef ORITW_TIMER_ID_H
 #define ORITW_TIMER_ID_H
 
-#include <limits.h>
-#include <math.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/types.h>
-#include <unistd.h>
 
-#include "async.h"
-#include "constants.h"
-#include "log.h"
-#include "types.h"
-#include "utilities.h"
 #include "oritw/timer_event.h"
 
 typedef struct timer_id_t {

@@ -17,7 +17,6 @@
 #include "oritlsf.h"
 #include "orilink/protocol.h"
 #include "oritw/timer_id.h"
-#include "constants.h"
 
 typedef struct {
     double hb_interval;
