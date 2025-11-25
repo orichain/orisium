@@ -299,7 +299,7 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, oritlsf
         result.status = FAILURE_OOBUF;
         return result;
     }
-    ipc_protocol_t* p = (ipc_protocol_t*)oritlsf_calloc(pool, 1, sizeof(ipc_protocol_t));
+    ipc_protocol_t* p = (ipc_protocol_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_protocol_t));
     if (!p) {
         LOG_ERROR("%sFailed to allocate ipc_protocol_t. %s", label, strerror(errno));
         result.status = FAILURE_NOMEM;
@@ -362,7 +362,7 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, oritlsf
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_master_worker_info_t *payload = (ipc_master_worker_info_t*)oritlsf_calloc(pool, 1, sizeof(ipc_master_worker_info_t));
+            ipc_master_worker_info_t *payload = (ipc_master_worker_info_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_master_worker_info_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_master_worker_info_t without FAM. %s", label, strerror(errno));
                 CLOSE_IPC_PROTOCOL(pool, &p);
@@ -380,7 +380,7 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, oritlsf
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_worker_master_task_info_t *payload = (ipc_worker_master_task_info_t*)oritlsf_calloc(pool, 1, sizeof(ipc_worker_master_task_info_t));
+            ipc_worker_master_task_info_t *payload = (ipc_worker_master_task_info_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_worker_master_task_info_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_worker_master_task_info_t without FAM. %s", label, strerror(errno));
                 CLOSE_IPC_PROTOCOL(pool, &p);
@@ -398,7 +398,7 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, oritlsf
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_worker_master_heartbeat_t *payload = (ipc_worker_master_heartbeat_t*)oritlsf_calloc(pool, 1, sizeof(ipc_worker_master_heartbeat_t));
+            ipc_worker_master_heartbeat_t *payload = (ipc_worker_master_heartbeat_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_worker_master_heartbeat_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_worker_master_heartbeat_t without FAM. %s", label, strerror(errno));
                 CLOSE_IPC_PROTOCOL(pool, &p);
@@ -416,7 +416,7 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, oritlsf
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_master_cow_connect_t *payload = (ipc_master_cow_connect_t*)oritlsf_calloc(pool, 1, sizeof(ipc_master_cow_connect_t));
+            ipc_master_cow_connect_t *payload = (ipc_master_cow_connect_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_master_cow_connect_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_master_cow_connect_t without FAM. %s", label, strerror(errno));
                 CLOSE_IPC_PROTOCOL(pool, &p);
@@ -438,7 +438,7 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, oritlsf
             uint16_t actual_data_len_be;
             memcpy(&actual_data_len_be, buffer + current_buffer_offset + fixed_header_blen_size, sizeof(uint16_t));
             uint16_t actual_data_len = be16toh(actual_data_len_be);
-            ipc_udp_data_t *payload = (ipc_udp_data_t*)oritlsf_calloc(pool, 1, sizeof(ipc_udp_data_t) + actual_data_len);
+            ipc_udp_data_t *payload = (ipc_udp_data_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_udp_data_t) + actual_data_len);
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_udp_data_t with FAM. %s", label, strerror(errno));
                 CLOSE_IPC_PROTOCOL(pool, &p);
@@ -456,7 +456,7 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, oritlsf
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_udp_data_ack_t *payload = (ipc_udp_data_ack_t*)oritlsf_calloc(pool, 1, sizeof(ipc_udp_data_ack_t));
+            ipc_udp_data_ack_t *payload = (ipc_udp_data_ack_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_udp_data_ack_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_udp_data_ack_t without FAM. %s", label, strerror(errno));
                 CLOSE_IPC_PROTOCOL(pool, &p);
@@ -474,7 +474,7 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, oritlsf
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_worker_master_hello1_t *payload = (ipc_worker_master_hello1_t*)oritlsf_calloc(pool, 1, sizeof(ipc_worker_master_hello1_t));
+            ipc_worker_master_hello1_t *payload = (ipc_worker_master_hello1_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_worker_master_hello1_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_worker_master_hello1_t without FAM. %s", label, strerror(errno));
                 CLOSE_IPC_PROTOCOL(pool, &p);
@@ -492,7 +492,7 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, oritlsf
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_worker_master_hello2_t *payload = (ipc_worker_master_hello2_t*)oritlsf_calloc(pool, 1, sizeof(ipc_worker_master_hello2_t));
+            ipc_worker_master_hello2_t *payload = (ipc_worker_master_hello2_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_worker_master_hello2_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_worker_master_hello2_t without FAM. %s", label, strerror(errno));
                 CLOSE_IPC_PROTOCOL(pool, &p);
@@ -510,7 +510,7 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, oritlsf
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_master_worker_hello1_ack_t *payload = (ipc_master_worker_hello1_ack_t*)oritlsf_calloc(pool, 1, sizeof(ipc_master_worker_hello1_ack_t));
+            ipc_master_worker_hello1_ack_t *payload = (ipc_master_worker_hello1_ack_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_master_worker_hello1_ack_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_master_worker_hello1_ack_t without FAM. %s", label, strerror(errno));
                 CLOSE_IPC_PROTOCOL(pool, &p);
@@ -528,7 +528,7 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, oritlsf
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_master_worker_hello2_ack_t *payload = (ipc_master_worker_hello2_ack_t*)oritlsf_calloc(pool, 1, sizeof(ipc_master_worker_hello2_ack_t));
+            ipc_master_worker_hello2_ack_t *payload = (ipc_master_worker_hello2_ack_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_master_worker_hello2_ack_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_master_worker_hello2_ack_t without FAM. %s", label, strerror(errno));
                 CLOSE_IPC_PROTOCOL(pool, &p);
@@ -582,19 +582,19 @@ static inline ssize_t_status_t send_ipc_protocol_message(const char *label, orit
         LOG_ERROR("%sCalculated required size is 0.", label);
         return result;
     }
-    uint8_t *serialized_ipc_data_buffer = (uint8_t *)oritlsf_calloc(pool, 1, serialized_ipc_data_len);
+    uint8_t *serialized_ipc_data_buffer = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, serialized_ipc_data_len);
     if (!serialized_ipc_data_buffer) {
 		result.status = FAILURE_NOMEM;
 		return result;
 	}
     ssize_t_status_t serialize_result = ipc_serialize(label, pool, key_aes, key_mac, nonce, ctr, p, &serialized_ipc_data_buffer, serialized_ipc_data_len);
     if (serialize_result.status != SUCCESS) {
-        LOG_ERROR("%sError serializing IPC protocol: %d", serialize_result.status);
+        LOG_ERROR("%sError serializing IPC protocol: %d", serialize_result.status, p->type);
         oritlsf_free(pool, (void **)&serialized_ipc_data_buffer);
         return result;
     }
     size_t total_message_len_to_send = IPC_LENGTH_PREFIX_BYTES + serialized_ipc_data_len;
-    uint8_t *final_send_buffer = (uint8_t *)oritlsf_calloc(pool, 1, total_message_len_to_send);
+    uint8_t *final_send_buffer = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, total_message_len_to_send);
     if (!final_send_buffer) {
         LOG_ERROR("%smalloc failed for final_send_buffer. %s", label, strerror(errno));
         oritlsf_free(pool, (void **)&serialized_ipc_data_buffer);
@@ -798,7 +798,7 @@ static inline status_t ipc_read_cleartext_header(const char *label, ipc_raw_prot
 static inline ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, oritlsf_pool_t *pool, int *uds_fd) {
 	ipc_raw_protocol_t_status_t result;
     result.status = FAILURE;
-    result.r_ipc_raw_protocol_t = (ipc_raw_protocol_t *)oritlsf_calloc(pool, 1, sizeof(ipc_raw_protocol_t));
+    result.r_ipc_raw_protocol_t = (ipc_raw_protocol_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_raw_protocol_t));
     if (!result.r_ipc_raw_protocol_t) {
         result.status = FAILURE_NOMEM;
         return result;
@@ -840,7 +840,7 @@ static inline ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const
         return result;
     }
     result.r_ipc_raw_protocol_t->n = (uint32_t)total_ipc_payload_len;
-    result.r_ipc_raw_protocol_t->recv_buffer = (uint8_t *)oritlsf_calloc(pool, 1, total_ipc_payload_len);
+    result.r_ipc_raw_protocol_t->recv_buffer = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, total_ipc_payload_len);
     if (!result.r_ipc_raw_protocol_t->recv_buffer) {
 		oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
         result.status = FAILURE_NOMEM;
@@ -916,7 +916,7 @@ static inline status_t ipc_add_tail_protocol_queue(
     ipc_protocol_queue_t **tail
 )
 {
-    ipc_protocol_queue_t *new_queue = (ipc_protocol_queue_t *)oritlsf_calloc(pool, 1, sizeof(ipc_protocol_queue_t));
+    ipc_protocol_queue_t *new_queue = (ipc_protocol_queue_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_protocol_queue_t));
     if (!new_queue) {
         LOG_ERROR("%sFailed to allocate ipc_protocol_queue_t buffer. %s", label, strerror(errno));
         return FAILURE;
@@ -956,7 +956,7 @@ static inline status_t ipc_add_head_protocol_queue(
     ipc_protocol_queue_t **tail
 )
 {
-    ipc_protocol_queue_t *new_queue = (ipc_protocol_queue_t *)oritlsf_calloc(pool, 1, sizeof(ipc_protocol_queue_t));
+    ipc_protocol_queue_t *new_queue = (ipc_protocol_queue_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_protocol_queue_t));
     if (!new_queue) {
         LOG_ERROR("%sFailed to allocate ipc_protocol_queue_t buffer. %s", label, strerror(errno));
         return FAILURE;

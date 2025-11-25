@@ -61,7 +61,7 @@ typedef struct {
 } ori_timer_wheels_t;
 
 static inline timer_id_t *oritw_id_alloc(oritlsf_pool_t *pool, ori_timer_wheels_t *tws, uint64_t id, double delay_us, timer_event_type_t event_type) {
-	timer_id_t *new_id = (timer_id_t *)oritlsf_calloc(pool, 1, sizeof(timer_id_t));
+	timer_id_t *new_id = (timer_id_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(timer_id_t));
     new_id->next = NULL;
     new_id->prev = NULL;
     new_id->delay_us = delay_us;
@@ -97,7 +97,7 @@ static inline timer_id_t *oritw_pop_timer_id_queue(ori_timer_wheels_t *tws) {
 }
 
 static inline timer_event_t *oritw_alloc(oritlsf_pool_t *pool, ori_timer_wheel_t *timer) {
-    timer_event_t *event = (timer_event_t *)oritlsf_calloc(pool, 1, sizeof(timer_event_t));
+    timer_event_t *event = (timer_event_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(timer_event_t));
     event->next = NULL;
     event->prev = NULL;
     event->sorting_next = NULL;
@@ -528,7 +528,7 @@ static inline status_t oritw_setup(const char *label, oritlsf_pool_t *pool, asyn
     timers->add_queue_head = NULL;
     timers->add_queue_tail = NULL;
     for (uint32_t llv = 0; llv < MAX_TIMER_LEVELS; ++llv) {
-        timers->timer[llv] = (ori_timer_wheel_t *)oritlsf_calloc(pool, 1, sizeof(ori_timer_wheel_t));
+        timers->timer[llv] = (ori_timer_wheel_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ori_timer_wheel_t));
         if (!timers->timer[llv]) return FAILURE_NOMEM;
         ori_timer_wheel_t *tw = timers->timer[llv];
         tw->tick_event_fd = -1;

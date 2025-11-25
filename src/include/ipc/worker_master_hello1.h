@@ -49,7 +49,7 @@ static inline status_t ipc_deserialize_worker_master_hello1(const char *label, i
 
 static inline ipc_protocol_t_status_t ipc_prepare_cmd_worker_master_hello1(const char *label, oritlsf_pool_t *pool, worker_type_t wot, uint8_t index, uint8_t *kem_publickey) {
 	ipc_protocol_t_status_t result;
-	result.r_ipc_protocol_t = (ipc_protocol_t *)oritlsf_calloc(pool, 1, sizeof(ipc_protocol_t));
+	result.r_ipc_protocol_t = (ipc_protocol_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_protocol_t));
 	result.status = FAILURE;
 	if (!result.r_ipc_protocol_t) {
 		LOG_ERROR("%sFailed to allocate ipc_protocol_t. %s", label, strerror(errno));
@@ -60,7 +60,7 @@ static inline ipc_protocol_t_status_t ipc_prepare_cmd_worker_master_hello1(const
     result.r_ipc_protocol_t->wot = wot;
     result.r_ipc_protocol_t->index = index;
 	result.r_ipc_protocol_t->type = IPC_WORKER_MASTER_HELLO1;
-	ipc_worker_master_hello1_t *payload = (ipc_worker_master_hello1_t *)oritlsf_calloc(pool, 1, sizeof(ipc_worker_master_hello1_t));
+	ipc_worker_master_hello1_t *payload = (ipc_worker_master_hello1_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_worker_master_hello1_t));
 	if (!payload) {
 		LOG_ERROR("%sFailed to allocate ipc_worker_master_hello1_t payload. %s", label, strerror(errno));
 		CLOSE_IPC_PROTOCOL(pool, &result.r_ipc_protocol_t);

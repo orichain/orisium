@@ -40,7 +40,7 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
 // Setup label
 //----------------------------------------------------------------------
 	int needed = snprintf(NULL, 0, "[%s %d]: ", woname, *ctx->index);
-    ctx->label = (char *)oritlsf_calloc(
+    ctx->label = (char *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         needed + 1,
         sizeof(char)
@@ -54,42 +54,42 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
 //----------------------------------------------------------------------
 // Setup IPC security
 //----------------------------------------------------------------------
-    ctx->kem_privatekey = (uint8_t *)oritlsf_calloc(
+    ctx->kem_privatekey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         KEM_PRIVATEKEY_BYTES,
         sizeof(uint8_t)
     );
-    ctx->kem_publickey = (uint8_t *)oritlsf_calloc(
+    ctx->kem_publickey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         KEM_PUBLICKEY_BYTES,
         sizeof(uint8_t)
     );
-    ctx->kem_ciphertext = (uint8_t *)oritlsf_calloc(
+    ctx->kem_ciphertext = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         KEM_CIPHERTEXT_BYTES,
         sizeof(uint8_t)
     );
-    ctx->kem_sharedsecret = (uint8_t *)oritlsf_calloc(
+    ctx->kem_sharedsecret = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         KEM_SHAREDSECRET_BYTES,
         sizeof(uint8_t)
     );
-    ctx->aes_key = (uint8_t *)oritlsf_calloc(
+    ctx->aes_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         HASHES_BYTES,
         sizeof(uint8_t)
     );
-    ctx->mac_key = (uint8_t *)oritlsf_calloc(
+    ctx->mac_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         HASHES_BYTES,
         sizeof(uint8_t)
     );
-    ctx->local_nonce = (uint8_t *)oritlsf_calloc(
+    ctx->local_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         AES_NONCE_BYTES,
         sizeof(uint8_t)
     );
-    ctx->remote_nonce = (uint8_t *)oritlsf_calloc(
+    ctx->remote_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         AES_NONCE_BYTES,
         sizeof(uint8_t)
@@ -150,14 +150,17 @@ void cleanup_worker(worker_context_t *ctx) {
         ctx->heartbeat_timer_id.event_type = TE_UNKNOWN;
     }
 //----------------------------------------------------------------------
+	int needed = strlen(ctx->label);
+    char llabel[needed + 1];
+    strcpy(llabel, ctx->label);
     oritw_cleanup(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer);
 //----------------------------------------------------------------------
     CLOSE_FD(&ctx->async.async_fd);
     oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->label);
 //----------------------------------------------------------------------
-    void *reclaimed_buffer = oritlsf_cleanup_pool(&ctx->oritlsf_pool);
+	void *reclaimed_buffer = oritlsf_cleanup_pool(llabel, &ctx->oritlsf_pool);
     if (reclaimed_buffer != ctx->arena_buffer) {
-        LOG_ERROR("%sFailed To oritlsf_cleanup_pool.", "[ORITLSF]: ");
+        LOG_ERROR("%sFailed To oritlsf_cleanup_pool.", llabel);
     }
     free(ctx->arena_buffer);
 }

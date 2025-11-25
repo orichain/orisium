@@ -49,37 +49,37 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
         LOG_ERROR("%sFailed To oritlsf_setup_pool", "[ORITLSF]: ");
         return FAILURE;
     }
-    master_ctx->sio_session = (master_worker_session_t *)oritlsf_calloc(
+    master_ctx->sio_session = (master_worker_session_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &master_ctx->oritlsf_pool,
         MAX_SIO_WORKERS,
         sizeof(master_worker_session_t)
     );
-    master_ctx->logic_session = (master_worker_session_t *)oritlsf_calloc(
+    master_ctx->logic_session = (master_worker_session_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &master_ctx->oritlsf_pool,
         MAX_LOGIC_WORKERS,
         sizeof(master_worker_session_t)
     );
-    master_ctx->cow_session = (master_worker_session_t *)oritlsf_calloc(
+    master_ctx->cow_session = (master_worker_session_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &master_ctx->oritlsf_pool,
         MAX_COW_WORKERS,
         sizeof(master_worker_session_t)
     );
-    master_ctx->dbr_session = (master_worker_session_t *)oritlsf_calloc(
+    master_ctx->dbr_session = (master_worker_session_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &master_ctx->oritlsf_pool,
         MAX_DBR_WORKERS,
         sizeof(master_worker_session_t)
     );
-    master_ctx->dbw_session = (master_worker_session_t *)oritlsf_calloc(
+    master_ctx->dbw_session = (master_worker_session_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &master_ctx->oritlsf_pool,
         MAX_DBW_WORKERS,
         sizeof(master_worker_session_t)
     );
-    master_ctx->sio_c_session = (master_sio_c_session_t *)oritlsf_calloc(
+    master_ctx->sio_c_session = (master_sio_c_session_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &master_ctx->oritlsf_pool,
         MAX_MASTER_SIO_SESSIONS,
         sizeof(master_sio_c_session_t)
     );
-    master_ctx->cow_c_session = (master_cow_c_session_t *)oritlsf_calloc(
+    master_ctx->cow_c_session = (master_cow_c_session_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &master_ctx->oritlsf_pool,
         MAX_MASTER_COW_SESSIONS,
         sizeof(master_cow_c_session_t)
@@ -185,9 +185,9 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     master_ctx->listen_port = (uint16_t)0;
     memset(&master_ctx->bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
 //----------------------------------------------------------------------
-    void *reclaimed_buffer = oritlsf_cleanup_pool(&master_ctx->oritlsf_pool);
+    void *reclaimed_buffer = oritlsf_cleanup_pool(label, &master_ctx->oritlsf_pool);
     if (reclaimed_buffer != master_ctx->arena_buffer) {
-        LOG_ERROR("%sFailed To oritlsf_cleanup_pool.", "[ORITLSF]: ");
+        LOG_ERROR("%sFailed To oritlsf_cleanup_pool.", label);
     }
     free(master_ctx->arena_buffer);
 }

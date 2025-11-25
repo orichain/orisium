@@ -277,7 +277,7 @@ static inline void calculate_oricle(const char *label, oritlsf_pool_t *pool, con
     }
     if (o->first_check) {
         o->first_check = false;
-        o->kalman_calibration_samples = (float *)oritlsf_calloc(pool, KALMAN_CALIBRATION_SAMPLES, sizeof(float));
+        o->kalman_calibration_samples = (float *)oritlsf_calloc(__FILE__, __LINE__, pool, KALMAN_CALIBRATION_SAMPLES, sizeof(float));
         o->temp_ewma_value = o->initial_value;
         o->value_prediction = o->initial_value;
         o->kalman_filter.is_initialized = false;
@@ -337,7 +337,7 @@ static inline void calculate_oricle_double(const char *label, oritlsf_pool_t *po
     }
     if (o->first_check) {
         o->first_check = false;
-        o->kalman_calibration_samples = (double *)oritlsf_calloc(pool, KALMAN_CALIBRATION_SAMPLES, sizeof(double));
+        o->kalman_calibration_samples = (double *)oritlsf_calloc(__FILE__, __LINE__, pool, KALMAN_CALIBRATION_SAMPLES, sizeof(double));
         o->temp_ewma_value = o->initial_value;
         o->value_prediction = o->initial_value;
         o->kalman_filter.is_initialized = false;
@@ -398,7 +398,7 @@ static inline void calculate_oricle_doubleX(const char *label, oritlsf_pool_t *p
     }
     if (o->first_check) {
         o->first_check = false;
-        o->kalman_calibration_samples = (double *)oritlsf_calloc(pool, KALMAN_CALIBRATION_SAMPLES, sizeof(double));
+        o->kalman_calibration_samples = (double *)oritlsf_calloc(__FILE__, __LINE__, pool, KALMAN_CALIBRATION_SAMPLES, sizeof(double));
         o->temp_ewma_value = o->initial_value;
         o->value_prediction = o->initial_value;
         o->kalman_filter.is_initialized = false;
@@ -459,7 +459,7 @@ static inline void calculate_oricle_long_double(const char *label, oritlsf_pool_
     }
     if (o->first_check) {
         o->first_check = false;
-        o->kalman_calibration_samples = (long double *)oritlsf_calloc(pool, KALMAN_CALIBRATION_SAMPLES, sizeof(long double));
+        o->kalman_calibration_samples = (long double *)oritlsf_calloc(__FILE__, __LINE__, pool, KALMAN_CALIBRATION_SAMPLES, sizeof(long double));
         o->temp_ewma_value = o->initial_value;
         o->value_prediction = o->initial_value;
         o->kalman_filter.is_initialized = false;

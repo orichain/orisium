@@ -2867,7 +2867,7 @@ status_t handle_workers_ipc_udp_data_sio(worker_context_t *worker_ctx, void *wor
     struct sockaddr_in6 remote_addr;
     memcpy(&remote_addr, &iudp_datai->remote_addr, sizeof(struct sockaddr_in6));
 //----------------------------------------------------------------------
-    orilink_raw_protocol_t *oudp_datao = (orilink_raw_protocol_t *)oritlsf_calloc(&worker_ctx->oritlsf_pool, 1, sizeof(orilink_raw_protocol_t));
+    orilink_raw_protocol_t *oudp_datao = (orilink_raw_protocol_t *)oritlsf_calloc(__FILE__, __LINE__, &worker_ctx->oritlsf_pool, 1, sizeof(orilink_raw_protocol_t));
     if (!oudp_datao) {
         LOG_ERROR("%sFailed to allocate orilink_raw_protocol_t. %s", worker_ctx->label, strerror(errno));
         CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
@@ -2934,7 +2934,7 @@ status_t handle_workers_ipc_udp_data_cow(worker_context_t *worker_ctx, void *wor
     struct sockaddr_in6 remote_addr;
     memcpy(&remote_addr, &iudp_datai->remote_addr, sizeof(struct sockaddr_in6));
 //----------------------------------------------------------------------
-    orilink_raw_protocol_t *oudp_datao = (orilink_raw_protocol_t *)oritlsf_calloc(&worker_ctx->oritlsf_pool, 1, sizeof(orilink_raw_protocol_t));
+    orilink_raw_protocol_t *oudp_datao = (orilink_raw_protocol_t *)oritlsf_calloc(__FILE__, __LINE__, &worker_ctx->oritlsf_pool, 1, sizeof(orilink_raw_protocol_t));
     if (!oudp_datao) {
         LOG_ERROR("%sFailed to allocate orilink_raw_protocol_t. %s", worker_ctx->label, strerror(errno));
         CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
@@ -3187,6 +3187,7 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
                 }
 //======================================================================
             }
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             break;
         }
         default:

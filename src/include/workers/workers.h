@@ -360,42 +360,42 @@ static inline status_t setup_cow_session(worker_context_t *ctx, cow_c_session_t 
     identity->local_index = index;
     identity->local_session_index = session_index;
     if (generate_uint64_t_id(ctx->label, &identity->local_id) != SUCCESS) return FAILURE;
-    single_session->kem_privatekey = (uint8_t *)oritlsf_calloc(
+    single_session->kem_privatekey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         KEM_PRIVATEKEY_BYTES,
         sizeof(uint8_t)
     );
-    security->kem_publickey = (uint8_t *)oritlsf_calloc(
+    security->kem_publickey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         KEM_PUBLICKEY_BYTES,
         sizeof(uint8_t)
     );
-    security->kem_ciphertext = (uint8_t *)oritlsf_calloc(
+    security->kem_ciphertext = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         KEM_CIPHERTEXT_BYTES,
         sizeof(uint8_t)
     );
-    security->kem_sharedsecret = (uint8_t *)oritlsf_calloc(
+    security->kem_sharedsecret = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         KEM_SHAREDSECRET_BYTES,
         sizeof(uint8_t)
     );
-    security->aes_key = (uint8_t *)oritlsf_calloc(
+    security->aes_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         HASHES_BYTES,
         sizeof(uint8_t)
     );
-    security->mac_key = (uint8_t *)oritlsf_calloc(
+    security->mac_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         HASHES_BYTES,
         sizeof(uint8_t)
     );
-    security->local_nonce = (uint8_t *)oritlsf_calloc(
+    security->local_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         AES_NONCE_BYTES,
         sizeof(uint8_t)
     );
-    security->remote_nonce = (uint8_t *)oritlsf_calloc(
+    security->remote_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         AES_NONCE_BYTES,
         sizeof(uint8_t)
@@ -512,37 +512,37 @@ static inline status_t setup_sio_session(worker_context_t *ctx, sio_c_session_t 
     identity->local_index = index;
     identity->local_session_index = session_index;
     if (generate_uint64_t_id(ctx->label, &identity->local_id) != SUCCESS) return FAILURE;
-    security->kem_publickey = (uint8_t *)oritlsf_calloc(
+    security->kem_publickey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         KEM_PUBLICKEY_BYTES,
         sizeof(uint8_t)
     );
-    security->kem_ciphertext = (uint8_t *)oritlsf_calloc(
+    security->kem_ciphertext = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         KEM_CIPHERTEXT_BYTES,
         sizeof(uint8_t)
     );
-    security->kem_sharedsecret = (uint8_t *)oritlsf_calloc(
+    security->kem_sharedsecret = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         KEM_SHAREDSECRET_BYTES,
         sizeof(uint8_t)
     );
-    security->aes_key = (uint8_t *)oritlsf_calloc(
+    security->aes_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         HASHES_BYTES,
         sizeof(uint8_t)
     );
-    security->mac_key = (uint8_t *)oritlsf_calloc(
+    security->mac_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         HASHES_BYTES,
         sizeof(uint8_t)
     );
-    security->local_nonce = (uint8_t *)oritlsf_calloc(
+    security->local_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         AES_NONCE_BYTES,
         sizeof(uint8_t)
     );
-    security->remote_nonce = (uint8_t *)oritlsf_calloc(
+    security->remote_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &ctx->oritlsf_pool,
         AES_NONCE_BYTES,
         sizeof(uint8_t)
@@ -568,6 +568,7 @@ static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *s
         oritw_remove_event(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer, &single_session->heartbeat.heartbeat_sender_timer_id.event);
         single_session->heartbeat.heartbeat_sender_timer_id.id = 0ULL;
         single_session->heartbeat.heartbeat_sender_timer_id.delay_us = 0.0;
+        single_session->heartbeat.heartbeat_sender_timer_id.event_type = TE_UNKNOWN;
     }
     #if defined(ACCRCY_TEST)
     if (single_session->heartbeat.heartbeat_openner_timer_id.event) {

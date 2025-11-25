@@ -204,7 +204,7 @@ static inline status_t encrypt_decrypt_256(
     const size_t data_len
 )
 {
-    uint8_t *keystream_buffer = (uint8_t *)oritlsf_calloc(pool, 1, data_len);
+    uint8_t *keystream_buffer = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, data_len);
     if (!keystream_buffer) {
         LOG_ERROR("%sError calloc keystream_buffer for encryption/decryption: %s", label, strerror(errno));
         return FAILURE;
@@ -245,7 +245,7 @@ static status_t encrypt_decrypt_128(
     const size_t data_len
 )
 {
-    uint8_t *keystream_buffer = (uint8_t *)oritlsf_calloc(pool, 1, data_len);
+    uint8_t *keystream_buffer = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, data_len);
     if (!keystream_buffer) {
         LOG_ERROR("%sError calloc keystream_buffer for encryption/decryption: %s", label, strerror(errno));
         return FAILURE;

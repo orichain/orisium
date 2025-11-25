@@ -80,37 +80,37 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
     session->isactive = true;
     session->ishealthy = true;        
     session->isready = false;  
-    security->kem_publickey = (uint8_t *)oritlsf_calloc(
+    security->kem_publickey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &master_ctx->oritlsf_pool,
         KEM_PUBLICKEY_BYTES,
         sizeof(uint8_t)
     );
-    security->kem_ciphertext = (uint8_t *)oritlsf_calloc(
+    security->kem_ciphertext = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &master_ctx->oritlsf_pool,
         KEM_CIPHERTEXT_BYTES,
         sizeof(uint8_t)
     );
-    security->kem_sharedsecret = (uint8_t *)oritlsf_calloc(
+    security->kem_sharedsecret = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &master_ctx->oritlsf_pool,
         KEM_SHAREDSECRET_BYTES,
         sizeof(uint8_t)
     );
-    security->aes_key = (uint8_t *)oritlsf_calloc(
+    security->aes_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &master_ctx->oritlsf_pool,
         HASHES_BYTES,
         sizeof(uint8_t)
     );
-    security->mac_key = (uint8_t *)oritlsf_calloc(
+    security->mac_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &master_ctx->oritlsf_pool,
         HASHES_BYTES,
         sizeof(uint8_t)
     );
-    security->local_nonce = (uint8_t *)oritlsf_calloc(
+    security->local_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &master_ctx->oritlsf_pool,
         AES_NONCE_BYTES,
         sizeof(uint8_t)
     );
-    security->remote_nonce = (uint8_t *)oritlsf_calloc(
+    security->remote_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &master_ctx->oritlsf_pool,
         AES_NONCE_BYTES,
         sizeof(uint8_t)
@@ -426,7 +426,7 @@ status_t calculate_avgtt(const char *label, master_context_t *master_ctx, worker
     }
     char *desc;
 	int needed = snprintf(NULL, 0, "ORICLE => AVGTT %s-%d", worker_name, index);
-    desc = (char *)oritlsf_calloc(
+    desc = (char *)oritlsf_calloc(__FILE__, __LINE__, 
         &master_ctx->oritlsf_pool,
         needed + 1,
         sizeof(char)
@@ -465,7 +465,7 @@ status_t calculate_healthy(const char* label, master_context_t *master_ctx, work
     current_health_measurement *= (double)100;    
     char *desc;
 	int needed = snprintf(NULL, 0, "ORICLE => HEALTHY %s-%d", worker_name, index);
-	desc = (char *)oritlsf_calloc(
+	desc = (char *)oritlsf_calloc(__FILE__, __LINE__, 
         &master_ctx->oritlsf_pool,
         needed + 1,
         sizeof(char)

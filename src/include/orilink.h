@@ -458,7 +458,7 @@ static inline orilink_protocol_t_status_t orilink_deserialize(const char *label,
         result.status = FAILURE;
         return result;
     }
-    orilink_protocol_t* p = (orilink_protocol_t*)oritlsf_calloc(pool, 1, sizeof(orilink_protocol_t));
+    orilink_protocol_t* p = (orilink_protocol_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(orilink_protocol_t));
     if (!p) {
         LOG_ERROR("%sFailed to allocate orilink_protocol_t. %s", label, strerror(errno));
         result.status = FAILURE_NOMEM;
@@ -576,7 +576,7 @@ static inline orilink_protocol_t_status_t orilink_deserialize(const char *label,
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            orilink_hello1_t *payload = (orilink_hello1_t*)oritlsf_calloc(pool, 1, sizeof(orilink_hello1_t));
+            orilink_hello1_t *payload = (orilink_hello1_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(orilink_hello1_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate orilink_hello1_t without FAM. %s", label, strerror(errno));
                 CLOSE_ORILINK_PROTOCOL(pool, &p);
@@ -594,7 +594,7 @@ static inline orilink_protocol_t_status_t orilink_deserialize(const char *label,
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            orilink_hello1_ack_t *payload = (orilink_hello1_ack_t*)oritlsf_calloc(pool, 1, sizeof(orilink_hello1_ack_t));
+            orilink_hello1_ack_t *payload = (orilink_hello1_ack_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(orilink_hello1_ack_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate orilink_hello1_ack_t without FAM. %s", label, strerror(errno));
                 CLOSE_ORILINK_PROTOCOL(pool, &p);
@@ -612,7 +612,7 @@ static inline orilink_protocol_t_status_t orilink_deserialize(const char *label,
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            orilink_hello2_t *payload = (orilink_hello2_t*)oritlsf_calloc(pool, 1, sizeof(orilink_hello2_t));
+            orilink_hello2_t *payload = (orilink_hello2_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(orilink_hello2_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate orilink_hello2_t without FAM. %s", label, strerror(errno));
                 CLOSE_ORILINK_PROTOCOL(pool, &p);
@@ -630,7 +630,7 @@ static inline orilink_protocol_t_status_t orilink_deserialize(const char *label,
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            orilink_hello2_ack_t *payload = (orilink_hello2_ack_t*)oritlsf_calloc(pool, 1, sizeof(orilink_hello2_ack_t));
+            orilink_hello2_ack_t *payload = (orilink_hello2_ack_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(orilink_hello2_ack_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate orilink_hello2_ack_t without FAM. %s", label, strerror(errno));
                 CLOSE_ORILINK_PROTOCOL(pool, &p);
@@ -648,7 +648,7 @@ static inline orilink_protocol_t_status_t orilink_deserialize(const char *label,
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            orilink_hello3_t *payload = (orilink_hello3_t*)oritlsf_calloc(pool, 1, sizeof(orilink_hello3_t));
+            orilink_hello3_t *payload = (orilink_hello3_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(orilink_hello3_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate orilink_hello3_t without FAM. %s", label, strerror(errno));
                 CLOSE_ORILINK_PROTOCOL(pool, &p);
@@ -666,7 +666,7 @@ static inline orilink_protocol_t_status_t orilink_deserialize(const char *label,
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            orilink_hello3_ack_t *payload = (orilink_hello3_ack_t*)oritlsf_calloc(pool, 1, sizeof(orilink_hello3_ack_t));
+            orilink_hello3_ack_t *payload = (orilink_hello3_ack_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(orilink_hello3_ack_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate orilink_hello3_ack_t without FAM. %s", label, strerror(errno));
                 CLOSE_ORILINK_PROTOCOL(pool, &p);
@@ -684,7 +684,7 @@ static inline orilink_protocol_t_status_t orilink_deserialize(const char *label,
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            orilink_hello4_t *payload = (orilink_hello4_t*)oritlsf_calloc(pool, 1, sizeof(orilink_hello4_t));
+            orilink_hello4_t *payload = (orilink_hello4_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(orilink_hello4_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate orilink_hello4_t without FAM. %s", label, strerror(errno));
                 CLOSE_ORILINK_PROTOCOL(pool, &p);
@@ -702,7 +702,7 @@ static inline orilink_protocol_t_status_t orilink_deserialize(const char *label,
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            orilink_hello4_ack_t *payload = (orilink_hello4_ack_t*)oritlsf_calloc(pool, 1, sizeof(orilink_hello4_ack_t));
+            orilink_hello4_ack_t *payload = (orilink_hello4_ack_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(orilink_hello4_ack_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate orilink_hello4_ack_t without FAM. %s", label, strerror(errno));
                 CLOSE_ORILINK_PROTOCOL(pool, &p);
@@ -720,7 +720,7 @@ static inline orilink_protocol_t_status_t orilink_deserialize(const char *label,
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            orilink_heartbeat_t *payload = (orilink_heartbeat_t*)oritlsf_calloc(pool, 1, sizeof(orilink_heartbeat_t));
+            orilink_heartbeat_t *payload = (orilink_heartbeat_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(orilink_heartbeat_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate orilink_heartbeat_t without FAM. %s", label, strerror(errno));
                 CLOSE_ORILINK_PROTOCOL(pool, &p);
@@ -738,7 +738,7 @@ static inline orilink_protocol_t_status_t orilink_deserialize(const char *label,
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            orilink_heartbeat_ack_t *payload = (orilink_heartbeat_ack_t*)oritlsf_calloc(pool, 1, sizeof(orilink_heartbeat_ack_t));
+            orilink_heartbeat_ack_t *payload = (orilink_heartbeat_ack_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(orilink_heartbeat_ack_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate orilink_heartbeat_ack_t without FAM. %s", label, strerror(errno));
                 CLOSE_ORILINK_PROTOCOL(pool, &p);
@@ -756,7 +756,7 @@ static inline orilink_protocol_t_status_t orilink_deserialize(const char *label,
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            orilink_info_t *payload = (orilink_info_t*)oritlsf_calloc(pool, 1, sizeof(orilink_info_t));
+            orilink_info_t *payload = (orilink_info_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(orilink_info_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate orilink_info_t without FAM. %s", label, strerror(errno));
                 CLOSE_ORILINK_PROTOCOL(pool, &p);
@@ -774,7 +774,7 @@ static inline orilink_protocol_t_status_t orilink_deserialize(const char *label,
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            orilink_info_ack_t *payload = (orilink_info_ack_t*)oritlsf_calloc(pool, 1, sizeof(orilink_info_ack_t));
+            orilink_info_ack_t *payload = (orilink_info_ack_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(orilink_info_ack_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate orilink_info_ack_t without FAM. %s", label, strerror(errno));
                 CLOSE_ORILINK_PROTOCOL(pool, &p);
@@ -820,7 +820,7 @@ static inline p8zs_t *create_orilink_raw_protocol_packet(const char *label, orit
 	if (!p) {
         return NULL;
     }
-	p8zs_t *result = (p8zs_t *)oritlsf_calloc(pool, 1, sizeof(p8zs_t));
+	p8zs_t *result = (p8zs_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(p8zs_t));
     if (!result) {
         return NULL;
     }
@@ -839,13 +839,13 @@ static inline p8zs_t *create_orilink_raw_protocol_packet(const char *label, orit
     }
     result->len = total_required_size;
     result->status = FAILURE;
-    result->data = (uint8_t *)oritlsf_calloc(pool, 1, result->len);
+    result->data = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, result->len);
     if (!result->data) {
         return NULL;
     }
     ssize_t_status_t serialize_result = orilink_serialize(label, pool, key_aes, key_mac, nonce, ctr, p, &result->data, total_required_size);
     if (serialize_result.status != SUCCESS) {
-        LOG_ERROR("%sError serializing ORILINK protocol: %d", label, serialize_result.status);
+        LOG_ERROR("%sError serializing ORILINK protocol: %d", label, serialize_result.status, p->type);
         if (result) oritlsf_free(pool, (void **)&result->data);
         oritlsf_free(pool, (void **)&result);
         return NULL;
@@ -1260,7 +1260,7 @@ static inline orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packe
 {
     orilink_raw_protocol_t_status_t result;
     result.status = FAILURE;
-    result.r_orilink_raw_protocol_t = (orilink_raw_protocol_t *)oritlsf_calloc(pool, 1, sizeof(orilink_raw_protocol_t));
+    result.r_orilink_raw_protocol_t = (orilink_raw_protocol_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(orilink_raw_protocol_t));
     if (!result.r_orilink_raw_protocol_t) {
         result.status = FAILURE_NOMEM;
         return result;
@@ -1306,7 +1306,7 @@ static inline orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packe
         return result;
     }
     result.r_orilink_raw_protocol_t->n = (uint16_t)bytes_read_payload;
-    result.r_orilink_raw_protocol_t->recv_buffer = (uint8_t *)oritlsf_calloc(pool, 1, bytes_read_payload);
+    result.r_orilink_raw_protocol_t->recv_buffer = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, bytes_read_payload);
     if (!result.r_orilink_raw_protocol_t->recv_buffer) {
 		oritlsf_free(pool, (void **)&result.r_orilink_raw_protocol_t);
         result.status = FAILURE_NOMEM;
@@ -1333,7 +1333,7 @@ static inline status_t udp_data_to_orilink_raw_protocol_packet(const char *label
 		*poudp_datao = NULL;
 		return FAILURE;
 	}
-	oudp_datao->recv_buffer = (uint8_t *)oritlsf_calloc(pool, 1, iudp_datai->len);
+	oudp_datao->recv_buffer = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, iudp_datai->len);
     if (!oudp_datao->recv_buffer) {
         *poudp_datao = NULL;
         return FAILURE_NOMEM;
