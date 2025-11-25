@@ -105,4 +105,10 @@ typedef struct {
 	status_t status;
 } uint64_t_status_t;
 
+typedef struct p8zs_t {
+    size_t len;
+	uint8_t *data;
+	status_t status;
+} p8zs_t;
+
 #endif

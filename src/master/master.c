@@ -26,7 +26,6 @@
 #include "node.h"
 #include "oritw.h"
 #include "oritlsf.h"
-#include "orilink/protocol.h"
 #include "oritw/timer_event.h"
 
 volatile sig_atomic_t shutdown_requested = 0;
@@ -134,20 +133,16 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
         return FAILURE;
 	}
     shutdown_event_fd = &master_ctx->shutdown_event_fd;
-    if (oritw_setup(label, &master_ctx->master_async, &master_ctx->timer) != SUCCESS) return FAILURE;
-    master_ctx->orilink_raw_protocol_pool.head = NULL;
-    master_ctx->orilink_raw_protocol_pool.tail = NULL;
-    master_ctx->orilink_p8zs_pool.head = NULL;
-    master_ctx->orilink_p8zs_pool.tail = NULL;
+    if (oritw_setup(label, &master_ctx->oritlsf_pool, &master_ctx->master_async, &master_ctx->timer) != SUCCESS) return FAILURE;
     return SUCCESS;
 }
 
 void cleanup_master(const char *label, master_context_t *master_ctx) {
-    oritlsf_free(&master_ctx->oritlsf_pool, master_ctx->sio_session);
-    oritlsf_free(&master_ctx->oritlsf_pool, master_ctx->logic_session);
-    oritlsf_free(&master_ctx->oritlsf_pool, master_ctx->cow_session);
-    oritlsf_free(&master_ctx->oritlsf_pool, master_ctx->dbr_session);
-    oritlsf_free(&master_ctx->oritlsf_pool, master_ctx->dbw_session);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_session);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_session);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbr_session);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbw_session);
     for (uint8_t sio_worker_idx=0;sio_worker_idx<MAX_SIO_WORKERS; ++sio_worker_idx) {
         for(uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
             master_ctx->sio_c_session[(sio_worker_idx * MAX_CONNECTION_PER_SIO_WORKER) + i].in_use = false;
@@ -164,8 +159,8 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
             master_ctx->cow_c_session[(cow_worker_idx * MAX_CONNECTION_PER_COW_WORKER) + i].id_connection = 0xffffffffffffffff;
         }
     }
-    oritlsf_free(&master_ctx->oritlsf_pool, master_ctx->sio_c_session);
-    oritlsf_free(&master_ctx->oritlsf_pool, master_ctx->cow_c_session);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_c_session);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_c_session);
     master_ctx->shutdown_requested = 0;
     master_ctx->hb_check_times = (uint16_t)0;
     master_ctx->is_rekeying = false;
@@ -178,20 +173,17 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     CLOSE_FD(&master_ctx->shutdown_event_fd);
 //----------------------------------------------------------------------
     if (master_ctx->check_healthy_timer_id.event) {
-        master_ctx->check_healthy_timer_id.event = oritw_remove_eventX(label, &master_ctx->master_async, &master_ctx->timer, master_ctx->check_healthy_timer_id.event);
+        oritw_remove_event(label, &master_ctx->oritlsf_pool, &master_ctx->master_async, &master_ctx->timer, &master_ctx->check_healthy_timer_id.event);
         master_ctx->check_healthy_timer_id.id = 0ULL;
         master_ctx->check_healthy_timer_id.delay_us = 0.0;
         master_ctx->check_healthy_timer_id.event_type = TE_UNKNOWN;
     }
 //----------------------------------------------------------------------
-    oritw_cleanup(label, &master_ctx->master_async, &master_ctx->timer);
+    oritw_cleanup(label, &master_ctx->oritlsf_pool, &master_ctx->master_async, &master_ctx->timer);
 //----------------------------------------------------------------------
     CLOSE_FD(&master_ctx->master_async.async_fd);
     master_ctx->listen_port = (uint16_t)0;
     memset(&master_ctx->bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
-//----------------------------------------------------------------------
-    orilink_raw_protocol_cleanup(&master_ctx->orilink_raw_protocol_pool.head, &master_ctx->orilink_raw_protocol_pool.tail);
-    orilink_p8zs_cleanup(&master_ctx->orilink_p8zs_pool.head, &master_ctx->orilink_p8zs_pool.tail);
 //----------------------------------------------------------------------
     void *reclaimed_buffer = oritlsf_cleanup_pool(&master_ctx->oritlsf_pool);
     if (reclaimed_buffer != master_ctx->arena_buffer) {
@@ -374,7 +366,7 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                     metrics->sum_hb_interval = metrics->hb_interval;
                                 }
                                 master_ctx->check_healthy_timer_id.delay_us = worker_check_healthy_us();
-                                status_t chst = oritw_add_eventX(label, &master_ctx->master_async, &master_ctx->timer, &master_ctx->check_healthy_timer_id);
+                                status_t chst = oritw_add_event(label, &master_ctx->oritlsf_pool, &master_ctx->master_async, &master_ctx->timer, &master_ctx->check_healthy_timer_id);
                                 if (chst != SUCCESS) {
                                     LOG_INFO("%sGagal async_create_timerfd hb checker. Initiating graceful shutdown...", label);
                                     master_ctx->shutdown_requested = 1;

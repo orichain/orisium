@@ -19,7 +19,7 @@ status_t handle_master_ipc_closed_event(const char *label, master_context_t *mas
 
 status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx, int *file_descriptor) {
     while (true) {
-        ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(label, file_descriptor);
+        ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(label, &master_ctx->oritlsf_pool, file_descriptor);
         if (ircvdi.status == FAILURE_EAGNEWBLK) {
             break;
         } else {
@@ -34,7 +34,7 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
             uint8_t rcvd_index = ircvdi.r_ipc_raw_protocol_t->index;
             master_worker_session_t *session = get_master_worker_session(master_ctx, rcvd_wot, rcvd_index);
             if (session == NULL) {
-                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi.r_ipc_raw_protocol_t);
                 return FAILURE;
             }
             const char *worker_name = get_master_worker_name(rcvd_wot);
@@ -42,7 +42,7 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
             worker_rekeying_t *rekeying = &session->rekeying;
             int *worker_uds_fd = &session->upp.uds[0];
             if (!security || !rekeying || *worker_uds_fd == -1) {
-                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi.r_ipc_raw_protocol_t);
                 return FAILURE;
             }
             if (ipc_check_mac(
@@ -52,7 +52,7 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
                 ) != SUCCESS
             )
             {
-                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi.r_ipc_raw_protocol_t);
                 return FAILURE;
             }
             if (ipc_read_header(
@@ -63,7 +63,7 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
                 ) != SUCCESS
             )
             {
-                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi.r_ipc_raw_protocol_t);
                 return FAILURE;
             }
             if (ipc_check_ctr(
@@ -74,7 +74,7 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
                 ) != SUCCESS
             )
             {
-                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi.r_ipc_raw_protocol_t);
                 return FAILURE;
             }
             switch (ircvdi.r_ipc_raw_protocol_t->type) {
@@ -114,7 +114,7 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
                 }
                 default:
                     LOG_ERROR("%sUnknown IPC protocol type %d from UDS FD %d. Ignoring.", label, ircvdi.r_ipc_raw_protocol_t->type, *file_descriptor);
-                    CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                    CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi.r_ipc_raw_protocol_t);
             }
         }
     }

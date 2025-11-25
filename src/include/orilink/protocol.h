@@ -4,12 +4,12 @@
 #include <netinet/in.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "constants.h"
 #include "pqc.h"
 #include "types.h"
+#include "oritlsf.h"
 
 typedef enum {
     ORILINK_HELLO1 = (uint8_t)0x00,
@@ -164,75 +164,69 @@ typedef struct {
 	} payload;
 } orilink_protocol_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan
-static inline void CLOSE_ORILINK_PAYLOAD(void **ptr) {
-    if (ptr != NULL && *ptr != NULL) {
-        free(*ptr);
-        *ptr = NULL;
-    }
-}
-//Huruf_besar biar selalu ingat karena akan sering digunakan
-static inline void CLOSE_ORILINK_PROTOCOL(orilink_protocol_t **protocol_ptr) {
+static inline void CLOSE_ORILINK_PROTOCOL(oritlsf_pool_t *pool, orilink_protocol_t **protocol_ptr) {
     if (protocol_ptr != NULL && *protocol_ptr != NULL) {
         orilink_protocol_t *x = *protocol_ptr;
-        if (x->type == ORILINK_HELLO1) {
-            memset(x->payload.orilink_hello1->publickey1, 0, KEM_PUBLICKEY_BYTES / 2);
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_hello1);
-        } else if (x->type == ORILINK_HELLO1_ACK) {
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_hello1_ack);
-        } else if (x->type == ORILINK_HELLO2) {
-            memset(x->payload.orilink_hello2->publickey2, 0, KEM_PUBLICKEY_BYTES / 2);
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_hello2);
-        } else if (x->type == ORILINK_HELLO2_ACK) {
-            memset(x->payload.orilink_hello2_ack->ciphertext1, 0, KEM_CIPHERTEXT_BYTES / 2);
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_hello2_ack);
-        } else if (x->type == ORILINK_HELLO3) {
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_hello3);
-        } else if (x->type == ORILINK_HELLO3_ACK) {
-            memset(x->payload.orilink_hello3_ack->nonce, 0, AES_NONCE_BYTES);
-            memset(x->payload.orilink_hello3_ack->ciphertext2, 0, KEM_CIPHERTEXT_BYTES / 2);
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_hello3_ack);
-        } else if (x->type == ORILINK_HELLO4) {
-            memset(x->payload.orilink_hello4->encrypted_local_identity, 0, 
-                AES_NONCE_BYTES +
-                sizeof(uint8_t) +
-                sizeof(uint8_t) +
-                sizeof(uint8_t) +
-                sizeof(uint64_t) +
-                AES_TAG_BYTES
-            );
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_hello4);
-        }  else if (x->type == ORILINK_HELLO4_ACK) {
-            memset(x->payload.orilink_hello4_ack->encrypted_remote_identity, 0, 
-                sizeof(uint8_t) +
-                sizeof(uint8_t) +
-                sizeof(uint8_t) +
-                sizeof(uint64_t) +
-                AES_TAG_BYTES
-            );
-            memset(x->payload.orilink_hello4_ack->encrypted_local_identity, 0, 
-                sizeof(uint8_t) +
-                sizeof(uint8_t) +
-                sizeof(uint8_t) +
-                sizeof(uint64_t) +
-                AES_TAG_BYTES
-            );
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_hello4_ack);
-        } else if (x->type == ORILINK_HEARTBEAT) {
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat);
-        } else if (x->type == ORILINK_HEARTBEAT_ACK) {
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_heartbeat_ack);
-        } else if (x->type == ORILINK_INFO) {
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_info);
-        } else if (x->type == ORILINK_INFO_ACK) {
-            CLOSE_ORILINK_PAYLOAD((void **)&x->payload.orilink_info_ack);
-        }
-        free(x);
-        *protocol_ptr = NULL;
+        if (x) {
+			if (x->type == ORILINK_HELLO1) {
+				memset(x->payload.orilink_hello1->publickey1, 0, KEM_PUBLICKEY_BYTES / 2);
+				oritlsf_free(pool, (void **)&x->payload.orilink_hello1);
+			} else if (x->type == ORILINK_HELLO1_ACK) {
+				oritlsf_free(pool, (void **)&x->payload.orilink_hello1_ack);
+			} else if (x->type == ORILINK_HELLO2) {
+				memset(x->payload.orilink_hello2->publickey2, 0, KEM_PUBLICKEY_BYTES / 2);
+				oritlsf_free(pool, (void **)&x->payload.orilink_hello2);
+			} else if (x->type == ORILINK_HELLO2_ACK) {
+				memset(x->payload.orilink_hello2_ack->ciphertext1, 0, KEM_CIPHERTEXT_BYTES / 2);
+				oritlsf_free(pool, (void **)&x->payload.orilink_hello2_ack);
+			} else if (x->type == ORILINK_HELLO3) {
+				oritlsf_free(pool, (void **)&x->payload.orilink_hello3);
+			} else if (x->type == ORILINK_HELLO3_ACK) {
+				memset(x->payload.orilink_hello3_ack->nonce, 0, AES_NONCE_BYTES);
+				memset(x->payload.orilink_hello3_ack->ciphertext2, 0, KEM_CIPHERTEXT_BYTES / 2);
+				oritlsf_free(pool, (void **)&x->payload.orilink_hello3_ack);
+			} else if (x->type == ORILINK_HELLO4) {
+				memset(x->payload.orilink_hello4->encrypted_local_identity, 0, 
+					AES_NONCE_BYTES +
+					sizeof(uint8_t) +
+					sizeof(uint8_t) +
+					sizeof(uint8_t) +
+					sizeof(uint64_t) +
+					AES_TAG_BYTES
+				);
+				oritlsf_free(pool, (void **)&x->payload.orilink_hello4);
+			}  else if (x->type == ORILINK_HELLO4_ACK) {
+				memset(x->payload.orilink_hello4_ack->encrypted_remote_identity, 0, 
+					sizeof(uint8_t) +
+					sizeof(uint8_t) +
+					sizeof(uint8_t) +
+					sizeof(uint64_t) +
+					AES_TAG_BYTES
+				);
+				memset(x->payload.orilink_hello4_ack->encrypted_local_identity, 0, 
+					sizeof(uint8_t) +
+					sizeof(uint8_t) +
+					sizeof(uint8_t) +
+					sizeof(uint64_t) +
+					AES_TAG_BYTES
+				);
+				oritlsf_free(pool, (void **)&x->payload.orilink_hello4_ack);
+			} else if (x->type == ORILINK_HEARTBEAT) {
+				oritlsf_free(pool, (void **)&x->payload.orilink_heartbeat);
+			} else if (x->type == ORILINK_HEARTBEAT_ACK) {
+				oritlsf_free(pool, (void **)&x->payload.orilink_heartbeat_ack);
+			} else if (x->type == ORILINK_INFO) {
+				oritlsf_free(pool, (void **)&x->payload.orilink_info);
+			} else if (x->type == ORILINK_INFO_ACK) {
+				oritlsf_free(pool, (void **)&x->payload.orilink_info_ack);
+			}
+		}
+        oritlsf_free(pool, (void **)protocol_ptr);
     }
 }
 
 typedef struct orilink_raw_protocol_t {
-    uint8_t recv_buffer[ORILINK_MAX_PACKET_SIZE];
+    uint8_t *recv_buffer;
     uint16_t n;
     uint8_t mac[AES_TAG_BYTES];
     uint32_t ctr;
@@ -249,145 +243,13 @@ typedef struct orilink_raw_protocol_t {
     uint8_t remote_session_index;
     orilink_protocol_type_t type;
     uint8_t trycount;
-    
-    struct orilink_raw_protocol_t *next;
-    struct orilink_raw_protocol_t *prev;
 } orilink_raw_protocol_t;
 
-typedef struct p8zs_t {
-    size_t len;
-	uint8_t data[ORILINK_MAX_PACKET_SIZE];
-	status_t status;
-    
-    struct p8zs_t *next;
-    struct p8zs_t *prev;
-} p8zs_t;
-
-typedef struct {
-    orilink_raw_protocol_t *head;
-    orilink_raw_protocol_t *tail;
-} orilink_raw_protocol_pool_t;
-
-typedef struct {
-    p8zs_t *head;
-    p8zs_t *tail;
-} p8zs_pool_t;
-
-static inline void orilink_add_head_orilink_raw_protocol(orilink_raw_protocol_t **head, orilink_raw_protocol_t **tail, orilink_raw_protocol_t *orp) {
-    orp->prev = NULL;
-    orp->next = *head;
-    if (*head) {
-        (*head)->prev = orp;
-    } else {
-        *tail = orp;
-    }
-    *head = orp;
-}
-
-static inline orilink_raw_protocol_t *orilink_pop_head_orilink_raw_protocol(orilink_raw_protocol_t **head, orilink_raw_protocol_t **tail) {
-    if (!(*head)) return NULL;
-    orilink_raw_protocol_t *orp = *head;
-    *head = orp->next;
-    if (*head)
-        (*head)->prev = NULL;
-    else
-        *tail = NULL;
-    orp->next = orp->prev = NULL;
-    return orp;
-}
-
-static inline orilink_raw_protocol_t *orilink_raw_protocol_pool_alloc(orilink_raw_protocol_pool_t *pool) {
-    orilink_raw_protocol_t *orp;
-    orp = orilink_pop_head_orilink_raw_protocol(&pool->head, &pool->tail); 
-    if (orp == NULL) {
-        orp = calloc(1, sizeof(orilink_raw_protocol_t));
-        if (orp == NULL) {
-            return NULL;
-        }
-    }
-    orp->next = NULL;
-    orp->prev = NULL;
-    return orp;
-}
-
-static inline orilink_raw_protocol_t *orilink_raw_protocol_pool_free(orilink_raw_protocol_pool_t *pool, orilink_raw_protocol_t *orp) {
-    if (!orp) return NULL;
-    memset(orp, 0, sizeof(orilink_raw_protocol_t));
-    orilink_add_head_orilink_raw_protocol(&pool->head, &pool->tail, orp);
-    return NULL;
-}
-
-static inline void orilink_raw_protocol_cleanup(orilink_raw_protocol_t **head, orilink_raw_protocol_t **tail) {
-    orilink_raw_protocol_t *cur = *head;
-    while (cur) {
-        orilink_raw_protocol_t *next = cur->next;
-        memset(cur, 0, sizeof(orilink_raw_protocol_t));
-        free(cur);
-        cur = next;
-    }
-    *head = *tail = NULL;
-}
-
-static inline void orilink_add_head_p8zs(p8zs_t **head, p8zs_t **tail, p8zs_t *p8zs) {
-    p8zs->prev = NULL;
-    p8zs->next = *head;
-    if (*head) {
-        (*head)->prev = p8zs;
-    } else {
-        *tail = p8zs;
-    }
-    *head = p8zs;
-}
-
-static inline p8zs_t *orilink_pop_head_p8zs(p8zs_t **head, p8zs_t **tail) {
-    if (!(*head)) return NULL;
-    p8zs_t *p8zs = *head;
-    *head = p8zs->next;
-    if (*head)
-        (*head)->prev = NULL;
-    else
-        *tail = NULL;
-    p8zs->next = p8zs->prev = NULL;
-    return p8zs;
-}
-
-static inline p8zs_t *orilink_p8zs_pool_alloc(p8zs_pool_t *pool) {
-    p8zs_t *p8zs;
-    p8zs = orilink_pop_head_p8zs(&pool->head, &pool->tail); 
-    if (p8zs == NULL) {
-        p8zs = calloc(1, sizeof(p8zs_t));
-        if (p8zs == NULL) {
-            return NULL;
-        }
-    }
-    p8zs->next = NULL;
-    p8zs->prev = NULL;
-    return p8zs;
-}
-
-static inline p8zs_t *orilink_p8zs_pool_free(p8zs_pool_t *pool, p8zs_t *p8zs) {
-    if (!p8zs) return NULL;
-    memset(p8zs, 0, sizeof(p8zs_t));
-    orilink_add_head_p8zs(&pool->head, &pool->tail, p8zs);
-    return NULL;
-}
-
-static inline void orilink_p8zs_cleanup(p8zs_t **head, p8zs_t **tail) {
-    p8zs_t *cur = *head;
-    while (cur) {
-        p8zs_t *next = cur->next;
-        memset(cur, 0, sizeof(p8zs_t));
-        free(cur);
-        cur = next;
-    }
-    *head = *tail = NULL;
-}
 //Huruf_besar biar selalu ingat karena akan sering digunakan
-static inline void CLOSE_ORILINK_RAW_PROTOCOL(orilink_raw_protocol_pool_t *orp_pool, orilink_raw_protocol_t **protocol_ptr) {
+static inline void CLOSE_ORILINK_RAW_PROTOCOL(oritlsf_pool_t *pool, orilink_raw_protocol_t **protocol_ptr) {
     if (protocol_ptr != NULL && *protocol_ptr != NULL) {
-        orilink_raw_protocol_t *x = *protocol_ptr;
-        x = orilink_raw_protocol_pool_free(orp_pool, x);
-        *protocol_ptr = NULL;
+		if (*protocol_ptr) oritlsf_free(pool, (void **)&((*protocol_ptr)->recv_buffer));
+		oritlsf_free(pool, (void **)protocol_ptr);
     }
 }
 

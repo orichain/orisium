@@ -51,18 +51,19 @@ status_t master_worker_info(const char *label, master_context_t *master_ctx, wor
         return FAILURE;
     }
     if (!rekeying || !security || !upp) return FAILURE;
-    ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_info(label, wot, index, flag);
+    ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_info(label, &master_ctx->oritlsf_pool, wot, index, flag);
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
     if (rekeying->is_rekeying) {
-        if (ipc_add_tail_protocol_queue(label, wot, index, &upp->uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        if (ipc_add_tail_protocol_queue(label, &master_ctx->oritlsf_pool, wot, index, &upp->uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
     } else {
         ssize_t_status_t send_result = send_ipc_protocol_message(
             label, 
+            &master_ctx->oritlsf_pool, 
             security->aes_key,
             security->mac_key,
             security->local_nonce,
@@ -72,7 +73,7 @@ status_t master_worker_info(const char *label, master_context_t *master_ctx, wor
         );
         if (send_result.status != SUCCESS) {
             LOG_ERROR("%sFailed to sent master_worker_info to worker.", label);
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+            CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         } else {
             LOG_DEBUG("%sSent master_worker_info to worker.", label);
@@ -84,7 +85,7 @@ status_t master_worker_info(const char *label, master_context_t *master_ctx, wor
             security->hello2_rcvd = false;
             security->hello2_ack_sent = false;
         }
-        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
     }
 	return SUCCESS;
 }
@@ -112,18 +113,19 @@ status_t master_cow_connect(const char *label, master_context_t *master_ctx, str
     master_worker_session_t *session = &master_ctx->cow_session[index];
     worker_rekeying_t *rekeying = &session->rekeying;
     if (!rekeying) return FAILURE;
-	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_cow_connect(label, COW, index, session_index, id_addr, addr);
+	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_cow_connect(label, &master_ctx->oritlsf_pool, COW, index, session_index, id_addr, addr);
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
     if (rekeying->is_rekeying) {
-        if (ipc_add_tail_protocol_queue(label, COW, index, &master_ctx->cow_session[index].upp.uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        if (ipc_add_tail_protocol_queue(label, &master_ctx->oritlsf_pool, COW, index, &master_ctx->cow_session[index].upp.uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
     } else {
         ssize_t_status_t send_result = send_ipc_protocol_message(
             label, 
+            &master_ctx->oritlsf_pool, 
             master_ctx->cow_session[index].security.aes_key,
             master_ctx->cow_session[index].security.mac_key,
             master_ctx->cow_session[index].security.local_nonce,
@@ -133,12 +135,12 @@ status_t master_cow_connect(const char *label, master_context_t *master_ctx, str
         );
         if (send_result.status != SUCCESS) {
             LOG_ERROR("%sFailed to sent master_cow_connect to COW %ld.", label, index);
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+            CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         } else {
             LOG_DEBUG("%sSent master_cow_connect to COW %ld.", label, index);
         }
-        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t); 
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t); 
     }
 	return SUCCESS;
 }
@@ -148,6 +150,7 @@ status_t master_worker_hello1_ack(const char *label, master_context_t *master_ct
     uint8_t *kem_ciphertext = security->kem_ciphertext;
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_hello1_ack(
         label, 
+        &master_ctx->oritlsf_pool, 
         wot, 
         index, 
         local_nonce,
@@ -158,6 +161,7 @@ status_t master_worker_hello1_ack(const char *label, master_context_t *master_ct
     }
     ssize_t_status_t send_result = send_ipc_protocol_message(
         label, 
+        &master_ctx->oritlsf_pool, 
         security->aes_key,
         security->mac_key,
         security->local_nonce,
@@ -167,13 +171,13 @@ status_t master_worker_hello1_ack(const char *label, master_context_t *master_ct
     );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent master_worker_hello1_ack to %s %ld.", label, worker_name, index);
-        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
         return FAILURE;
     } else {
         LOG_DEBUG("%sSent master_worker_hello1_ack to %s %ld.", label, worker_name, index);
     }
     security->hello1_ack_sent = true;
-    CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t); 
+    CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t); 
 	return SUCCESS;
 }
 
@@ -181,6 +185,7 @@ status_t master_worker_hello2_ack(const char *label, master_context_t *master_ct
     if (!security || *worker_uds_fd == -1) return FAILURE;
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_hello2_ack(
         label, 
+        &master_ctx->oritlsf_pool, 
         wot,
         index,
         encrypted_wot_index1
@@ -190,6 +195,7 @@ status_t master_worker_hello2_ack(const char *label, master_context_t *master_ct
     }
     ssize_t_status_t send_result = send_ipc_protocol_message(
         label, 
+        &master_ctx->oritlsf_pool, 
         security->aes_key,
         security->mac_key,
         security->local_nonce,
@@ -199,13 +205,13 @@ status_t master_worker_hello2_ack(const char *label, master_context_t *master_ct
     );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent master_worker_hello2_ack to %s %ld.", label, worker_name, index);
-        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
         return FAILURE;
     } else {
         LOG_DEBUG("%sSent master_worker_hello2_ack to %s %ld.", label, worker_name, index);
     }
     security->hello2_ack_sent = true;
-    CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t); 
+    CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t); 
 	return SUCCESS;
 }
 
@@ -243,6 +249,7 @@ status_t master_worker_udp_data(
     if (!rekeying) return FAILURE;
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data(
         label,
+        &master_ctx->oritlsf_pool, 
         r->local_wot,
         r->local_index,
         session_index,
@@ -268,15 +275,15 @@ status_t master_worker_udp_data(
             }
             default:
                 LOG_ERROR("%sFailed to sent udp_data to Worker.", label);
-                CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+                CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
                 return FAILURE;
         }
         if (upp == NULL) {
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+            CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
-        if (ipc_add_tail_protocol_queue(label, wot, index, &upp->uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        if (ipc_add_tail_protocol_queue(label, &master_ctx->oritlsf_pool, wot, index, &upp->uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
     } else {
@@ -298,15 +305,16 @@ status_t master_worker_udp_data(
             }
             default:
                 LOG_ERROR("%sFailed to sent udp_data to Worker.", label);
-                CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+                CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
                 return FAILURE;
         }
         if (security == NULL || upp == NULL) {
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+            CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
         ssize_t_status_t send_result = send_ipc_protocol_message(
             label, 
+            &master_ctx->oritlsf_pool, 
             security->aes_key,
             security->mac_key,
             security->local_nonce,
@@ -316,12 +324,12 @@ status_t master_worker_udp_data(
         );
         if (send_result.status != SUCCESS) {
             LOG_ERROR("%sFailed to sent udp_data to %s.", label, worker_name);
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+            CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         } else {
             LOG_DEBUG("%sSent udp_data to %s.", label, worker_name);
         }
-        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
     }
     return SUCCESS;
 }
@@ -359,6 +367,7 @@ status_t master_worker_udp_data_ack(
     if (!rekeying) return FAILURE;
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data_ack(
         label,
+        &master_ctx->oritlsf_pool, 
         wot,
         index,
         session_index,
@@ -382,15 +391,15 @@ status_t master_worker_udp_data_ack(
             }
             default:
                 LOG_ERROR("%sFailed to sent udp_data to Worker.", label);
-                CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+                CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
                 return FAILURE;
         }
         if (upp == NULL) {
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+            CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
-        if (ipc_add_tail_protocol_queue(label, wot, index, &upp->uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        if (ipc_add_tail_protocol_queue(label, &master_ctx->oritlsf_pool, wot, index, &upp->uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
     } else {
@@ -412,15 +421,16 @@ status_t master_worker_udp_data_ack(
             }
             default:
                 LOG_ERROR("%sFailed to sent udp_data to Worker.", label);
-                CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+                CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
                 return FAILURE;
         }
         if (security == NULL || upp == NULL) {
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+            CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
         ssize_t_status_t send_result = send_ipc_protocol_message(
             label, 
+            &master_ctx->oritlsf_pool, 
             security->aes_key,
             security->mac_key,
             security->local_nonce,
@@ -430,12 +440,12 @@ status_t master_worker_udp_data_ack(
         );
         if (send_result.status != SUCCESS) {
             LOG_ERROR("%sFailed to sent udp_data to %s.", label, worker_name);
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+            CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         } else {
             LOG_DEBUG("%sSent udp_data to %s.", label, worker_name);
         }
-        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
     }
     return SUCCESS;
 }

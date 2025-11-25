@@ -9,6 +9,7 @@
 #include "constants.h"
 #include "pqc.h"
 #include "types.h"
+#include "oritlsf.h"
 
 typedef enum {
     IPC_WORKER_MASTER_HELLO1 = (uint8_t)0x00,
@@ -113,44 +114,38 @@ typedef struct ipc_protocol_queue_t {
     struct ipc_protocol_queue_t *prev;
 } ipc_protocol_queue_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan
-static inline void CLOSE_IPC_PAYLOAD(void **ptr) {
-    if (ptr != NULL && *ptr != NULL) {
-        free(*ptr);
-        *ptr = NULL;
-    }
-}
-//Huruf_besar biar selalu ingat karena akan sering digunakan
-static inline void CLOSE_IPC_PROTOCOL(ipc_protocol_t **protocol_ptr) {
+static inline void CLOSE_IPC_PROTOCOL(oritlsf_pool_t *pool, ipc_protocol_t **protocol_ptr) {
     if (protocol_ptr != NULL && *protocol_ptr != NULL) {
         ipc_protocol_t *x = *protocol_ptr;
-        if (x->type == IPC_WORKER_MASTER_HEARTBEAT) {
-            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_worker_master_heartbeat);
-        } else if (x->type == IPC_MASTER_WORKER_INFO) {
-            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_worker_info);
-        } else if (x->type == IPC_WORKER_MASTER_TASK_INFO) {
-            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_worker_master_task_info);
-        } else if (x->type == IPC_MASTER_COW_CONNECT) {
-            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_cow_connect);
-        } else if (x->type == IPC_UDP_DATA) {
-            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_udp_data);
-        } else if (x->type == IPC_UDP_DATA_ACK) {
-            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_udp_data_ack);
-        } else if (x->type == IPC_WORKER_MASTER_HELLO1) {
-            memset(x->payload.ipc_worker_master_hello1->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
-            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_worker_master_hello1);
-        } else if (x->type == IPC_MASTER_WORKER_HELLO1_ACK) {
-            memset(x->payload.ipc_master_worker_hello1_ack->nonce, 0, AES_NONCE_BYTES);
-            memset(x->payload.ipc_master_worker_hello1_ack->kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
-            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_worker_hello1_ack);
-        } else if (x->type == IPC_WORKER_MASTER_HELLO2) {
-            memset(x->payload.ipc_worker_master_hello2->encrypted_wot_index, 0, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES);
-            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_worker_master_hello2);
-        } else if (x->type == IPC_MASTER_WORKER_HELLO2_ACK) {
-            memset(x->payload.ipc_master_worker_hello2_ack->encrypted_wot_index, 0, sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES);
-            CLOSE_IPC_PAYLOAD((void **)&x->payload.ipc_master_worker_hello2_ack);
-        }
-        free(x);
-        *protocol_ptr = NULL;
+        if (x) {
+			if (x->type == IPC_WORKER_MASTER_HEARTBEAT) {
+				oritlsf_free(pool, (void **)&x->payload.ipc_worker_master_heartbeat);
+			} else if (x->type == IPC_MASTER_WORKER_INFO) {
+				oritlsf_free(pool, (void **)&x->payload.ipc_master_worker_info);
+			} else if (x->type == IPC_WORKER_MASTER_TASK_INFO) {
+				oritlsf_free(pool, (void **)&x->payload.ipc_worker_master_task_info);
+			} else if (x->type == IPC_MASTER_COW_CONNECT) {
+				oritlsf_free(pool, (void **)&x->payload.ipc_master_cow_connect);
+			} else if (x->type == IPC_UDP_DATA) {
+				oritlsf_free(pool, (void **)&x->payload.ipc_udp_data);
+			} else if (x->type == IPC_UDP_DATA_ACK) {
+				oritlsf_free(pool, (void **)&x->payload.ipc_udp_data_ack);
+			} else if (x->type == IPC_WORKER_MASTER_HELLO1) {
+				memset(x->payload.ipc_worker_master_hello1->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
+				oritlsf_free(pool, (void **)&x->payload.ipc_worker_master_hello1);
+			} else if (x->type == IPC_MASTER_WORKER_HELLO1_ACK) {
+				memset(x->payload.ipc_master_worker_hello1_ack->nonce, 0, AES_NONCE_BYTES);
+				memset(x->payload.ipc_master_worker_hello1_ack->kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
+				oritlsf_free(pool, (void **)&x->payload.ipc_master_worker_hello1_ack);
+			} else if (x->type == IPC_WORKER_MASTER_HELLO2) {
+				memset(x->payload.ipc_worker_master_hello2->encrypted_wot_index, 0, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES);
+				oritlsf_free(pool, (void **)&x->payload.ipc_worker_master_hello2);
+			} else if (x->type == IPC_MASTER_WORKER_HELLO2_ACK) {
+				memset(x->payload.ipc_master_worker_hello2_ack->encrypted_wot_index, 0, sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES);
+				oritlsf_free(pool, (void **)&x->payload.ipc_master_worker_hello2_ack);
+			}
+		}
+        oritlsf_free(pool, (void **)protocol_ptr);
     }
 }
 
@@ -165,19 +160,10 @@ typedef struct {
     uint8_t index;
 } ipc_raw_protocol_t;
 //Huruf_besar biar selalu ingat karena akan sering digunakan
-static inline void CLOSE_IPC_RAW_PAYLOAD(void **ptr) {
-    if (ptr != NULL && *ptr != NULL) {
-        free(*ptr);
-        *ptr = NULL;
-    }
-}
-//Huruf_besar biar selalu ingat karena akan sering digunakan
-static inline void CLOSE_IPC_RAW_PROTOCOL(ipc_raw_protocol_t **protocol_ptr) {
+static inline void CLOSE_IPC_RAW_PROTOCOL(oritlsf_pool_t *pool, ipc_raw_protocol_t **protocol_ptr) {
     if (protocol_ptr != NULL && *protocol_ptr != NULL) {
-        ipc_raw_protocol_t *x = *protocol_ptr;
-        CLOSE_IPC_RAW_PAYLOAD((void **)&x->recv_buffer);
-        free(x);
-        *protocol_ptr = NULL;
+		if (*protocol_ptr) oritlsf_free(pool, (void **)&((*protocol_ptr)->recv_buffer));
+		oritlsf_free(pool, (void **)protocol_ptr);
     }
 }
 

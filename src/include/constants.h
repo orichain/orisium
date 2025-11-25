@@ -28,7 +28,7 @@
 #define LONGINTV_TEST
 #undef LONGINTV_TEST
 
-#define MAX_TIMER_LEVELS 10
+#define MAX_TIMER_LEVELS 15
 #define WHEEL_SIZE 256
 #define MIN_GAP_US 1000
 //----------------------------------------------------------------------

@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <errno.h>
 
 #include "utilities.h"
@@ -12,6 +11,7 @@
 #include "types.h"
 #include "log.h"
 #include "constants.h"
+#include "oritlsf.h"
 
 static inline status_t orilink_serialize_hello4(const char *label, const orilink_hello4_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
     if (!payload || !current_buffer || !offset) {
@@ -99,6 +99,7 @@ static inline status_t orilink_deserialize_hello4(const char *label, orilink_pro
 
 static inline orilink_protocol_t_status_t orilink_prepare_cmd_hello4(
     const char *label, 
+    oritlsf_pool_t *pool, 
     uint8_t inc_ctr, 
     worker_type_t remote_wot, 
     uint8_t remote_index, 
@@ -112,13 +113,12 @@ static inline orilink_protocol_t_status_t orilink_prepare_cmd_hello4(
 )
 {
 	orilink_protocol_t_status_t result;
-	result.r_orilink_protocol_t = (orilink_protocol_t *)malloc(sizeof(orilink_protocol_t));
+	result.r_orilink_protocol_t = (orilink_protocol_t *)oritlsf_calloc(pool, 1, sizeof(orilink_protocol_t));
 	result.status = FAILURE;
 	if (!result.r_orilink_protocol_t) {
 		LOG_ERROR("%sFailed to allocate orilink_protocol_t. %s", label, strerror(errno));
 		return result;
 	}
-	memset(result.r_orilink_protocol_t, 0, sizeof(orilink_protocol_t));
 	result.r_orilink_protocol_t->version[0] = ORILINK_VERSION_MAJOR;
 	result.r_orilink_protocol_t->version[1] = ORILINK_VERSION_MINOR;
     result.r_orilink_protocol_t->inc_ctr = inc_ctr;
@@ -131,10 +131,10 @@ static inline orilink_protocol_t_status_t orilink_prepare_cmd_hello4(
     result.r_orilink_protocol_t->id_connection = id_connection;
     result.r_orilink_protocol_t->trycount = trycount;
 	result.r_orilink_protocol_t->type = ORILINK_HELLO4;
-	orilink_hello4_t *payload = (orilink_hello4_t *)calloc(1, sizeof(orilink_hello4_t));
+	orilink_hello4_t *payload = (orilink_hello4_t *)oritlsf_calloc(pool, 1, sizeof(orilink_hello4_t));
 	if (!payload) {
 		LOG_ERROR("%sFailed to allocate orilink_hello4_t payload. %s", label, strerror(errno));
-		CLOSE_ORILINK_PROTOCOL(&result.r_orilink_protocol_t);
+		CLOSE_ORILINK_PROTOCOL(pool, &result.r_orilink_protocol_t);
 		return result;
 	}
     memcpy(payload->encrypted_local_identity, encrypted_local_identity, 

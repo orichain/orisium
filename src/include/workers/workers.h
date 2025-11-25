@@ -117,9 +117,6 @@ typedef struct {
 	oricle_double_t rtt;
     oricle_double_t retry;
     oricle_double_t healthy;
-//----------------------------------------------------------------------
-    orilink_raw_protocol_pool_t orilink_raw_protocol_pool;
-    p8zs_pool_t orilink_p8zs_pool;
 } sio_c_session_t; //Server
 
 typedef struct {
@@ -153,9 +150,6 @@ typedef struct {
     oricle_double_t retry;
     oricle_double_t healthy;
     oricle_long_double_t avgtt;
-//----------------------------------------------------------------------
-    orilink_raw_protocol_pool_t orilink_raw_protocol_pool;
-    p8zs_pool_t orilink_p8zs_pool;
 } cow_c_session_t; //Client
 
 typedef struct {
@@ -219,7 +213,7 @@ static inline void calculate_retry(worker_context_t *ctx, void *void_session, wo
             int needed = snprintf(NULL, 0, "[RETRY %d]: ", session->identity.local_session_index);
             char desc[needed+1];
             snprintf(desc, needed + 1, "[RETRY %d]: ", session->identity.local_session_index);
-            calculate_oricle_double(ctx->label, desc, &session->retry, try_count, ((double)MAX_RETRY_CNT * (double)2));
+            calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, &session->retry, try_count, ((double)MAX_RETRY_CNT * (double)2));
             //printf("%s%s Value Prediction: %f\n", ctx->label, desc, session->retry.value_prediction);
             break;
         }
@@ -228,7 +222,7 @@ static inline void calculate_retry(worker_context_t *ctx, void *void_session, wo
             int needed = snprintf(NULL, 0, "[RETRY %d]: ", session->identity.local_session_index);
             char desc[needed+1];
             snprintf(desc, needed + 1, "[RETRY %d]: ", session->identity.local_session_index);
-            calculate_oricle_double(ctx->label, desc, &session->retry, try_count, ((double)MAX_RETRY_CNT * (double)2));
+            calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, &session->retry, try_count, ((double)MAX_RETRY_CNT * (double)2));
             //printf("%s%s Value Prediction: %f\n", ctx->label, desc, session->retry.value_prediction);
             break;
         }
@@ -244,7 +238,7 @@ static inline void calculate_rtt(worker_context_t *ctx, void *void_session, work
             int needed = snprintf(NULL, 0, "[RTT %d]: ", session->identity.local_session_index);
             char desc[needed + 1];
             snprintf(desc, needed + 1, "[RTT %d]: ", session->identity.local_session_index);
-            calculate_oricle_double(ctx->label, desc, &session->rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
+            calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, &session->rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
             //printf("%s%s Value Prediction: %f\n", ctx->label, desc, session->rtt.value_prediction);
             break;
         }
@@ -253,7 +247,7 @@ static inline void calculate_rtt(worker_context_t *ctx, void *void_session, work
             int needed = snprintf(NULL, 0, "[RTT %d]: ", session->identity.local_session_index);
             char desc[needed + 1];
             snprintf(desc, needed + 1, "[RTT %d]: ", session->identity.local_session_index);
-            calculate_oricle_double(ctx->label, desc, &session->rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
+            calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, &session->rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
             //printf("%s%s Value Prediction: %f\n", ctx->label, desc, session->rtt.value_prediction);
             break;
         }
@@ -262,7 +256,7 @@ static inline void calculate_rtt(worker_context_t *ctx, void *void_session, work
     }
 }
 
-static inline void cleanup_control_packet(worker_context_t *ctx, p8zs_pool_t *pool, packet_t *h, bool clean_state, bool clean_data) {
+static inline void cleanup_control_packet(worker_context_t *ctx, packet_t *h, bool clean_state, bool clean_data) {
     if (clean_state) {
         h->sent = false;
         h->sent_time = (uint64_t)0;
@@ -270,11 +264,12 @@ static inline void cleanup_control_packet(worker_context_t *ctx, p8zs_pool_t *po
         h->ack_rcvd = false;
     }
     if (clean_data) {
-        h->udp_data = orilink_p8zs_pool_free(pool, h->udp_data);
+		if (h->udp_data) oritlsf_free(&ctx->oritlsf_pool, (void **)&h->udp_data->data);
+		oritlsf_free(&ctx->oritlsf_pool, (void **)&h->udp_data);
     }
     h->sent_try_count = 0x00;
     if (h->retry_timer_id.event) {
-        h->retry_timer_id.event = oritw_remove_eventX(ctx->label, &ctx->async, &ctx->timer, h->retry_timer_id.event);
+        oritw_remove_event(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer, &h->retry_timer_id.event);
         h->retry_timer_id.delay_us = 0.0;
 //----------------------------------------------------------------------
 // Reuse Old Id And Old Type
@@ -298,7 +293,7 @@ static inline void setup_control_packet(const char *label, uint8_t session_index
     h->retry_timer_id.event = NULL;
 }
 
-static inline void cleanup_control_packet_ack(p8zs_pool_t *pool, packet_ack_t *h, bool clean_state, bool clean_data) {
+static inline void cleanup_control_packet_ack(oritlsf_pool_t *pool, packet_ack_t *h, bool clean_state, bool clean_data) {
     if (clean_state) {
         h->rcvd = false;
         h->rcvd_time = (uint64_t)0;
@@ -307,7 +302,8 @@ static inline void cleanup_control_packet_ack(p8zs_pool_t *pool, packet_ack_t *h
     }
     //----------------------------------------------------------------------
     if (clean_data) {
-        h->udp_data = orilink_p8zs_pool_free(pool, h->udp_data);
+		if (h->udp_data) oritlsf_free(pool, (void **)&h->udp_data->data);
+		oritlsf_free(pool, (void **)&h->udp_data);
     }
     h->ack_sent_try_count = 0x00;
     h->last_trycount = (uint8_t)0;
@@ -410,44 +406,40 @@ static inline status_t setup_cow_session(worker_context_t *ctx, cow_c_session_t 
         LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", ctx->label);
         return FAILURE;
     }
-    single_session->orilink_raw_protocol_pool.head = NULL;
-    single_session->orilink_raw_protocol_pool.tail = NULL;
-    single_session->orilink_p8zs_pool.head = NULL;
-    single_session->orilink_p8zs_pool.tail = NULL;
     return SUCCESS;
 }
 
 static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *single_session) {
 //----------------------------------------------------------------------
-    cleanup_control_packet(ctx, &single_session->orilink_p8zs_pool, &single_session->hello1, true, true);
-    cleanup_control_packet(ctx, &single_session->orilink_p8zs_pool, &single_session->hello2, true, true);
-    cleanup_control_packet(ctx, &single_session->orilink_p8zs_pool, &single_session->hello3, true, true);
-    cleanup_control_packet(ctx, &single_session->orilink_p8zs_pool, &single_session->hello4, true, true);
+    cleanup_control_packet(ctx, &single_session->hello1, true, true);
+    cleanup_control_packet(ctx, &single_session->hello2, true, true);
+    cleanup_control_packet(ctx, &single_session->hello3, true, true);
+    cleanup_control_packet(ctx, &single_session->hello4, true, true);
 //----------------------------------------------------------------------
-    cleanup_control_packet(ctx, &single_session->orilink_p8zs_pool, &single_session->heartbeat.heartbeat, true, true);
-    cleanup_control_packet_ack(&single_session->orilink_p8zs_pool, &single_session->heartbeat.heartbeat_ack, true, true);
+    cleanup_control_packet(ctx, &single_session->heartbeat.heartbeat, true, true);
+    cleanup_control_packet_ack(&ctx->oritlsf_pool, &single_session->heartbeat.heartbeat_ack, true, true);
     single_session->heartbeat.heartbeat_interval = (double)0;
     single_session->heartbeat.last_send_heartbeat_interval = (double)0;
     single_session->heartbeat.heartbeat_cnt = 0x00;
     if (single_session->heartbeat.heartbeat_sender_timer_id.event) {
-        single_session->heartbeat.heartbeat_sender_timer_id.event = oritw_remove_eventX(ctx->label, &ctx->async, &ctx->timer, single_session->heartbeat.heartbeat_sender_timer_id.event);
+        oritw_remove_event(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer, &single_session->heartbeat.heartbeat_sender_timer_id.event);
         single_session->heartbeat.heartbeat_sender_timer_id.id = 0ULL;
         single_session->heartbeat.heartbeat_sender_timer_id.delay_us = 0.0;
         single_session->heartbeat.heartbeat_sender_timer_id.event_type = TE_UNKNOWN;
     }
     #if defined(ACCRCY_TEST)
     if (single_session->heartbeat.heartbeat_openner_timer_id.event) {
-        single_session->heartbeat.heartbeat_openner_timer_id.event = oritw_remove_eventX(ctx->label, &ctx->async, &ctx->timer, single_session->heartbeat.heartbeat_openner_timer_id.event);
+        oritw_remove_event(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer, &single_session->heartbeat.heartbeat_openner_timer_id.event);
         single_session->heartbeat.heartbeat_openner_timer_id.id = 0ULL;
         single_session->heartbeat.heartbeat_openner_timer_id.delay_us = 0.0;
         single_session->heartbeat.heartbeat_openner_timer_id.event_type = TE_UNKNOWN;
     }
     #endif
 //----------------------------------------------------------------------
-    cleanup_oricle_double(&single_session->retry);
-    cleanup_oricle_double(&single_session->rtt);
-    cleanup_oricle_long_double(&single_session->avgtt);
-    cleanup_oricle_double(&single_session->healthy);
+    cleanup_oricle_double(&ctx->oritlsf_pool, &single_session->retry);
+    cleanup_oricle_double(&ctx->oritlsf_pool, &single_session->rtt);
+    cleanup_oricle_long_double(&ctx->oritlsf_pool, &single_session->avgtt);
+    cleanup_oricle_double(&ctx->oritlsf_pool, &single_session->healthy);
     orilink_identity_t *identity = &single_session->identity;
     orilink_security_t *security = &single_session->security;
     identity->id_connection = 0xffffffffffffffff;
@@ -470,18 +462,14 @@ static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *s
     security->local_ctr = (uint32_t)0;
     memset(security->remote_nonce, 0, AES_NONCE_BYTES);
     security->remote_ctr = (uint32_t)0;
-    oritlsf_free(&ctx->oritlsf_pool, single_session->kem_privatekey);
-    oritlsf_free(&ctx->oritlsf_pool, security->kem_publickey);
-    oritlsf_free(&ctx->oritlsf_pool, security->kem_ciphertext);
-    oritlsf_free(&ctx->oritlsf_pool, security->kem_sharedsecret);
-    oritlsf_free(&ctx->oritlsf_pool, security->aes_key);
-    oritlsf_free(&ctx->oritlsf_pool, security->mac_key);
-    oritlsf_free(&ctx->oritlsf_pool, security->local_nonce);
-    oritlsf_free(&ctx->oritlsf_pool, security->remote_nonce);
-//----------------------------------------------------------------------
-    orilink_raw_protocol_cleanup(&single_session->orilink_raw_protocol_pool.head, &single_session->orilink_raw_protocol_pool.tail);
-    orilink_p8zs_cleanup(&single_session->orilink_p8zs_pool.head, &single_session->orilink_p8zs_pool.tail);
-//----------------------------------------------------------------------
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&single_session->kem_privatekey);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&security->kem_publickey);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&security->kem_ciphertext);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&security->kem_sharedsecret);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&security->aes_key);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&security->mac_key);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&security->local_nonce);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&security->remote_nonce);
 }
 
 static inline status_t setup_sio_session(worker_context_t *ctx, sio_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
@@ -561,42 +549,38 @@ static inline status_t setup_sio_session(worker_context_t *ctx, sio_c_session_t 
     );
     security->local_ctr = (uint32_t)0;
     security->remote_ctr = (uint32_t)0;
-    single_session->orilink_raw_protocol_pool.head = NULL;
-    single_session->orilink_raw_protocol_pool.tail = NULL;
-    single_session->orilink_p8zs_pool.head = NULL;
-    single_session->orilink_p8zs_pool.tail = NULL;
     return SUCCESS;
 }
 
 static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *single_session) {
 //----------------------------------------------------------------------
-    cleanup_control_packet_ack(&single_session->orilink_p8zs_pool, &single_session->hello1_ack, true, true);
-    cleanup_control_packet_ack(&single_session->orilink_p8zs_pool, &single_session->hello2_ack, true, true);
-    cleanup_control_packet_ack(&single_session->orilink_p8zs_pool, &single_session->hello3_ack, true, true);
-    cleanup_control_packet_ack(&single_session->orilink_p8zs_pool, &single_session->hello4_ack, true, true);
+    cleanup_control_packet_ack(&ctx->oritlsf_pool, &single_session->hello1_ack, true, true);
+    cleanup_control_packet_ack(&ctx->oritlsf_pool, &single_session->hello2_ack, true, true);
+    cleanup_control_packet_ack(&ctx->oritlsf_pool, &single_session->hello3_ack, true, true);
+    cleanup_control_packet_ack(&ctx->oritlsf_pool, &single_session->hello4_ack, true, true);
 //----------------------------------------------------------------------
-    cleanup_control_packet(ctx, &single_session->orilink_p8zs_pool, &single_session->heartbeat.heartbeat, true, true);
-    cleanup_control_packet_ack(&single_session->orilink_p8zs_pool, &single_session->heartbeat.heartbeat_ack, true, true);
+    cleanup_control_packet(ctx, &single_session->heartbeat.heartbeat, true, true);
+    cleanup_control_packet_ack(&ctx->oritlsf_pool, &single_session->heartbeat.heartbeat_ack, true, true);
     single_session->heartbeat.heartbeat_interval = (double)0;
     single_session->heartbeat.last_send_heartbeat_interval = (double)0;
     single_session->heartbeat.heartbeat_cnt = 0x00;
     if (single_session->heartbeat.heartbeat_sender_timer_id.event) {
-        single_session->heartbeat.heartbeat_sender_timer_id.event = oritw_remove_eventX(ctx->label, &ctx->async, &ctx->timer, single_session->heartbeat.heartbeat_sender_timer_id.event);
+        oritw_remove_event(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer, &single_session->heartbeat.heartbeat_sender_timer_id.event);
         single_session->heartbeat.heartbeat_sender_timer_id.id = 0ULL;
         single_session->heartbeat.heartbeat_sender_timer_id.delay_us = 0.0;
     }
     #if defined(ACCRCY_TEST)
     if (single_session->heartbeat.heartbeat_openner_timer_id.event) {
-        single_session->heartbeat.heartbeat_openner_timer_id.event = oritw_remove_eventX(ctx->label, &ctx->async, &ctx->timer, single_session->heartbeat.heartbeat_openner_timer_id.event);
+        oritw_remove_event(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer, &single_session->heartbeat.heartbeat_openner_timer_id.event);
         single_session->heartbeat.heartbeat_openner_timer_id.id = 0ULL;
         single_session->heartbeat.heartbeat_openner_timer_id.delay_us = 0.0;
         single_session->heartbeat.heartbeat_openner_timer_id.event_type = TE_UNKNOWN;
     }
     #endif
 //----------------------------------------------------------------------
-    cleanup_oricle_double(&single_session->retry);
-    cleanup_oricle_double(&single_session->rtt);
-    cleanup_oricle_double(&single_session->healthy);
+    cleanup_oricle_double(&ctx->oritlsf_pool, &single_session->retry);
+    cleanup_oricle_double(&ctx->oritlsf_pool, &single_session->rtt);
+    cleanup_oricle_double(&ctx->oritlsf_pool, &single_session->healthy);
     orilink_identity_t *identity = &single_session->identity;
     orilink_security_t *security = &single_session->security;
     identity->id_connection = 0xffffffffffffffff;
@@ -618,17 +602,13 @@ static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *s
     security->local_ctr = (uint32_t)0;
     memset(security->remote_nonce, 0, AES_NONCE_BYTES);
     security->remote_ctr = (uint32_t)0;
-    oritlsf_free(&ctx->oritlsf_pool, security->kem_publickey);
-    oritlsf_free(&ctx->oritlsf_pool, security->kem_ciphertext);
-    oritlsf_free(&ctx->oritlsf_pool, security->kem_sharedsecret);
-    oritlsf_free(&ctx->oritlsf_pool, security->aes_key);
-    oritlsf_free(&ctx->oritlsf_pool, security->mac_key);
-    oritlsf_free(&ctx->oritlsf_pool, security->local_nonce);
-    oritlsf_free(&ctx->oritlsf_pool, security->remote_nonce);
-//----------------------------------------------------------------------
-    orilink_raw_protocol_cleanup(&single_session->orilink_raw_protocol_pool.head, &single_session->orilink_raw_protocol_pool.tail);
-    orilink_p8zs_cleanup(&single_session->orilink_p8zs_pool.head, &single_session->orilink_p8zs_pool.tail);
-//----------------------------------------------------------------------
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&security->kem_publickey);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&security->kem_ciphertext);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&security->kem_sharedsecret);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&security->aes_key);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&security->mac_key);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&security->local_nonce);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&security->remote_nonce);
 }
 
 #endif

@@ -110,7 +110,7 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
 	if (async_create(ctx->label, &ctx->async) != SUCCESS) return FAILURE;
 	if (async_create_incoming_event(ctx->label, &ctx->async, ctx->master_uds_fd) != SUCCESS) return FAILURE;
 //----------------------------------------------------------------------
-    if (oritw_setup(ctx->label, &ctx->async, &ctx->timer) != SUCCESS) return FAILURE;
+    if (oritw_setup(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer) != SUCCESS) return FAILURE;
 //----------------------------------------------------------------------
     return SUCCESS;
 }
@@ -126,34 +126,34 @@ void cleanup_worker(worker_context_t *ctx) {
     ctx->local_ctr = (uint32_t)0;
     memset(ctx->remote_nonce, 0, AES_NONCE_BYTES);
     ctx->remote_ctr = (uint32_t)0;
-    oritlsf_free(&ctx->oritlsf_pool, ctx->kem_privatekey);
-    oritlsf_free(&ctx->oritlsf_pool, ctx->kem_publickey);
-    oritlsf_free(&ctx->oritlsf_pool, ctx->kem_ciphertext);
-    oritlsf_free(&ctx->oritlsf_pool, ctx->kem_sharedsecret);
-    oritlsf_free(&ctx->oritlsf_pool, ctx->aes_key);
-    oritlsf_free(&ctx->oritlsf_pool, ctx->mac_key);
-    oritlsf_free(&ctx->oritlsf_pool, ctx->local_nonce);
-    oritlsf_free(&ctx->oritlsf_pool, ctx->remote_nonce);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->kem_privatekey);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->kem_publickey);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->kem_ciphertext);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->kem_sharedsecret);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->aes_key);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->mac_key);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->local_nonce);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->remote_nonce);
     ctx->hello1_sent = false;
     ctx->hello1_ack_rcvd = false;
     ctx->hello2_sent = false;
     ctx->hello2_ack_rcvd = false;
     ctx->is_rekeying = false;
-    ipc_cleanup_protocol_queue(&ctx->rekeying_queue_head, &ctx->rekeying_queue_tail);
+    ipc_cleanup_protocol_queue(&ctx->oritlsf_pool, &ctx->rekeying_queue_head, &ctx->rekeying_queue_tail);
     async_delete_event(ctx->label, &ctx->async, ctx->master_uds_fd);
     CLOSE_FD(ctx->master_uds_fd);
 //----------------------------------------------------------------------
     if (ctx->heartbeat_timer_id.event) {
-        ctx->heartbeat_timer_id.event = oritw_remove_eventX(ctx->label, &ctx->async, &ctx->timer, ctx->heartbeat_timer_id.event);
+        oritw_remove_event(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer, &ctx->heartbeat_timer_id.event);
         ctx->heartbeat_timer_id.id = 0ULL;
         ctx->heartbeat_timer_id.delay_us = 0.0;
         ctx->heartbeat_timer_id.event_type = TE_UNKNOWN;
     }
 //----------------------------------------------------------------------
-    oritw_cleanup(ctx->label, &ctx->async, &ctx->timer);
+    oritw_cleanup(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer);
 //----------------------------------------------------------------------
     CLOSE_FD(&ctx->async.async_fd);
-    oritlsf_free(&ctx->oritlsf_pool, ctx->label);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->label);
 //----------------------------------------------------------------------
     void *reclaimed_buffer = oritlsf_cleanup_pool(&ctx->oritlsf_pool);
     if (reclaimed_buffer != ctx->arena_buffer) {

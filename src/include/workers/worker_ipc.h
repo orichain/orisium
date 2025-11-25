@@ -16,7 +16,6 @@ status_t worker_master_hello2(worker_context_t *ctx, uint8_t encrypted_wot_index
 status_t worker_master_udp_data_ack_send_ipc(
     const char *label, 
     worker_context_t *worker_ctx, 
-    p8zs_pool_t *pool,
     worker_type_t wot, 
     uint8_t index,
     uint8_t session_index,
@@ -28,7 +27,6 @@ status_t worker_master_udp_data_ack_send_ipc(
 status_t worker_master_udp_data_send_ipc(
     const char *label, 
     worker_context_t *worker_ctx, 
-    p8zs_pool_t *pool,
     worker_type_t wot, 
     uint8_t index,
     uint8_t session_index,
@@ -45,7 +43,6 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
 void handle_workers_ipc_closed_event(worker_context_t *worker_ctx);
 status_t retry_control_packet_ack(
     worker_context_t *worker_ctx, 
-    p8zs_pool_t *pool,
     orilink_identity_t *identity, 
     orilink_security_t *security, 
     packet_ack_t *control_packet_ack,
@@ -53,7 +50,6 @@ status_t retry_control_packet_ack(
 );
 status_t retry_control_packet(
     worker_context_t *worker_ctx, 
-    p8zs_pool_t *pool,
     orilink_identity_t *identity, 
     orilink_security_t *security, 
     packet_t *control_packet,

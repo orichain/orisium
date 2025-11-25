@@ -35,10 +35,12 @@
 #include "xorshiro128plus.h"
 #include "workers/worker_ipc.h"
 #include "oritw.h"
+#include "oritlsf.h"
 
 status_t worker_master_heartbeat(worker_context_t *ctx, double new_heartbeat_interval_double) {
 	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_master_heartbeat(
         ctx->label, 
+        &ctx->oritlsf_pool, 
         *ctx->wot, 
         *ctx->index, 
         new_heartbeat_interval_double
@@ -47,13 +49,14 @@ status_t worker_master_heartbeat(worker_context_t *ctx, double new_heartbeat_int
         return FAILURE;
     }
     if (ctx->is_rekeying) {
-        if (ipc_add_tail_protocol_queue(ctx->label, *ctx->wot, *ctx->index, ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &ctx->rekeying_queue_head, &ctx->rekeying_queue_tail) != SUCCESS) {
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        if (ipc_add_tail_protocol_queue(ctx->label, &ctx->oritlsf_pool, *ctx->wot, *ctx->index, ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &ctx->rekeying_queue_head, &ctx->rekeying_queue_tail) != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
     } else {
         ssize_t_status_t send_result = send_ipc_protocol_message(
             ctx->label, 
+            &ctx->oritlsf_pool, 
             ctx->aes_key,
             ctx->mac_key,
             ctx->local_nonce,
@@ -63,19 +66,20 @@ status_t worker_master_heartbeat(worker_context_t *ctx, double new_heartbeat_int
         );
         if (send_result.status != SUCCESS) {
             LOG_ERROR("%sFailed to sent worker_master_heartbeat to Master.", ctx->label);
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+            CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return send_result.status;
         } else {
             LOG_DEBUG("%sSent worker_master_heartbeat to Master.", ctx->label);
         }
-        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
     }
     return SUCCESS;
 }
 
 status_t worker_master_hello1(worker_context_t *ctx) {
 	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_master_hello1(
-        ctx->label, 
+        ctx->label,
+        &ctx->oritlsf_pool,  
         *ctx->wot, 
         *ctx->index, 
         ctx->kem_publickey
@@ -85,6 +89,7 @@ status_t worker_master_hello1(worker_context_t *ctx) {
     }
     ssize_t_status_t send_result = send_ipc_protocol_message(
         ctx->label, 
+        &ctx->oritlsf_pool, 
         ctx->aes_key,
         ctx->mac_key,
         ctx->local_nonce,
@@ -94,19 +99,20 @@ status_t worker_master_hello1(worker_context_t *ctx) {
     );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent worker_master_hello1 to Master.", ctx->label);
-        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
         return send_result.status;
     } else {
         LOG_DEBUG("%sSent worker_master_hello1 to Master.", ctx->label);
     }
     ctx->hello1_sent = true;
-    CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+    CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
     return SUCCESS;
 }
 
 status_t worker_master_hello2(worker_context_t *ctx, uint8_t encrypted_wot_index2[]) {
 	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_master_hello2(
         ctx->label, 
+        &ctx->oritlsf_pool, 
         *ctx->wot, 
         *ctx->index, 
         encrypted_wot_index2
@@ -116,6 +122,7 @@ status_t worker_master_hello2(worker_context_t *ctx, uint8_t encrypted_wot_index
     }
     ssize_t_status_t send_result = send_ipc_protocol_message(
         ctx->label, 
+        &ctx->oritlsf_pool, 
         ctx->aes_key,
         ctx->mac_key,
         ctx->local_nonce,
@@ -125,20 +132,19 @@ status_t worker_master_hello2(worker_context_t *ctx, uint8_t encrypted_wot_index
     );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent worker_master_hello2 to Master.", ctx->label);
-        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
         return send_result.status;
     } else {
         LOG_DEBUG("%sSent worker_master_hello2 to Master.", ctx->label);
     }
     ctx->hello2_sent = true;
-    CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+    CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
     return SUCCESS;
 }
 
 status_t worker_master_udp_data_ack_send_ipc(
     const char *label, 
     worker_context_t *worker_ctx, 
-    p8zs_pool_t *pool,
     worker_type_t wot, 
     uint8_t index,
     uint8_t session_index,
@@ -150,6 +156,7 @@ status_t worker_master_udp_data_ack_send_ipc(
 {
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data(
         label,
+        &worker_ctx->oritlsf_pool, 
         wot,
         index,
         session_index,
@@ -160,18 +167,21 @@ status_t worker_master_udp_data_ack_send_ipc(
         h->udp_data->data
     );
     if (cmd_result.status != SUCCESS) {
-        h->udp_data = orilink_p8zs_pool_free(pool, h->udp_data);
+		if (h->udp_data) oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&h->udp_data->data);
+        oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&h->udp_data);
         return FAILURE;
     }
     if (worker_ctx->is_rekeying) {
-        if (ipc_add_tail_protocol_queue(worker_ctx->label, *worker_ctx->wot, *worker_ctx->index, worker_ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &worker_ctx->rekeying_queue_head, &worker_ctx->rekeying_queue_tail) != SUCCESS) {
-            h->udp_data = orilink_p8zs_pool_free(pool, h->udp_data);
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        if (ipc_add_tail_protocol_queue(worker_ctx->label, &worker_ctx->oritlsf_pool, *worker_ctx->wot, *worker_ctx->index, worker_ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &worker_ctx->rekeying_queue_head, &worker_ctx->rekeying_queue_tail) != SUCCESS) {
+			if (h->udp_data) oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&h->udp_data->data);
+			oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&h->udp_data);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
     } else {
         ssize_t_status_t send_result = send_ipc_protocol_message(
             worker_ctx->label,
+            &worker_ctx->oritlsf_pool, 
             worker_ctx->aes_key,
             worker_ctx->mac_key,
             worker_ctx->local_nonce,
@@ -181,13 +191,14 @@ status_t worker_master_udp_data_ack_send_ipc(
         );
         if (send_result.status != SUCCESS) {
             LOG_ERROR("%sFailed to sent udp_data to Master.", worker_ctx->label);
-            h->udp_data = orilink_p8zs_pool_free(pool, h->udp_data);
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+            if (h->udp_data) oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&h->udp_data->data);
+            oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&h->udp_data);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return send_result.status;
         } else {
             LOG_DEBUG("%sSent udp_data to Master.", worker_ctx->label);
         }
-        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
     }
     return SUCCESS;
 }
@@ -195,7 +206,6 @@ status_t worker_master_udp_data_ack_send_ipc(
 status_t worker_master_udp_data_send_ipc(
     const char *label, 
     worker_context_t *worker_ctx, 
-    p8zs_pool_t *pool,
     worker_type_t wot, 
     uint8_t index,
     uint8_t session_index,
@@ -207,6 +217,7 @@ status_t worker_master_udp_data_send_ipc(
 {
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data(
         label,
+        &worker_ctx->oritlsf_pool, 
         wot,
         index,
         session_index,
@@ -217,18 +228,21 @@ status_t worker_master_udp_data_send_ipc(
         h->udp_data->data
     );
     if (cmd_result.status != SUCCESS) {
-        h->udp_data = orilink_p8zs_pool_free(pool, h->udp_data);
+		if (h->udp_data) oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&h->udp_data->data);
+		oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&h->udp_data);
         return FAILURE;
     }
     if (worker_ctx->is_rekeying) {
-        if (ipc_add_tail_protocol_queue(worker_ctx->label, *worker_ctx->wot, *worker_ctx->index, worker_ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &worker_ctx->rekeying_queue_head, &worker_ctx->rekeying_queue_tail) != SUCCESS) {
-            h->udp_data = orilink_p8zs_pool_free(pool, h->udp_data);
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        if (ipc_add_tail_protocol_queue(worker_ctx->label, &worker_ctx->oritlsf_pool, *worker_ctx->wot, *worker_ctx->index, worker_ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &worker_ctx->rekeying_queue_head, &worker_ctx->rekeying_queue_tail) != SUCCESS) {
+			if (h->udp_data) oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&h->udp_data->data);
+			oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&h->udp_data);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
     } else {
         ssize_t_status_t send_result = send_ipc_protocol_message(
             worker_ctx->label,
+            &worker_ctx->oritlsf_pool, 
             worker_ctx->aes_key,
             worker_ctx->mac_key,
             worker_ctx->local_nonce,
@@ -238,13 +252,14 @@ status_t worker_master_udp_data_send_ipc(
         );
         if (send_result.status != SUCCESS) {
             LOG_ERROR("%sFailed to sent udp_data to Master.", worker_ctx->label);
-            h->udp_data = orilink_p8zs_pool_free(pool, h->udp_data);
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+            if (h->udp_data) oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&h->udp_data->data);
+            oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&h->udp_data);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return send_result.status;
         } else {
             LOG_DEBUG("%sSent udp_data to Master.", worker_ctx->label);
         }
-        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
     }
     return SUCCESS;
 }
@@ -252,6 +267,7 @@ status_t worker_master_udp_data_send_ipc(
 status_t worker_master_task_info(worker_context_t *ctx, uint8_t session_index, task_info_type_t flag) {
 	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_master_task_info(
         ctx->label, 
+        &ctx->oritlsf_pool, 
         *ctx->wot, 
         *ctx->index,
         session_index,
@@ -261,13 +277,14 @@ status_t worker_master_task_info(worker_context_t *ctx, uint8_t session_index, t
         return FAILURE;
     }
     if (ctx->is_rekeying) {
-        if (ipc_add_tail_protocol_queue(ctx->label, *ctx->wot, *ctx->index, ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &ctx->rekeying_queue_head, &ctx->rekeying_queue_tail) != SUCCESS) {
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        if (ipc_add_tail_protocol_queue(ctx->label, &ctx->oritlsf_pool, *ctx->wot, *ctx->index, ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &ctx->rekeying_queue_head, &ctx->rekeying_queue_tail) != SUCCESS) {
+            CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
     } else {
         ssize_t_status_t send_result = send_ipc_protocol_message(
             ctx->label, 
+            &ctx->oritlsf_pool, 
             ctx->aes_key,
             ctx->mac_key,
             ctx->local_nonce,
@@ -277,41 +294,41 @@ status_t worker_master_task_info(worker_context_t *ctx, uint8_t session_index, t
         );
         if (send_result.status != SUCCESS) {
             LOG_ERROR("%sFailed to sent worker_master_task_info to Master.", ctx->label);
-            CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+            CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return send_result.status;
         } else {
             LOG_DEBUG("%sSent worker_master_task_info to Master.", ctx->label);
         }
-        CLOSE_IPC_PROTOCOL(&cmd_result.r_ipc_protocol_t);
+        CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
     }
     return SUCCESS;
 }
 
 status_t handle_workers_ipc_info(worker_context_t *worker_ctx, double *initial_delay_ms, ipc_raw_protocol_t_status_t *ircvdi) {
-    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label,
+    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool, 
         worker_ctx->aes_key, worker_ctx->remote_nonce, &worker_ctx->remote_ctr,
         (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
     );
     if (deserialized_ircvdi.status != SUCCESS) {
         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_ircvdi.status);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
         return FAILURE;
     } else {
         LOG_DEBUG("%sipc_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
     }           
     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
     ipc_master_worker_info_t *iinfoi = received_protocol->payload.ipc_master_worker_info;
     switch (iinfoi->flag) {
         case IT_SHUTDOWN: {
             LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             worker_ctx->shutdown_requested = 1;
             break;
         }
         case IT_WAKEUP: {
             LOG_INFO("%sIT_WAKEUP received...", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             break;
         }
         case IT_READY: {
@@ -325,16 +342,16 @@ status_t handle_workers_ipc_info(worker_context_t *worker_ctx, double *initial_d
             if (KEM_GENERATE_KEYPAIR(worker_ctx->kem_publickey, worker_ctx->kem_privatekey) != 0) {
                 LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", worker_ctx->label);
                 worker_ctx->shutdown_requested = 1;
-                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
                 return FAILURE;
             }
             if (worker_master_hello1(worker_ctx) != SUCCESS) {
                 LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
                 worker_ctx->shutdown_requested = 1;
-                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
                 return FAILURE;
             }
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             break;
         }
         case IT_REKEYING: {
@@ -349,7 +366,7 @@ status_t handle_workers_ipc_info(worker_context_t *worker_ctx, double *initial_d
             if (KEM_GENERATE_KEYPAIR(worker_ctx->kem_publickey, worker_ctx->kem_privatekey) != 0) {
                 LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", worker_ctx->label);
                 worker_ctx->shutdown_requested = 1;
-                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
                 return FAILURE;
             }
             worker_ctx->hello1_sent = false;
@@ -359,7 +376,7 @@ status_t handle_workers_ipc_info(worker_context_t *worker_ctx, double *initial_d
             if (worker_master_hello1(worker_ctx) != SUCCESS) {
                 LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
                 worker_ctx->shutdown_requested = 1;
-                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
                 return FAILURE;
             }
 //----------------------------------------------------------------------
@@ -369,45 +386,45 @@ status_t handle_workers_ipc_info(worker_context_t *worker_ctx, double *initial_d
             if (worker_master_task_info(worker_ctx, 0xff, TIT_WAKEUP) != SUCCESS) {
                 LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
                 worker_ctx->shutdown_requested = 1;
-                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
                 return FAILURE;
             }
             if (worker_master_task_info(worker_ctx, 0xff, TIT_WAKEUP) != SUCCESS) {
                 LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
                 worker_ctx->shutdown_requested = 1;
-                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
                 return FAILURE;
             }
             if (worker_master_task_info(worker_ctx, 0xff, TIT_WAKEUP) != SUCCESS) {
                 LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
                 worker_ctx->shutdown_requested = 1;
-                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
                 return FAILURE;
             }
             */
 //----------------------------------------------------------------------
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             break;
         }
         default:
             LOG_ERROR("%sUnknown Info Flag %d from Master. Ignoring.", worker_ctx->label, iinfoi->flag);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
     }
     return SUCCESS;
 }
 
 status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *worker_sessions, ipc_raw_protocol_t_status_t *ircvdi) {
-    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label,
+    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool, 
         worker_ctx->aes_key, worker_ctx->remote_nonce, &worker_ctx->remote_ctr,
         (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
     );
     if (deserialized_ircvdi.status != SUCCESS) {
         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_ircvdi.status);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
         return FAILURE;
     } else {
         LOG_DEBUG("%sipc_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
     }           
     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
     ipc_master_cow_connect_t *icow_connecti = received_protocol->payload.ipc_master_cow_connect;            
@@ -423,7 +440,7 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
 //----------------------------------------------------------------------
     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
         return FAILURE;
     }
     session->hello1.sent_try_count++;
@@ -432,6 +449,7 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
     identity->id_connection = icow_connecti->id_connection;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello1(
         worker_ctx->label,
+        &worker_ctx->oritlsf_pool,
         0x01,
 //----------------------------------------------------------------------
 // Hello1 remote and local wot, index and session index is the same
@@ -450,28 +468,27 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
         session->hello1.sent_try_count
     );
     if (orilink_cmd_result.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
     session->hello1.udp_data = create_orilink_raw_protocol_packet(
         worker_ctx->label,
-        &session->orilink_p8zs_pool,
+        &worker_ctx->oritlsf_pool,
         security->aes_key,
         security->mac_key,
         security->local_nonce,
         &security->local_ctr,
         orilink_cmd_result.r_orilink_protocol_t
     );
-    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+    CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &orilink_cmd_result.r_orilink_protocol_t);
     if (session->hello1.udp_data->status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
     //print_hex("COW Sending Hello1 ", udp_data->data, udp_data->len, 1);
     if (worker_master_udp_data_send_ipc(
             worker_ctx->label, 
             worker_ctx, 
-            &session->orilink_p8zs_pool,
             identity->local_wot, 
             identity->local_index, 
             identity->local_session_index, 
@@ -482,11 +499,11 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
         ) != SUCCESS
     )
     {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
 //======================================================================
-    CLOSE_IPC_PROTOCOL(&received_protocol);
+    CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
 //======================================================================
     session->hello1.sent = true;
 //======================================================================
@@ -496,25 +513,25 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
 status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_protocol_t_status_t *ircvdi) {
     if (!worker_ctx->hello1_sent) {
         LOG_ERROR("%sBelum pernah mengirim HELLO1", worker_ctx->label);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
         return FAILURE;
     }
     if (worker_ctx->hello1_ack_rcvd) {
         LOG_ERROR("%sSudah ada HELLO1_ACK", worker_ctx->label);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
         return FAILURE;
     }
-    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label,
+    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool, 
         worker_ctx->aes_key, worker_ctx->remote_nonce, &worker_ctx->remote_ctr,
         (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
     );
     if (deserialized_ircvdi.status != SUCCESS) {
         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_ircvdi.status);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
         return FAILURE;
     } else {
         LOG_DEBUG("%sipc_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
     }           
     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
     ipc_master_worker_hello1_ack_t *ihello1_acki = received_protocol->payload.ipc_master_worker_hello1_ack;
@@ -522,7 +539,7 @@ status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_pro
     if (KEM_DECODE_SHAREDSECRET(worker_ctx->kem_sharedsecret, worker_ctx->kem_ciphertext, worker_ctx->kem_privatekey) != 0) {
         LOG_ERROR("%sFailed to KEM_DECODE_SHAREDSECRET. Worker error. Initiating graceful shutdown...", worker_ctx->label);
         worker_ctx->shutdown_requested = 1;
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }    
 //----------------------------------------------------------------------
@@ -534,7 +551,7 @@ status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_pro
     if (generate_nonce(worker_ctx->label, local_nonce) != SUCCESS) {
         LOG_ERROR("%sFailed to generate_nonce. Worker error. Initiating graceful shutdown...", worker_ctx->label);
         worker_ctx->shutdown_requested = 1;
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
     uint32_t local_ctr = (uint32_t)0;
@@ -554,6 +571,7 @@ status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_pro
     const size_t data_len = sizeof(uint8_t) + sizeof(uint8_t);
     if (encrypt_decrypt_256(
             worker_ctx->label,
+            &worker_ctx->oritlsf_pool,
             aes_key,
             local_nonce,
             &local_ctr,
@@ -564,7 +582,7 @@ status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_pro
     )
     {
         worker_ctx->shutdown_requested = 1;
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
 //======================================================================    
@@ -580,7 +598,7 @@ status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_pro
     if (worker_master_hello2(worker_ctx, encrypted_wot_index2) != SUCCESS) {
         LOG_ERROR("%sFailed to worker_master_hello2. Worker error. Initiating graceful shutdown...", worker_ctx->label);
         worker_ctx->shutdown_requested = 1;
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
     memset(aes_key, 0, HASHES_BYTES);
@@ -589,32 +607,32 @@ status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_pro
     worker_ctx->local_ctr = local_ctr;
     memcpy(worker_ctx->remote_nonce, ihello1_acki->nonce, AES_NONCE_BYTES);
     worker_ctx->hello1_ack_rcvd = true;
-    CLOSE_IPC_PROTOCOL(&received_protocol);
+    CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
     return SUCCESS;
 }
 
 status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_protocol_t_status_t *ircvdi) {
     if (!worker_ctx->hello2_sent) {
         LOG_ERROR("%sBelum pernah mengirim HELLO2", worker_ctx->label);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
         return FAILURE;
     }
     if (worker_ctx->hello2_ack_rcvd) {
         LOG_ERROR("%sSudah ada HELLO2_ACK", worker_ctx->label);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
         return FAILURE;
     }
-    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label,
+    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool, 
         worker_ctx->aes_key, worker_ctx->remote_nonce, &worker_ctx->remote_ctr,
         (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
     );
     if (deserialized_ircvdi.status != SUCCESS) {
         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_ircvdi.status);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
         return FAILURE;
     } else {
         LOG_DEBUG("%sipc_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
     }           
     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
     ipc_master_worker_hello2_ack_t *ihello2_acki = received_protocol->payload.ipc_master_worker_hello2_ack;
@@ -649,7 +667,7 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
     )
     {
         LOG_ERROR("%sIPC Hello2 Ack Mac mismatch!", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
         return FAILURE_MACMSMTCH;
     }
 //----------------------------------------------------------------------
@@ -659,6 +677,7 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
     const size_t data_len = sizeof(uint8_t) + sizeof(uint8_t);
     if (encrypt_decrypt_256(
             worker_ctx->label,
+            &worker_ctx->oritlsf_pool,
             aes_key,
             worker_ctx->remote_nonce,
             &remote_ctr,
@@ -668,7 +687,7 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
         ) != SUCCESS
     )
     {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
 //======================================================================    
@@ -679,14 +698,14 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
     memcpy((uint8_t *)&data_wot, decrypted_wot_index, sizeof(uint8_t));
     if (*(uint8_t *)worker_ctx->wot != *(uint8_t *)&data_wot) {
         LOG_ERROR("%sberbeda wot. Worker error...", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
     uint8_t data_index;
     memcpy(&data_index, decrypted_wot_index + sizeof(uint8_t), sizeof(uint8_t));
     if (*worker_ctx->index != data_index) {
         LOG_ERROR("%sberbeda index. Worker error...", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
 //---------------------------------------------------------------------- 
@@ -695,10 +714,10 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
 // Aktifkan Heartbeat Karna security/Enkripsi Sudah Ready
 //---------------------------------------------------------------------- 
         worker_ctx->heartbeat_timer_id.delay_us = worker_hb_interval_us();
-        status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &worker_ctx->heartbeat_timer_id);
+        status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &worker_ctx->heartbeat_timer_id);
         if (chst != SUCCESS) {
             LOG_ERROR("%sWorker error oritw_add_eventX...", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             return FAILURE;
         }
     }
@@ -720,6 +739,7 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
             }
             ssize_t_status_t send_result = send_ipc_protocol_message(
                 worker_ctx->label, 
+                &worker_ctx->oritlsf_pool, 
                 worker_ctx->aes_key,
                 worker_ctx->mac_key,
                 worker_ctx->local_nonce,
@@ -732,14 +752,14 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
             } else {
                 LOG_DEBUG("%sSent rekeying queue data to Master.", worker_ctx->label);
             }
-            CLOSE_IPC_PROTOCOL(&current_pqueue->p);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &current_pqueue->p);
             free(current_pqueue);
         } while (current_pqueue != NULL);
         worker_ctx->rekeying_queue_head = NULL;
         worker_ctx->rekeying_queue_tail = NULL;
     }
 //---------------------------------------------------------------------- 
-    CLOSE_IPC_PROTOCOL(&received_protocol);
+    CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
     return SUCCESS;
 }
 
@@ -749,8 +769,7 @@ void handle_workers_ipc_closed_event(worker_context_t *worker_ctx) {
 }
 
 status_t retry_control_packet_ack(
-    worker_context_t *worker_ctx, 
-    p8zs_pool_t *pool, 
+    worker_context_t *worker_ctx,  
     orilink_identity_t *identity, 
     orilink_security_t *security, 
     packet_ack_t *control_packet_ack,
@@ -762,7 +781,8 @@ status_t retry_control_packet_ack(
 //----------------------------------------------------------------------
     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
-        control_packet_ack->udp_data = orilink_p8zs_pool_free(pool, control_packet_ack->udp_data);
+		if (control_packet_ack->udp_data) oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&control_packet_ack->udp_data->data);
+		oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&control_packet_ack->udp_data);
         return FAILURE;
     }
     control_packet_ack->ack_sent_try_count++;
@@ -810,7 +830,6 @@ status_t retry_control_packet_ack(
     if (worker_master_udp_data_ack_send_ipc(
             worker_ctx->label, 
             worker_ctx, 
-            pool,
             identity->local_wot, 
             identity->local_index, 
             identity->local_session_index, 
@@ -821,7 +840,8 @@ status_t retry_control_packet_ack(
         ) != SUCCESS
     )
     {
-        control_packet_ack->udp_data = orilink_p8zs_pool_free(pool, control_packet_ack->udp_data);
+		if (control_packet_ack->udp_data) oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&control_packet_ack->udp_data->data);
+		oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&control_packet_ack->udp_data);
         return FAILURE;
     }
 //======================================================================
@@ -829,8 +849,7 @@ status_t retry_control_packet_ack(
 }
 
 status_t retry_control_packet(
-    worker_context_t *worker_ctx,
-    p8zs_pool_t *pool,  
+    worker_context_t *worker_ctx, 
     orilink_identity_t *identity, 
     orilink_security_t *security, 
     packet_t *control_packet,
@@ -842,7 +861,8 @@ status_t retry_control_packet(
 //----------------------------------------------------------------------
     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
-        control_packet->udp_data = orilink_p8zs_pool_free(pool, control_packet->udp_data);
+		if (control_packet->udp_data) oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&control_packet->udp_data->data);
+		oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&control_packet->udp_data);
         return FAILURE;
     }
     control_packet->sent_try_count++;
@@ -890,7 +910,6 @@ status_t retry_control_packet(
     if (worker_master_udp_data_send_ipc(
             worker_ctx->label, 
             worker_ctx, 
-            pool,
             identity->local_wot, 
             identity->local_index, 
             identity->local_session_index, 
@@ -901,7 +920,8 @@ status_t retry_control_packet(
         ) != SUCCESS
     )
     {
-        control_packet->udp_data = orilink_p8zs_pool_free(pool, control_packet->udp_data);
+		if (control_packet->udp_data) oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&control_packet->udp_data->data);
+		oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&control_packet->udp_data);
         return FAILURE;
     }
 //======================================================================
@@ -935,8 +955,8 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
 //======================================================================
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -944,14 +964,14 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     if (trycount != (uint8_t)1) {
         if (trycount > (uint8_t)MAX_RETRY_CNT) {
             LOG_ERROR("%sHello4 Max Retry.", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
             return FAILURE_MAXTRY;
         }
         if (trycount <= session->hello4_ack.last_trycount) {
             LOG_ERROR("%sHello4 Try Count Invalid.", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
             return FAILURE_IVLDTRY;
         }
         isretry = true;
@@ -963,8 +983,8 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     if (!isretry && !from_retry_timer) {
         if (!session->hello3_ack.ack_sent) {
             LOG_ERROR("%sReceive Hello4 But This Worker Session Is Never Sending Hello3_Ack.", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
             return FAILURE;
         }
     }
@@ -974,7 +994,6 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
             //print_hex("SIO Sending Hello4 Ack Retry Response ", session->hello4_ack.data, session->hello4_ack.len, 1);
             if (retry_control_packet_ack(
                     worker_ctx, 
-                    &session->orilink_p8zs_pool,
                     identity, 
                     security, 
                     &session->hello4_ack,
@@ -982,13 +1001,13 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
                 ) != SUCCESS
             )
             {
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+                CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
                 return FAILURE;
             }
         }
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
 //======================================================================
         memcpy(security->aes_key, aes_key, HASHES_BYTES);
         memcpy(security->remote_nonce, remote_nonce, AES_NONCE_BYTES);
@@ -1002,18 +1021,18 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         return SUCCESS;
     }
 //======================================================================
-    orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
+    orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
         (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n
     );
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello4_t *ohello4 = received_orilink_protocol->payload.orilink_hello4;
@@ -1054,8 +1073,8 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     )
     {
         LOG_ERROR("%sORILINK Hello4 Mac mismatch!", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -1067,6 +1086,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     const size_t data_len = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t);
     if (encrypt_decrypt_256(
             worker_ctx->label,
+            &worker_ctx->oritlsf_pool,
             aes_key,
             remote_nonce,
             &remote_ctr,
@@ -1076,8 +1096,8 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         ) != SUCCESS
     )
     {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================
@@ -1087,24 +1107,24 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     memcpy((uint8_t *)&data_wot, decrypted_remote_identity_rcvd, sizeof(uint8_t));
     if (*(uint8_t *)&identity->remote_wot != *(uint8_t *)&data_wot) {
         LOG_ERROR("%sberbeda wot.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     uint8_t data_index;
     memcpy(&data_index, decrypted_remote_identity_rcvd + sizeof(uint8_t), sizeof(uint8_t));
     if (identity->remote_index != data_index) {
         LOG_ERROR("%sberbeda index.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     uint8_t data_session_index;
     memcpy(&data_session_index, decrypted_remote_identity_rcvd + sizeof(uint8_t) + sizeof(uint8_t), sizeof(uint8_t));
     if (identity->remote_session_index != data_session_index) {
         LOG_ERROR("%sberbeda session_index.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }      
     uint64_t remote_id_be0;
@@ -1112,8 +1132,8 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     uint64_t remote_id = be64toh(remote_id_be0);
     if (remote_id != identity->remote_id) {
         LOG_ERROR("%sberbeda id.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================
@@ -1144,6 +1164,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
 //======================================================================    
     if (encrypt_decrypt_256(
             worker_ctx->label,
+            &worker_ctx->oritlsf_pool,
             aes_key,
             security->local_nonce,
             &local_ctr,
@@ -1153,8 +1174,8 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         ) != SUCCESS
     )
     {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================    
@@ -1192,6 +1213,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
 //======================================================================    
     if (encrypt_decrypt_256(
             worker_ctx->label,
+            &worker_ctx->oritlsf_pool,
             aes_key,
             security->local_nonce,
             &local_ctr,
@@ -1201,8 +1223,8 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         ) != SUCCESS
     )
     {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================    
@@ -1212,11 +1234,11 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     memcpy(encrypted_local_identity1, encrypted_local_identity, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t));
     memcpy(encrypted_local_identity1 + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t), mac2, AES_TAG_BYTES);
 //======================================================================
-    cleanup_control_packet_ack(&session->orilink_p8zs_pool, &session->hello4_ack, false, true);
+    cleanup_control_packet_ack(&worker_ctx->oritlsf_pool, &session->hello4_ack, false, true);
     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -1226,6 +1248,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     l_inc_ctr = 0x01;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello4_ack(
         worker_ctx->label,
+        &worker_ctx->oritlsf_pool,
         l_inc_ctr,
         identity->remote_wot,
         identity->remote_index,
@@ -1239,30 +1262,29 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         session->hello4_ack.ack_sent_try_count
     );
     if (orilink_cmd_result.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     session->hello4_ack.udp_data = create_orilink_raw_protocol_packet(
         worker_ctx->label,
-        &session->orilink_p8zs_pool,
+        &worker_ctx->oritlsf_pool,
         security->aes_key,
         security->mac_key,
         security->local_nonce,
         &security->local_ctr,
         orilink_cmd_result.r_orilink_protocol_t
     );
-    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+    CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &orilink_cmd_result.r_orilink_protocol_t);
     if (session->hello4_ack.udp_data->status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     //print_hex("SIO Sending Hello4 Ack ", udp_data->data, udp_data->len, 1);
     if (worker_master_udp_data_ack_send_ipc(
             worker_ctx->label, 
             worker_ctx, 
-            &session->orilink_p8zs_pool,
             identity->local_wot, 
             identity->local_index, 
             identity->local_session_index, 
@@ -1273,13 +1295,13 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
         ) != SUCCESS
     )
     {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================
-    CLOSE_IPC_PROTOCOL(&received_protocol);
-    CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+    CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+    CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
 //======================================================================
     memcpy(&identity->remote_addr, remote_addr, sizeof(struct sockaddr_in6));
     memcpy(security->aes_key, aes_key, HASHES_BYTES);
@@ -1339,8 +1361,8 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
 //======================================================================
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -1348,14 +1370,14 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
     if (trycount != (uint8_t)1) {
         if (trycount > (uint8_t)MAX_RETRY_CNT) {
             LOG_ERROR("%sHello3 Max Retry.", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
             return FAILURE_MAXTRY;
         }
         if (trycount <= session->hello3_ack.last_trycount) {
             LOG_ERROR("%sHello3 Try Count Invalid.", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
             return FAILURE_IVLDTRY;
         }
         isretry = true;
@@ -1367,8 +1389,8 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
     if (!isretry && !from_retry_timer) {
         if (!session->hello2_ack.ack_sent) {
             LOG_ERROR("%sReceive Hello2 But This Worker Session Is Never Sending Hello3_Ack.", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
             return FAILURE;
         }
     }
@@ -1378,7 +1400,6 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
             //print_hex("SIO Sending Hello3 Ack Retry Response ", session->hello3_ack.data, session->hello3_ack.len, 1);
             if (retry_control_packet_ack(
                     worker_ctx, 
-                    &session->orilink_p8zs_pool,
                     identity, 
                     security, 
                     &session->hello3_ack,
@@ -1386,13 +1407,13 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
                 ) != SUCCESS
             )
             {
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+                CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
                 return FAILURE;
             }
         }
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
 //======================================================================
         memcpy(security->local_nonce, tmp_local_nonce, AES_NONCE_BYTES);
         memset(tmp_local_nonce, 0, AES_NONCE_BYTES);
@@ -1403,18 +1424,18 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
         return SUCCESS;
     }
 //======================================================================
-    orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
+    orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
         (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n
     );
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello3_t *ohello3 = received_orilink_protocol->payload.orilink_hello3;
@@ -1424,24 +1445,24 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
 //======================================================================
     if (remote_id != identity->remote_id) {
         LOG_ERROR("%sReceive Different Id Between Hello3 And Hello2_Ack.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================
     uint8_t local_nonce[AES_NONCE_BYTES];
     if (generate_nonce(worker_ctx->label, local_nonce) != SUCCESS) {
         LOG_ERROR("%sFailed to generate_nonce.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================
-    cleanup_control_packet_ack(&session->orilink_p8zs_pool, &session->hello3_ack, false, true);
+    cleanup_control_packet_ack(&worker_ctx->oritlsf_pool, &session->hello3_ack, false, true);
     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -1451,6 +1472,7 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
     l_inc_ctr = 0x01;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello3_ack(
         worker_ctx->label,
+        &worker_ctx->oritlsf_pool,
         l_inc_ctr,
         identity->remote_wot,
         identity->remote_index,
@@ -1465,30 +1487,29 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
         session->hello3_ack.ack_sent_try_count
     );
     if (orilink_cmd_result.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     session->hello3_ack.udp_data = create_orilink_raw_protocol_packet(
         worker_ctx->label,
-        &session->orilink_p8zs_pool,
+        &worker_ctx->oritlsf_pool,
         security->aes_key,
         security->mac_key,
         security->local_nonce,
         &security->local_ctr,
         orilink_cmd_result.r_orilink_protocol_t
     );
-    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+    CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &orilink_cmd_result.r_orilink_protocol_t);
     if (session->hello3_ack.udp_data->status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     //print_hex("SIO Sending Hello3 Ack ", udp_data->data, udp_data->len, 1);
     if (worker_master_udp_data_ack_send_ipc(
             worker_ctx->label, 
             worker_ctx, 
-            &session->orilink_p8zs_pool,
             identity->local_wot, 
             identity->local_index, 
             identity->local_session_index, 
@@ -1499,13 +1520,13 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
         ) != SUCCESS
     )
     {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================
-    CLOSE_IPC_PROTOCOL(&received_protocol);
-    CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+    CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+    CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
 //======================================================================
     memcpy(&identity->remote_addr, remote_addr, sizeof(struct sockaddr_in6));
     memcpy(security->local_nonce, local_nonce, AES_NONCE_BYTES);
@@ -1558,8 +1579,8 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
 //======================================================================
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -1567,14 +1588,14 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
     if (trycount != (uint8_t)1) {
         if (trycount > (uint8_t)MAX_RETRY_CNT) {
             LOG_ERROR("%sHello2 Max Retry.", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
             return FAILURE_MAXTRY;
         }
         if (trycount <= session->hello2_ack.last_trycount) {
             LOG_ERROR("%sHello2 Try Count Invalid.", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
             return FAILURE_IVLDTRY;
         }
         isretry = true;
@@ -1586,8 +1607,8 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
     if (!isretry && !from_retry_timer) {
         if (!session->hello1_ack.ack_sent) {
             LOG_ERROR("%sReceive Hello2 But This Worker Session Is Never Sending Hello1_Ack.", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
             return FAILURE;
         }
     }
@@ -1597,7 +1618,6 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
             //print_hex("SIO Sending Hello2 Ack Retry Response ", session->hello2_ack.data, session->hello2_ack.len, 1);
             if (retry_control_packet_ack(
                     worker_ctx, 
-                    &session->orilink_p8zs_pool,
                     identity, 
                     security, 
                     &session->hello2_ack,
@@ -1605,28 +1625,28 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
                 ) != SUCCESS
             )
             {
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+                CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
                 return FAILURE;
             }
         }
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return SUCCESS;
     }
 //======================================================================
-    orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
+    orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
         (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n
     );
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello2_t *ohello2 = received_orilink_protocol->payload.orilink_hello2;
@@ -1636,8 +1656,8 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
 //======================================================================
     if (remote_id != identity->remote_id) {
         LOG_ERROR("%sReceive Different Id Between Hello2 And Hello1_Ack.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================
@@ -1653,16 +1673,16 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
     ) != 0)
     {
         LOG_ERROR("%sFailed to KEM_ENCODE_SHAREDSECRET.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================
-    cleanup_control_packet_ack(&session->orilink_p8zs_pool, &session->hello2_ack, false, true);
+    cleanup_control_packet_ack(&worker_ctx->oritlsf_pool, &session->hello2_ack, false, true);
     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -1672,6 +1692,7 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
     l_inc_ctr = 0x01;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello2_ack(
         worker_ctx->label,
+        &worker_ctx->oritlsf_pool,
         l_inc_ctr,
         identity->remote_wot,
         identity->remote_index,
@@ -1685,30 +1706,29 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
         session->hello2_ack.ack_sent_try_count
     );
     if (orilink_cmd_result.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     session->hello2_ack.udp_data = create_orilink_raw_protocol_packet(
         worker_ctx->label,
-        &session->orilink_p8zs_pool,
+        &worker_ctx->oritlsf_pool,
         security->aes_key,
         security->mac_key,
         security->local_nonce,
         &security->local_ctr,
         orilink_cmd_result.r_orilink_protocol_t
     );
-    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+    CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &orilink_cmd_result.r_orilink_protocol_t);
     if (session->hello2_ack.udp_data->status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     //print_hex("SIO Sending Hello2 Ack ", udp_data->data, udp_data->len, 1);
     if (worker_master_udp_data_ack_send_ipc(
             worker_ctx->label, 
             worker_ctx,
-            &session->orilink_p8zs_pool, 
             identity->local_wot, 
             identity->local_index, 
             identity->local_session_index, 
@@ -1719,13 +1739,13 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
         ) != SUCCESS
     )
     {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================
-    CLOSE_IPC_PROTOCOL(&received_protocol);
-    CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+    CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+    CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
 //======================================================================
     memcpy(security->kem_publickey + (KEM_PUBLICKEY_BYTES / 2), kem_publickey + (KEM_PUBLICKEY_BYTES / 2), KEM_PUBLICKEY_BYTES / 2);
     memcpy(security->kem_ciphertext, kem_ciphertext, KEM_CIPHERTEXT_BYTES);
@@ -1770,8 +1790,8 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
 //======================================================================
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -1779,14 +1799,14 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
     if (trycount != (uint8_t)1) {
         if (trycount > (uint8_t)MAX_RETRY_CNT) {
             LOG_ERROR("%sHello1 Max Retry.", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
             return FAILURE_MAXTRY;
         }
         if (trycount <= session->hello1_ack.last_trycount) {
             LOG_ERROR("%sHello1 Try Count Invalid.", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
             return FAILURE_IVLDTRY;
         }
         isretry = true;
@@ -1799,7 +1819,6 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
             //print_hex("SIO Sending Hello1 Ack Retry Response ", session->hello1_ack.data, session->hello1_ack.len, 1);
             if (retry_control_packet_ack(
                     worker_ctx, 
-                    &session->orilink_p8zs_pool,
                     identity, 
                     security, 
                     &session->hello1_ack,
@@ -1807,13 +1826,13 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
                 ) != SUCCESS
             )
             {
-                CLOSE_IPC_PROTOCOL(&received_protocol);
-                CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+                CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
                 return FAILURE;
             }
         }
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
 //----------------------------------------------------------------------
         session->hello1_ack.ack_sent = true;
 //----------------------------------------------------------------------
@@ -1824,14 +1843,14 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
     uint8_t remote_index;
     uint8_t remote_session_index;
     uint64_t rcvd_id_connection;
-    orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
+    orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
         (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n
     );
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     } else {
 //----------------------------------------------------------------------
@@ -1844,7 +1863,7 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
 //----------------------------------------------------------------------        
         rcvd_id_connection = oudp_datao->id_connection;
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello1_t *ohello1 = received_orilink_protocol->payload.orilink_hello1;
@@ -1852,11 +1871,11 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
     uint8_t kem_publickey[KEM_PUBLICKEY_BYTES / 2];
     memcpy(kem_publickey, ohello1->publickey1, KEM_PUBLICKEY_BYTES / 2);
 //======================================================================
-    cleanup_control_packet_ack(&session->orilink_p8zs_pool, &session->hello1_ack, false, true);
+    cleanup_control_packet_ack(&worker_ctx->oritlsf_pool, &session->hello1_ack, false, true);
     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -1867,6 +1886,7 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
     l_inc_ctr = 0x01;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello1_ack(
         worker_ctx->label,
+        &worker_ctx->oritlsf_pool,
         l_inc_ctr,
         remote_wot,
         remote_index,
@@ -1879,30 +1899,29 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
         session->hello1_ack.ack_sent_try_count
     );
     if (orilink_cmd_result.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     session->hello1_ack.udp_data = create_orilink_raw_protocol_packet(
         worker_ctx->label,
-        &session->orilink_p8zs_pool,
+        &worker_ctx->oritlsf_pool,
         security->aes_key,
         security->mac_key,
         security->local_nonce,
         &security->local_ctr,
         orilink_cmd_result.r_orilink_protocol_t
     );
-    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+    CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &orilink_cmd_result.r_orilink_protocol_t);
     if (session->hello1_ack.udp_data->status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     //print_hex("SIO Sending Hello1 Ack ", udp_data->data, udp_data->len, 1);
     if (worker_master_udp_data_ack_send_ipc(
             worker_ctx->label, 
             worker_ctx, 
-            &session->orilink_p8zs_pool,
             identity->local_wot, 
             identity->local_index, 
             identity->local_session_index, 
@@ -1913,13 +1932,13 @@ status_t handle_workers_ipc_udp_data_cow_hello1(worker_context_t *worker_ctx, ip
         ) != SUCCESS
     )
     {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================
-    CLOSE_IPC_PROTOCOL(&received_protocol);
-    CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+    CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+    CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
 //======================================================================
     memcpy(&identity->remote_addr, remote_addr, sizeof(struct sockaddr_in6));
     identity->remote_wot = remote_wot;
@@ -1942,45 +1961,45 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
 //======================================================================
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
     //print_hex("COW Receiving Hello4 Ack ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
     if (!session->hello4.sent) {
         LOG_ERROR("%sReceive Hello4_Ack But This Worker Session Is Never Sending Hello4.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
     if (session->hello4.ack_rcvd) {
         LOG_ERROR("%sHello4_Ack Received Already.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
-    status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
+    status_t rhd = orilink_read_header(worker_ctx->label, &worker_ctx->oritlsf_pool, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
     if (rhd != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //======================================================================
-    orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
+    orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
         (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n
     );
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello4_ack_t *ohello4_ack = received_orilink_protocol->payload.orilink_hello4_ack;
@@ -2015,8 +2034,8 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     )
     {
         LOG_ERROR("%sORILINK Hello4 Ack Mac mismatch!", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -2026,6 +2045,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     const size_t data_len = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t);
     if (encrypt_decrypt_256(
             worker_ctx->label,
+            &worker_ctx->oritlsf_pool,
             aes_key,
             security->remote_nonce,
             &remote_ctr,
@@ -2035,8 +2055,8 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         ) != SUCCESS
     )
     {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================
@@ -2046,24 +2066,24 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     memcpy((uint8_t *)&data_wot0, decrypted_local_identity, sizeof(uint8_t));
     if (*(uint8_t *)&identity->local_wot != *(uint8_t *)&data_wot0) {
         LOG_ERROR("%sberbeda wot %d <=> %d. Worker error...", worker_ctx->label, data_wot0, identity->local_wot);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     uint8_t data_index0;
     memcpy(&data_index0, decrypted_local_identity + sizeof(uint8_t), sizeof(uint8_t));
     if (identity->local_index != data_index0) {
         LOG_ERROR("%sberbeda index. Worker error...", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     uint8_t data_session_index0;
     memcpy(&data_session_index0, decrypted_local_identity + sizeof(uint8_t) + sizeof(uint8_t), sizeof(uint8_t));
     if (identity->local_session_index != data_session_index0) {
         LOG_ERROR("%sberbeda session_index.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }      
     uint64_t local_id_be;
@@ -2071,8 +2091,8 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     uint64_t local_id = be64toh(local_id_be);
     if (local_id != identity->local_id) {
         LOG_ERROR("%sberbeda id.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================
@@ -2092,8 +2112,8 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     )
     {
         LOG_ERROR("%sORILINK Hello4 Ack Mac mismatch!", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -2102,6 +2122,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     uint8_t decrypted_remote_identity[sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t)];
     if (encrypt_decrypt_256(
             worker_ctx->label,
+            &worker_ctx->oritlsf_pool,
             aes_key,
             security->remote_nonce,
             &remote_ctr,
@@ -2111,8 +2132,8 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         ) != SUCCESS
     )
     {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -2122,24 +2143,24 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     memcpy((uint8_t *)&data_wot1, decrypted_remote_identity, sizeof(uint8_t));
     if (*(uint8_t *)&identity->remote_wot != *(uint8_t *)&data_wot1) {
         LOG_ERROR("%sberbeda wot %d <=> %d. Worker error...", worker_ctx->label, data_wot1, identity->local_wot);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     uint8_t data_index1;
     memcpy(&data_index1, decrypted_remote_identity + sizeof(uint8_t), sizeof(uint8_t));
     if (identity->remote_index != data_index1) {
         LOG_ERROR("%sberbeda index. Worker error...", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     uint8_t data_session_index1;
     memcpy(&data_session_index1, decrypted_remote_identity + sizeof(uint8_t) + sizeof(uint8_t), sizeof(uint8_t));
     if (identity->remote_session_index != data_session_index1) {
         LOG_ERROR("%sberbeda session_index.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     uint64_t remote_id_be;
@@ -2148,8 +2169,8 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
 //----------------------------------------------------------------------
     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     session->heartbeat.heartbeat.sent_try_count++;
@@ -2164,6 +2185,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     l_inc_ctr = 0x01;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_heartbeat(
         worker_ctx->label,
+        &worker_ctx->oritlsf_pool,
         l_inc_ctr,
         identity->remote_wot,
         identity->remote_index,
@@ -2178,23 +2200,23 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         session->heartbeat.heartbeat.sent_try_count
     );
     if (orilink_cmd_result.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     session->heartbeat.heartbeat.udp_data = create_orilink_raw_protocol_packet(
         worker_ctx->label,
-        &session->orilink_p8zs_pool,
+        &worker_ctx->oritlsf_pool,
         aes_key,
         security->mac_key,
         security->local_nonce,
         &security->local_ctr,
         orilink_cmd_result.r_orilink_protocol_t
     );
-    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+    CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &orilink_cmd_result.r_orilink_protocol_t);
     if (session->heartbeat.heartbeat.udp_data->status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         if (l_inc_ctr != 0xFF) {
             decrement_ctr(&security->local_ctr, security->local_nonce);
         }
@@ -2203,7 +2225,6 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     if (worker_master_udp_data_send_ipc(
             worker_ctx->label, 
             worker_ctx, 
-            &session->orilink_p8zs_pool,
             identity->local_wot, 
             identity->local_index, 
             identity->local_session_index, 
@@ -2214,22 +2235,22 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
         ) != SUCCESS
     )
     {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         if (l_inc_ctr != 0xFF) {
             decrement_ctr(&security->local_ctr, security->local_nonce);
         }
         return FAILURE;
     }
 //======================================================================
-    CLOSE_IPC_PROTOCOL(&received_protocol);
+    CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
 //----------------------------------------------------------------------
     memcpy(&identity->remote_addr, remote_addr, sizeof(struct sockaddr_in6));
     memcpy(security->aes_key, aes_key, HASHES_BYTES);
     memset(aes_key, 0, HASHES_BYTES);
     identity->remote_id = remote_id;
     security->remote_ctr = remote_ctr;
-    CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+    CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
 //======================================================================
 // 
 //----------------------------------------------------------------------
@@ -2252,7 +2273,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
 //======================================================================
     session->heartbeat.heartbeat.sent = true;
     session->heartbeat.heartbeat.ack_rcvd = false;
-    cleanup_control_packet(worker_ctx, &session->orilink_p8zs_pool, &session->hello4, false, true);
+    cleanup_control_packet(worker_ctx, &session->hello4, false, true);
 //======================================================================
 // Heartbeat Security 1 & Security 2 Open
 //======================================================================
@@ -2269,45 +2290,45 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
 //======================================================================
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
     //print_hex("COW Receiving Hello3 Ack ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
     if (!session->hello3.sent) {
         LOG_ERROR("%sReceive Hello3_Ack But This Worker Session Is Never Sending Hello3.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
     if (session->hello3.ack_rcvd) {
         LOG_ERROR("%sHello3_Ack Received Already.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
-    status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
+    status_t rhd = orilink_read_header(worker_ctx->label, &worker_ctx->oritlsf_pool, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
     if (rhd != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //======================================================================
-    orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
+    orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
         (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n
     );
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello3_ack_t *ohello3_ack = received_orilink_protocol->payload.orilink_hello3_ack;
@@ -2317,8 +2338,8 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
 //======================================================================
     if (local_id != identity->local_id) {
         LOG_ERROR("%sReceive Different Id Between Hello3_Ack And Hello3.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================
@@ -2334,8 +2355,8 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     memcpy(kem_ciphertext + (KEM_CIPHERTEXT_BYTES / 2), ohello3_ack->ciphertext2, KEM_CIPHERTEXT_BYTES / 2);
     if (KEM_DECODE_SHAREDSECRET(kem_sharedsecret, kem_ciphertext, session->kem_privatekey) != 0) {
         LOG_ERROR("%sFailed to KEM_DECODE_SHAREDSECRET.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -2344,8 +2365,8 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     kdf1(kem_sharedsecret, aes_key);
     if (generate_nonce(worker_ctx->label, local_nonce) != SUCCESS) {
         LOG_ERROR("%sFailed to generate_nonce.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -2394,6 +2415,7 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     const size_t data_len = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t);
     if (encrypt_decrypt_256(
             worker_ctx->label,
+            &worker_ctx->oritlsf_pool,
             aes_key,
             local_nonce,
             &local_ctr,
@@ -2403,8 +2425,8 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
         ) != SUCCESS
     )
     {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================    
@@ -2419,8 +2441,8 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
 //======================================================================
     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     session->hello4.sent_try_count++;
@@ -2429,6 +2451,7 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     l_inc_ctr = 0x01;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello4(
         worker_ctx->label,
+        &worker_ctx->oritlsf_pool,
         l_inc_ctr,
         identity->remote_wot,
         identity->remote_index,
@@ -2441,29 +2464,28 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
         session->hello4.sent_try_count
     );
     if (orilink_cmd_result.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     session->hello4.udp_data = create_orilink_raw_protocol_packet(
         worker_ctx->label,
-        &session->orilink_p8zs_pool,
+        &worker_ctx->oritlsf_pool,
         security->aes_key,
         mac_key,
         security->local_nonce,
         &security->local_ctr,
         orilink_cmd_result.r_orilink_protocol_t
     );
-    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+    CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &orilink_cmd_result.r_orilink_protocol_t);
     if (session->hello4.udp_data->status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     if (worker_master_udp_data_send_ipc(
             worker_ctx->label, 
             worker_ctx, 
-            &session->orilink_p8zs_pool,
             identity->local_wot, 
             identity->local_index, 
             identity->local_session_index, 
@@ -2474,12 +2496,12 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
         ) != SUCCESS
     )
     {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================
-    CLOSE_IPC_PROTOCOL(&received_protocol);
+    CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
 //----------------------------------------------------------------------                            
     memcpy(&identity->remote_addr, remote_addr, sizeof(struct sockaddr_in6));
     memcpy(security->remote_nonce, remote_nonce, AES_NONCE_BYTES);
@@ -2494,7 +2516,7 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     memset(aes_key, 0, HASHES_BYTES);
     memset(mac_key, 0, HASHES_BYTES);
     memset(local_nonce, 0, AES_NONCE_BYTES);
-    CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+    CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
 //======================================================================
 // 
 //----------------------------------------------------------------------
@@ -2512,7 +2534,7 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     #endif
 //======================================================================
     session->hello3.ack_rcvd = true;
-    cleanup_control_packet(worker_ctx, &session->orilink_p8zs_pool, &session->hello3, false, true);
+    cleanup_control_packet(worker_ctx, &session->hello3, false, true);
 //======================================================================
     session->hello4.sent = true;
 //======================================================================
@@ -2526,45 +2548,45 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
 //======================================================================
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
     //print_hex("COW Receiving Hello2 Ack ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
     if (!session->hello2.sent) {
         LOG_ERROR("%sReceive Hello2_Ack But This Worker Session Is Never Sending Hello2.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
     if (session->hello2.ack_rcvd) {
         LOG_ERROR("%sHello2_Ack Received Already.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
-    status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
+    status_t rhd = orilink_read_header(worker_ctx->label, &worker_ctx->oritlsf_pool, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
     if (rhd != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //======================================================================
-    orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
+    orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
         (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n
     );
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     } else {
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello2_ack_t *ohello2_ack = received_orilink_protocol->payload.orilink_hello2_ack;
@@ -2574,8 +2596,8 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
 //======================================================================
     if (local_id != identity->local_id) {
         LOG_ERROR("%sReceive Different Id Between Hello2_Ack And Hello2.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================
@@ -2584,8 +2606,8 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
 //======================================================================
     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     session->hello3.sent_try_count++;
@@ -2594,6 +2616,7 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
     l_inc_ctr = 0x01;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello3(
         worker_ctx->label,
+        &worker_ctx->oritlsf_pool,
         l_inc_ctr,
         identity->remote_wot,
         identity->remote_index,
@@ -2606,29 +2629,28 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
         session->hello3.sent_try_count
     );
     if (orilink_cmd_result.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     session->hello3.udp_data = create_orilink_raw_protocol_packet(
         worker_ctx->label,
-        &session->orilink_p8zs_pool,
+        &worker_ctx->oritlsf_pool,
         security->aes_key,
         security->mac_key,
         security->local_nonce,
         &security->local_ctr,
         orilink_cmd_result.r_orilink_protocol_t
     );
-    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+    CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &orilink_cmd_result.r_orilink_protocol_t);
     if (session->hello3.udp_data->status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     if (worker_master_udp_data_send_ipc(
             worker_ctx->label, 
             worker_ctx, 
-            &session->orilink_p8zs_pool,
             identity->local_wot, 
             identity->local_index, 
             identity->local_session_index, 
@@ -2639,17 +2661,17 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
         ) != SUCCESS
     )
     {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================
-    CLOSE_IPC_PROTOCOL(&received_protocol);
+    CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
 //----------------------------------------------------------------------                            
     memcpy(&identity->remote_addr, remote_addr, sizeof(struct sockaddr_in6));
     memcpy(security->kem_ciphertext, kem_ciphertext, KEM_CIPHERTEXT_BYTES / 2);
     memset(kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES / 2);
-    CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+    CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
 //======================================================================
 // 
 //----------------------------------------------------------------------
@@ -2667,7 +2689,7 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
     #endif
 //======================================================================
     session->hello2.ack_rcvd = true;
-    cleanup_control_packet(worker_ctx, &session->orilink_p8zs_pool, &session->hello2, false, true);
+    cleanup_control_packet(worker_ctx, &session->hello2, false, true);
 //======================================================================
     session->hello3.sent = true;
 //======================================================================
@@ -2681,51 +2703,51 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
 //======================================================================
     status_t cmac = orilink_check_mac(worker_ctx->label, security->mac_key, oudp_datao);
     if (cmac != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
     //print_hex("COW Receiving Hello1 Ack ", (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n, 1);
     if (!session->hello1.sent) {
         LOG_ERROR("%sReceive Hello1_Ack But This Worker Session Is Never Sending Hello1.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
     if (session->hello1.ack_rcvd) {
         LOG_ERROR("%sHello1_Ack Received Already.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //----------------------------------------------------------------------
-    status_t rhd = orilink_read_header(worker_ctx->label, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
+    status_t rhd = orilink_read_header(worker_ctx->label, &worker_ctx->oritlsf_pool, security->mac_key, security->remote_nonce, &security->remote_ctr, oudp_datao);
     if (rhd != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
 //======================================================================
     worker_type_t remote_wot;
     uint8_t remote_index;
     uint8_t remote_session_index;
-    orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label,
+    orilink_protocol_t_status_t deserialized_oudp_datao = orilink_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
         (uint8_t*)oudp_datao->recv_buffer, oudp_datao->n
     );
     if (deserialized_oudp_datao.status != SUCCESS) {
         LOG_ERROR("%sorilink_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_oudp_datao.status);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     } else {
         remote_wot = oudp_datao->local_wot;
         remote_index = oudp_datao->local_index;
         remote_session_index = oudp_datao->local_session_index;
         LOG_DEBUG("%sorilink_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
     }
     orilink_protocol_t *received_orilink_protocol = deserialized_oudp_datao.r_orilink_protocol_t;
     orilink_hello1_ack_t *ohello1_ack = received_orilink_protocol->payload.orilink_hello1_ack;
@@ -2735,15 +2757,15 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
 //======================================================================
     if (local_id != identity->local_id) {
         LOG_ERROR("%sReceive Different Id Between Hello1_Ack And Hello1.", worker_ctx->label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================
     uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
     if (current_time.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     session->hello2.sent_try_count++;
@@ -2752,6 +2774,7 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
     l_inc_ctr = 0x01;
     orilink_protocol_t_status_t orilink_cmd_result = orilink_prepare_cmd_hello2(
         worker_ctx->label,
+        &worker_ctx->oritlsf_pool,
         l_inc_ctr,
         remote_wot,
         remote_index,
@@ -2765,29 +2788,28 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
         session->hello2.sent_try_count
     );
     if (orilink_cmd_result.status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     session->hello2.udp_data = create_orilink_raw_protocol_packet(
         worker_ctx->label,
-        &session->orilink_p8zs_pool,
+        &worker_ctx->oritlsf_pool,
         security->aes_key,
         security->mac_key,
         security->local_nonce,
         &security->local_ctr,
         orilink_cmd_result.r_orilink_protocol_t
     );
-    CLOSE_ORILINK_PROTOCOL(&orilink_cmd_result.r_orilink_protocol_t);
+    CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &orilink_cmd_result.r_orilink_protocol_t);
     if (session->hello2.udp_data->status != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
     if (worker_master_udp_data_send_ipc(
             worker_ctx->label, 
             worker_ctx, 
-            &session->orilink_p8zs_pool,
             identity->local_wot, 
             identity->local_index, 
             identity->local_session_index, 
@@ -2798,18 +2820,18 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
         ) != SUCCESS
     )
     {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
         return FAILURE;
     }
 //======================================================================
-    CLOSE_IPC_PROTOCOL(&received_protocol);
+    CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
 //----------------------------------------------------------------------                            
     memcpy(&identity->remote_addr, remote_addr, sizeof(struct sockaddr_in6));
     identity->remote_wot = remote_wot;
     identity->remote_index = remote_index;
     identity->remote_session_index = remote_session_index;
-    CLOSE_ORILINK_PROTOCOL(&received_orilink_protocol);
+    CLOSE_ORILINK_PROTOCOL(&worker_ctx->oritlsf_pool, &received_orilink_protocol);
 //======================================================================
 // 
 //----------------------------------------------------------------------
@@ -2827,7 +2849,7 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
     #endif
 //======================================================================
     session->hello1.ack_rcvd = true;
-    cleanup_control_packet(worker_ctx, &session->orilink_p8zs_pool, &session->hello1, false, true);
+    cleanup_control_packet(worker_ctx, &session->hello1, false, true);
 //======================================================================
     session->hello2.sent = true;
 //======================================================================
@@ -2845,15 +2867,15 @@ status_t handle_workers_ipc_udp_data_sio(worker_context_t *worker_ctx, void *wor
     struct sockaddr_in6 remote_addr;
     memcpy(&remote_addr, &iudp_datai->remote_addr, sizeof(struct sockaddr_in6));
 //----------------------------------------------------------------------
-    orilink_raw_protocol_t *oudp_datao = orilink_raw_protocol_pool_alloc(&session->orilink_raw_protocol_pool);
+    orilink_raw_protocol_t *oudp_datao = (orilink_raw_protocol_t *)oritlsf_calloc(&worker_ctx->oritlsf_pool, 1, sizeof(orilink_raw_protocol_t));
     if (!oudp_datao) {
         LOG_ERROR("%sFailed to allocate orilink_raw_protocol_t. %s", worker_ctx->label, strerror(errno));
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
         return FAILURE_NOMEM;
     }
-    if (udp_data_to_orilink_raw_protocol_packet(worker_ctx->label, &session->orilink_raw_protocol_pool, iudp_datai, oudp_datao) != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+    if (udp_data_to_orilink_raw_protocol_packet(worker_ctx->label, &worker_ctx->oritlsf_pool, iudp_datai, &oudp_datao) != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
     switch (oudp_datao->type) {
@@ -2895,8 +2917,8 @@ status_t handle_workers_ipc_udp_data_sio(worker_context_t *worker_ctx, void *wor
         }
         default:
             LOG_ERROR("%sUnknown ORILINK protocol type %d from Remote SIO-%d[%d]. Ignoring.", worker_ctx->label, oudp_datao->type, oudp_datao->local_index, oudp_datao->local_session_index);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
     }
     return SUCCESS;
 }
@@ -2912,15 +2934,15 @@ status_t handle_workers_ipc_udp_data_cow(worker_context_t *worker_ctx, void *wor
     struct sockaddr_in6 remote_addr;
     memcpy(&remote_addr, &iudp_datai->remote_addr, sizeof(struct sockaddr_in6));
 //----------------------------------------------------------------------
-    orilink_raw_protocol_t *oudp_datao = orilink_raw_protocol_pool_alloc(&session->orilink_raw_protocol_pool);
+    orilink_raw_protocol_t *oudp_datao = (orilink_raw_protocol_t *)oritlsf_calloc(&worker_ctx->oritlsf_pool, 1, sizeof(orilink_raw_protocol_t));
     if (!oudp_datao) {
         LOG_ERROR("%sFailed to allocate orilink_raw_protocol_t. %s", worker_ctx->label, strerror(errno));
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
         return FAILURE_NOMEM;
     }
-    if (udp_data_to_orilink_raw_protocol_packet(worker_ctx->label, &session->orilink_raw_protocol_pool, iudp_datai, oudp_datao) != SUCCESS) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
-        CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+    if (udp_data_to_orilink_raw_protocol_packet(worker_ctx->label, &worker_ctx->oritlsf_pool, iudp_datai, &oudp_datao) != SUCCESS) {
+        CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+        CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
         return FAILURE;
     }
     switch (oudp_datao->type) {
@@ -2962,26 +2984,26 @@ status_t handle_workers_ipc_udp_data_cow(worker_context_t *worker_ctx, void *wor
         }
         default:
             LOG_ERROR("%sUnknown ORILINK protocol type %d from Remote COW-%d[%d]. Ignoring.", worker_ctx->label, oudp_datao->type, oudp_datao->local_index, oudp_datao->local_session_index);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
-            CLOSE_ORILINK_RAW_PROTOCOL(&session->orilink_raw_protocol_pool, &oudp_datao);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+            CLOSE_ORILINK_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &oudp_datao);
     }
     return SUCCESS;
 }
 
 status_t handle_workers_ipc_udp_data(worker_context_t *worker_ctx, void *worker_sessions, ipc_raw_protocol_t_status_t *ircvdi) {
     worker_type_t remote_wot = UNKNOWN;
-    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label,
+    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool, 
         worker_ctx->aes_key, worker_ctx->remote_nonce, &worker_ctx->remote_ctr,
         (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
     );
     if (deserialized_ircvdi.status != SUCCESS) {
         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_ircvdi.status);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
         return FAILURE;
     } else {
         remote_wot = ircvdi->r_ipc_raw_protocol_t->wot;
         LOG_DEBUG("%sipc_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
     }           
     ipc_protocol_t *received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
     switch (remote_wot) {
@@ -3006,7 +3028,7 @@ status_t handle_workers_ipc_udp_data(worker_context_t *worker_ctx, void *worker_
 //----------------------------------------------------------------------
         default:
             LOG_ERROR("%sUnknown Source. UDP Remote Worker %d. Ignoring.", worker_ctx->label, remote_wot);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
     }
     return SUCCESS;
 }
@@ -3021,56 +3043,56 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
         case ORILINK_HELLO1: {
 //======================================================================
             session->hello1.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
-            status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->hello1.retry_timer_id);
+            status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &session->hello1.retry_timer_id);
             if (chst != SUCCESS) {
-                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
                 return FAILURE;
             }
 //======================================================================
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             break;
         }
         case ORILINK_HELLO2: {
 //======================================================================
             session->hello2.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
-            status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->hello2.retry_timer_id);
+            status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &session->hello2.retry_timer_id);
             if (chst != SUCCESS) {
-                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
                 return FAILURE;
             }
 //======================================================================
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             break;
         }
         case ORILINK_HELLO3: {
 //======================================================================
             session->hello3.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
-            status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->hello3.retry_timer_id);
+            status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &session->hello3.retry_timer_id);
             if (chst != SUCCESS) {
-                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
                 return FAILURE;
             }
 //======================================================================
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             break;
         }
         case ORILINK_HELLO4: {
 //======================================================================
             session->hello4.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
-            status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->hello4.retry_timer_id);
+            status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &session->hello4.retry_timer_id);
             if (chst != SUCCESS) {
-                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
                 return FAILURE;
             }
 //======================================================================
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             break;
         }
         case ORILINK_HEARTBEAT: {
             #if defined(ACCRCY_TEST)
             session->heartbeat.heartbeat_ack.ack_sent = false;
             session->heartbeat.heartbeat_openner_timer_id.delay_us = session->heartbeat.last_send_heartbeat_interval;
-            status_t otmr = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_openner_timer_id);
+            status_t otmr = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_openner_timer_id);
             if (otmr != SUCCESS) {
                 return FAILURE;
             }
@@ -3079,32 +3101,32 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
             #endif
 //======================================================================
             session->heartbeat.heartbeat.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
-            status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id);
+            status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id);
             if (chst != SUCCESS) {
-                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
                 return FAILURE;
             }
 //======================================================================
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             break;
         }
         case ORILINK_HEARTBEAT_ACK: {
             if (iudp_data_acki->trycount == (uint8_t)1) {
                 session->heartbeat.heartbeat_sender_timer_id.delay_us = session->heartbeat.heartbeat_interval;
 //======================================================================
-                status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_sender_timer_id);
+                status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_sender_timer_id);
                 if (chst != SUCCESS) {
-                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
                     return FAILURE;
                 }
 //======================================================================
             }
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             break;
         }
         default:
             LOG_ERROR("%sUnknown ORILINK protocol type %d From Master To COW-%d[%d]. Ignoring.", worker_ctx->label, (orilink_protocol_type_t)iudp_data_acki->orilink_protocol, index, session_index);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
     }
     return SUCCESS;
 }
@@ -3117,26 +3139,26 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
     sio_c_session_t *session = &sio_c_session[session_index];
     switch ((orilink_protocol_type_t)iudp_data_acki->orilink_protocol) {
         case ORILINK_HELLO1_ACK: {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             break;
         }
         case ORILINK_HELLO2_ACK: {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             break;
         }
         case ORILINK_HELLO3_ACK: {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             break;
         }
         case ORILINK_HELLO4_ACK: {
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             break;
         }
         case ORILINK_HEARTBEAT: {
             #if defined(ACCRCY_TEST)
             session->heartbeat.heartbeat_ack.ack_sent = false;
             session->heartbeat.heartbeat_openner_timer_id.delay_us = session->heartbeat.last_send_heartbeat_interval;
-            status_t otmr = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_openner_timer_id);
+            status_t otmr = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_openner_timer_id);
             if (otmr != SUCCESS) {
                 return FAILURE;
             }
@@ -3145,22 +3167,22 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
             #endif
 //======================================================================
             session->heartbeat.heartbeat.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
-            status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id);
+            status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id);
             if (chst != SUCCESS) {
-                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
                 return FAILURE;
             }
 //======================================================================
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             break;
         }
         case ORILINK_HEARTBEAT_ACK: {
             if (iudp_data_acki->trycount == (uint8_t)1) {
                 session->heartbeat.heartbeat_sender_timer_id.delay_us = session->heartbeat.heartbeat_interval;
 //======================================================================
-                status_t chst = oritw_add_eventX(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_sender_timer_id);
+                status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat_sender_timer_id);
                 if (chst != SUCCESS) {
-                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
                     return FAILURE;
                 }
 //======================================================================
@@ -3169,25 +3191,25 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
         }
         default:
             LOG_ERROR("%sUnknown ORILINK protocol type %d From Master To SIO-%d[%d]. Ignoring.", worker_ctx->label, (orilink_protocol_type_t)iudp_data_acki->orilink_protocol, index, session_index);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
     }
     return SUCCESS;
 }
 
 status_t handle_workers_ipc_udp_data_ack(worker_context_t *worker_ctx, void *worker_sessions, ipc_raw_protocol_t_status_t *ircvdi) {
     worker_type_t rcvd_wot = UNKNOWN;
-    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label,
+    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool, 
         worker_ctx->aes_key, worker_ctx->remote_nonce, &worker_ctx->remote_ctr,
         (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
     );
     if (deserialized_ircvdi.status != SUCCESS) {
         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_ircvdi.status);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
         return FAILURE;
     } else {
         rcvd_wot = ircvdi->r_ipc_raw_protocol_t->wot;
         LOG_DEBUG("%sipc_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
     }           
     ipc_protocol_t *received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
     switch (rcvd_wot) {
@@ -3212,14 +3234,14 @@ status_t handle_workers_ipc_udp_data_ack(worker_context_t *worker_ctx, void *wor
 //----------------------------------------------------------------------
         default:
             LOG_ERROR("%sUnknown Source. UDP Remote Worker %d. Ignoring.", worker_ctx->label, rcvd_wot);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
     }
     return SUCCESS;
 }
 
 status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_sessions, double *initial_delay_ms) {
     while (true) {
-        ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(worker_ctx->label, worker_ctx->master_uds_fd);
+        ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(worker_ctx->label, &worker_ctx->oritlsf_pool, worker_ctx->master_uds_fd);
         if (ircvdi.status == FAILURE_EAGNEWBLK) {
             break;
         } else {
@@ -3234,7 +3256,7 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                 ) != SUCCESS
             )
             {
-                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi.r_ipc_raw_protocol_t);
                 return FAILURE;
             }
             if (ipc_read_header(
@@ -3245,7 +3267,7 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                 ) != SUCCESS
             )
             {
-                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi.r_ipc_raw_protocol_t);
                 return FAILURE;
             }
             if (ipc_check_ctr(
@@ -3256,7 +3278,7 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                 ) != SUCCESS
             )
             {
-                CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi.r_ipc_raw_protocol_t);
                 return FAILURE;
             }
             switch (ircvdi.r_ipc_raw_protocol_t->type) {
@@ -3298,7 +3320,7 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_ses
                 }
                 default:
                     LOG_ERROR("%sUnknown IPC protocol type %d from Master. Ignoring.", worker_ctx->label, ircvdi.r_ipc_raw_protocol_t->type);
-                    CLOSE_IPC_RAW_PROTOCOL(&ircvdi.r_ipc_raw_protocol_t);
+                    CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi.r_ipc_raw_protocol_t);
             }
         }
     }

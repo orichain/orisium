@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <errno.h>
 
 #include "utilities.h"
@@ -13,6 +12,7 @@
 #include "log.h"
 #include "ipc/worker_master_hello2.h"
 #include "constants.h"
+#include "oritlsf.h"
 
 static inline status_t ipc_serialize_worker_master_hello2(const char *label, const ipc_worker_master_hello2_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
     if (!payload || !current_buffer || !offset) {
@@ -46,24 +46,23 @@ static inline status_t ipc_deserialize_worker_master_hello2(const char *label, i
     return SUCCESS;
 }
 
-static inline ipc_protocol_t_status_t ipc_prepare_cmd_worker_master_hello2(const char *label, worker_type_t wot, uint8_t index, uint8_t *encrypted_wot_index) {
+static inline ipc_protocol_t_status_t ipc_prepare_cmd_worker_master_hello2(const char *label, oritlsf_pool_t *pool, worker_type_t wot, uint8_t index, uint8_t *encrypted_wot_index) {
 	ipc_protocol_t_status_t result;
-	result.r_ipc_protocol_t = (ipc_protocol_t *)malloc(sizeof(ipc_protocol_t));
+	result.r_ipc_protocol_t = (ipc_protocol_t *)oritlsf_calloc(pool, 1, sizeof(ipc_protocol_t));
 	result.status = FAILURE;
 	if (!result.r_ipc_protocol_t) {
 		LOG_ERROR("%sFailed to allocate ipc_protocol_t. %s", label, strerror(errno));
 		return result;
 	}
-	memset(result.r_ipc_protocol_t, 0, sizeof(ipc_protocol_t));
 	result.r_ipc_protocol_t->version[0] = IPC_VERSION_MAJOR;
 	result.r_ipc_protocol_t->version[1] = IPC_VERSION_MINOR;
     result.r_ipc_protocol_t->wot = wot;
     result.r_ipc_protocol_t->index = index;
 	result.r_ipc_protocol_t->type = IPC_WORKER_MASTER_HELLO2;
-	ipc_worker_master_hello2_t *payload = (ipc_worker_master_hello2_t *)calloc(1, sizeof(ipc_worker_master_hello2_t));
+	ipc_worker_master_hello2_t *payload = (ipc_worker_master_hello2_t *)oritlsf_calloc(pool, 1, sizeof(ipc_worker_master_hello2_t));
 	if (!payload) {
 		LOG_ERROR("%sFailed to allocate ipc_worker_master_hello2_t payload. %s", label, strerror(errno));
-		CLOSE_IPC_PROTOCOL(&result.r_ipc_protocol_t);
+		CLOSE_IPC_PROTOCOL(pool, &result.r_ipc_protocol_t);
 		return result;
 	}
     memcpy(payload->encrypted_wot_index, encrypted_wot_index, AES_NONCE_BYTES + sizeof(uint8_t) + sizeof(uint8_t) + AES_TAG_BYTES);

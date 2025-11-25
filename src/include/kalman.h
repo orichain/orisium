@@ -10,6 +10,7 @@
 #include "constants.h"
 #include "log.h"
 #include "types.h"
+#include "oritlsf.h"
 
 typedef struct {
     float state_estimate;
@@ -257,29 +258,26 @@ static inline void setup_oricle_long_double(oricle_long_double_t *o, long double
     o->value_prediction = initial_value;
 }
 
-static inline void cleanup_oricle(oricle_t *o) {
-    if (o->kalman_calibration_samples) free(o->kalman_calibration_samples);
-    o->kalman_calibration_samples = NULL;
+static inline void cleanup_oricle(oritlsf_pool_t *pool, oricle_t *o) {
+    oritlsf_free(pool, (void **)&o->kalman_calibration_samples);
 }
 
-static inline void cleanup_oricle_double(oricle_double_t *o) {
-    if (o->kalman_calibration_samples) free(o->kalman_calibration_samples);
-    o->kalman_calibration_samples = NULL;
+static inline void cleanup_oricle_double(oritlsf_pool_t *pool, oricle_double_t *o) {
+    oritlsf_free(pool, (void **)&o->kalman_calibration_samples);
 }
 
-static inline void cleanup_oricle_long_double(oricle_long_double_t *o) {
-    if (o->kalman_calibration_samples) free(o->kalman_calibration_samples);
-    o->kalman_calibration_samples = NULL;
+static inline void cleanup_oricle_long_double(oritlsf_pool_t *pool, oricle_long_double_t *o) {
+    oritlsf_free(pool, (void **)&o->kalman_calibration_samples);
 }
 
-static inline void calculate_oricle(const char *label, const char *desc, oricle_t *o, float value, float max_value) {
+static inline void calculate_oricle(const char *label, oritlsf_pool_t *pool, const char *desc, oricle_t *o, float value, float max_value) {
     uint64_t_status_t current_time = get_monotonic_time_ns(label);
     if (current_time.status != SUCCESS) {
         return;
     }
     if (o->first_check) {
         o->first_check = false;
-        o->kalman_calibration_samples = (float *)calloc(KALMAN_CALIBRATION_SAMPLES, sizeof(float));
+        o->kalman_calibration_samples = (float *)oritlsf_calloc(pool, KALMAN_CALIBRATION_SAMPLES, sizeof(float));
         o->temp_ewma_value = o->initial_value;
         o->value_prediction = o->initial_value;
         o->kalman_filter.is_initialized = false;
@@ -305,7 +303,7 @@ static inline void calculate_oricle(const char *label, const char *desc, oricle_
             if (o->kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
                 float avg_value = calculate_average(o->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
                 float var_value = calculate_variance(o->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_value);
-                free(o->kalman_calibration_samples);
+                oritlsf_free(pool, (void **)&o->kalman_calibration_samples);
                 o->kalman_calibration_samples = NULL;               
                 if (var_value < 0.1f) var_value = 0.1f;
                 float kalman_q_avg_task = 1.0f;
@@ -332,14 +330,14 @@ static inline void calculate_oricle(const char *label, const char *desc, oricle_
     LOG_DEBUG("%s[%s]Meas: %.2f -> Est: %.2f (Vel: %.2f)", label, desc, value, o->value_prediction, o->kalman_filter.value_velocity);
 }
 
-static inline void calculate_oricle_double(const char *label, const char *desc, oricle_double_t *o, double value, double max_value) {
+static inline void calculate_oricle_double(const char *label, oritlsf_pool_t *pool, const char *desc, oricle_double_t *o, double value, double max_value) {
     uint64_t_status_t current_time = get_monotonic_time_ns(label);
     if (current_time.status != SUCCESS) {
         return;
     }
     if (o->first_check) {
         o->first_check = false;
-        o->kalman_calibration_samples = (double *)calloc(KALMAN_CALIBRATION_SAMPLES, sizeof(double));
+        o->kalman_calibration_samples = (double *)oritlsf_calloc(pool, KALMAN_CALIBRATION_SAMPLES, sizeof(double));
         o->temp_ewma_value = o->initial_value;
         o->value_prediction = o->initial_value;
         o->kalman_filter.is_initialized = false;
@@ -365,7 +363,7 @@ static inline void calculate_oricle_double(const char *label, const char *desc, 
             if (o->kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
                 double avg_value = calculate_double_average(o->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
                 double var_value = calculate_double_variance(o->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_value);
-                free(o->kalman_calibration_samples);
+                oritlsf_free(pool, (void **)&o->kalman_calibration_samples);
                 o->kalman_calibration_samples = NULL;
                 if (var_value < 0.1) var_value = 0.1;                
                 double kalman_q_avg_task = 1.0;
@@ -393,14 +391,14 @@ static inline void calculate_oricle_double(const char *label, const char *desc, 
 }
 
 #if defined(LONGINTV_TEST)
-static inline void calculate_oricle_doubleX(const char *label, const char *desc, oricle_double_t *o, double value, double max_value) {
+static inline void calculate_oricle_doubleX(const char *label, oritlsf_pool_t *pool, const char *desc, oricle_double_t *o, double value, double max_value) {
     uint64_t_status_t current_time = get_monotonic_time_ns(label);
     if (current_time.status != SUCCESS) {
         return;
     }
     if (o->first_check) {
         o->first_check = false;
-        o->kalman_calibration_samples = (double *)calloc(KALMAN_CALIBRATION_SAMPLES, sizeof(double));
+        o->kalman_calibration_samples = (double *)oritlsf_calloc(pool, KALMAN_CALIBRATION_SAMPLES, sizeof(double));
         o->temp_ewma_value = o->initial_value;
         o->value_prediction = o->initial_value;
         o->kalman_filter.is_initialized = false;
@@ -426,7 +424,7 @@ static inline void calculate_oricle_doubleX(const char *label, const char *desc,
             if (o->kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
                 double avg_value = calculate_double_average(o->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
                 double var_value = calculate_double_variance(o->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_value);
-                free(o->kalman_calibration_samples);
+                oritlsf_free(pool, (void **)&o->kalman_calibration_samples);
                 o->kalman_calibration_samples = NULL;
                 if (var_value < 0.1) var_value = 0.1;                
                 double kalman_q_avg_task = 1.0;
@@ -454,14 +452,14 @@ static inline void calculate_oricle_doubleX(const char *label, const char *desc,
 }
 #endif
 
-static inline void calculate_oricle_long_double(const char *label, const char *desc, oricle_long_double_t *o, long double value, long double max_value) {
+static inline void calculate_oricle_long_double(const char *label, oritlsf_pool_t *pool, const char *desc, oricle_long_double_t *o, long double value, long double max_value) {
     uint64_t_status_t current_time = get_monotonic_time_ns(label);
     if (current_time.status != SUCCESS) {
         return;
     }
     if (o->first_check) {
         o->first_check = false;
-        o->kalman_calibration_samples = (long double *)calloc(KALMAN_CALIBRATION_SAMPLES, sizeof(long double));
+        o->kalman_calibration_samples = (long double *)oritlsf_calloc(pool, KALMAN_CALIBRATION_SAMPLES, sizeof(long double));
         o->temp_ewma_value = o->initial_value;
         o->value_prediction = o->initial_value;
         o->kalman_filter.is_initialized = false;
@@ -487,7 +485,7 @@ static inline void calculate_oricle_long_double(const char *label, const char *d
             if (o->kalman_initialized_count == KALMAN_CALIBRATION_SAMPLES) {
                 long double avg_value = calculate_long_double_average(o->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES);
                 long double var_value = calculate_long_double_variance(o->kalman_calibration_samples, KALMAN_CALIBRATION_SAMPLES, avg_value);
-                free(o->kalman_calibration_samples);
+                oritlsf_free(pool, (void **)&o->kalman_calibration_samples);
                 o->kalman_calibration_samples = NULL;                
                 if (var_value < 0.1L) var_value = 0.1L;
                 long double kalman_q_avg_task = 1.0L;

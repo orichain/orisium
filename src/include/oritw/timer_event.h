@@ -3,9 +3,9 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "constants.h"
+#include "oritlsf.h"
 
 typedef struct timer_event_t {
     struct timer_event_t *next;
@@ -195,7 +195,7 @@ static inline void timer_event_sorting_remove_all(timer_event_t **head, timer_ev
     *head = *tail = NULL;
 }
 
-static inline void timer_event_remove_all(timer_event_t **pool_head, timer_event_t **pool_tail, timer_event_t **head, timer_event_t **tail) {
+static inline void timer_event_cleanup(oritlsf_pool_t *pool, timer_event_t **head, timer_event_t **tail) {
     timer_event_t *cur = *head;
     while (cur) {
         timer_event_t *next = cur->next;
@@ -203,22 +203,7 @@ static inline void timer_event_remove_all(timer_event_t **pool_head, timer_event
         cur->timer_id = 0;
         cur->slot_index = WHEEL_SIZE;
         cur->level_index = MAX_TIMER_LEVELS;
-        timer_event_remove(head, tail, cur);
-        timer_event_add_head(pool_head, pool_tail, cur);
-        cur = next;
-    }
-    *head = *tail = NULL;
-}
-
-static inline void timer_event_cleanup(timer_event_t **head, timer_event_t **tail) {
-    timer_event_t *cur = *head;
-    while (cur) {
-        timer_event_t *next = cur->next;
-        cur->expiration_tick = 0;
-        cur->timer_id = 0;
-        cur->slot_index = WHEEL_SIZE;
-        cur->level_index = MAX_TIMER_LEVELS;
-        free(cur);
+        oritlsf_free(pool, (void **)&cur);
         cur = next;
     }
     *head = *tail = NULL;

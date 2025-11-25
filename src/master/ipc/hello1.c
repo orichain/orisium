@@ -14,24 +14,24 @@
 #include "ipc/protocol.h"
 
 status_t handle_master_ipc_hello1(const char *label, master_context_t *master_ctx, worker_type_t rcvd_wot, uint8_t rcvd_index, worker_security_t *security, const char *worker_name, int *worker_uds_fd, ipc_raw_protocol_t_status_t *ircvdi) {
-    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
+    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label, &master_ctx->oritlsf_pool,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
         (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
     );
     if (deserialized_ircvdi.status != SUCCESS) {
         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", label, deserialized_ircvdi.status);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
         return deserialized_ircvdi.status;
     } else {
         LOG_DEBUG("%sipc_deserialize BERHASIL.", label);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
     }           
     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
     ipc_worker_master_hello1_t *ihello1i = received_protocol->payload.ipc_worker_master_hello1;
     uint8_t kem_sharedsecret[KEM_SHAREDSECRET_BYTES];
     if (security->hello1_rcvd) {
         LOG_ERROR("%sSudah ada HELLO1", label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
     memcpy(security->kem_publickey, ihello1i->kem_publickey, KEM_PUBLICKEY_BYTES);
@@ -42,7 +42,7 @@ status_t handle_master_ipc_hello1(const char *label, master_context_t *master_ct
     ) != 0)
     {
         LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -52,12 +52,12 @@ status_t handle_master_ipc_hello1(const char *label, master_context_t *master_ct
     uint8_t local_nonce[AES_NONCE_BYTES];
     if (generate_nonce(label, local_nonce) != SUCCESS) {
         LOG_ERROR("%sFailed to generate_nonce.", label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
     if (master_worker_hello1_ack(label, master_ctx, rcvd_wot, rcvd_index, security, worker_name, worker_uds_fd, local_nonce) != SUCCESS) {
         LOG_ERROR("%sFailed to master_worker_hello1_ack.", label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
     memcpy(security->local_nonce, local_nonce, AES_NONCE_BYTES);
@@ -81,6 +81,6 @@ status_t handle_master_ipc_hello1(const char *label, master_context_t *master_ct
     memset(aes_key, 0, HASHES_BYTES);
 //----------------------------------------------------------------------
     security->hello1_rcvd = true;
-    CLOSE_IPC_PROTOCOL(&received_protocol);
+    CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
     return SUCCESS;
 }

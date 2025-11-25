@@ -3,9 +3,9 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "oritw/timer_event.h"
+#include "oritlsf.h"
 
 typedef struct timer_id_t {
     timer_event_t *event;
@@ -107,14 +107,14 @@ static inline timer_id_t *timer_id_pop_tail(timer_id_t **head, timer_id_t **tail
     return ev;
 }
 
-static inline void timer_id_cleanup(timer_id_t **head, timer_id_t **tail) {
+static inline void timer_id_cleanup(oritlsf_pool_t *pool, timer_id_t **head, timer_id_t **tail) {
     timer_id_t *cur = *head;
     while (cur) {
         timer_id_t *next = cur->next;
         cur->id = 0;
         cur->delay_us = 0;
         cur->event = NULL;
-        free(cur);
+        oritlsf_free(pool, (void **)&cur);
         cur = next;
     }
     *head = *tail = NULL;

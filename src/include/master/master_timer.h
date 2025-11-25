@@ -46,8 +46,8 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                 handler_result = FAILURE;
                 break;
             }
-            handler_result = oritw_add_eventX(label, &master_ctx->master_async, &master_ctx->timer, current_add);
-            current_add = oritw_id_pool_free(&master_ctx->timer, current_add);
+            handler_result = oritw_add_event(label, &master_ctx->oritlsf_pool, &master_ctx->master_async, &master_ctx->timer, current_add);
+            oritw_id_free(&master_ctx->oritlsf_pool, &master_ctx->timer, &current_add);
             if (handler_result != SUCCESS) {
                 break;
             }
@@ -94,9 +94,9 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                 }
                 uint64_t expired_timer_id = current_event->timer_id;
                 if (expired_timer_id == master_ctx->check_healthy_timer_id.id) {
-                    master_ctx->check_healthy_timer_id.event = oritw_pool_free(&master_ctx->timer, master_ctx->check_healthy_timer_id.event);
+                    oritw_free(&master_ctx->oritlsf_pool, &master_ctx->timer, &master_ctx->check_healthy_timer_id.event);
                     master_ctx->check_healthy_timer_id.delay_us = worker_check_healthy_us();
-                    status_t chst = oritw_add_eventX(label, &master_ctx->master_async, &master_ctx->timer, &master_ctx->check_healthy_timer_id);
+                    status_t chst = oritw_add_event(label, &master_ctx->oritlsf_pool, &master_ctx->master_async, &master_ctx->timer, &master_ctx->check_healthy_timer_id);
                     if (chst != SUCCESS) {
                         LOG_INFO("%sGagal set timer. Initiating graceful shutdown...", label);
                         master_ctx->shutdown_requested = 1;
@@ -141,7 +141,7 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                     }
                 } else {
                     handler_result = FAILURE;
-                    oritw_pool_free(&master_ctx->timer, current_event);
+                    oritw_free(&master_ctx->oritlsf_pool, &master_ctx->timer, &current_event);
                     break;
                 }
             } while (current_event != NULL);

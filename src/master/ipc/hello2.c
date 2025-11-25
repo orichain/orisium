@@ -14,29 +14,29 @@
 #include "ipc/protocol.h"
 
 status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ctx, worker_type_t rcvd_wot, uint8_t rcvd_index, worker_security_t *security, worker_rekeying_t *rekeying, const char *worker_name, int *worker_uds_fd, ipc_raw_protocol_t_status_t *ircvdi) {
-    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
+    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label, &master_ctx->oritlsf_pool,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
         (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
     );
     if (deserialized_ircvdi.status != SUCCESS) {
         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", label, deserialized_ircvdi.status);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
         return deserialized_ircvdi.status;
     } else {
         LOG_DEBUG("%sipc_deserialize BERHASIL.", label);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
     }           
     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
     ipc_worker_master_hello2_t *ihello2i = received_protocol->payload.ipc_worker_master_hello2;
     
     if (!security->hello1_ack_sent) {
         LOG_ERROR("%sBelum pernah mengirim HELLO1_ACK", label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
     if (security->hello2_rcvd) {
         LOG_ERROR("%sSudah ada HELLO2", label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
 //======================================================================
@@ -75,7 +75,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
     )
     {
         LOG_ERROR("%sIPC Hello2 Mac mismatch!", label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
         return FAILURE_MACMSMTCH;
     }
 //----------------------------------------------------------------------
@@ -85,6 +85,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
     const size_t data_len = sizeof(uint8_t) + sizeof(uint8_t);
     if (encrypt_decrypt_256(
             label,
+            &master_ctx->oritlsf_pool,
             aes_key,
             remote_nonce,
             &remote_ctr,
@@ -94,7 +95,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
         ) != SUCCESS
     )
     {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -104,14 +105,14 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
     memcpy((uint8_t *)&data_wot, decrypted_wot_index_rcvd, sizeof(uint8_t));
     if (*(uint8_t *)&rcvd_wot != *(uint8_t *)&data_wot) {
         LOG_ERROR("%sberbeda wot.", label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
     uint8_t data_index;
     memcpy(&data_index, decrypted_wot_index_rcvd + sizeof(uint8_t), sizeof(uint8_t));
     if (rcvd_index != data_index) {
         LOG_ERROR("%sberbeda index.", label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -123,6 +124,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
 //======================================================================    
     if (encrypt_decrypt_256(
             label,
+            &master_ctx->oritlsf_pool,
             aes_key,
             security->local_nonce,
             &local_ctr,
@@ -132,7 +134,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
         ) != SUCCESS
     )
     {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
 //======================================================================    
@@ -145,7 +147,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
 //======================================================================
     if (master_worker_hello2_ack(label, master_ctx, rcvd_wot, rcvd_index, security, worker_name, worker_uds_fd, encrypted_wot_index1) != SUCCESS) {
         LOG_ERROR("%sFailed to master_worker_hello2_ack.", label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
     memcpy(security->aes_key, aes_key, HASHES_BYTES);
@@ -157,7 +159,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
 //----------------------------------------------------------------------
     master_worker_session_t *session = get_master_worker_session(master_ctx, rcvd_wot, rcvd_index);
     if (session == NULL) {
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -166,7 +168,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
     session->isready = true;
     if (!rekeying || !security) {
         LOG_ERROR("%sFailed to master_worker_hello2_ack.", label);
-        CLOSE_IPC_PROTOCOL(&received_protocol);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
         return FAILURE;
     }
 //----------------------------------------------------------------------
@@ -180,6 +182,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
         }
         ssize_t_status_t send_result = send_ipc_protocol_message(
             label, 
+            &master_ctx->oritlsf_pool, 
             security->aes_key,
             security->mac_key,
             security->local_nonce,
@@ -192,7 +195,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
         } else {
             LOG_DEBUG("%sSent rekeying queue data to Worker.", label);
         }
-        CLOSE_IPC_PROTOCOL(&current_pqueue->p);
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &current_pqueue->p);
         free(current_pqueue);
     } while (current_pqueue != NULL);
     rekeying->rekeying_queue_head = NULL;
@@ -203,7 +206,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
         for (uint8_t indexrdy = 0; indexrdy < MAX_SIO_WORKERS; ++indexrdy) {
             master_worker_session_t *indexrdy_session = get_master_worker_session(master_ctx, SIO, indexrdy);
             if (session == NULL) {
-                CLOSE_IPC_PROTOCOL(&received_protocol);
+                CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
                 return FAILURE;
             }
             if (!indexrdy_session->isready) {
@@ -215,7 +218,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
             for (uint8_t indexrdy = 0; indexrdy < MAX_LOGIC_WORKERS; ++indexrdy) {
                 master_worker_session_t *indexrdy_session = get_master_worker_session(master_ctx, LOGIC, indexrdy);
                 if (session == NULL) {
-                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
                     return FAILURE;
                 }
                 if (!indexrdy_session->isready) {
@@ -228,7 +231,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
             for (uint8_t indexrdy = 0; indexrdy < MAX_COW_WORKERS; ++indexrdy) {
                 master_worker_session_t *indexrdy_session = get_master_worker_session(master_ctx, COW, indexrdy);
                 if (session == NULL) {
-                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
                     return FAILURE;
                 }
                 if (!indexrdy_session->isready) {
@@ -241,7 +244,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
             for (uint8_t indexrdy = 0; indexrdy < MAX_DBR_WORKERS; ++indexrdy) {
                 master_worker_session_t *indexrdy_session = get_master_worker_session(master_ctx, DBR, indexrdy);
                 if (session == NULL) {
-                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
                     return FAILURE;
                 }
                 if (!indexrdy_session->isready) {
@@ -254,7 +257,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
             for (uint8_t indexrdy = 0; indexrdy < MAX_DBW_WORKERS; ++indexrdy) {
                 master_worker_session_t *indexrdy_session = get_master_worker_session(master_ctx, DBW, indexrdy);
                 if (session == NULL) {
-                    CLOSE_IPC_PROTOCOL(&received_protocol);
+                    CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
                     return FAILURE;
                 }
                 if (!indexrdy_session->isready) {
@@ -267,11 +270,11 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
             LOG_INFO("%s====================================================", label);
             LOG_INFO("%sAll Workers Is READY [Secure]", label);
             LOG_INFO("%s====================================================", label);
-            CLOSE_IPC_PROTOCOL(&received_protocol);
+            CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
             return SUCCESS_WRKSRDY;
         }
     }
 //---------------------------------------------------------------------- 
-    CLOSE_IPC_PROTOCOL(&received_protocol);
+    CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
     return SUCCESS;
 }

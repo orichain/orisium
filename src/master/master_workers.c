@@ -30,8 +30,8 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
     uds_pair_pid_t *upp = &session->upp;
     worker_security_t *security = &session->security;
     worker_rekeying_t *rekeying = &session->rekeying;
-    cleanup_oricle_long_double(&session->avgtt);
-    cleanup_oricle_double(&session->healthy);
+    cleanup_oricle_long_double(&master_ctx->oritlsf_pool, &session->avgtt);
+    cleanup_oricle_double(&master_ctx->oritlsf_pool, &session->healthy);
     session->isactive = false;
     session->ishealthy = false;
     session->isready = false;
@@ -44,19 +44,19 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
     security->local_ctr = (uint32_t)0;
     memset(security->remote_nonce, 0, AES_NONCE_BYTES);
     security->remote_ctr = (uint32_t)0;
-    oritlsf_free(&master_ctx->oritlsf_pool, security->kem_publickey);
-    oritlsf_free(&master_ctx->oritlsf_pool, security->kem_ciphertext);
-    oritlsf_free(&master_ctx->oritlsf_pool, security->kem_sharedsecret);
-    oritlsf_free(&master_ctx->oritlsf_pool, security->aes_key);
-    oritlsf_free(&master_ctx->oritlsf_pool, security->mac_key);
-    oritlsf_free(&master_ctx->oritlsf_pool, security->local_nonce);
-    oritlsf_free(&master_ctx->oritlsf_pool, security->remote_nonce);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->kem_publickey);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->kem_ciphertext);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->kem_sharedsecret);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->aes_key);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->mac_key);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->local_nonce);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->remote_nonce);
     security->hello1_rcvd = false;
     security->hello1_ack_sent = false;
     security->hello2_rcvd = false;
     security->hello2_ack_sent = false;
     rekeying->is_rekeying = false;
-    ipc_cleanup_protocol_queue(&rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail);
+    ipc_cleanup_protocol_queue(&master_ctx->oritlsf_pool, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail);
     async_delete_event(label, &master_ctx->master_async, &upp->uds[0]);
     CLOSE_UDS(&upp->uds[0]);
     CLOSE_UDS(&upp->uds[1]);
@@ -164,13 +164,13 @@ void close_master_resource(master_context_t *master_ctx, worker_type_t wot, uint
     security->local_ctr = (uint32_t)0;
     memset(security->remote_nonce, 0, AES_NONCE_BYTES);
     security->remote_ctr = (uint32_t)0;
-    oritlsf_free(&master_ctx->oritlsf_pool, security->kem_publickey);
-    oritlsf_free(&master_ctx->oritlsf_pool, security->kem_ciphertext);
-    oritlsf_free(&master_ctx->oritlsf_pool, security->kem_sharedsecret);
-    oritlsf_free(&master_ctx->oritlsf_pool, security->aes_key);
-    oritlsf_free(&master_ctx->oritlsf_pool, security->mac_key);
-    oritlsf_free(&master_ctx->oritlsf_pool, security->local_nonce);
-    oritlsf_free(&master_ctx->oritlsf_pool, security->remote_nonce);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->kem_publickey);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->kem_ciphertext);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->kem_sharedsecret);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->aes_key);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->mac_key);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->local_nonce);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->remote_nonce);
 }
 
 status_t setup_fork_worker(const char* label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
@@ -432,8 +432,8 @@ status_t calculate_avgtt(const char *label, master_context_t *master_ctx, worker
         sizeof(char)
     );
 	snprintf(desc, needed + 1, "ORICLE => AVGTT %s-%d", worker_name, index);
-    calculate_oricle_long_double(label, desc, oricle, current_avgtt_measurement, (long double)0);
-    oritlsf_free(&master_ctx->oritlsf_pool, desc);
+    calculate_oricle_long_double(label, &master_ctx->oritlsf_pool, desc, oricle, current_avgtt_measurement, (long double)0);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&desc);
     return SUCCESS;
 }
 
@@ -472,11 +472,11 @@ status_t calculate_healthy(const char* label, master_context_t *master_ctx, work
     );
 	snprintf(desc, needed + 1, "ORICLE => HEALTHY %s-%d", worker_name, index);
     #if defined(LONGINTV_TEST)
-    calculate_oricle_doubleX(label, desc, oricle, current_health_measurement, (double)200);
+    calculate_oricle_doubleX(label, &master_ctx->oritlsf_pool, desc, oricle, current_health_measurement, (double)200);
     #else
-    calculate_oricle_double(label, desc, oricle, current_health_measurement, (double)200);
+    calculate_oricle_double(label, &master_ctx->oritlsf_pool, desc, oricle, current_health_measurement, (double)200);
     #endif
-    oritlsf_free(&master_ctx->oritlsf_pool, desc);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&desc);
     *ishealthy = (oricle->value_prediction >= HEALTHY_THRESHOLD);
     metrics->last_checkhealthy = now_ns;
     metrics->count_ack = (double)0;

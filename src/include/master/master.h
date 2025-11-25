@@ -15,7 +15,6 @@
 #include "types.h"
 #include "oritw.h"
 #include "oritlsf.h"
-#include "orilink/protocol.h"
 #include "oritw/timer_id.h"
 
 typedef struct {
@@ -117,8 +116,6 @@ typedef struct {
 //----------------------------------------------------------------------
     ori_timer_wheels_t timer;
 //----------------------------------------------------------------------
-    orilink_raw_protocol_pool_t orilink_raw_protocol_pool;
-    p8zs_pool_t orilink_p8zs_pool;
     uint8_t *arena_buffer;
     oritlsf_pool_t oritlsf_pool;
 } master_context_t;

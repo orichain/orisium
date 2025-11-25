@@ -29,6 +29,7 @@
 #include "constants.h"
 #include "pqc.h"
 #include "xorshiro128plus.h"
+#include "oritlsf.h"
 
 static inline size_t calculate_ipc_payload_fixed_size(const char *label, ipc_protocol_type_t type, bool plus_header) {
 	size_t payload_fixed_size = 0;
@@ -118,41 +119,19 @@ static inline size_t_status_t calculate_ipc_payload_size(const char *label, cons
     return result;
 }
 
-static inline ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, const ipc_protocol_t* p, uint8_t** ptr_buffer, size_t* buffer_size) {
+static inline ssize_t_status_t ipc_serialize(const char *label, oritlsf_pool_t *pool, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, const ipc_protocol_t *p, uint8_t **ptr_buffer, size_t buffer_size) {
     ssize_t_status_t result;
     result.r_ssize_t = 0;
     result.status = FAILURE;
-    if (!p || !ptr_buffer || !buffer_size) {
+    if (!p || !ptr_buffer) {
         return result;
     }
-    size_t_status_t psize = calculate_ipc_payload_size(label, p);
-    if (psize.status != SUCCESS) {
-		result.status = psize.status;
-		return result;
-	}
-    size_t total_required_size = psize.r_size_t;
-    if (total_required_size == 0) {
-        LOG_ERROR("%sCalculated required size is 0.", label);
-        result.status = FAILURE;
-        return result;
-    }
-    uint8_t* current_buffer = *ptr_buffer;
-    if (current_buffer == NULL || *buffer_size < total_required_size) {
-        LOG_DEBUG("%sAllocating/resizing buffer. Old size: %zu, Required: %zu", label, *buffer_size, total_required_size);
-        uint8_t* new_buffer = realloc(current_buffer, total_required_size);
-        if (!new_buffer) {
-            LOG_ERROR("%sError reallocating buffer for serialization: %s", label, strerror(errno));
-            result.status = FAILURE_NOMEM;
-            return result;
-        }
-        *ptr_buffer = new_buffer;
-        current_buffer = new_buffer;
-        *buffer_size = total_required_size;
-    } else {
-        LOG_DEBUG("%sBuffer size %zu is sufficient for %zu bytes. No reallocation needed.", label, *buffer_size, total_required_size);
-    }
+    uint8_t *current_buffer = *ptr_buffer;
     size_t offset = 0;
-    if (CHECK_BUFFER_BOUNDS(offset, AES_TAG_BYTES, *buffer_size) != SUCCESS) {
+//----------------------------------------------------------------------
+// Mac
+//----------------------------------------------------------------------    
+    if (CHECK_BUFFER_BOUNDS(offset, AES_TAG_BYTES, buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
     }
@@ -161,7 +140,7 @@ static inline ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes
 //----------------------------------------------------------------------
 // Counter
 //----------------------------------------------------------------------    
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint32_t), *buffer_size) != SUCCESS) {
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint32_t), buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
     }
@@ -170,25 +149,25 @@ static inline ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes
     memcpy(current_buffer + offset, &ctr_be, sizeof(uint32_t));
     offset += sizeof(uint32_t);
 //----------------------------------------------------------------------    
-    if (CHECK_BUFFER_BOUNDS(offset, IPC_VERSION_BYTES, *buffer_size) != SUCCESS) {
+    if (CHECK_BUFFER_BOUNDS(offset, IPC_VERSION_BYTES, buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
     }
     memcpy(current_buffer + offset, p->version, IPC_VERSION_BYTES);
     offset += IPC_VERSION_BYTES;
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
     }
     memcpy(current_buffer + offset, (uint8_t *)&p->type, sizeof(uint8_t));
     offset += sizeof(uint8_t);
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
     }
     memcpy(current_buffer + offset, (uint8_t *)&p->wot, sizeof(uint8_t));
     offset += sizeof(uint8_t);
-    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), *buffer_size) != SUCCESS) {
+    if (CHECK_BUFFER_BOUNDS(offset, sizeof(uint8_t), buffer_size) != SUCCESS) {
         result.status = FAILURE_OOBUF;
         return result;
     }
@@ -197,34 +176,34 @@ static inline ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes
     status_t result_pyld = FAILURE;
     switch (p->type) {
         case IPC_MASTER_WORKER_INFO:
-            result_pyld = ipc_serialize_master_worker_info(label, p->payload.ipc_master_worker_info, current_buffer, *buffer_size, &offset);
+            result_pyld = ipc_serialize_master_worker_info(label, p->payload.ipc_master_worker_info, current_buffer, buffer_size, &offset);
             break;
         case IPC_WORKER_MASTER_TASK_INFO:
-            result_pyld = ipc_serialize_worker_master_task_info(label, p->payload.ipc_worker_master_task_info, current_buffer, *buffer_size, &offset);
+            result_pyld = ipc_serialize_worker_master_task_info(label, p->payload.ipc_worker_master_task_info, current_buffer, buffer_size, &offset);
             break;
         case IPC_WORKER_MASTER_HEARTBEAT:
-            result_pyld = ipc_serialize_worker_master_heartbeat(label, p->payload.ipc_worker_master_heartbeat, current_buffer, *buffer_size, &offset);
+            result_pyld = ipc_serialize_worker_master_heartbeat(label, p->payload.ipc_worker_master_heartbeat, current_buffer, buffer_size, &offset);
             break;
         case IPC_MASTER_COW_CONNECT:
-            result_pyld = ipc_serialize_master_cow_connect(label, p->payload.ipc_master_cow_connect, current_buffer, *buffer_size, &offset);
+            result_pyld = ipc_serialize_master_cow_connect(label, p->payload.ipc_master_cow_connect, current_buffer, buffer_size, &offset);
             break;
         case IPC_UDP_DATA:
-            result_pyld = ipc_serialize_udp_data(label, p->payload.ipc_udp_data, current_buffer, *buffer_size, &offset);
+            result_pyld = ipc_serialize_udp_data(label, p->payload.ipc_udp_data, current_buffer, buffer_size, &offset);
             break;
         case IPC_UDP_DATA_ACK:
-            result_pyld = ipc_serialize_udp_data_ack(label, p->payload.ipc_udp_data_ack, current_buffer, *buffer_size, &offset);
+            result_pyld = ipc_serialize_udp_data_ack(label, p->payload.ipc_udp_data_ack, current_buffer, buffer_size, &offset);
             break;
         case IPC_WORKER_MASTER_HELLO1:
-            result_pyld = ipc_serialize_worker_master_hello1(label, p->payload.ipc_worker_master_hello1, current_buffer, *buffer_size, &offset);
+            result_pyld = ipc_serialize_worker_master_hello1(label, p->payload.ipc_worker_master_hello1, current_buffer, buffer_size, &offset);
             break;
         case IPC_WORKER_MASTER_HELLO2:
-            result_pyld = ipc_serialize_worker_master_hello2(label, p->payload.ipc_worker_master_hello2, current_buffer, *buffer_size, &offset);
+            result_pyld = ipc_serialize_worker_master_hello2(label, p->payload.ipc_worker_master_hello2, current_buffer, buffer_size, &offset);
             break;
         case IPC_MASTER_WORKER_HELLO1_ACK:
-            result_pyld = ipc_serialize_master_worker_hello1_ack(label, p->payload.ipc_master_worker_hello1_ack, current_buffer, *buffer_size, &offset);
+            result_pyld = ipc_serialize_master_worker_hello1_ack(label, p->payload.ipc_master_worker_hello1_ack, current_buffer, buffer_size, &offset);
             break;
         case IPC_MASTER_WORKER_HELLO2_ACK:
-            result_pyld = ipc_serialize_master_worker_hello2_ack(label, p->payload.ipc_master_worker_hello2_ack, current_buffer, *buffer_size, &offset);
+            result_pyld = ipc_serialize_master_worker_hello2_ack(label, p->payload.ipc_master_worker_hello2_ack, current_buffer, buffer_size, &offset);
             break;
             
         default:
@@ -257,6 +236,7 @@ static inline ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes
         uint8_t *encrypted_data = current_buffer + data_offset;
         if (encrypt_decrypt_256(
                 label,
+                pool,
                 key_aes,
                 nonce,
                 &pctr,
@@ -304,7 +284,7 @@ static inline ssize_t_status_t ipc_serialize(const char *label, uint8_t* key_aes
     return result;
 }
 
-static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t* key_aes, uint8_t* nonce, uint32_t *ctr, uint8_t* buffer, size_t len) {
+static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, oritlsf_pool_t *pool, uint8_t* key_aes, uint8_t* nonce, uint32_t *ctr, uint8_t* buffer, size_t len) {
     ipc_protocol_t_status_t result;
     result.r_ipc_protocol_t = NULL;
     result.status = FAILURE;
@@ -319,7 +299,7 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t
         result.status = FAILURE_OOBUF;
         return result;
     }
-    ipc_protocol_t* p = (ipc_protocol_t*)calloc(1, sizeof(ipc_protocol_t));
+    ipc_protocol_t* p = (ipc_protocol_t*)oritlsf_calloc(pool, 1, sizeof(ipc_protocol_t));
     if (!p) {
         LOG_ERROR("%sFailed to allocate ipc_protocol_t. %s", label, strerror(errno));
         result.status = FAILURE_NOMEM;
@@ -355,6 +335,7 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t
         uint8_t *decrypted_data = buffer + data_offset;
         if (encrypt_decrypt_256(
                 label,
+                pool,
                 key_aes,
                 nonce,
                 &p->ctr,
@@ -364,7 +345,7 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t
             ) != SUCCESS
         )
         {
-            CLOSE_IPC_PROTOCOL(&p);
+            CLOSE_IPC_PROTOCOL(pool, &p);
             result.status = FAILURE;
             return result;
         }
@@ -377,14 +358,14 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t
         case IPC_MASTER_WORKER_INFO: {
             if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_MASTER_WORKER_INFO fixed header.", label);
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_master_worker_info_t *payload = (ipc_master_worker_info_t*) calloc(1, sizeof(ipc_master_worker_info_t));
+            ipc_master_worker_info_t *payload = (ipc_master_worker_info_t*)oritlsf_calloc(pool, 1, sizeof(ipc_master_worker_info_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_master_worker_info_t without FAM. %s", label, strerror(errno));
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
@@ -395,14 +376,14 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t
         case IPC_WORKER_MASTER_TASK_INFO: {
             if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_WORKER_MASTER_TASK_INFO fixed header.", label);
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_worker_master_task_info_t *payload = (ipc_worker_master_task_info_t*) calloc(1, sizeof(ipc_worker_master_task_info_t));
+            ipc_worker_master_task_info_t *payload = (ipc_worker_master_task_info_t*)oritlsf_calloc(pool, 1, sizeof(ipc_worker_master_task_info_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_worker_master_task_info_t without FAM. %s", label, strerror(errno));
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
@@ -413,14 +394,14 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t
         case IPC_WORKER_MASTER_HEARTBEAT: {
             if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_WORKER_MASTER_HEARTBEAT fixed header.", label);
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_worker_master_heartbeat_t *payload = (ipc_worker_master_heartbeat_t*) calloc(1, sizeof(ipc_worker_master_heartbeat_t));
+            ipc_worker_master_heartbeat_t *payload = (ipc_worker_master_heartbeat_t*)oritlsf_calloc(pool, 1, sizeof(ipc_worker_master_heartbeat_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_worker_master_heartbeat_t without FAM. %s", label, strerror(errno));
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
@@ -431,14 +412,14 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t
         case IPC_MASTER_COW_CONNECT: {
             if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_MASTER_COW_CONNECT fixed header.", label);
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_master_cow_connect_t *payload = (ipc_master_cow_connect_t*) calloc(1, sizeof(ipc_master_cow_connect_t));
+            ipc_master_cow_connect_t *payload = (ipc_master_cow_connect_t*)oritlsf_calloc(pool, 1, sizeof(ipc_master_cow_connect_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_master_cow_connect_t without FAM. %s", label, strerror(errno));
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
@@ -449,7 +430,7 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t
         case IPC_UDP_DATA: {
             if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_UDP_DATA fixed header.", label);
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
@@ -457,10 +438,10 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t
             uint16_t actual_data_len_be;
             memcpy(&actual_data_len_be, buffer + current_buffer_offset + fixed_header_blen_size, sizeof(uint16_t));
             uint16_t actual_data_len = be16toh(actual_data_len_be);
-            ipc_udp_data_t *payload = (ipc_udp_data_t*) calloc(1, sizeof(ipc_udp_data_t) + actual_data_len);
+            ipc_udp_data_t *payload = (ipc_udp_data_t*)oritlsf_calloc(pool, 1, sizeof(ipc_udp_data_t) + actual_data_len);
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_udp_data_t with FAM. %s", label, strerror(errno));
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
@@ -471,14 +452,14 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t
         case IPC_UDP_DATA_ACK: {
             if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_UDP_DATA_ACK fixed header.", label);
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_udp_data_ack_t *payload = (ipc_udp_data_ack_t*) calloc(1, sizeof(ipc_udp_data_ack_t));
+            ipc_udp_data_ack_t *payload = (ipc_udp_data_ack_t*)oritlsf_calloc(pool, 1, sizeof(ipc_udp_data_ack_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_udp_data_ack_t without FAM. %s", label, strerror(errno));
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
@@ -489,14 +470,14 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t
         case IPC_WORKER_MASTER_HELLO1: {
             if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_WORKER_MASTER_HELLO1 fixed header.", label);
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_worker_master_hello1_t *payload = (ipc_worker_master_hello1_t*) calloc(1, sizeof(ipc_worker_master_hello1_t));
+            ipc_worker_master_hello1_t *payload = (ipc_worker_master_hello1_t*)oritlsf_calloc(pool, 1, sizeof(ipc_worker_master_hello1_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_worker_master_hello1_t without FAM. %s", label, strerror(errno));
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
@@ -507,14 +488,14 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t
         case IPC_WORKER_MASTER_HELLO2: {
             if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_WORKER_MASTER_HELLO1 fixed header.", label);
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_worker_master_hello2_t *payload = (ipc_worker_master_hello2_t*) calloc(1, sizeof(ipc_worker_master_hello2_t));
+            ipc_worker_master_hello2_t *payload = (ipc_worker_master_hello2_t*)oritlsf_calloc(pool, 1, sizeof(ipc_worker_master_hello2_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_worker_master_hello2_t without FAM. %s", label, strerror(errno));
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
@@ -525,14 +506,14 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t
         case IPC_MASTER_WORKER_HELLO1_ACK: {
             if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_MASTER_WORKER_HELLO1_ACK fixed header.", label);
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_master_worker_hello1_ack_t *payload = (ipc_master_worker_hello1_ack_t*) calloc(1, sizeof(ipc_master_worker_hello1_ack_t));
+            ipc_master_worker_hello1_ack_t *payload = (ipc_master_worker_hello1_ack_t*)oritlsf_calloc(pool, 1, sizeof(ipc_master_worker_hello1_ack_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_master_worker_hello1_ack_t without FAM. %s", label, strerror(errno));
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
@@ -543,14 +524,14 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t
         case IPC_MASTER_WORKER_HELLO2_ACK: {
             if (current_buffer_offset + fixed_payload_size > len) {
                 LOG_ERROR("%sBuffer terlalu kecil untuk IPC_MASTER_WORKER_HELLO2_ACK fixed header.", label);
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_master_worker_hello2_ack_t *payload = (ipc_master_worker_hello2_ack_t*) calloc(1, sizeof(ipc_master_worker_hello2_ack_t));
+            ipc_master_worker_hello2_ack_t *payload = (ipc_master_worker_hello2_ack_t*)oritlsf_calloc(pool, 1, sizeof(ipc_master_worker_hello2_ack_t));
             if (!payload) {
                 LOG_ERROR("%sFailed to allocate ipc_master_worker_hello2_ack_t without FAM. %s", label, strerror(errno));
-                CLOSE_IPC_PROTOCOL(&p);
+                CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
@@ -561,12 +542,12 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t
         default:
             LOG_ERROR("%sUnknown protocol type for deserialization: 0x%02x", label, p->type);
             result.status = FAILURE_IPYLD;
-            CLOSE_IPC_PROTOCOL(&p);
+            CLOSE_IPC_PROTOCOL(pool, &p);
             return result;
     }
     if (result_pyld != SUCCESS) {
         LOG_ERROR("%sPayload deserialization failed with status %d.", label, result_pyld);
-        CLOSE_IPC_PROTOCOL(&p);
+        CLOSE_IPC_PROTOCOL(pool, &p);
         result.status = FAILURE_IPYLD;
         return result;
     }
@@ -587,28 +568,36 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, uint8_t
     return result;
 }
 
-static inline ssize_t_status_t send_ipc_protocol_message(const char *label, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, int *uds_fd, const ipc_protocol_t* p) {
+static inline ssize_t_status_t send_ipc_protocol_message(const char *label, oritlsf_pool_t *pool, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, int *uds_fd, const ipc_protocol_t* p) {
 	ssize_t_status_t result;
     result.r_ssize_t = 0;
     result.status = FAILURE;
-    uint8_t* serialized_ipc_data_buffer = NULL;
-    size_t serialized_ipc_data_len = 0;
     
-    ssize_t_status_t serialize_result = ipc_serialize(label, key_aes, key_mac, nonce, ctr, p, &serialized_ipc_data_buffer, &serialized_ipc_data_len);
+    size_t_status_t psize = calculate_ipc_payload_size(label, p);
+    if (psize.status != SUCCESS) {
+		return result;
+	}
+    size_t serialized_ipc_data_len = psize.r_size_t;
+    if (serialized_ipc_data_len == 0) {
+        LOG_ERROR("%sCalculated required size is 0.", label);
+        return result;
+    }
+    uint8_t *serialized_ipc_data_buffer = (uint8_t *)oritlsf_calloc(pool, 1, serialized_ipc_data_len);
+    if (!serialized_ipc_data_buffer) {
+		result.status = FAILURE_NOMEM;
+		return result;
+	}
+    ssize_t_status_t serialize_result = ipc_serialize(label, pool, key_aes, key_mac, nonce, ctr, p, &serialized_ipc_data_buffer, serialized_ipc_data_len);
     if (serialize_result.status != SUCCESS) {
         LOG_ERROR("%sError serializing IPC protocol: %d", serialize_result.status);
-        if (serialized_ipc_data_buffer) {
-            free(serialized_ipc_data_buffer);
-        }
+        oritlsf_free(pool, (void **)&serialized_ipc_data_buffer);
         return result;
     }
     size_t total_message_len_to_send = IPC_LENGTH_PREFIX_BYTES + serialized_ipc_data_len;
-    uint8_t *final_send_buffer = (uint8_t *)malloc(total_message_len_to_send);
+    uint8_t *final_send_buffer = (uint8_t *)oritlsf_calloc(pool, 1, total_message_len_to_send);
     if (!final_send_buffer) {
         LOG_ERROR("%smalloc failed for final_send_buffer. %s", label, strerror(errno));
-        if (serialized_ipc_data_buffer) {
-            free(serialized_ipc_data_buffer);
-        }
+        oritlsf_free(pool, (void **)&serialized_ipc_data_buffer);
         return result;
     }
     size_t offset = 0;
@@ -631,35 +620,27 @@ static inline ssize_t_status_t send_ipc_protocol_message(const char *label, uint
     } while (result.r_ssize_t == -1 && errno == EINTR);
     if (result.r_ssize_t == -1) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            free(final_send_buffer);
-            if (serialized_ipc_data_buffer) {
-                free(serialized_ipc_data_buffer);
-            }
+            oritlsf_free(pool, (void **)&final_send_buffer);
+            oritlsf_free(pool, (void **)&serialized_ipc_data_buffer);
             result.status = SUCCESS;
             return result;
         }
         LOG_ERROR("%ssend_ipc_protocol_message sendmsg. %s", label, strerror(errno));
-        free(final_send_buffer);
-        if (serialized_ipc_data_buffer) {
-            free(serialized_ipc_data_buffer);
-        }
+        oritlsf_free(pool, (void **)&final_send_buffer);
+        oritlsf_free(pool, (void **)&serialized_ipc_data_buffer);
         result.status = FAILURE;
         return result;
     }
     if (result.r_ssize_t != (ssize_t)total_message_len_to_send) {
         LOG_ERROR("%ssend_ipc_protocol_message sendmsg partial write %zd from %zu byte!",
                 label, result.r_ssize_t, total_message_len_to_send);
-        free(final_send_buffer);
-        if (serialized_ipc_data_buffer) {
-            free(serialized_ipc_data_buffer);
-        }
+        oritlsf_free(pool, (void **)&final_send_buffer);
+        oritlsf_free(pool, (void **)&serialized_ipc_data_buffer);
         result.status = FAILURE;
         return result;
     }    
-    free(final_send_buffer);
-    if (serialized_ipc_data_buffer) {
-        free(serialized_ipc_data_buffer);
-    }
+    oritlsf_free(pool, (void **)&final_send_buffer);
+    oritlsf_free(pool, (void **)&serialized_ipc_data_buffer);
     result.status = SUCCESS;
     return result;
 }
@@ -814,10 +795,15 @@ static inline status_t ipc_read_cleartext_header(const char *label, ipc_raw_prot
     return SUCCESS;
 }
 
-static inline ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, int *uds_fd) {
-    ipc_raw_protocol_t_status_t result;
+static inline ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, oritlsf_pool_t *pool, int *uds_fd) {
+	ipc_raw_protocol_t_status_t result;
     result.status = FAILURE;
-    result.r_ipc_raw_protocol_t = NULL;
+    result.r_ipc_raw_protocol_t = (ipc_raw_protocol_t *)oritlsf_calloc(pool, 1, sizeof(ipc_raw_protocol_t));
+    if (!result.r_ipc_raw_protocol_t) {
+        result.status = FAILURE_NOMEM;
+        return result;
+    }
+    
     uint32_t total_ipc_payload_len_be;
     char temp_len_prefix_buf[IPC_LENGTH_PREFIX_BYTES];
     struct msghdr msg_prefix = {0};
@@ -829,47 +815,45 @@ static inline ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const
     char cmsgbuf_prefix[CMSG_SPACE(sizeof(int))];
     msg_prefix.msg_control = cmsgbuf_prefix;
     msg_prefix.msg_controllen = sizeof(cmsgbuf_prefix);
-    LOG_DEBUG("%sTahap 1: Membaca length prefix dan potensi FD (%zu byte).", label, IPC_LENGTH_PREFIX_BYTES);
     ssize_t bytes_read_prefix_and_fd = recvmsg(*uds_fd, &msg_prefix, MSG_WAITALL);
     if (bytes_read_prefix_and_fd < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
+			oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
 			result.status = FAILURE_EAGNEWBLK;
             return result;
         } else {
-            LOG_ERROR("%sreceive_ipc_raw_protocol_message recvmsg (length prefix + FD). %s", label, strerror(errno));
+            oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
             result.status = FAILURE;
             return result;
         }
     }
     if (bytes_read_prefix_and_fd != (ssize_t)IPC_LENGTH_PREFIX_BYTES) {
-        LOG_ERROR("%sGagal membaca length prefix sepenuhnya. Diharapkan %zu byte, diterima %zd.",
-                label, IPC_LENGTH_PREFIX_BYTES, bytes_read_prefix_and_fd);
+        oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
         result.status = FAILURE_OOBUF;
         return result;
     }
     memcpy(&total_ipc_payload_len_be, temp_len_prefix_buf, IPC_LENGTH_PREFIX_BYTES);
     uint32_t total_ipc_payload_len = be32toh(total_ipc_payload_len_be);
-    LOG_DEBUG("%sDitemukan panjang payload IPC: %u byte.", label, total_ipc_payload_len);
     if (total_ipc_payload_len == 0) {
-        LOG_ERROR("%sPanjang payload IPC adalah 0. Tidak ada data untuk dibaca.", label);
+        oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
         result.status = FAILURE_BAD_PROTOCOL;
         return result;
     }
-    uint8_t *full_ipc_payload_buffer = (uint8_t *)malloc(total_ipc_payload_len);
-    if (!full_ipc_payload_buffer) {
-        LOG_ERROR("%sreceive_ipc_raw_protocol_message: malloc failed for full_ipc_payload_buffer. %s", label, strerror(errno));
+    result.r_ipc_raw_protocol_t->n = (uint32_t)total_ipc_payload_len;
+    result.r_ipc_raw_protocol_t->recv_buffer = (uint8_t *)oritlsf_calloc(pool, 1, total_ipc_payload_len);
+    if (!result.r_ipc_raw_protocol_t->recv_buffer) {
+		oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
         result.status = FAILURE_NOMEM;
         return result;
     }
     struct msghdr msg_payload = {0};
     struct iovec iov_payload[1];
-    iov_payload[0].iov_base = full_ipc_payload_buffer;
+    iov_payload[0].iov_base = result.r_ipc_raw_protocol_t->recv_buffer;
     iov_payload[0].iov_len = total_ipc_payload_len;
     msg_payload.msg_iov = iov_payload;
     msg_payload.msg_iovlen = 1;
     msg_payload.msg_control = NULL;
     msg_payload.msg_controllen = 0;
-    LOG_DEBUG("%sTahap 2: Membaca %u byte payload IPC.", label, total_ipc_payload_len);
     ssize_t bytes_read_payload = recvmsg(*uds_fd, &msg_payload, MSG_WAITALL);
     const size_t min_size = AES_TAG_BYTES +
                             sizeof(uint32_t) +
@@ -879,38 +863,27 @@ static inline ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const
                             sizeof(uint8_t);
     if (bytes_read_payload < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-			free(full_ipc_payload_buffer);
+			if (result.r_ipc_raw_protocol_t) oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t->recv_buffer);
+			oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
 			result.status = FAILURE_EAGNEWBLK;
             return result;
         } else {
-            LOG_ERROR("%sreceive_ipc_raw_protocol_message recvmsg (payload). %s", label, strerror(errno));
-			free(full_ipc_payload_buffer);
+            if (result.r_ipc_raw_protocol_t) oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t->recv_buffer);
+			oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
 			result.status = FAILURE;
 			return result;
         }
     } else if (bytes_read_payload < (ssize_t)min_size) {
-        LOG_ERROR("%sreceive_ipc_raw_protocol_message received 0 bytes (unexpected for IPC).", label);
-        free(full_ipc_payload_buffer);
+        if (result.r_ipc_raw_protocol_t) oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t->recv_buffer);
+		oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
         result.status = FAILURE_OOBUF;
         return result;
     } else if (bytes_read_payload != (ssize_t)total_ipc_payload_len) {
-        LOG_ERROR("%sPayload IPC tidak lengkap. Diharapkan %u byte, diterima %zd.", label, total_ipc_payload_len, bytes_read_payload);
-        free(full_ipc_payload_buffer);
+        if (result.r_ipc_raw_protocol_t) oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t->recv_buffer);
+		oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
         result.status = FAILURE_OOBUF;
         return result;
     }
-    ipc_raw_protocol_t* r = (ipc_raw_protocol_t*)calloc(1, sizeof(ipc_raw_protocol_t));
-    if (!r) {
-        LOG_ERROR("%sFailed to allocate ipc_raw_protocol_t. %s", label, strerror(errno));
-        free(full_ipc_payload_buffer);
-        result.status = FAILURE_NOMEM;
-        return result;
-    }
-    r->recv_buffer = full_ipc_payload_buffer;
-    r->n = (uint32_t)bytes_read_payload;
-    full_ipc_payload_buffer = NULL;
-    bytes_read_payload = 0;
-    result.r_ipc_raw_protocol_t = r;
     result.status = SUCCESS;
     return result;
 }
@@ -934,6 +907,7 @@ static inline status_t ipc_add_tail_protocol_queue_internal(
 
 static inline status_t ipc_add_tail_protocol_queue(
     const char *label,
+    oritlsf_pool_t *pool, 
     worker_type_t wot,
     uint8_t index,
     int *uds_fd,
@@ -942,7 +916,7 @@ static inline status_t ipc_add_tail_protocol_queue(
     ipc_protocol_queue_t **tail
 )
 {
-    ipc_protocol_queue_t *new_queue = (ipc_protocol_queue_t *)calloc(1, sizeof(ipc_protocol_queue_t));
+    ipc_protocol_queue_t *new_queue = (ipc_protocol_queue_t *)oritlsf_calloc(pool, 1, sizeof(ipc_protocol_queue_t));
     if (!new_queue) {
         LOG_ERROR("%sFailed to allocate ipc_protocol_queue_t buffer. %s", label, strerror(errno));
         return FAILURE;
@@ -973,6 +947,7 @@ static inline status_t ipc_add_head_protocol_queue_internal(
 
 static inline status_t ipc_add_head_protocol_queue(
     const char *label,
+    oritlsf_pool_t *pool, 
     worker_type_t wot,
     uint8_t index,
     int *uds_fd,
@@ -981,7 +956,7 @@ static inline status_t ipc_add_head_protocol_queue(
     ipc_protocol_queue_t **tail
 )
 {
-    ipc_protocol_queue_t *new_queue = (ipc_protocol_queue_t *)calloc(1, sizeof(ipc_protocol_queue_t));
+    ipc_protocol_queue_t *new_queue = (ipc_protocol_queue_t *)oritlsf_calloc(pool, 1, sizeof(ipc_protocol_queue_t));
     if (!new_queue) {
         LOG_ERROR("%sFailed to allocate ipc_protocol_queue_t buffer. %s", label, strerror(errno));
         return FAILURE;
@@ -1038,6 +1013,7 @@ static inline status_t ipc_insert_after_protocol_queue(
 }
 
 static inline void ipc_remove_protocol_queue(
+	oritlsf_pool_t *pool, 
     ipc_protocol_queue_t **head,
     ipc_protocol_queue_t **tail,
     ipc_protocol_queue_t *queue
@@ -1053,7 +1029,7 @@ static inline void ipc_remove_protocol_queue(
         queue->next->prev = queue->prev;
     else
         *tail = queue->prev;
-    CLOSE_IPC_PROTOCOL(&queue->p);
+    CLOSE_IPC_PROTOCOL(pool, &queue->p);
     queue->next = NULL;
     queue->prev = NULL;
     free(queue);
@@ -1092,6 +1068,7 @@ static inline ipc_protocol_queue_t *ipc_pop_tail_protocol_queue(
 }
 
 static inline void ipc_cleanup_protocol_queue(
+	oritlsf_pool_t *pool, 
     ipc_protocol_queue_t **head,
     ipc_protocol_queue_t **tail
 )
@@ -1099,7 +1076,7 @@ static inline void ipc_cleanup_protocol_queue(
     ipc_protocol_queue_t *cur = *head;
     while (cur) {
         ipc_protocol_queue_t *next = cur->next;
-        CLOSE_IPC_PROTOCOL(&cur->p);
+        CLOSE_IPC_PROTOCOL(pool, &cur->p);
         free(cur);
         cur = next;
     }

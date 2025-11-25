@@ -10,23 +10,23 @@
 #include "ipc/protocol.h"
 
 status_t handle_master_ipc_heartbeat(const char *label, master_context_t *master_ctx, worker_type_t rcvd_wot, uint8_t rcvd_index, worker_security_t *security, ipc_raw_protocol_t_status_t *ircvdi) {
-    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label,
+    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label, &master_ctx->oritlsf_pool,
         security->aes_key, security->remote_nonce, &security->remote_ctr,
         (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
     );
     master_worker_session_t *session = get_master_worker_session(master_ctx, rcvd_wot, rcvd_index);
     if (session == NULL) {
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
         return FAILURE;
     }
     const char *worker_name = get_master_worker_name(rcvd_wot);
     if (deserialized_ircvdi.status != SUCCESS) {
         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", label, deserialized_ircvdi.status);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
         return deserialized_ircvdi.status;
     } else {
         LOG_DEBUG("%sipc_deserialize BERHASIL.", label);
-        CLOSE_IPC_RAW_PROTOCOL(&ircvdi->r_ipc_raw_protocol_t);
+        CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
     }           
     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
     ipc_worker_master_heartbeat_t *iheartbeati = received_protocol->payload.ipc_worker_master_heartbeat;
@@ -37,6 +37,6 @@ status_t handle_master_ipc_heartbeat(const char *label, master_context_t *master
     double hb_interval = iheartbeati->hb_interval;
     session->metrics.sum_hb_interval += hb_interval;
     session->metrics.hb_interval = hb_interval;
-    CLOSE_IPC_PROTOCOL(&received_protocol);
+    CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
     return SUCCESS;
 }
