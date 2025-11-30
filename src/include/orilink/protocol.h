@@ -50,6 +50,10 @@ typedef struct {
     uint32_t local_ctr;
     uint8_t *remote_nonce;
     uint32_t remote_ctr;
+    uint8_t *local_data_nonce[PARALLEL_DATA_WINDOW_SIZE];
+    uint32_t local_data_ctr[PARALLEL_DATA_WINDOW_SIZE];
+    uint8_t *remote_data_nonce[PARALLEL_DATA_WINDOW_SIZE];
+    uint32_t remote_data_ctr[PARALLEL_DATA_WINDOW_SIZE];
 } orilink_security_t;
 
 typedef struct {
@@ -112,6 +116,7 @@ typedef struct {
         sizeof(uint64_t) +
         AES_TAG_BYTES
     ];
+    uint8_t data_nonce[128 * AES_NONCE_BYTES];
 } orilink_hello4_t;
 
 typedef struct {

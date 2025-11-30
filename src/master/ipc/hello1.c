@@ -69,16 +69,12 @@ status_t handle_master_ipc_hello1(const char *label, master_context_t *master_ct
 //----------------------------------------------------------------------
     memcpy(security->kem_sharedsecret, kem_sharedsecret, KEM_SHAREDSECRET_BYTES);
     memset(kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
-    uint8_t aes_key[HASHES_BYTES];
-    kdf1(security->kem_sharedsecret, aes_key);
 //----------------------------------------------------------------------
 // Di workers
 // 1. HELLO2 harus sudah pakai mac_key baru
 // 2. HELLO2 harus masih memakai aes_key lama
 //----------------------------------------------------------------------
-    kdf2(aes_key, security->mac_key);
-//----------------------------------------------------------------------
-    memset(aes_key, 0, HASHES_BYTES);
+    kdf(security->mac_key, HASHES_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, "mac_key");
 //----------------------------------------------------------------------
     security->hello1_rcvd = true;
     CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);

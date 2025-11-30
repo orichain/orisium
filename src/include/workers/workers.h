@@ -71,6 +71,7 @@ typedef struct {
     double interval;
     double last_send_interval;
     timer_id_t data_sender_timer_id;
+    
 } packet_data_sender_t;
 
 typedef struct {
@@ -402,7 +403,21 @@ static inline status_t setup_cow_session(worker_context_t *ctx, cow_c_session_t 
     );
     security->local_ctr = (uint32_t)0;
     security->remote_ctr = (uint32_t)0;
-    if (KEM_GENERATE_KEYPAIR(security->kem_publickey, single_session->kem_privatekey) != 0) {
+    for (uint16_t illp=0;illp<PARALLEL_DATA_WINDOW_SIZE;++illp) {
+		security->local_data_nonce[illp] = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
+			&ctx->oritlsf_pool,
+			AES_NONCE_BYTES,
+			sizeof(uint8_t)
+		);
+		security->remote_data_nonce[illp] = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
+			&ctx->oritlsf_pool,
+			AES_NONCE_BYTES,
+			sizeof(uint8_t)
+		);
+		security->local_data_ctr[illp] = (uint32_t)0;
+		security->remote_data_ctr[illp] = (uint32_t)0;
+	}
+	if (KEM_GENERATE_KEYPAIR(security->kem_publickey, single_session->kem_privatekey) != 0) {
         LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", ctx->label);
         return FAILURE;
     }
@@ -462,6 +477,12 @@ static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *s
     security->local_ctr = (uint32_t)0;
     memset(security->remote_nonce, 0, AES_NONCE_BYTES);
     security->remote_ctr = (uint32_t)0;
+    for (uint16_t illp=0;illp<PARALLEL_DATA_WINDOW_SIZE;++illp) {
+		memset(security->local_data_nonce[illp], 0, AES_NONCE_BYTES);
+		security->local_data_ctr[illp] = (uint32_t)0;
+		memset(security->remote_data_nonce[illp], 0, AES_NONCE_BYTES);
+		security->remote_data_ctr[illp] = (uint32_t)0;
+	}
     oritlsf_free(&ctx->oritlsf_pool, (void **)&single_session->kem_privatekey);
     oritlsf_free(&ctx->oritlsf_pool, (void **)&security->kem_publickey);
     oritlsf_free(&ctx->oritlsf_pool, (void **)&security->kem_ciphertext);
@@ -470,6 +491,10 @@ static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *s
     oritlsf_free(&ctx->oritlsf_pool, (void **)&security->mac_key);
     oritlsf_free(&ctx->oritlsf_pool, (void **)&security->local_nonce);
     oritlsf_free(&ctx->oritlsf_pool, (void **)&security->remote_nonce);
+    for (uint16_t illp=0;illp<PARALLEL_DATA_WINDOW_SIZE;++illp) {
+		oritlsf_free(&ctx->oritlsf_pool, (void **)&security->local_data_nonce[illp]);
+		oritlsf_free(&ctx->oritlsf_pool, (void **)&security->remote_data_nonce[illp]);
+	}
 }
 
 static inline status_t setup_sio_session(worker_context_t *ctx, sio_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
@@ -549,6 +574,20 @@ static inline status_t setup_sio_session(worker_context_t *ctx, sio_c_session_t 
     );
     security->local_ctr = (uint32_t)0;
     security->remote_ctr = (uint32_t)0;
+    for (uint16_t illp=0;illp<PARALLEL_DATA_WINDOW_SIZE;++illp) {
+		security->local_data_nonce[illp] = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
+			&ctx->oritlsf_pool,
+			AES_NONCE_BYTES,
+			sizeof(uint8_t)
+		);
+		security->remote_data_nonce[illp] = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
+			&ctx->oritlsf_pool,
+			AES_NONCE_BYTES,
+			sizeof(uint8_t)
+		);
+		security->local_data_ctr[illp] = (uint32_t)0;
+		security->remote_data_ctr[illp] = (uint32_t)0;
+	}
     return SUCCESS;
 }
 
@@ -603,6 +642,12 @@ static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *s
     security->local_ctr = (uint32_t)0;
     memset(security->remote_nonce, 0, AES_NONCE_BYTES);
     security->remote_ctr = (uint32_t)0;
+    for (uint16_t illp=0;illp<PARALLEL_DATA_WINDOW_SIZE;++illp) {
+		memset(security->local_data_nonce[illp], 0, AES_NONCE_BYTES);
+		security->local_data_ctr[illp] = (uint32_t)0;
+		memset(security->remote_data_nonce[illp], 0, AES_NONCE_BYTES);
+		security->remote_data_ctr[illp] = (uint32_t)0;
+	}
     oritlsf_free(&ctx->oritlsf_pool, (void **)&security->kem_publickey);
     oritlsf_free(&ctx->oritlsf_pool, (void **)&security->kem_ciphertext);
     oritlsf_free(&ctx->oritlsf_pool, (void **)&security->kem_sharedsecret);
@@ -610,6 +655,10 @@ static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *s
     oritlsf_free(&ctx->oritlsf_pool, (void **)&security->mac_key);
     oritlsf_free(&ctx->oritlsf_pool, (void **)&security->local_nonce);
     oritlsf_free(&ctx->oritlsf_pool, (void **)&security->remote_nonce);
+    for (uint16_t illp=0;illp<PARALLEL_DATA_WINDOW_SIZE;++illp) {
+		oritlsf_free(&ctx->oritlsf_pool, (void **)&security->local_data_nonce[illp]);
+		oritlsf_free(&ctx->oritlsf_pool, (void **)&security->remote_data_nonce[illp]);
+	}
 }
 
 #endif

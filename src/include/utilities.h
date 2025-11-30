@@ -615,12 +615,40 @@ static inline bool is_1lower_ctr(const char* label, oritlsf_pool_t *pool, uint8_
     return islwr;
 }
 
-static inline void kdf1(uint8_t *key, uint8_t *key_deriv) {
-    shake256(key_deriv, HASHES_BYTES, key, KEM_SHAREDSECRET_BYTES);
-}
-
-static inline void kdf2(uint8_t *key, uint8_t *key_deriv) {
-    shake256(key_deriv, HASHES_BYTES, key, HASHES_BYTES);
+static inline void kdf(
+    uint8_t *out, size_t outlen,
+    const uint8_t *key, size_t key_len,
+    const char *info_string
+)
+{
+    shake256incctx st;
+    size_t info_len = info_string ? strlen(info_string) : 0;
+    uint8_t buffer[4];
+    shake256_inc_init(&st);
+    const uint8_t tag = 0xFF;
+    shake256_inc_absorb(&st, &tag, 1);
+    uint8_t key_header = 0x01;
+    shake256_inc_absorb(&st, &key_header, 1);
+    uint32_t klen_be = (uint32_t)key_len;
+    buffer[0] = (uint8_t)(klen_be >> 24);
+    buffer[1] = (uint8_t)(klen_be >> 16);
+    buffer[2] = (uint8_t)(klen_be >> 8);
+    buffer[3] = (uint8_t)(klen_be);
+    shake256_inc_absorb(&st, buffer, 4);
+    if (key && key_len) shake256_inc_absorb(&st, key, key_len);
+    uint8_t info_header = 0x02;
+    shake256_inc_absorb(&st, &info_header, 1);
+    uint32_t ilen_be = (uint32_t)info_len;
+    buffer[0] = (uint8_t)(ilen_be >> 24);
+    buffer[1] = (uint8_t)(ilen_be >> 16);
+    buffer[2] = (uint8_t)(ilen_be >> 8);
+    buffer[3] = (uint8_t)(ilen_be);
+    shake256_inc_absorb(&st, buffer, 4);
+    if (info_len) shake256_inc_absorb(&st, (const uint8_t *)info_string, info_len);
+    shake256_inc_finalize(&st);
+    shake256_inc_squeeze(out, outlen, &st);
+    shake256_inc_ctx_release(&st);
+    memset(buffer, 0, sizeof(buffer));
 }
 
 static inline status_t generate_nonce(const char* label, uint8_t *out_nonce) {

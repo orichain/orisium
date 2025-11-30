@@ -7,7 +7,6 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <string.h>
-#include <limits.h>
 #include <inttypes.h>
 
 #define GUARD_MAGIC 0xDEADBEEFABADBABEULL
@@ -398,7 +397,6 @@ static inline void oritlsf_free(oritlsf_pool_t *pool, void **pptr) {
             next_blk->prev_phys_block = coalesce;
         }
     }
-
     tlsf_insert_block(pool, coalesce);
 }
 
