@@ -116,7 +116,6 @@ typedef struct {
         sizeof(uint64_t) +
         AES_TAG_BYTES
     ];
-    uint8_t data_nonce[128 * AES_NONCE_BYTES];
 } orilink_hello4_t;
 
 typedef struct {

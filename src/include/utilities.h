@@ -29,7 +29,6 @@
 #include "constants.h"
 #include "log.h"
 #include "poly1305-donna.h"
-#include "pqc.h"
 #include "types.h"
 #include "oritlsf.h"
 
