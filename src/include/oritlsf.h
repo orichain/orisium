@@ -9,11 +9,18 @@
 #include <string.h>
 #include <inttypes.h>
 
+#define TLSF_DEBUG
+
+#if defined(TLSF_DEBUG)
+static const size_t FOOTER_SIZE = sizeof(uint64_t);
 #define GUARD_MAGIC 0xDEADBEEFABADBABEULL
-#define TLSF_BLOCKHEADER_PADDING_LEN 7
-#if defined(DEVELOPMENT)
-#define TLSF_BLOCKHEADER_DEBUGGING_LEN 48
+#else
+static const size_t FOOTER_SIZE = 0;
 #endif
+
+#define TLSF_BLOCKHEADER_PADDING_LEN 7
+#define TLSF_BLOCKHEADER_DEBUGGING_LEN 48
+
 #define FL_INDEX_COUNT 30
 #define SL_INDEX_COUNT 8
 #define SL_INDEX_COUNT_LOG2 3
@@ -47,15 +54,13 @@ static inline uintptr_t align_down_ptr(uintptr_t x) {
     return x & ~(uintptr_t)(ALIGN_SIZE - 1);
 }
 
-static const size_t FOOTER_SIZE = sizeof(uint64_t);
-
 typedef struct block_header_t {
     struct block_header_t *prev_phys_block;
     struct block_header_t *next_free;
     struct block_header_t *prev_free;
     size_t size;
     uint8_t status;
-    #if defined(DEVELOPMENT)
+    #if defined(TLSF_DEBUG)
     uint8_t debugging[TLSF_BLOCKHEADER_DEBUGGING_LEN];
     #endif
     uint8_t padding[TLSF_BLOCKHEADER_PADDING_LEN];
@@ -133,17 +138,18 @@ static inline void get_indices(size_t size, int *out_fl, int *out_sl) {
     }
 }
 
+#if defined(TLSF_DEBUG)
 static inline void write_footer_guard(const oritlsf_pool_t *pool, block_header_t *block) {
     if (!pool || !block) return;
     if (block->size < OVERHEAD + FOOTER_SIZE) return;
     
     uint8_t *footer_ptr = (uint8_t*)block + block->size - FOOTER_SIZE;
     uint8_t *limit = pool->pool_end;
-    
     if (in_pool(pool, footer_ptr) && (footer_ptr + FOOTER_SIZE) <= limit) {
         *(uint64_t*)footer_ptr = GUARD_MAGIC;
     }
 }
+#endif
 
 static inline void link_next_phys(const oritlsf_pool_t *pool, block_header_t *block) {
     if (!pool || !block) return;
@@ -184,7 +190,9 @@ static inline void tlsf_insert_block(oritlsf_pool_t *pool, block_header_t *block
     pool->fl_bitmap |= ((size_t)1 << fli);
     pool->sl_bitmap[fli] |= ((size_t)1 << sli);
 
+	#if defined(TLSF_DEBUG)
     write_footer_guard(pool, block);
+    #endif
     link_next_phys(pool, block);
 }
 
@@ -256,8 +264,10 @@ static inline int tlsf_add_pool(oritlsf_pool_t *pool, uint8_t *buffer, size_t si
     initial->next_free = initial->prev_free = NULL;
 
     sentinel->prev_phys_block = initial;
+    #if defined(TLSF_DEBUG)
     write_footer_guard(pool, initial);
-
+	#endif
+	
     tlsf_insert_block(pool, initial);
     return 0;
 }
@@ -339,8 +349,10 @@ static inline void *oritlsf_malloc(const char *label, oritlsf_pool_t *pool, size
                 }
 
                 block->size = required;
+                #if defined(TLSF_DEBUG)
                 write_footer_guard(pool, block);
                 write_footer_guard(pool, new_free);
+                #endif
                 tlsf_insert_block(pool, new_free);
                 link_next_phys(pool, block);
             }
@@ -348,10 +360,10 @@ static inline void *oritlsf_malloc(const char *label, oritlsf_pool_t *pool, size
     }
 
     block->status = 1;
-    #if defined(DEVELOPMENT)
+    #if defined(TLSF_DEBUG)
     snprintf((char *)block->debugging, TLSF_BLOCKHEADER_DEBUGGING_LEN, "%s", label);
-    #endif
     write_footer_guard(pool, block);
+    #endif
     return (void*)((uint8_t*)block + OVERHEAD);
 }
 
@@ -374,7 +386,9 @@ static inline void oritlsf_free(oritlsf_pool_t *pool, void **pptr) {
             tlsf_remove_block(pool, prev);
             prev->size = prev->size + coalesce->size;
             coalesce = prev;
+            #if defined(TLSF_DEBUG)
             write_footer_guard(pool, coalesce); 
+            #endif
         }
     }
 
@@ -385,7 +399,9 @@ static inline void oritlsf_free(oritlsf_pool_t *pool, void **pptr) {
             if (coalesce->size < SIZE_MAX - next->size) {
                 tlsf_remove_block(pool, next);
                 coalesce->size = coalesce->size + next->size;
+                #if defined(TLSF_DEBUG)
                 write_footer_guard(pool, coalesce); 
+                #endif
             }
         }
     }
@@ -421,11 +437,13 @@ static inline void *oritlsf_realloc(const char *file_name, int line_num, oritlsf
     if (!in_pool(pool, block) || !header_aligned(block) || block->status != 1) {
         return NULL;
     }
-
+	
+	#if defined(TLSF_DEBUG)
     uint8_t *footer_ptr = (uint8_t*)block + block->size - FOOTER_SIZE;
     if (!in_pool(pool, footer_ptr) || footer_ptr + FOOTER_SIZE > pool->pool_end) return NULL;
     if (*(const uint64_t*)footer_ptr != GUARD_MAGIC) return NULL;
-
+	#endif
+	
     size_t payload_aligned = align_up_size(newsize);
     size_t required_overhead = OVERHEAD + FOOTER_SIZE;
 
@@ -459,14 +477,18 @@ static inline void *oritlsf_realloc(const char *file_name, int line_num, oritlsf
                     }
 
                     block->size = required;
+                    #if defined(TLSF_DEBUG)
                     write_footer_guard(pool, block);
                     write_footer_guard(pool, new_free);
+                    #endif
                     tlsf_insert_block(pool, new_free);
                     link_next_phys(pool, block);
                 }
             }
         }
+        #if defined(TLSF_DEBUG)
         write_footer_guard(pool, block);
+        #endif
         return ptr;
     }
 
@@ -495,14 +517,18 @@ static inline void *oritlsf_realloc(const char *file_name, int line_num, oritlsf
                             }
 
                             block->size = required;
+                            #if defined(TLSF_DEBUG)
                             write_footer_guard(pool, block);
                             write_footer_guard(pool, new_free);
+                            #endif
                             tlsf_insert_block(pool, new_free);
                             link_next_phys(pool, block);
                         }
                     } else {
                         link_next_phys(pool, block);
+                        #if defined(TLSF_DEBUG)
                         write_footer_guard(pool, block);
+                        #endif
                     }
                     return ptr;
                 }
@@ -519,6 +545,7 @@ static inline void *oritlsf_realloc(const char *file_name, int line_num, oritlsf
     return newptr;
 }
 
+#if defined(TLSF_DEBUG)
 static inline size_t tlsf_check_leaks_and_report(const char *label, const oritlsf_pool_t *pool) {
     if (!pool || !pool->pool_start || pool->pool_start >= pool->pool_end) return 0;
 
@@ -559,11 +586,7 @@ static inline size_t tlsf_check_leaks_and_report(const char *label, const oritls
             if (is_sentinel) {
                 fprintf(stderr, "%sSENTINEL: block=%p size=%zu (ignored)\n", label, (void*)bh, bh->size);
             } else {
-                #if defined(DEVELOPMENT)
                 fprintf(stderr, "%sALLOC: block=%p size=%zu payload=%zu -> payload_ptr=%p debugging=%s\n", label, (void*)bh, bh->size, payload, (void*)((uint8_t*)bh + OVERHEAD), (char *)bh->debugging);
-                #else
-                fprintf(stderr, "%sALLOC: block=%p size=%zu payload=%zu -> payload_ptr=%p\n", label, (void*)bh, bh->size, payload, (void*)((uint8_t*)bh + OVERHEAD));
-                #endif
                 total_leaked += bh->size;
                 leaked_count++;
             }
@@ -585,10 +608,11 @@ static inline size_t tlsf_check_leaks_and_report(const char *label, const oritls
     fprintf(stderr, "%s=== END TLSF REPORT ===\n", label);
     return total_leaked;
 }
+#endif
 
 static inline void *oritlsf_cleanup_pool(const char *label, oritlsf_pool_t *pool) {
     if (!pool) return NULL;
-    #if defined(DEVELOPMENT)
+    #if defined(TLSF_DEBUG)
     if (pool->pool_start) tlsf_check_leaks_and_report(label, pool);
     #endif
     void *start = pool->pool_start;
@@ -596,7 +620,7 @@ static inline void *oritlsf_cleanup_pool(const char *label, oritlsf_pool_t *pool
     return start;
 }
 
-#if defined(DEVELOPMENT)
+#if defined(TLSF_DEBUG)
 static inline void tlsf_dump_free_lists(const oritlsf_pool_t *pool) {
     if (!pool) return;
     fprintf(stderr, "=== TLSF FREE LISTS DUMP ===\n");
@@ -637,13 +661,14 @@ static inline void tlsf_validate_all(const oritlsf_pool_t *pool) {
         bool is_sentinel = (cur == pool->pool_end - OVERHEAD) && (bh->size == OVERHEAD) && (bh->status == 1);
         if (!is_sentinel && bh->size < MIN_BLOCK_TOTAL) { fprintf(stderr, "tlsf_validate_all: size too small at %p\n", (void*)bh); abort(); }
 
-
+		#if defined(TLSF_DEBUG)
         if (!is_sentinel && bh->size >= OVERHEAD + FOOTER_SIZE) {
             uint8_t *footer = (uint8_t*)bh + bh->size - FOOTER_SIZE;
             if (!in_pool(pool, footer) || footer + FOOTER_SIZE > pool->pool_end) { fprintf(stderr, "tlsf_validate_all: footer OOB for %p\n", (void*)bh); abort(); }
             uint64_t f = *(const uint64_t*)footer;
             if (f != GUARD_MAGIC) { fprintf(stderr, "tlsf_validate_all: footer mismatch at %p\n", (void*)bh); abort(); }
         }
+        #endif
 
         phy[phy_count++] = bh;
         cur += bh->size;
