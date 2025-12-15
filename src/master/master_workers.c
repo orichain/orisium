@@ -27,11 +27,11 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
     if (session == NULL) {
         return FAILURE;
     }
-    uds_pair_pid_t *upp = &session->upp;
-    worker_security_t *security = &session->security;
-    worker_rekeying_t *rekeying = &session->rekeying;
-    cleanup_oricle_long_double(&master_ctx->oritlsf_pool, &session->avgtt);
-    cleanup_oricle_double(&master_ctx->oritlsf_pool, &session->healthy);
+    uds_pair_pid_t *upp = session->upp;
+    worker_security_t *security = session->security;
+    worker_rekeying_t *rekeying = session->rekeying;
+    cleanup_oricle_long_double(&master_ctx->oritlsf_pool, session->avgtt);
+    cleanup_oricle_double(&master_ctx->oritlsf_pool, session->healthy);
     session->isactive = false;
     session->ishealthy = false;
     session->isready = false;
@@ -70,13 +70,13 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
         return FAILURE;
     }
     const char *worker_name = get_master_worker_name(wot);
-    uds_pair_pid_t *upp = &session->upp;
-    worker_security_t *security = &session->security;
-    worker_rekeying_t *rekeying = &session->rekeying;
+    uds_pair_pid_t *upp = session->upp;
+    worker_security_t *security = session->security;
+    worker_rekeying_t *rekeying = session->rekeying;
     upp->uds[0] = 0; 
     upp->uds[1] = 0; 
-    setup_oricle_long_double(&session->avgtt, (long double)0);
-    setup_oricle_double(&session->healthy, (double)100);
+    setup_oricle_long_double(session->avgtt, (long double)0);
+    setup_oricle_double(session->healthy, (double)100);
     session->isactive = true;
     session->ishealthy = true;        
     session->isready = false;  
@@ -143,7 +143,7 @@ void close_master_resource(master_context_t *master_ctx, worker_type_t wot, uint
     if (session == NULL) {
         return;
     }
-    worker_security_t *security = &session->security;
+    worker_security_t *security = session->security;
     if (!security) return;
 //----------------------------------------------------------------------
 // Jika di close, kadang terjadi EBADF saat recreate worker dengan cepat
@@ -180,13 +180,13 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
     }
     const char *worker_name = get_master_worker_name(wot);
     double initial_delay_ms = (double)0;
-    session->upp.pid = fork();
-    if (session->upp.pid == -1) {
+    session->upp->pid = fork();
+    if (session->upp->pid == -1) {
         LOG_ERROR("%sfork (%s): %s", label, worker_name, strerror(errno));
         return FAILURE;
-    } else if (session->upp.pid == 0) {
+    } else if (session->upp->pid == 0) {
         close_master_resource(master_ctx, wot, index);
-        CLOSE_UDS(&session->upp.uds[0]);
+        CLOSE_UDS(&session->upp->uds[0]);
         for (uint8_t j = 0; j < MAX_SIO_WORKERS; ++j) {
             master_worker_session_t *jsession = get_master_worker_session(master_ctx, SIO, j);
             if (jsession == NULL) {
@@ -194,12 +194,12 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
             }
             if (wot == SIO) {
                 if (j != index) {
-                    CLOSE_UDS(&jsession->upp.uds[0]);
-                    CLOSE_UDS(&jsession->upp.uds[1]);
+                    CLOSE_UDS(&jsession->upp->uds[0]);
+                    CLOSE_UDS(&jsession->upp->uds[1]);
                 }
             } else {
-                CLOSE_UDS(&jsession->upp.uds[0]);
-                CLOSE_UDS(&jsession->upp.uds[1]);
+                CLOSE_UDS(&jsession->upp->uds[0]);
+                CLOSE_UDS(&jsession->upp->uds[1]);
             }
         }
         for (int j = 0; j < MAX_LOGIC_WORKERS; ++j) {
@@ -209,12 +209,12 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
             }
             if (wot == LOGIC) {
                 if (j != index) {
-                    CLOSE_UDS(&jsession->upp.uds[0]);
-                    CLOSE_UDS(&jsession->upp.uds[1]);
+                    CLOSE_UDS(&jsession->upp->uds[0]);
+                    CLOSE_UDS(&jsession->upp->uds[1]);
                 }
             } else {
-                CLOSE_UDS(&jsession->upp.uds[0]);
-                CLOSE_UDS(&jsession->upp.uds[1]);
+                CLOSE_UDS(&jsession->upp->uds[0]);
+                CLOSE_UDS(&jsession->upp->uds[1]);
             }
         }
         for (int j = 0; j < MAX_COW_WORKERS; ++j) {
@@ -224,12 +224,12 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
             }
             if (wot == COW) {
                 if (j != index) {
-                    CLOSE_UDS(&jsession->upp.uds[0]);
-                    CLOSE_UDS(&jsession->upp.uds[1]);
+                    CLOSE_UDS(&jsession->upp->uds[0]);
+                    CLOSE_UDS(&jsession->upp->uds[1]);
                 }
             } else {
-                CLOSE_UDS(&jsession->upp.uds[0]);
-                CLOSE_UDS(&jsession->upp.uds[1]);
+                CLOSE_UDS(&jsession->upp->uds[0]);
+                CLOSE_UDS(&jsession->upp->uds[1]);
             }
         }
         for (int j = 0; j < MAX_DBR_WORKERS; ++j) {
@@ -239,12 +239,12 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
             }
             if (wot == DBR) {
                 if (j != index) {
-                    CLOSE_UDS(&jsession->upp.uds[0]);
-                    CLOSE_UDS(&jsession->upp.uds[1]);
+                    CLOSE_UDS(&jsession->upp->uds[0]);
+                    CLOSE_UDS(&jsession->upp->uds[1]);
                 }
             } else {
-                CLOSE_UDS(&jsession->upp.uds[0]);
-                CLOSE_UDS(&jsession->upp.uds[1]);
+                CLOSE_UDS(&jsession->upp->uds[0]);
+                CLOSE_UDS(&jsession->upp->uds[1]);
             }
         }
         for (int j = 0; j < MAX_DBW_WORKERS; ++j) {
@@ -254,18 +254,18 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
             }
             if (wot == DBW) {
                 if (j != index) {
-                    CLOSE_UDS(&jsession->upp.uds[0]);
-                    CLOSE_UDS(&jsession->upp.uds[1]);
+                    CLOSE_UDS(&jsession->upp->uds[0]);
+                    CLOSE_UDS(&jsession->upp->uds[1]);
                 }
             } else {
-                CLOSE_UDS(&jsession->upp.uds[0]);
-                CLOSE_UDS(&jsession->upp.uds[1]);
+                CLOSE_UDS(&jsession->upp->uds[0]);
+                CLOSE_UDS(&jsession->upp->uds[1]);
             }
         }
         worker_type_t x_wot = wot;
         uint8_t x_index = index;
         double x_initial_delay_ms = initial_delay_ms;
-        int *master_uds_fd = &session->upp.uds[1];
+        int *master_uds_fd = &session->upp->uds[1];
         switch (wot) {
             case SIO: {
                 run_sio_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
@@ -291,19 +291,19 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
                 return FAILURE;
         }
     } else {
-        CLOSE_UDS(&session->upp.uds[1]);
+        CLOSE_UDS(&session->upp->uds[1]);
 //======================================================================
 // Hitung delay start dan inisialisasi metrics
 //======================================================================
         session->task_count = (uint16_t)0;
-        initial_delay_ms = initialize_metrics(label, &session->metrics, wot, index);
+        initial_delay_ms = initialize_metrics(label, session->metrics, wot, index);
 //======================================================================
         async_create_incoming_event(
             label,
             &master_ctx->master_async,
-            &session->upp.uds[0]
+            &session->upp->uds[0]
         );
-        LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, session->upp.pid);
+        LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, session->upp->pid);
     }
     return SUCCESS;
 }
@@ -380,9 +380,9 @@ status_t calculate_avgtt(const char *label, master_context_t *master_ctx, worker
     const char *worker_name = get_master_worker_name(wot);
     uint64_t_status_t rt = get_monotonic_time_ns(label);
     if (rt.status != SUCCESS) return rt.status;
-    worker_metrics_t *metrics = &session->metrics;
+    worker_metrics_t *metrics = session->metrics;
     uint16_t *task_count = &session->task_count;
-    oricle_long_double_t *oricle = &session->avgtt;
+    oricle_long_double_t *oricle = session->avgtt;
     uint64_t MAX_CONNECTION_PER_WORKER;
     if (wot == SIO) {
         MAX_CONNECTION_PER_WORKER = MAX_CONNECTION_PER_SIO_WORKER;
@@ -445,8 +445,8 @@ status_t calculate_healthy(const char* label, master_context_t *master_ctx, work
     const char *worker_name = get_master_worker_name(wot);
     uint64_t_status_t rt = get_monotonic_time_ns(label);
     if (rt.status != SUCCESS) return rt.status;
-    worker_metrics_t *metrics = &session->metrics;
-    oricle_double_t *oricle = &session->healthy;
+    worker_metrics_t *metrics = session->metrics;
+    oricle_double_t *oricle = session->healthy;
     bool *ishealthy = &session->ishealthy;
     if (!metrics || !oricle || !ishealthy) return FAILURE;
     uint64_t now_ns = rt.r_uint64_t;
@@ -509,7 +509,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
         if (session == NULL) {
             return FAILURE;
         }
-        if (session->healthy.value_prediction < (double)10) {
+        if (session->healthy->value_prediction < (double)10) {
             session->isactive = false;
             if (recreate_worker(label, master_ctx, SIO, i) != SUCCESS) {
                 return FAILURE;
@@ -524,7 +524,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
         if (session == NULL) {
             return FAILURE;
         }
-        if (session->healthy.value_prediction < (double)10) {
+        if (session->healthy->value_prediction < (double)10) {
             session->isactive = false;
             if (recreate_worker(label, master_ctx, LOGIC, i) != SUCCESS) {
                 return FAILURE;
@@ -539,7 +539,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
         if (session == NULL) {
             return FAILURE;
         }
-        if (session->healthy.value_prediction < (double)10) {
+        if (session->healthy->value_prediction < (double)10) {
             session->isactive = false;
             if (recreate_worker(label, master_ctx, COW, i) != SUCCESS) {
                 return FAILURE;
@@ -554,7 +554,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
         if (session == NULL) {
             return FAILURE;
         }
-        if (session->healthy.value_prediction < (double)10) {
+        if (session->healthy->value_prediction < (double)10) {
             session->isactive = false;
             if (recreate_worker(label, master_ctx, DBR, i) != SUCCESS) {
                 return FAILURE;
@@ -569,7 +569,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
         if (session == NULL) {
             return FAILURE;
         }
-        if (session->healthy.value_prediction < (double)10) {
+        if (session->healthy->value_prediction < (double)10) {
             session->isactive = false;
             if (recreate_worker(label, master_ctx, DBW, i) != SUCCESS) {
                 return FAILURE;

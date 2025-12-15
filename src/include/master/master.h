@@ -62,12 +62,12 @@ typedef struct {
     bool ishealthy;
     bool isready;
     uint16_t task_count;
-    uds_pair_pid_t upp;
-	worker_metrics_t metrics;
-    oricle_double_t healthy;
-    oricle_long_double_t avgtt;
-    worker_security_t security;
-    worker_rekeying_t rekeying;
+    uds_pair_pid_t *upp;
+	worker_metrics_t *metrics;
+    oricle_double_t *healthy;
+    oricle_long_double_t *avgtt;
+    worker_security_t *security;
+    worker_rekeying_t *rekeying;
 } master_worker_session_t;
 
 typedef struct {

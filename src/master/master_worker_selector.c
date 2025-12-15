@@ -23,8 +23,8 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
             }
             if (session->task_count < MAX_CONNECTION_PER_SIO_WORKER) {
                 if (session->isactive && session->ishealthy) {
-                    if (session->avgtt.value_prediction < min_avg_task_time) {
-                        min_avg_task_time = session->avgtt.value_prediction;
+                    if (session->avgtt->value_prediction < min_avg_task_time) {
+                        min_avg_task_time = session->avgtt->value_prediction;
                         temp_best_idx_t1 = i;
                     }
                 }
@@ -38,8 +38,8 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
             }
             if (session->task_count < MAX_CONNECTION_PER_COW_WORKER) {
                 if (session->isactive && session->ishealthy) {
-                    if (session->avgtt.value_prediction < min_avg_task_time) {
-                        min_avg_task_time = session->avgtt.value_prediction;
+                    if (session->avgtt->value_prediction < min_avg_task_time) {
+                        min_avg_task_time = session->avgtt->value_prediction;
                         temp_best_idx_t1 = i;
                     }
                 }
@@ -66,8 +66,8 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
             }
             if (session->task_count < MAX_CONNECTION_PER_SIO_WORKER) {
                 if (session->isactive && session->ishealthy) {
-                    if (session->metrics.longest_task_time < min_longest_task_time) {
-                        min_longest_task_time = session->metrics.longest_task_time;
+                    if (session->metrics-> longest_task_time < min_longest_task_time) {
+                        min_longest_task_time = session->metrics-> longest_task_time;
                         temp_best_idx_t2 = i;
                     }
                 }
@@ -81,8 +81,8 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
             }
             if (session->task_count < MAX_CONNECTION_PER_COW_WORKER) {
                 if (session->isactive && session->ishealthy) {
-                    if (session->metrics.longest_task_time < min_longest_task_time) {
-                        min_longest_task_time = session->metrics.longest_task_time;
+                    if (session->metrics-> longest_task_time < min_longest_task_time) {
+                        min_longest_task_time = session->metrics-> longest_task_time;
                         temp_best_idx_t2 = i;
                     }
                 }

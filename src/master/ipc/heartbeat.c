@@ -32,11 +32,11 @@ status_t handle_master_ipc_heartbeat(const char *label, master_context_t *master
     ipc_worker_master_heartbeat_t *iheartbeati = received_protocol->payload.ipc_worker_master_heartbeat;
     uint64_t_status_t rt = get_monotonic_time_ns(label);
     LOG_DEBUG("%s%s %d set last_ack to %llu.", label, worker_name, rcvd_index, rt.r_uint64_t);
-    session->metrics.last_ack = rt.r_uint64_t;
-    session->metrics.count_ack += (double)1;
+    session->metrics->last_ack = rt.r_uint64_t;
+    session->metrics->count_ack += (double)1;
     double hb_interval = iheartbeati->hb_interval;
-    session->metrics.sum_hb_interval += hb_interval;
-    session->metrics.hb_interval = hb_interval;
+    session->metrics->sum_hb_interval += hb_interval;
+    session->metrics->hb_interval = hb_interval;
     CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
     return SUCCESS;
 }

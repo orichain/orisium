@@ -1,42 +1,48 @@
-# =============================
-# Nama dan folder utama
-# =============================
 TARGET = orisium
 SRC_DIR = src
 OBJ_DIR = obj
 
-# =============================
-# Compiler dan flags
-# =============================
-
 CC = gcc
+
+JSONC_CFLAGS :=
+JSONC_LIBS := -ljson-c -pthread
+
+ifneq ($(shell command -v pkg-config 2>/dev/null),)
+	JSONC_CFLAGS := $(shell pkg-config --cflags json-c 2>/dev/null)
+	JSONC_LIBS := $(shell pkg-config --libs json-c 2>/dev/null)
+endif
+
+COMMON_CFLAGS = -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration -lm $(JSONC_CFLAGS)
+LDFLAGS = $(JSONC_LIBS)
+
 GCC_INCLUDE_DIRS := $(shell echo '' | gcc -E -x c - -v 2>&1 | awk '/^ \/.*\/include/ { print "-I" $$1 }')
 INCLUDE_DIR = $(GCC_INCLUDE_DIRS) -I./$(SRC_DIR)/include -I./PQClean -I./PQClean/common -I./lmdb/libraries/liblmdb
-COMMON_CFLAGS = -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration -pthread -ljson-c -lm $(INCLUDE_DIR)
+COMMON_CFLAGS += $(INCLUDE_DIR)
+
 BUILD_MODE ?= DEVELOPMENT
 DEBUG_MODE ?= DEVELOPMENT
 LOG_TO ?= SCREEN
 ifeq ($(BUILD_MODE), PRODUCTION)
-    FINAL_CFLAGS = $(COMMON_CFLAGS) -O3 -DNDEBUG -DPRODUCTION
+	FINAL_CFLAGS = $(COMMON_CFLAGS) -O3 -DNDEBUG -DPRODUCTION
 else
 	ifeq ($(LOG_TO), FILE)
-		FINAL_CFLAGS = $(COMMON_CFLAGS) -fsanitize=address -fsanitize=leak -g -O3 -Werror -DDEVELOPMENT -DTOFILE
+		FINAL_CFLAGS = $(COMMON_CFLAGS) -g -O3 -Werror -DDEVELOPMENT -DTOFILE
 	else
-		FINAL_CFLAGS = $(COMMON_CFLAGS) -fsanitize=address -fsanitize=leak -g -O3 -Werror -DNDEBUG -DDEVELOPMENT -DTOSCREEN
+		FINAL_CFLAGS = $(COMMON_CFLAGS) -g -O3 -Werror -DNDEBUG -DDEVELOPMENT -DTOSCREEN
 	endif
 endif
-LDFLAGS =
 
-# =============================
-# Deteksi Distribusi Linux dan Package Manager
-# =============================
-DISTRO_ID := $(shell . /etc/os-release 2>/dev/null && echo $$ID || echo unknown)
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),NetBSD)
+	DISTRO_ID := netbsd
+else
+	DISTRO_ID := $(shell . /etc/os-release 2>/dev/null && echo $$ID || echo unknown)
+endif
 
 PKG_MANAGER := $(shell \
-	if [ "$(DISTRO_ID)" = "rocky" ] || [ "$(DISTRO_ID)" = "fedora" ]; then echo "dnf"; \
-	elif [ "$(DISTRO_ID)" = "centos" ]; then \
-		if command -v dnf >/dev/null 2>&1; then echo "dnf"; else echo "yum"; fi; \
-	elif [ "$(DISTRO_ID)" = "rhel" ]; then \
+	if [ "$(DISTRO_ID)" = "netbsd" ]; then echo "pkgin"; \
+	elif [ "$(DISTRO_ID)" = "rocky" ] || [ "$(DISTRO_ID)" = "fedora" ]; then echo "dnf"; \
+	elif [ "$(DISTRO_ID)" = "centos" ] || [ "$(DISTRO_ID)" = "rhel" ]; then \
 		if command -v dnf >/dev/null 2>&1; then echo "dnf"; else echo "yum"; fi; \
 	elif [ "$(DISTRO_ID)" = "debian" ] || [ "$(DISTRO_ID)" = "ubuntu" ]; then echo "apt"; \
 	elif [ "$(DISTRO_ID)" = "arch" ]; then echo "pacman"; \
@@ -95,54 +101,118 @@ HFILES := $(shell find . $(EXCLUDE_PATHS) -name '*.h' -print)
 # =============================
 .PHONY: all dev prod clean run debug check_iwyu_h check_iwyu_c
 
-# Target default
 all: prod
 	
 define install_pkg
-	@echo "🔧 Memeriksa dan menginstall $(1)..."
-	@if [ "$(PKG_MANAGER)" = "unsupported" ]; then \
-		echo "❌ Distribusi tidak didukung. Install $(1) secara manual."; \
-	elif [ "$(PKG_MANAGER)" = "apt" ]; then \
-		if dpkg -s $(1) >/dev/null 2>&1; then \
-			echo "✅ $(1) sudah terinstal. Melewati instalasi."; \
+	@echo ">> Memeriksa: $(1)"
+	@if command -v $(1) >/dev/null 2>&1; then \
+		echo ">> $(1) sudah tersedia (binary)."; \
+	elif [ "$(PKG_MANAGER)" = "unsupported" ]; then \
+		echo "!! Distribusi tidak didukung. Install $(1) manual."; \
+	elif [ "$(PKG_MANAGER)" = "pkgin" ]; then \
+		if pkg_info -e $(1) >/dev/null 2>&1; then \
+			echo ">> $(1) sudah terinstal (pkgsrc)."; \
 		else \
-			$(USE_SUDO) apt update && $(USE_SUDO) apt install -y $(1) || true; \
+			echo ">> Menginstal $(1) via pkgin..."; \
+			$(USE_SUDO) pkgin -y install $(1) || true; \
 		fi; \
-	elif [ "$(PKG_MANAGER)" = "dnf" ] || [ "$(PKG_MANAGER)" = "yum" ]; then \
-		if rpm -q $(1) >/dev/null 2>&1; then \
-			echo "✅ $(1) sudah terinstal. Melewati instalasi."; \
+	elif [ "$(PKG_MANAGER)" = "apt" ]; then \
+		if dpkg-query -W -f='${Status}' $(1) 2>/dev/null | grep -q "installed"; then \
+			echo ">> $(1) sudah terinstal (paket)."; \
 		else \
-			$(USE_SUDO) $(PKG_MANAGER) install -y $(1) || true; \
+			echo ">> Menginstal $(1) via apt..."; \
+			$(USE_SUDO) apt-get update && $(USE_SUDO) apt-get install -y $(1) || true; \
+		fi; \
+	elif [ "$(PKG_MANAGER)" = "dnf" ]; then \
+		if dnf list installed $(1) >/dev/null 2>&1; then \
+			echo ">> $(1) sudah terinstal (paket)."; \
+		else \
+			echo ">> Menginstal $(1) via dnf..."; \
+			$(USE_SUDO) dnf install -y $(1) || true; \
+		fi; \
+	elif [ "$(PKG_MANAGER)" = "yum" ]; then \
+		if yum list installed $(1) >/dev/null 2>&1; then \
+			echo ">> $(1) sudah terinstal (paket)."; \
+		else \
+			echo ">> Menginstal $(1) via yum..."; \
+			$(USE_SUDO) yum install -y $(1) || true; \
 		fi; \
 	elif [ "$(PKG_MANAGER)" = "pacman" ]; then \
-		if pacman -Q $(1) >/dev/null 2>&1; then \
-			echo "✅ $(1) sudah terinstal. Melewati instalasi."; \
+		if pacman -Qi $(1) >/dev/null 2>&1; then \
+			echo ">> $(1) sudah terinstal (paket)."; \
 		else \
-			$(USE_SUDO) pacman -S --noconfirm $(1) || true; \
+			echo ">> Menginstal $(1) via pacman..."; \
+			$(USE_SUDO) pacman -Sy --noconfirm $(1) || true; \
 		fi; \
 	elif [ "$(PKG_MANAGER)" = "zypper" ]; then \
-		if zypper se --installed-only $(1) >/dev/null 2>&1; then \
-			echo "✅ $(1) sudah terinstal. Melewati instalasi."; \
+		if rpm -q $(1) >/dev/null 2>&1; then \
+			echo ">> $(1) sudah terinstal (paket)."; \
 		else \
-			$(USE_SUDO) zypper install -y $(1) || true; \
+			echo ">> Menginstal $(1) via zypper..."; \
+			$(USE_SUDO) zypper --non-interactive install $(1) || true; \
 		fi; \
 	else \
-		echo "⚠️ Tidak bisa menginstall $(1)."; \
+		echo "!! Package manager tidak dikenali."; \
 	fi
 endef
 
 dev-libraries:
-	@echo "📥 Menginstall library development Orisium untuk $(DISTRO_ID) menggunakan $(PKG_MANAGER)..."
+	@echo "Menginstall library development Orisium untuk $(DISTRO_ID) menggunakan $(PKG_MANAGER)..."
+	$(call install_pkg,pkg-config)
 	$(call install_pkg,json-c)
-	$(call install_pkg,json-c-devel)
-	$(call install_pkg,libasan)
+ifeq ($(DISTRO_ID),netbsd)
+	$(call install_pkg,python312)
+	@if [ ! -e /usr/bin/python ]; then \
+		echo ">> Membuat symlink /usr/bin/python -> python3.12..."; \
+		$(USE_SUDO) ln -s /usr/pkg/bin/python3.12 /usr/bin/python; \
+	else \
+		echo ">> /usr/bin/python sudah ada. Symlink dilewati."; \
+	fi
+else ifeq ($(DISTRO_ID),debian)
+	$(call install_pkg,libjson-c-dev)
 	$(call install_pkg,python3)
+else ifeq ($(DISTRO_ID),ubuntu)
+	$(call install_pkg,libjson-c-dev)
+	$(call install_pkg,python3)
+else ifeq ($(DISTRO_ID),fedora)
+	$(call install_pkg,json-c-devel)
+	$(call install_pkg,python3)
+else ifeq ($(DISTRO_ID),rocky)
+	$(call install_pkg,json-c-devel)
+	$(call install_pkg,python3)
+else ifeq ($(DISTRO_ID),centos)
+	$(call install_pkg,json-c-devel)
+	$(call install_pkg,python3)
+endif
 
 prod-libraries:
-	@echo "📥 Menginstall library production Orisium untuk $(DISTRO_ID) menggunakan $(PKG_MANAGER)..."
+	@echo "Menginstall library production Orisium untuk $(DISTRO_ID) menggunakan $(PKG_MANAGER)..."
+	$(call install_pkg,pkg-config)
 	$(call install_pkg,json-c)
+ifeq ($(DISTRO_ID),netbsd)
+	$(call install_pkg,python312)
+	@if [ ! -e /usr/bin/python ]; then \
+		echo ">> Membuat symlink /usr/bin/python -> python3.12..."; \
+		$(USE_SUDO) ln -s /usr/pkg/bin/python3.12 /usr/bin/python; \
+	else \
+		echo ">> /usr/bin/python sudah ada. Symlink dilewati."; \
+	fi
+else ifeq ($(DISTRO_ID),debian)
+	$(call install_pkg,libjson-c-dev)
+	$(call install_pkg,python3)
+else ifeq ($(DISTRO_ID),ubuntu)
+	$(call install_pkg,libjson-c-dev)
+	$(call install_pkg,python3)
+else ifeq ($(DISTRO_ID),fedora)
 	$(call install_pkg,json-c-devel)
-	$(call install_pkg,python3)	
+	$(call install_pkg,python3)
+else ifeq ($(DISTRO_ID),rocky)
+	$(call install_pkg,json-c-devel)
+	$(call install_pkg,python3)
+else ifeq ($(DISTRO_ID),centos)
+	$(call install_pkg,json-c-devel)
+	$(call install_pkg,python3)
+endif	
 
 dev:
 	$(MAKE) dev-libraries check_iwyu_h check_iwyu_c $(TARGET)
@@ -159,11 +229,11 @@ prod:
 	@echo "-------------------------------------"
 	
 $(TARGET): $(OBJS) \
-		$(PQCLEAN_COMMON_OBJS) \
-		$(PQCLEAN_SIGN_MLDSA87_LIB_PATH) \
-		$(PQCLEAN_SIGN_FALCONPADDED512_LIB_PATH) \
-		$(PQCLEAN_KEM_LIB_PATH) \
-	    $(LMDB_LIB_PATH)
+	$(PQCLEAN_COMMON_OBJS) \
+	$(PQCLEAN_SIGN_MLDSA87_LIB_PATH) \
+	$(PQCLEAN_SIGN_FALCONPADDED512_LIB_PATH) \
+	$(PQCLEAN_KEM_LIB_PATH) \
+	$(LMDB_LIB_PATH)
 	$(CC) $(FINAL_CFLAGS) $^ -o $@ $(LDFLAGS)
 
 # =============================
@@ -184,29 +254,29 @@ $(OBJ_DIR)/%.o: $(PQCLEAN_COMMON_DIR)/%.c
 # =============================
 $(PQCLEAN_SIGN_MLDSA87_LIB_PATH):
 	@echo "Membangun ML-DSA-87..."
-	@echo "📥 Membangun dari sumber..."
+	@echo "Membangun dari sumber..."
 	@if [ ! -f "$(PQCLEAN_SIGN_MLDSA87_LIB_PATH)" ]; then \
 		$(MAKE) -C $(PQCLEAN_SIGN_MLDSA87_DIR); \
 	else \
-		echo "✅ Library sudah ada: $@"; \
+		echo "Library sudah ada: $@"; \
 	fi
 
 $(PQCLEAN_SIGN_FALCONPADDED512_LIB_PATH):
 	@echo "Membangun Falcon-Padded-512..."
-	@echo "📥 Membangun dari sumber..."
+	@echo "Membangun dari sumber..."
 	@if [ ! -f "$(PQCLEAN_SIGN_FALCONPADDED512_LIB_PATH)" ]; then \
 		$(MAKE) -C $(PQCLEAN_SIGN_FALCONPADDED512_DIR); \
 	else \
-		echo "✅ Library sudah ada: $@"; \
+		echo "Library sudah ada: $@"; \
 	fi
 
 $(PQCLEAN_KEM_LIB_PATH):
 	@echo "Membangun ML-KEM-1024..."
-	@echo "📥 Membangun dari sumber..."
+	@echo "Membangun dari sumber..."
 	@if [ ! -f "$(PQCLEAN_KEM_LIB_PATH)" ]; then \
 		$(MAKE) -C $(PQCLEAN_KEM_DIR); \
 	else \
-		echo "✅ Library sudah ada: $@"; \
+		echo "Library sudah ada: $@"; \
 	fi
 	
 # =============================
@@ -226,62 +296,64 @@ $(LMDB_LIB_PATH):
 # IWYU Check
 # =============================
 check_iwyu_c: $(IWYU_BIN_PATH)
-	@echo "🔍 Menjalankan IWYU untuk *.c (kecuali: $(EXCLUDED_DIRS))..."
+	@echo "Menjalankan IWYU untuk *.c (kecuali: $(EXCLUDED_DIRS))..."
 	@rm -f iwyu_failed_c.log iwyu_applied_c.log
 	@for file in $(CFILES); do \
-		echo "🧪 $$file"; \
+		echo "file: $$file"; \
 		$(IWYU_BIN_PATH) $(FINAL_CFLAGS) "$$file" > /tmp/iwyu.tmp 2>&1; \
 		if grep -q "should" /tmp/iwyu.tmp; then \
-			echo "❌ IWYU error in $$file" | tee -a iwyu_failed_c.log; \
+			echo "IWYU error in $$file" | tee -a iwyu_failed_c.log; \
 			cat /tmp/iwyu.tmp >> iwyu_failed_c.log; \
 			echo "" >> iwyu_failed_c.log; \
 			python3 $(IWYU_DIR)/fix_includes.py < /tmp/iwyu.tmp >> iwyu_applied_c.log 2>&1; \
-			echo "🔧 FIX applied to $$file" >> iwyu_applied_c.log; \
+			echo "FIX applied to $$file" >> iwyu_applied_c.log; \
 		else \
-			echo "✅ Tidak ada masalah di $$file."; \
+			echo "Tidak ada masalah di $$file."; \
 		fi; \
 		rm -f /tmp/iwyu.tmp; \
 	done; \
 	if [ -f iwyu_failed_c.log ]; then \
-		echo "📌 IWYU sudah diperbaiki secara otomatis, log: iwyu_applied_c.log"; \
+		echo "IWYU sudah diperbaiki secara otomatis, log: iwyu_applied_c.log"; \
 	else \
-		echo "✅ Semua file bersih dari masalah IWYU."; \
+		echo "Semua file bersih dari masalah IWYU."; \
 	fi
 	
 check_iwyu_h: $(IWYU_BIN_PATH)
-	@echo "🔍 Menjalankan IWYU untuk *.h (kecuali: $(EXCLUDED_DIRS))..."
+	@echo "Menjalankan IWYU untuk *.h (kecuali: $(EXCLUDED_DIRS))..."
 	@rm -f iwyu_failed_h.log iwyu_applied_h.log
 	@for file in $(HFILES); do \
-		echo "🧪 $$file"; \
+		echo "file: $$file"; \
 		$(IWYU_BIN_PATH) $(FINAL_CFLAGS) "$$file" > /tmp/iwyu.tmp 2>&1; \
 		if grep -q "should" /tmp/iwyu.tmp; then \
-			echo "❌ IWYU error in $$file" | tee -a iwyu_failed_h.log; \
+			echo "IWYU error in $$file" | tee -a iwyu_failed_h.log; \
 			cat /tmp/iwyu.tmp >> iwyu_failed_h.log; \
 			echo "" >> iwyu_failed_h.log; \
 			python3 $(IWYU_DIR)/fix_includes.py < /tmp/iwyu.tmp >> iwyu_applied_h.log 2>&1; \
-			echo "🔧 FIX applied to $$file" >> iwyu_applied_h.log; \
+			echo "FIX applied to $$file" >> iwyu_applied_h.log; \
 		else \
-			echo "✅ Tidak ada masalah di $$file."; \
+			echo "Tidak ada masalah di $$file."; \
 		fi; \
 		rm -f /tmp/iwyu.tmp; \
 	done; \
 	if [ -f iwyu_failed_h.log ]; then \
-		echo "📌 IWYU sudah diperbaiki secara otomatis, log: iwyu_applied_h.log"; \
+		echo "IWYU sudah diperbaiki secara otomatis, log: iwyu_applied_h.log"; \
 	else \
-		echo "✅ Semua file bersih dari masalah IWYU."; \
+		echo "Semua file bersih dari masalah IWYU."; \
 	fi
 
 # =============================
 # Bangun IWYU (jika belum ada)
 # =============================
 $(IWYU_BIN_PATH):
-	@echo "🔧 Membangun IWYU..."
+	@echo "Membangun IWYU..."
 	@if [ ! -f "$(IWYU_BIN_PATH)" ]; then \
-		echo "📥 Membangun dari sumber..."; \
-		echo "📥 Memeriksa dan menginstall dependensi IWYU untuk distro $(DISTRO_ID) menggunakan $(PKG_MANAGER)..."; \
+		echo "Membangun dari sumber..."; \
+		echo "Memeriksa dan menginstall dependensi IWYU untuk distro $(DISTRO_ID) menggunakan $(PKG_MANAGER)..."; \
 		if [ "$(PKG_MANAGER)" = "unsupported" ]; then \
-			echo "❌ Tidak bisa install dependensi. Distribusi tidak didukung."; \
+			echo "Tidak bisa install dependensi. Distribusi tidak didukung."; \
 			exit 1; \
+		elif [ "$(PKG_MANAGER)" = "pkgin" ]; then \
+			$(USE_SUDO) pkgin update && $(USE_SUDO) pkgin install -y wget cmake clang llvm; \
 		elif [ "$(PKG_MANAGER)" = "apt" ]; then \
 			$(USE_SUDO) apt update && $(USE_SUDO) apt install -y wget cmake clang llvm || true; \
 		elif [ "$(PKG_MANAGER)" = "dnf" ] || [ "$(PKG_MANAGER)" = "yum" ]; then \
@@ -294,7 +366,7 @@ $(IWYU_BIN_PATH):
 		\
 		CLANG_MAJOR_VER=$$(clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \
 		IWYU_VER=$$(expr $$CLANG_MAJOR_VER + 4); \
-		echo "📌 Deteksi Clang versi $$CLANG_MAJOR_VER"; \
+		echo "Deteksi Clang versi $$CLANG_MAJOR_VER"; \
 		wget -q -O iwyu.tar.gz https://github.com/include-what-you-use/include-what-you-use/archive/refs/tags/0.$$IWYU_VER.tar.gz && \
 		tar -xzf iwyu.tar.gz -C iwyu --strip-components=1 && \
 		rm -f iwyu.tar.gz && \
@@ -304,14 +376,14 @@ $(IWYU_BIN_PATH):
 		cmake \
 		-G "Unix Makefiles" \
 		-DCMAKE_C_COMPILER=clang \
-        -DCMAKE_CXX_COMPILER=clang++ \
-        -DCMAKE_BUILD_TYPE="Release" \
+		-DCMAKE_CXX_COMPILER=clang++ \
+		-DCMAKE_BUILD_TYPE="Release" \
 		-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
 		-DLLVM_DIR=/usr/lib64/cmake/llvm \
 		.. && \
 		$(MAKE) -j4; \
 	else \
-		echo "✅ IWYU sudah tersedia."; \
+		echo "IWYU sudah tersedia."; \
 	fi
 
 # =============================
@@ -326,5 +398,5 @@ run: $(TARGET)
 	./$(TARGET)
 	
 debug: dev
-	@echo "🚀 Menjalankan Orisium dengan AddressSanitizer (ASAN)..."
-	ASAN_OPTIONS=detect_leaks=1 ./$(TARGET)
+	@echo "Menjalankan Orisium dalam mode debug..."
+	./$(TARGET)

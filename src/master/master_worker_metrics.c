@@ -37,10 +37,10 @@ status_t new_task_metrics(const char *label, master_context_t *master_ctx, worke
     worker_metrics_t *metrics = NULL;
     uint16_t *task_count = NULL;
     if (wot == SIO) {
-        metrics = &master_ctx->sio_session[index].metrics;
+        metrics = master_ctx->sio_session[index].metrics;
         task_count = &master_ctx->sio_session[index].task_count;
     } else if (wot == COW) {
-        metrics = &master_ctx->cow_session[index].metrics;
+        metrics = master_ctx->cow_session[index].metrics;
         task_count = &master_ctx->cow_session[index].task_count;
     }
     if (!task_count || !metrics) return FAILURE;

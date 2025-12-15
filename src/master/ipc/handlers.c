@@ -38,9 +38,9 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
                 return FAILURE;
             }
             const char *worker_name = get_master_worker_name(rcvd_wot);
-            worker_security_t *security = &session->security;
-            worker_rekeying_t *rekeying = &session->rekeying;
-            int *worker_uds_fd = &session->upp.uds[0];
+            worker_security_t *security = session->security;
+            worker_rekeying_t *rekeying = session->rekeying;
+            int *worker_uds_fd = &session->upp->uds[0];
             if (!security || !rekeying || *worker_uds_fd == -1) {
                 CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi.r_ipc_raw_protocol_t);
                 return FAILURE;
