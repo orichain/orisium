@@ -5,7 +5,7 @@ OBJ_DIR = obj
 CC = gcc
 
 JSONC_CFLAGS :=
-JSONC_LIBS := -ljson-c -pthread
+JSONC_LIBS := -ljson-c
 
 ifneq ($(shell command -v pkg-config 2>/dev/null),)
 	JSONC_CFLAGS := $(shell pkg-config --cflags json-c 2>/dev/null)
@@ -13,7 +13,7 @@ ifneq ($(shell command -v pkg-config 2>/dev/null),)
 endif
 
 COMMON_CFLAGS = -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration -lm $(JSONC_CFLAGS)
-LDFLAGS = $(JSONC_LIBS)
+LDFLAGS = -pthread $(JSONC_LIBS)
 
 GCC_INCLUDE_DIRS := $(shell echo '' | gcc -E -x c - -v 2>&1 | awk '/^ \/.*\/include/ { print "-I" $$1 }')
 INCLUDE_DIR = $(GCC_INCLUDE_DIRS) -I./$(SRC_DIR)/include -I./PQClean -I./PQClean/common -I./lmdb/libraries/liblmdb
@@ -121,21 +121,21 @@ define install_pkg
 			echo ">> $(1) sudah terinstal (paket)."; \
 		else \
 			echo ">> Menginstal $(1) via apt..."; \
-			$(USE_SUDO) apt-get update && $(USE_SUDO) apt-get install -y $(1) || true; \
+			$(USE_SUDO) apt-get update && $(USE_SUDO) apt-get -y install $(1) || true; \
 		fi; \
 	elif [ "$(PKG_MANAGER)" = "dnf" ]; then \
 		if dnf list installed $(1) >/dev/null 2>&1; then \
 			echo ">> $(1) sudah terinstal (paket)."; \
 		else \
 			echo ">> Menginstal $(1) via dnf..."; \
-			$(USE_SUDO) dnf install -y $(1) || true; \
+			$(USE_SUDO) dnf -y install $(1) || true; \
 		fi; \
 	elif [ "$(PKG_MANAGER)" = "yum" ]; then \
 		if yum list installed $(1) >/dev/null 2>&1; then \
 			echo ">> $(1) sudah terinstal (paket)."; \
 		else \
 			echo ">> Menginstal $(1) via yum..."; \
-			$(USE_SUDO) yum install -y $(1) || true; \
+			$(USE_SUDO) yum -y install $(1) || true; \
 		fi; \
 	elif [ "$(PKG_MANAGER)" = "pacman" ]; then \
 		if pacman -Qi $(1) >/dev/null 2>&1; then \
@@ -353,15 +353,15 @@ $(IWYU_BIN_PATH):
 			echo "Tidak bisa install dependensi. Distribusi tidak didukung."; \
 			exit 1; \
 		elif [ "$(PKG_MANAGER)" = "pkgin" ]; then \
-			$(USE_SUDO) pkgin update && $(USE_SUDO) pkgin install -y wget cmake clang llvm; \
+			$(USE_SUDO) pkgin update && $(USE_SUDO) pkgin -y install wget cmake clang llvm; \
 		elif [ "$(PKG_MANAGER)" = "apt" ]; then \
-			$(USE_SUDO) apt update && $(USE_SUDO) apt install -y wget cmake clang llvm || true; \
+			$(USE_SUDO) apt update && $(USE_SUDO) apt -y install wget cmake clang llvm || true; \
 		elif [ "$(PKG_MANAGER)" = "dnf" ] || [ "$(PKG_MANAGER)" = "yum" ]; then \
-			$(USE_SUDO) $(PKG_MANAGER) install -y wget cmake clang llvm clang-devel llvm-devel || true; \
+			$(USE_SUDO) $(PKG_MANAGER) -y install wget cmake clang llvm clang-devel llvm-devel || true; \
 		elif [ "$(PKG_MANAGER)" = "pacman" ]; then \
 			$(USE_SUDO) pacman -Syu --noconfirm wget cmake clang llvm || true; \
 		elif [ "$(PKG_MANAGER)" = "zypper" ]; then \
-			$(USE_SUDO) zypper install -y wget cmake clang llvm || true; \
+			$(USE_SUDO) zypper -y install wget cmake clang llvm || true; \
 		fi; \
 		\
 		CLANG_MAJOR_VER=$$(clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \

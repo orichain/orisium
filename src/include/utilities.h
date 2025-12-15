@@ -9,6 +9,13 @@
 #include <fips202.h>
 #include <math.h>
 #include <netdb.h>
+
+#ifdef __NetBSD__
+    #ifndef AI_V4MAPPED
+        #define AI_V4MAPPED 0
+    #endif
+#endif
+
 #include <netinet/in.h>
 #include <randombytes.h>
 #include <signal.h>
