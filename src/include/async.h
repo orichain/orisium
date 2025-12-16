@@ -5,9 +5,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <unistd.h>
-#include <sys/errno.h>
-#include <sys/fcntl.h>
 
 #ifdef __NetBSD__
     #include <sys/types.h>
@@ -22,7 +19,6 @@
     #include <sys/eventfd.h>
     #include <sys/timerfd.h>
     #include <time.h>
-    #include <fcntl.h>
 #endif
 
 #include "constants.h"

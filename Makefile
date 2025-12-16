@@ -168,6 +168,12 @@ ifeq ($(DISTRO_ID),netbsd)
 	else \
 		echo ">> /usr/bin/python sudah ada. Symlink dilewati."; \
 	fi
+	@if [ ! -e /usr/bin/python3 ]; then \
+		echo ">> Membuat symlink /usr/bin/python3 -> python3.12..."; \
+		$(USE_SUDO) ln -s /usr/pkg/bin/python3.12 /usr/bin/python3; \
+	else \
+		echo ">> /usr/bin/python3 sudah ada. Symlink dilewati."; \
+	fi
 else ifeq ($(DISTRO_ID),debian)
 	$(call install_pkg,libjson-c-dev)
 	$(call install_pkg,python3)
@@ -196,6 +202,12 @@ ifeq ($(DISTRO_ID),netbsd)
 		$(USE_SUDO) ln -s /usr/pkg/bin/python3.12 /usr/bin/python; \
 	else \
 		echo ">> /usr/bin/python sudah ada. Symlink dilewati."; \
+	fi
+	@if [ ! -e /usr/bin/python3 ]; then \
+		echo ">> Membuat symlink /usr/bin/python3 -> python3.12..."; \
+		$(USE_SUDO) ln -s /usr/pkg/bin/python3.12 /usr/bin/python3; \
+	else \
+		echo ">> /usr/bin/python3 sudah ada. Symlink dilewati."; \
 	fi
 else ifeq ($(DISTRO_ID),debian)
 	$(call install_pkg,libjson-c-dev)
