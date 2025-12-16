@@ -105,10 +105,24 @@ typedef struct {
 	status_t status;
 } uint64_t_status_t;
 
-typedef struct p8zs_t {
+typedef struct {
     size_t len;
 	uint8_t *data;
 	status_t status;
 } p8zs_t;
+
+typedef struct {
+    uint8_t *buffer_in;
+    ssize_t in_size_tb;
+    ssize_t in_size_c;
+    uint8_t *buffer_out;
+    ssize_t out_size_tb;
+    ssize_t out_size_c;
+} et_buffer_t;
+
+typedef struct {
+    int fd;
+    et_buffer_t *buffer;
+} et_buffered_fd_t;
 
 #endif

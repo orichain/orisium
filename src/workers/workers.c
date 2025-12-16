@@ -108,7 +108,7 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
     ctx->rekeying_queue_tail = NULL;
 //----------------------------------------------------------------------
 	if (async_create(ctx->label, &ctx->async) != SUCCESS) return FAILURE;
-	if (async_create_incoming_event(ctx->label, &ctx->async, ctx->master_uds_fd) != SUCCESS) return FAILURE;
+	if (async_create_inout_event(ctx->label, &ctx->async, ctx->master_uds_fd) != SUCCESS) return FAILURE;
 //----------------------------------------------------------------------
     if (oritw_setup(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer) != SUCCESS) return FAILURE;
 //----------------------------------------------------------------------

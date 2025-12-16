@@ -17,9 +17,9 @@ status_t handle_master_ipc_closed_event(const char *label, master_context_t *mas
 	return SUCCESS;
 }
 
-status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx, int *file_descriptor) {
+status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx, int *file_descriptor, et_buffer_t *buffer) {
     while (true) {
-        ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(label, &master_ctx->oritlsf_pool, file_descriptor);
+        ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(label, &master_ctx->oritlsf_pool, file_descriptor, buffer);
         if (ircvdi.status == FAILURE_EAGNEWBLK) {
             break;
         } else {

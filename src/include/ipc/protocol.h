@@ -109,6 +109,7 @@ typedef struct ipc_protocol_queue_t {
     worker_type_t wot;
     uint8_t index;
     int *uds_fd;
+    et_buffer_t *buffer;
     ipc_protocol_t *p;
     struct ipc_protocol_queue_t *next;
     struct ipc_protocol_queue_t *prev;

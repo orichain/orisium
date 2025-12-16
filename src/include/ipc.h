@@ -574,7 +574,7 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, oritlsf
     return result;
 }
 
-static inline ssize_t_status_t send_ipc_protocol_message(const char *label, oritlsf_pool_t *pool, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, int *uds_fd, const ipc_protocol_t* p) {
+static inline ssize_t_status_t send_ipc_protocol_message(const char *label, oritlsf_pool_t *pool, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, int *uds_fd, et_buffer_t *buffer, const ipc_protocol_t* p) {
 	ssize_t_status_t result;
     result.r_ssize_t = 0;
     result.status = FAILURE;
@@ -801,7 +801,7 @@ static inline status_t ipc_read_cleartext_header(const char *label, ipc_raw_prot
     return SUCCESS;
 }
 
-static inline ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, oritlsf_pool_t *pool, int *uds_fd) {
+static inline ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, oritlsf_pool_t *pool, int *uds_fd, et_buffer_t *buffer) {
 	ipc_raw_protocol_t_status_t result;
     result.status = FAILURE;
     result.r_ipc_raw_protocol_t = (ipc_raw_protocol_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_raw_protocol_t));
@@ -917,6 +917,7 @@ static inline status_t ipc_add_tail_protocol_queue(
     worker_type_t wot,
     uint8_t index,
     int *uds_fd,
+    et_buffer_t *buffer,
     ipc_protocol_t *p,
     ipc_protocol_queue_t **head,
     ipc_protocol_queue_t **tail
@@ -930,6 +931,7 @@ static inline status_t ipc_add_tail_protocol_queue(
     new_queue->wot = wot;
     new_queue->index = index;
     new_queue->uds_fd = uds_fd;
+    new_queue->buffer = buffer;
     new_queue->p = p;
     return ipc_add_tail_protocol_queue_internal(head, tail, new_queue);
 }
@@ -957,6 +959,7 @@ static inline status_t ipc_add_head_protocol_queue(
     worker_type_t wot,
     uint8_t index,
     int *uds_fd,
+    et_buffer_t *buffer,
     ipc_protocol_t *p,
     ipc_protocol_queue_t **head,
     ipc_protocol_queue_t **tail
@@ -970,6 +973,7 @@ static inline status_t ipc_add_head_protocol_queue(
     new_queue->wot = wot;
     new_queue->index = index;
     new_queue->uds_fd = uds_fd;
+    new_queue->buffer = buffer;
     new_queue->p = p;
     return ipc_add_head_protocol_queue_internal(head, tail, new_queue);
 }

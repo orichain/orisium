@@ -32,7 +32,7 @@ typedef int uds_pair[2];
 
 typedef struct {
 	uds_pair uds;
-	pid_t pid;
+    pid_t pid;
 } uds_pair_pid_t;
 
 typedef struct {
@@ -68,6 +68,7 @@ typedef struct {
     oricle_long_double_t *avgtt;
     worker_security_t *security;
     worker_rekeying_t *rekeying;
+    et_buffer_t *buffer;
 } master_worker_session_t;
 
 typedef struct {
@@ -91,7 +92,7 @@ typedef struct {
 	int master_pid;
     int udp_sock;
     timer_id_t check_healthy_timer_id;
-    int shutdown_event_fd;
+    et_buffered_fd_t *shutdown_event_fd;
     async_type_t master_async;
 //----------------------------------------------------------------------
     uint8_t last_sio_rr_idx;

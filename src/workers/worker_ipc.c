@@ -54,7 +54,7 @@ status_t worker_master_heartbeat(worker_context_t *ctx, double new_heartbeat_int
         return FAILURE;
     }
     if (ctx->is_rekeying) {
-        if (ipc_add_tail_protocol_queue(ctx->label, &ctx->oritlsf_pool, *ctx->wot, *ctx->index, ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &ctx->rekeying_queue_head, &ctx->rekeying_queue_tail) != SUCCESS) {
+        if (ipc_add_tail_protocol_queue(ctx->label, &ctx->oritlsf_pool, *ctx->wot, *ctx->index, ctx->master_uds_fd, ctx->buffer, cmd_result.r_ipc_protocol_t, &ctx->rekeying_queue_head, &ctx->rekeying_queue_tail) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
@@ -67,6 +67,7 @@ status_t worker_master_heartbeat(worker_context_t *ctx, double new_heartbeat_int
             ctx->local_nonce,
             &ctx->local_ctr,
             ctx->master_uds_fd, 
+            ctx->buffer,
             cmd_result.r_ipc_protocol_t
         );
         if (send_result.status != SUCCESS) {
@@ -100,6 +101,7 @@ status_t worker_master_hello1(worker_context_t *ctx) {
         ctx->local_nonce,
         &ctx->local_ctr,
         ctx->master_uds_fd, 
+        ctx->buffer,
         cmd_result.r_ipc_protocol_t
     );
     if (send_result.status != SUCCESS) {
@@ -133,6 +135,7 @@ status_t worker_master_hello2(worker_context_t *ctx, uint8_t encrypted_wot_index
         ctx->local_nonce,
         &ctx->local_ctr,
         ctx->master_uds_fd, 
+        ctx->buffer,
         cmd_result.r_ipc_protocol_t
     );
     if (send_result.status != SUCCESS) {
@@ -177,7 +180,7 @@ status_t worker_master_udp_data_ack_send_ipc(
         return FAILURE;
     }
     if (worker_ctx->is_rekeying) {
-        if (ipc_add_tail_protocol_queue(worker_ctx->label, &worker_ctx->oritlsf_pool, *worker_ctx->wot, *worker_ctx->index, worker_ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &worker_ctx->rekeying_queue_head, &worker_ctx->rekeying_queue_tail) != SUCCESS) {
+        if (ipc_add_tail_protocol_queue(worker_ctx->label, &worker_ctx->oritlsf_pool, *worker_ctx->wot, *worker_ctx->index, worker_ctx->master_uds_fd, worker_ctx->buffer, cmd_result.r_ipc_protocol_t, &worker_ctx->rekeying_queue_head, &worker_ctx->rekeying_queue_tail) != SUCCESS) {
 			if (h->udp_data) oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&h->udp_data->data);
 			oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&h->udp_data);
             CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
@@ -192,6 +195,7 @@ status_t worker_master_udp_data_ack_send_ipc(
             worker_ctx->local_nonce,
             &worker_ctx->local_ctr,
             worker_ctx->master_uds_fd, 
+            worker_ctx->buffer,
             cmd_result.r_ipc_protocol_t
         );
         if (send_result.status != SUCCESS) {
@@ -238,7 +242,7 @@ status_t worker_master_udp_data_send_ipc(
         return FAILURE;
     }
     if (worker_ctx->is_rekeying) {
-        if (ipc_add_tail_protocol_queue(worker_ctx->label, &worker_ctx->oritlsf_pool, *worker_ctx->wot, *worker_ctx->index, worker_ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &worker_ctx->rekeying_queue_head, &worker_ctx->rekeying_queue_tail) != SUCCESS) {
+        if (ipc_add_tail_protocol_queue(worker_ctx->label, &worker_ctx->oritlsf_pool, *worker_ctx->wot, *worker_ctx->index, worker_ctx->master_uds_fd, worker_ctx->buffer, cmd_result.r_ipc_protocol_t, &worker_ctx->rekeying_queue_head, &worker_ctx->rekeying_queue_tail) != SUCCESS) {
 			if (h->udp_data) oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&h->udp_data->data);
 			oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&h->udp_data);
             CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
@@ -253,6 +257,7 @@ status_t worker_master_udp_data_send_ipc(
             worker_ctx->local_nonce,
             &worker_ctx->local_ctr,
             worker_ctx->master_uds_fd, 
+            worker_ctx->buffer,
             cmd_result.r_ipc_protocol_t
         );
         if (send_result.status != SUCCESS) {
@@ -282,7 +287,7 @@ status_t worker_master_task_info(worker_context_t *ctx, uint8_t session_index, t
         return FAILURE;
     }
     if (ctx->is_rekeying) {
-        if (ipc_add_tail_protocol_queue(ctx->label, &ctx->oritlsf_pool, *ctx->wot, *ctx->index, ctx->master_uds_fd, cmd_result.r_ipc_protocol_t, &ctx->rekeying_queue_head, &ctx->rekeying_queue_tail) != SUCCESS) {
+        if (ipc_add_tail_protocol_queue(ctx->label, &ctx->oritlsf_pool, *ctx->wot, *ctx->index, ctx->master_uds_fd, ctx->buffer, cmd_result.r_ipc_protocol_t, &ctx->rekeying_queue_head, &ctx->rekeying_queue_tail) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
@@ -295,6 +300,7 @@ status_t worker_master_task_info(worker_context_t *ctx, uint8_t session_index, t
             ctx->local_nonce,
             &ctx->local_ctr,
             ctx->master_uds_fd, 
+            ctx->buffer,
             cmd_result.r_ipc_protocol_t
         );
         if (send_result.status != SUCCESS) {
@@ -749,6 +755,7 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
                 worker_ctx->local_nonce,
                 &worker_ctx->local_ctr,
                 current_pqueue->uds_fd,
+                current_pqueue->buffer,
                 current_pqueue->p
             );
             if (send_result.status != SUCCESS) {
@@ -3259,7 +3266,7 @@ status_t handle_workers_ipc_udp_data_ack(worker_context_t *worker_ctx, void **wo
 
 status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void **worker_sessions, double *initial_delay_ms) {
     while (true) {
-        ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(worker_ctx->label, &worker_ctx->oritlsf_pool, worker_ctx->master_uds_fd);
+        ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(worker_ctx->label, &worker_ctx->oritlsf_pool, worker_ctx->master_uds_fd, worker_ctx->buffer);
         if (ircvdi.status == FAILURE_EAGNEWBLK) {
             break;
         } else {

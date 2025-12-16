@@ -218,10 +218,11 @@ static inline status_t async_set_timerfd_time(const char* label, int *timer_fd,
     return SUCCESS;
 }
 
-static inline status_t
-async_create_incoming_event(const char* label,
-                            async_type_t *async,
-                            int *fd)
+static inline status_t async_create_in_event(
+    const char* label,
+    async_type_t *async,
+    int *fd
+)
 {
 #ifdef __NetBSD__
     EV_SET(&async->event_change[0], *fd,
@@ -245,6 +246,43 @@ async_create_incoming_event(const char* label,
                    &async->event) == -1) {
         LOG_ERROR("%sepoll add failed: %s",
                   label, strerror(errno));
+        return FAILURE;
+    }
+#endif
+    return SUCCESS;
+}
+
+static inline status_t async_create_inout_event(
+    const char* label,
+    async_type_t *async,
+    int *fd
+)
+{
+#ifdef __NetBSD__
+    EV_SET(&async->event_change[0], *fd,
+            EVFILT_READ,
+            EV_ADD | EV_ENABLE | EV_CLEAR,
+            0, 0, NULL);
+    EV_SET(&async->event_change[1], *fd,
+            EVFILT_WRITE,
+            EV_ADD | EV_ENABLE | EV_CLEAR,
+            0, 0, NULL);
+    if (kevent(async->async_fd,
+                async->event_change, 2,
+                NULL, 0, NULL) == -1) {
+        LOG_ERROR("%skqueue READ/WRITE add failed: %s", label, strerror(errno));
+        return FAILURE;
+    }
+#else
+    async->event.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLET;
+    async->event.data.fd = *fd;
+
+    if (epoll_ctl(async->async_fd,
+                    EPOLL_CTL_ADD,
+                    *fd,
+                    &async->event) == -1) {
+        LOG_ERROR("%sepoll add failed: %s",
+                    label, strerror(errno));
         return FAILURE;
     }
 #endif
@@ -287,7 +325,7 @@ static inline status_t async_create_timer_oneshot(const char* label, async_type_
         return FAILURE;
     }
     if (closed) {
-        if (async_create_incoming_event(label, async, file_descriptor) != SUCCESS) {
+        if (async_create_in_event(label, async, file_descriptor) != SUCCESS) {
             return FAILURE;
         }
     }

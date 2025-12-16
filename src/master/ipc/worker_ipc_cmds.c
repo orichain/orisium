@@ -22,31 +22,37 @@ status_t master_worker_info(const char *label, master_context_t *master_ctx, wor
     worker_security_t * security = NULL;
     uds_pair_pid_t *upp = NULL;
     worker_rekeying_t *rekeying = NULL;
+    et_buffer_t *buffer = NULL;
     if (wot == SIO) {
         master_worker_session_t *session = &master_ctx->sio_session[index];
         rekeying = session->rekeying;
         security = session->security;
         upp = session->upp;
+        buffer = session->buffer;
     } else if (wot == LOGIC) {
         master_worker_session_t *session = &master_ctx->logic_session[index];
         rekeying = session->rekeying;
         security = session->security;
         upp = session->upp;
+        buffer = session->buffer;
     } else if (wot == COW) {
         master_worker_session_t *session = &master_ctx->cow_session[index];
         rekeying = session->rekeying;
         security = session->security;
         upp = session->upp;
+        buffer = session->buffer;
     } else if (wot == DBR) {
         master_worker_session_t *session = &master_ctx->dbr_session[index];
         rekeying = session->rekeying;
         security = session->security;
         upp = session->upp;
+        buffer = session->buffer;
     } else if (wot == DBW) {
         master_worker_session_t *session = &master_ctx->dbw_session[index];
         rekeying = session->rekeying;
         security = session->security;
         upp = session->upp;
+        buffer = session->buffer;
     } else {
         return FAILURE;
     }
@@ -56,7 +62,7 @@ status_t master_worker_info(const char *label, master_context_t *master_ctx, wor
         return FAILURE;
     }
     if (rekeying->is_rekeying) {
-        if (ipc_add_tail_protocol_queue(label, &master_ctx->oritlsf_pool, wot, index, &upp->uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
+        if (ipc_add_tail_protocol_queue(label, &master_ctx->oritlsf_pool, wot, index, &upp->uds[0], buffer, cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
@@ -69,6 +75,7 @@ status_t master_worker_info(const char *label, master_context_t *master_ctx, wor
             security->local_nonce,
             &security->local_ctr,
             &upp->uds[0], 
+            buffer,
             cmd_result.r_ipc_protocol_t
         );
         if (send_result.status != SUCCESS) {
@@ -118,7 +125,7 @@ status_t master_cow_connect(const char *label, master_context_t *master_ctx, str
         return FAILURE;
     }
     if (rekeying->is_rekeying) {
-        if (ipc_add_tail_protocol_queue(label, &master_ctx->oritlsf_pool, COW, index, &master_ctx->cow_session[index].upp->uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
+        if (ipc_add_tail_protocol_queue(label, &master_ctx->oritlsf_pool, COW, index, &master_ctx->cow_session[index].upp->uds[0], master_ctx->cow_session[index].buffer, cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
@@ -131,6 +138,7 @@ status_t master_cow_connect(const char *label, master_context_t *master_ctx, str
             master_ctx->cow_session[index].security->local_nonce,
             &master_ctx->cow_session[index].security->local_ctr,
             &master_ctx->cow_session[index].upp->uds[0], 
+            master_ctx->cow_session[index].buffer,
             cmd_result.r_ipc_protocol_t
         );
         if (send_result.status != SUCCESS) {
@@ -147,6 +155,25 @@ status_t master_cow_connect(const char *label, master_context_t *master_ctx, str
 
 status_t master_worker_hello1_ack(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index, worker_security_t *security, const char *worker_name, int *worker_uds_fd, uint8_t local_nonce[]) {
     if (!security || *worker_uds_fd == -1) return FAILURE;
+    et_buffer_t *buffer = NULL;
+    if (wot == SIO) {
+        master_worker_session_t *session = &master_ctx->sio_session[index];
+        buffer = session->buffer;
+    } else if (wot == LOGIC) {
+        master_worker_session_t *session = &master_ctx->logic_session[index];
+        buffer = session->buffer;
+    } else if (wot == COW) {
+        master_worker_session_t *session = &master_ctx->cow_session[index];
+        buffer = session->buffer;
+    } else if (wot == DBR) {
+        master_worker_session_t *session = &master_ctx->dbr_session[index];
+        buffer = session->buffer;
+    } else if (wot == DBW) {
+        master_worker_session_t *session = &master_ctx->dbw_session[index];
+        buffer = session->buffer;
+    } else {
+        return FAILURE;
+    }
     uint8_t *kem_ciphertext = security->kem_ciphertext;
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_hello1_ack(
         label, 
@@ -167,6 +194,7 @@ status_t master_worker_hello1_ack(const char *label, master_context_t *master_ct
         security->local_nonce,
         &security->local_ctr,
         worker_uds_fd, 
+        buffer,
         cmd_result.r_ipc_protocol_t
     );
     if (send_result.status != SUCCESS) {
@@ -183,6 +211,25 @@ status_t master_worker_hello1_ack(const char *label, master_context_t *master_ct
 
 status_t master_worker_hello2_ack(const char *label, master_context_t *master_ctx, worker_type_t wot, int index, worker_security_t *security, const char *worker_name, int *worker_uds_fd, uint8_t encrypted_wot_index1[]) {
     if (!security || *worker_uds_fd == -1) return FAILURE;
+    et_buffer_t *buffer = NULL;
+    if (wot == SIO) {
+        master_worker_session_t *session = &master_ctx->sio_session[index];
+        buffer = session->buffer;
+    } else if (wot == LOGIC) {
+        master_worker_session_t *session = &master_ctx->logic_session[index];
+        buffer = session->buffer;
+    } else if (wot == COW) {
+        master_worker_session_t *session = &master_ctx->cow_session[index];
+        buffer = session->buffer;
+    } else if (wot == DBR) {
+        master_worker_session_t *session = &master_ctx->dbr_session[index];
+        buffer = session->buffer;
+    } else if (wot == DBW) {
+        master_worker_session_t *session = &master_ctx->dbw_session[index];
+        buffer = session->buffer;
+    } else {
+        return FAILURE;
+    }
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_hello2_ack(
         label, 
         &master_ctx->oritlsf_pool, 
@@ -201,6 +248,7 @@ status_t master_worker_hello2_ack(const char *label, master_context_t *master_ct
         security->local_nonce,
         &security->local_ctr,
         worker_uds_fd, 
+        buffer,
         cmd_result.r_ipc_protocol_t
     );
     if (send_result.status != SUCCESS) {
@@ -264,13 +312,16 @@ status_t master_worker_udp_data(
     }
     if (rekeying->is_rekeying) {
         uds_pair_pid_t *upp = NULL;
+        et_buffer_t *buffer = NULL;
         switch (wot) {
             case SIO: {
                 upp = master_ctx->sio_session[index].upp;
+                buffer = master_ctx->sio_session[index].buffer;
                 break;
             }
             case COW: {
                 upp = master_ctx->cow_session[index].upp;
+                buffer = master_ctx->cow_session[index].buffer;
                 break;
             }
             default:
@@ -282,24 +333,27 @@ status_t master_worker_udp_data(
             CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
-        if (ipc_add_tail_protocol_queue(label, &master_ctx->oritlsf_pool, wot, index, &upp->uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
+        if (ipc_add_tail_protocol_queue(label, &master_ctx->oritlsf_pool, wot, index, &upp->uds[0], buffer, cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
     } else {
         worker_security_t *security = NULL;
         uds_pair_pid_t *upp = NULL;
+        et_buffer_t *buffer = NULL;
         const char* worker_name = "UNKNOWN";
         switch (wot) {
             case SIO: {
                 security = master_ctx->sio_session[index].security;
                 upp = master_ctx->sio_session[index].upp;
+                buffer = master_ctx->sio_session[index].buffer;
                 worker_name = "SIO";
                 break;
             }
             case COW: {
                 security = master_ctx->cow_session[index].security;
                 upp = master_ctx->cow_session[index].upp;
+                buffer = master_ctx->cow_session[index].buffer;
                 worker_name = "COW";
                 break;
             }
@@ -320,6 +374,7 @@ status_t master_worker_udp_data(
             security->local_nonce,
             &security->local_ctr,
             &upp->uds[0], 
+            buffer,
             cmd_result.r_ipc_protocol_t
         );
         if (send_result.status != SUCCESS) {
@@ -380,13 +435,16 @@ status_t master_worker_udp_data_ack(
     }
     if (rekeying->is_rekeying) {
         uds_pair_pid_t *upp = NULL;
+        et_buffer_t *buffer = NULL;
         switch (wot) {
             case SIO: {
                 upp = master_ctx->sio_session[index].upp;
+                buffer = master_ctx->sio_session[index].buffer;
                 break;
             }
             case COW: {
                 upp = master_ctx->cow_session[index].upp;
+                buffer = master_ctx->cow_session[index].buffer;
                 break;
             }
             default:
@@ -398,24 +456,27 @@ status_t master_worker_udp_data_ack(
             CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
-        if (ipc_add_tail_protocol_queue(label, &master_ctx->oritlsf_pool, wot, index, &upp->uds[0], cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
+        if (ipc_add_tail_protocol_queue(label, &master_ctx->oritlsf_pool, wot, index, &upp->uds[0], buffer, cmd_result.r_ipc_protocol_t, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail) != SUCCESS) {
             CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         }
     } else {
         worker_security_t *security = NULL;
         uds_pair_pid_t *upp = NULL;
+        et_buffer_t *buffer = NULL;
         const char* worker_name = "UNKNOWN";
         switch (wot) {
             case SIO: {
                 security = master_ctx->sio_session[index].security;
                 upp = master_ctx->sio_session[index].upp;
+                buffer = master_ctx->sio_session[index].buffer;
                 worker_name = "SIO";
                 break;
             }
             case COW: {
                 security = master_ctx->cow_session[index].security;
                 upp = master_ctx->cow_session[index].upp;
+                buffer = master_ctx->cow_session[index].buffer;
                 worker_name = "COW";
                 break;
             }
@@ -436,6 +497,7 @@ status_t master_worker_udp_data_ack(
             security->local_nonce,
             &security->local_ctr,
             &upp->uds[0], 
+            buffer,
             cmd_result.r_ipc_protocol_t
         );
         if (send_result.status != SUCCESS) {

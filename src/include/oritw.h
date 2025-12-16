@@ -46,8 +46,8 @@ typedef struct {
 
 typedef struct {
     timer_wheel_t timer_wheel;
-    int tick_event_fd;
-    int timeout_event_fd;
+    et_buffered_fd_t *tick_event_fd;
+    et_buffered_fd_t *timeout_event_fd;
     timer_event_t *sorting_queue_head;
     timer_event_t *sorting_queue_tail;
     timer_event_t *ready_queue_head;
@@ -59,7 +59,7 @@ typedef struct {
 } ori_timer_wheel_t;
 
 typedef struct {
-    int add_event_fd;
+    et_buffered_fd_t *add_event_fd;
     timer_id_t *add_queue_head;
     timer_id_t *add_queue_tail;
     ori_timer_wheel_t *timer[MAX_TIMER_LEVELS];
@@ -180,19 +180,19 @@ static inline status_t oritw_reschedule_main_timer(
         double delay_s = delay_us / 1e6;
         timer->last_delay_us = delay_us;
         timer->next_expiration_tick = next_expiration_tick;
-        if (timer->timeout_event_fd == -1) {
-            if (async_create_event(label, &timer->timeout_event_fd) != SUCCESS) return FAILURE;
-            if (async_create_incoming_event(label, async, &timer->timeout_event_fd) != SUCCESS) return FAILURE;
+        if (timer->timeout_event_fd->fd == -1) {
+            if (async_create_event(label, &timer->timeout_event_fd->fd) != SUCCESS) return FAILURE;
+            if (async_create_inout_event(label, async, &timer->timeout_event_fd->fd) != SUCCESS) return FAILURE;
         }
-        if (async_create_timer_oneshot(label, async, &timer->tick_event_fd, delay_s) != SUCCESS) {
+        if (async_create_timer_oneshot(label, async, &timer->tick_event_fd->fd, delay_s) != SUCCESS) {
             LOG_ERROR("%sFailed to re-arm main tick timer (delay_us=%.2f).", label, delay_us);
             return FAILURE;
         }
     } else {
         timer->last_delay_us = 0.0;
         timer->next_expiration_tick = ULLONG_MAX;
-        if (timer->tick_event_fd != -1) {
-            if (async_update_timer_oneshot(label, &timer->tick_event_fd, 0.0) != SUCCESS) {
+        if (timer->tick_event_fd->fd != -1) {
+            if (async_update_timer_oneshot(label, &timer->tick_event_fd->fd, 0.0) != SUCCESS) {
                 LOG_ERROR("%sFailed to disarm main tick timer.", label);
                 return FAILURE;
             }
@@ -383,27 +383,65 @@ static inline status_t oritw_add_event(
     timer_event_t *new_event = oritw_calculate_level(pool, timers, delay_us, &level_index, &should_reschedule, timer_id->event_type);
     if (new_event == NULL) {
         oritw_add_timer_id_queue(pool, timers, timer_id->id, timer_id->delay_us, timer_id->event_type);
-        if (timers->add_event_fd == -1) {
-            if (async_create_event(label, &timers->add_event_fd) != SUCCESS) return FAILURE;
-            if (async_create_incoming_event(label, async, &timers->add_event_fd) != SUCCESS) return FAILURE;
+        if (timers->add_event_fd->fd == -1) {
+            if (async_create_event(label, &timers->add_event_fd->fd) != SUCCESS) return FAILURE;
+            if (async_create_inout_event(label, async, &timers->add_event_fd->fd) != SUCCESS) return FAILURE;
         }
-        uint64_t val = 1ULL;
-        ssize_t w;
-        do {
-            w = write(timers->add_event_fd, &val, sizeof(uint64_t));
-        } while (w == -1 && errno == EINTR);
-        if (w == -1) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                return SUCCESS;
+        bool wfailure = false;
+        bool wpartial = true;
+        uint64_t u = 1ULL;
+        if (timers->add_event_fd->buffer->out_size_tb == 0) {
+            timers->add_event_fd->buffer->out_size_tb = sizeof(uint64_t);
+            timers->add_event_fd->buffer->buffer_out = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
+                pool,
+                timers->add_event_fd->buffer->out_size_tb,
+                sizeof(uint8_t)
+            );
+            memcpy(timers->add_event_fd->buffer->buffer_out, &u, sizeof(uint64_t));
+        } else {
+            timers->add_event_fd->buffer->out_size_tb += sizeof(uint64_t);
+            timers->add_event_fd->buffer->buffer_out = (uint8_t *)oritlsf_realloc(__FILE__, __LINE__, 
+                pool,
+                timers->add_event_fd->buffer->buffer_out,
+                timers->add_event_fd->buffer->out_size_tb * sizeof(uint8_t)
+            );
+            memcpy(timers->add_event_fd->buffer->buffer_out + sizeof(uint64_t), &u, sizeof(uint64_t));
+        }
+        while (true) {
+            ssize_t wsize = write(timers->add_event_fd->fd, timers->add_event_fd->buffer->buffer_out + timers->add_event_fd->buffer->out_size_c, timers->add_event_fd->buffer->out_size_tb - timers->add_event_fd->buffer->out_size_c);
+            if (wsize < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    if (timers->add_event_fd->buffer->out_size_tb == timers->add_event_fd->buffer->out_size_c) {
+                        wpartial = false;
+                    }
+                    break;
+                } else {
+                    oritlsf_free(pool, (void **)&timers->add_event_fd->buffer->buffer_out);
+                    timers->add_event_fd->buffer->out_size_tb = 0;
+                    timers->add_event_fd->buffer->out_size_c = 0;
+                    wfailure = true;
+                    break;
+                }
+            } 
+            if (wsize > 0) {
+                timers->add_event_fd->buffer->out_size_c += wsize;
             }
-            LOG_ERROR("%sFailed to write add_event_fd: %s", label, strerror(errno));
+            if (timers->add_event_fd->buffer->out_size_tb == timers->add_event_fd->buffer->out_size_c) {
+                wpartial = false;
+                break;
+            }
+        }
+        if (!wfailure) {
+            if (!wpartial) {
+                oritlsf_free(pool, (void **)&timers->add_event_fd->buffer->buffer_out);
+                timers->add_event_fd->buffer->out_size_tb = 0;
+                timers->add_event_fd->buffer->out_size_c = 0;
+            } else {
+                return FAILURE;
+            }
+        } else {
             return FAILURE;
         }
-        if (w != sizeof(uint64_t)) {
-            LOG_ERROR("%sPartial write to add_event_fd: %zd bytes", label, w);
-            return FAILURE;
-        }
-        return SUCCESS;
     }
     new_event->timer_id = timer_id->id;
     timer_id->event = new_event;
@@ -529,15 +567,63 @@ static inline status_t oritw_advance_time_and_process_expired(
 
 static inline status_t oritw_setup(const char *label, oritlsf_pool_t *pool, async_type_t *async, ori_timer_wheels_t *timers) {
     if (!timers) return FAILURE_NOMEM;
-    timers->add_event_fd = -1;
+    timers->add_event_fd = (et_buffered_fd_t *)oritlsf_calloc(__FILE__, __LINE__, 
+        pool,
+        1,
+        sizeof(et_buffered_fd_t)
+    );
+    timers->add_event_fd->fd = -1;
+    timers->add_event_fd->buffer = (et_buffer_t *)oritlsf_calloc(__FILE__, __LINE__, 
+        pool,
+        1,
+        sizeof(et_buffer_t)
+    );
+    timers->add_event_fd->buffer->buffer_in = NULL;
+    timers->add_event_fd->buffer->in_size_tb = 0;
+    timers->add_event_fd->buffer->in_size_c = 0;
+    timers->add_event_fd->buffer->buffer_out = NULL;
+    timers->add_event_fd->buffer->out_size_tb = 0;
+    timers->add_event_fd->buffer->out_size_c = 0;
     timers->add_queue_head = NULL;
     timers->add_queue_tail = NULL;
     for (uint32_t llv = 0; llv < MAX_TIMER_LEVELS; ++llv) {
         timers->timer[llv] = (ori_timer_wheel_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ori_timer_wheel_t));
         if (!timers->timer[llv]) return FAILURE_NOMEM;
         ori_timer_wheel_t *tw = timers->timer[llv];
-        tw->tick_event_fd = -1;
-        tw->timeout_event_fd = -1;
+        tw->tick_event_fd = (et_buffered_fd_t *)oritlsf_calloc(__FILE__, __LINE__, 
+            pool,
+            1,
+            sizeof(et_buffered_fd_t)
+        );
+        tw->tick_event_fd->fd = -1;
+        tw->tick_event_fd->buffer = (et_buffer_t *)oritlsf_calloc(__FILE__, __LINE__, 
+            pool,
+            1,
+            sizeof(et_buffer_t)
+        );
+        tw->tick_event_fd->buffer->buffer_in = NULL;
+        tw->tick_event_fd->buffer->in_size_tb = 0;
+        tw->tick_event_fd->buffer->in_size_c = 0;
+        tw->tick_event_fd->buffer->buffer_out = NULL;
+        tw->tick_event_fd->buffer->out_size_tb = 0;
+        tw->tick_event_fd->buffer->out_size_c = 0;
+        tw->timeout_event_fd = (et_buffered_fd_t *)oritlsf_calloc(__FILE__, __LINE__, 
+            pool,
+            1,
+            sizeof(et_buffered_fd_t)
+        );
+        tw->timeout_event_fd->fd = -1;
+        tw->timeout_event_fd->buffer = (et_buffer_t *)oritlsf_calloc(__FILE__, __LINE__, 
+            pool,
+            1,
+            sizeof(et_buffer_t)
+        );
+        tw->timeout_event_fd->buffer->buffer_in = NULL;
+        tw->timeout_event_fd->buffer->in_size_tb = 0;
+        tw->timeout_event_fd->buffer->in_size_c = 0;
+        tw->timeout_event_fd->buffer->buffer_out = NULL;
+        tw->timeout_event_fd->buffer->out_size_tb = 0;
+        tw->timeout_event_fd->buffer->out_size_c = 0;
         tw->sorting_queue_head = NULL;
         tw->sorting_queue_tail = NULL;
         tw->ready_queue_head = NULL;
@@ -588,16 +674,40 @@ static inline void oritw_cleanup(const char *label, oritlsf_pool_t *pool, async_
         tw->global_current_tick = 0;
         tw->next_expiration_tick = ULLONG_MAX;
         tw->last_delay_us = 0.0;
-        async_delete_event(label, async, &tw->tick_event_fd);
-        CLOSE_FD(&tw->tick_event_fd);
-        async_delete_event(label, async, &tw->timeout_event_fd);
-        CLOSE_FD(&tw->timeout_event_fd);
+        async_delete_event(label, async, &tw->tick_event_fd->fd);
+        CLOSE_FD(&tw->tick_event_fd->fd);
+        if (tw->tick_event_fd->buffer->buffer_in != NULL) {
+            oritlsf_free(pool, (void **)&tw->tick_event_fd->buffer->buffer_in);
+        }
+        if (tw->tick_event_fd->buffer->buffer_out != NULL) {
+            oritlsf_free(pool, (void **)&tw->tick_event_fd->buffer->buffer_out);
+        }
+        oritlsf_free(pool, (void **)&tw->tick_event_fd->buffer);
+        oritlsf_free(pool, (void **)&tw->tick_event_fd);
+        async_delete_event(label, async, &tw->timeout_event_fd->fd);
+        CLOSE_FD(&tw->timeout_event_fd->fd);
+        if (tw->timeout_event_fd->buffer->buffer_in != NULL) {
+            oritlsf_free(pool, (void **)&tw->timeout_event_fd->buffer->buffer_in);
+        }
+        if (tw->timeout_event_fd->buffer->buffer_out != NULL) {
+            oritlsf_free(pool, (void **)&tw->timeout_event_fd->buffer->buffer_out);
+        }
+        oritlsf_free(pool, (void **)&tw->timeout_event_fd->buffer);
+        oritlsf_free(pool, (void **)&tw->timeout_event_fd);
         oritlsf_free(pool, (void **)&tw);
         timers->timer[llv] = NULL;
     }
     timer_id_cleanup(pool, &timers->add_queue_head, &timers->add_queue_tail);
-    async_delete_event(label, async, &timers->add_event_fd);
-    CLOSE_FD(&timers->add_event_fd);
+    async_delete_event(label, async, &timers->add_event_fd->fd);
+    CLOSE_FD(&timers->add_event_fd->fd);
+    if (timers->add_event_fd->buffer->buffer_in != NULL) {
+        oritlsf_free(pool, (void **)&timers->add_event_fd->buffer->buffer_in);
+    }
+    if (timers->add_event_fd->buffer->buffer_out != NULL) {
+        oritlsf_free(pool, (void **)&timers->add_event_fd->buffer->buffer_out);
+    }
+    oritlsf_free(pool, (void **)&timers->add_event_fd->buffer);
+    oritlsf_free(pool, (void **)&timers->add_event_fd);
 }
 
 #endif

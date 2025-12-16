@@ -233,7 +233,15 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
     oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_c_session);
     oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_c_session);
     CLOSE_FD(&master_ctx->udp_sock);
-    CLOSE_FD(&master_ctx->shutdown_event_fd);
+    CLOSE_FD(&master_ctx->shutdown_event_fd->fd);
+    if (master_ctx->shutdown_event_fd->buffer->buffer_in != NULL) {
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->shutdown_event_fd->buffer->buffer_in);
+    }
+    if (master_ctx->shutdown_event_fd->buffer->buffer_out != NULL) {
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->shutdown_event_fd->buffer->buffer_out);
+    }
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->shutdown_event_fd->buffer);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->shutdown_event_fd);
     if (master_ctx->check_healthy_timer_id.event) {
         oritw_remove_event(label, &master_ctx->oritlsf_pool, &master_ctx->master_async, &master_ctx->timer, &master_ctx->check_healthy_timer_id.event);
     }
@@ -291,7 +299,7 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
         session->task_count = (uint16_t)0;
         initial_delay_ms = initialize_metrics(label, session->metrics, wot, index);
 //======================================================================
-        async_create_incoming_event(
+        async_create_inout_event(
             label,
             &master_ctx->master_async,
             &session->upp->uds[0]

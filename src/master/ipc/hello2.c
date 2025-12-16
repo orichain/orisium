@@ -189,6 +189,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
             security->local_nonce,
             &security->local_ctr,
             current_pqueue->uds_fd,
+            session->buffer,
             current_pqueue->p
         );
         if (send_result.status != SUCCESS) {

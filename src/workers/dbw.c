@@ -37,11 +37,13 @@ void run_dbw_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
                     handle_workers_ipc_closed_event(worker_ctx);
                     continue;
                 } else {
-                    handle_workers_ipc_event(worker_ctx, NULL, initial_delay_ms);
+                    if (async_event_is_IN(current_events)) {
+                        handle_workers_ipc_event(worker_ctx, NULL, initial_delay_ms);
+                    }
                     continue;
                 }
             } else {
-                handle_worker_timer_event(worker_ctx, NULL, &current_fd);
+                handle_worker_timer_event(worker_ctx, NULL, &current_fd, &current_events);
                 continue;
             }
         }

@@ -24,13 +24,13 @@
 #define ORILINK_DECRYPT_HEADER
 //#undef ORILINK_DECRYPT_HEADER
 #define ACCRCY_TEST
-#undef ACCRCY_TEST
+//#undef ACCRCY_TEST
 #define LONGINTV_TEST
 #undef LONGINTV_TEST
 
 #define MAX_TIMER_LEVELS 15
 #define WHEEL_SIZE 256
-#define MIN_GAP_US 1000
+#define MIN_GAP_US 5000
 //----------------------------------------------------------------------
 #define KALMAN_CALIBRATION_SAMPLES 50
 //----------------------------------------------------------------------
