@@ -93,8 +93,8 @@ typedef struct {
 //======================================================================
 // IDENTITY & SECURITY
 //======================================================================    
-	orilink_identity_t identity;
-	orilink_security_t security;
+	orilink_identity_t *identity;
+	orilink_security_t *security;
 //======================================================================
 // HELLO
 //======================================================================
@@ -111,22 +111,23 @@ typedef struct {
 //======================================================================
     packet_datas_t data;
 //----------------------------------------------------------------------
-    node_metrics_t metrics;
+    node_metrics_t *metrics;
 //======================================================================
 // ORICLE
 //======================================================================
-	oricle_double_t rtt;
-    oricle_double_t retry;
-    oricle_double_t healthy;
-} sio_c_session_t; //Server
+	oricle_double_t *rtt;
+    oricle_double_t *retry;
+    oricle_double_t *healthy;
+    oricle_long_double_t *avgtt;
+} sio_c_session_t;
 
 typedef struct {
 //======================================================================
 // IDENTITY & SECURITY
 //======================================================================    
-	orilink_identity_t identity;
+	orilink_identity_t *identity;
 	uint8_t *kem_privatekey;
-	orilink_security_t security;
+	orilink_security_t *security;
 //======================================================================
 // HELLO
 //======================================================================
@@ -143,15 +144,15 @@ typedef struct {
 //======================================================================
     packet_datas_t data;
 //----------------------------------------------------------------------
-    node_metrics_t metrics;
+    node_metrics_t *metrics;
 //======================================================================
 // ORICLE
 //======================================================================
-	oricle_double_t rtt;
-    oricle_double_t retry;
-    oricle_double_t healthy;
-    oricle_long_double_t avgtt;
-} cow_c_session_t; //Client
+	oricle_double_t *rtt;
+    oricle_double_t *retry;
+    oricle_double_t *healthy;
+    oricle_long_double_t *avgtt;
+} cow_c_session_t;
 
 typedef struct {
     int pid;
@@ -211,19 +212,19 @@ static inline void calculate_retry(worker_context_t *ctx, void *void_session, wo
     switch (wot) {
         case COW: {
             cow_c_session_t *session = (cow_c_session_t *)void_session;
-            int needed = snprintf(NULL, 0, "[RETRY %d]: ", session->identity.local_session_index);
+            int needed = snprintf(NULL, 0, "[RETRY %d]: ", session->identity->local_session_index);
             char desc[needed+1];
-            snprintf(desc, needed + 1, "[RETRY %d]: ", session->identity.local_session_index);
-            calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, &session->retry, try_count, ((double)MAX_RETRY_CNT * (double)2));
+            snprintf(desc, needed + 1, "[RETRY %d]: ", session->identity->local_session_index);
+            calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, session->retry, try_count, ((double)MAX_RETRY_CNT * (double)2));
             //printf("%s%s Value Prediction: %f\n", ctx->label, desc, session->retry.value_prediction);
             break;
         }
         case SIO: {
             sio_c_session_t *session = (sio_c_session_t *)void_session;
-            int needed = snprintf(NULL, 0, "[RETRY %d]: ", session->identity.local_session_index);
+            int needed = snprintf(NULL, 0, "[RETRY %d]: ", session->identity->local_session_index);
             char desc[needed+1];
-            snprintf(desc, needed + 1, "[RETRY %d]: ", session->identity.local_session_index);
-            calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, &session->retry, try_count, ((double)MAX_RETRY_CNT * (double)2));
+            snprintf(desc, needed + 1, "[RETRY %d]: ", session->identity->local_session_index);
+            calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, session->retry, try_count, ((double)MAX_RETRY_CNT * (double)2));
             //printf("%s%s Value Prediction: %f\n", ctx->label, desc, session->retry.value_prediction);
             break;
         }
@@ -236,19 +237,19 @@ static inline void calculate_rtt(worker_context_t *ctx, void *void_session, work
     switch (wot) {
         case COW: {
             cow_c_session_t *session = (cow_c_session_t *)void_session;
-            int needed = snprintf(NULL, 0, "[RTT %d]: ", session->identity.local_session_index);
+            int needed = snprintf(NULL, 0, "[RTT %d]: ", session->identity->local_session_index);
             char desc[needed + 1];
-            snprintf(desc, needed + 1, "[RTT %d]: ", session->identity.local_session_index);
-            calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, &session->rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
+            snprintf(desc, needed + 1, "[RTT %d]: ", session->identity->local_session_index);
+            calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, session->rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
             //printf("%s%s Value Prediction: %f\n", ctx->label, desc, session->rtt.value_prediction);
             break;
         }
         case SIO: {
             sio_c_session_t *session = (sio_c_session_t *)void_session;
-            int needed = snprintf(NULL, 0, "[RTT %d]: ", session->identity.local_session_index);
+            int needed = snprintf(NULL, 0, "[RTT %d]: ", session->identity->local_session_index);
             char desc[needed + 1];
-            snprintf(desc, needed + 1, "[RTT %d]: ", session->identity.local_session_index);
-            calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, &session->rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
+            snprintf(desc, needed + 1, "[RTT %d]: ", session->identity->local_session_index);
+            calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, session->rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
             //printf("%s%s Value Prediction: %f\n", ctx->label, desc, session->rtt.value_prediction);
             break;
         }
@@ -321,8 +322,43 @@ static inline void setup_control_packet_ack(packet_ack_t *h) {
 }
 
 static inline status_t setup_cow_session(worker_context_t *ctx, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
+    single_session->identity = (orilink_identity_t *)oritlsf_calloc(__FILE__, __LINE__, 
+        &ctx->oritlsf_pool,
+        1,
+        sizeof(orilink_identity_t)
+    );
+    single_session->security = (orilink_security_t *)oritlsf_calloc(__FILE__, __LINE__, 
+        &ctx->oritlsf_pool,
+        1,
+        sizeof(orilink_security_t)
+    );
+    single_session->metrics = (node_metrics_t *)oritlsf_calloc(__FILE__, __LINE__, 
+        &ctx->oritlsf_pool,
+        1,
+        sizeof(node_metrics_t)
+    );
+    single_session->rtt = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__, 
+        &ctx->oritlsf_pool,
+        1,
+        sizeof(oricle_double_t)
+    );
+    single_session->retry = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__, 
+        &ctx->oritlsf_pool,
+        1,
+        sizeof(oricle_double_t)
+    );
+    single_session->healthy = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__, 
+        &ctx->oritlsf_pool,
+        1,
+        sizeof(oricle_double_t)
+    );
+    single_session->avgtt = (oricle_long_double_t *)oritlsf_calloc(__FILE__, __LINE__, 
+        &ctx->oritlsf_pool,
+        1,
+        sizeof(oricle_long_double_t)
+    );
 //----------------------------------------------------------------------
-    initialize_node_metrics(ctx->label, &single_session->metrics);
+    initialize_node_metrics(ctx->label, single_session->metrics);
 //----------------------------------------------------------------------
     setup_control_packet(ctx->label, session_index, &single_session->hello1);
     setup_control_packet(ctx->label, session_index, &single_session->hello2);
@@ -345,12 +381,12 @@ static inline status_t setup_cow_session(worker_context_t *ctx, cow_c_session_t 
     single_session->heartbeat.heartbeat_openner_timer_id.event_type = TE_GENERAL;
     #endif
 //----------------------------------------------------------------------
-    setup_oricle_double(&single_session->retry, (double)0);
-    setup_oricle_double(&single_session->rtt, (double)0);
-    setup_oricle_long_double(&single_session->avgtt, (long double)0);
-    setup_oricle_double(&single_session->healthy, (double)100);
-    orilink_identity_t *identity = &single_session->identity;
-    orilink_security_t *security = &single_session->security;
+    setup_oricle_double(single_session->retry, (double)0);
+    setup_oricle_double(single_session->rtt, (double)0);
+    setup_oricle_long_double(single_session->avgtt, (long double)0);
+    setup_oricle_double(single_session->healthy, (double)100);
+    orilink_identity_t *identity = single_session->identity;
+    orilink_security_t *security = single_session->security;
     identity->id_connection = 0xffffffffffffffff;
     memset(&identity->remote_addr, 0, sizeof(struct sockaddr_in6));
     identity->remote_wot = UNKNOWN;
@@ -451,12 +487,12 @@ static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *s
     }
     #endif
 //----------------------------------------------------------------------
-    cleanup_oricle_double(&ctx->oritlsf_pool, &single_session->retry);
-    cleanup_oricle_double(&ctx->oritlsf_pool, &single_session->rtt);
-    cleanup_oricle_long_double(&ctx->oritlsf_pool, &single_session->avgtt);
-    cleanup_oricle_double(&ctx->oritlsf_pool, &single_session->healthy);
-    orilink_identity_t *identity = &single_session->identity;
-    orilink_security_t *security = &single_session->security;
+    cleanup_oricle_double(&ctx->oritlsf_pool, single_session->retry);
+    cleanup_oricle_double(&ctx->oritlsf_pool, single_session->rtt);
+    cleanup_oricle_long_double(&ctx->oritlsf_pool, single_session->avgtt);
+    cleanup_oricle_double(&ctx->oritlsf_pool, single_session->healthy);
+    orilink_identity_t *identity = single_session->identity;
+    orilink_security_t *security = single_session->security;
     identity->id_connection = 0xffffffffffffffff;
     memset(&identity->remote_addr, 0, sizeof(struct sockaddr_in6));
     identity->remote_wot = UNKNOWN;
@@ -495,11 +531,53 @@ static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *s
 		oritlsf_free(&ctx->oritlsf_pool, (void **)&security->local_data_nonce[illp]);
 		oritlsf_free(&ctx->oritlsf_pool, (void **)&security->remote_data_nonce[illp]);
 	}
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&single_session->metrics);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&single_session->retry);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&single_session->rtt);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&single_session->healthy);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&single_session->avgtt);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&single_session->identity);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&single_session->security);
 }
 
 static inline status_t setup_sio_session(worker_context_t *ctx, sio_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
+    single_session->identity = (orilink_identity_t *)oritlsf_calloc(__FILE__, __LINE__, 
+        &ctx->oritlsf_pool,
+        1,
+        sizeof(orilink_identity_t)
+    );
+    single_session->security = (orilink_security_t *)oritlsf_calloc(__FILE__, __LINE__, 
+        &ctx->oritlsf_pool,
+        1,
+        sizeof(orilink_security_t)
+    );
+    single_session->metrics = (node_metrics_t *)oritlsf_calloc(__FILE__, __LINE__, 
+        &ctx->oritlsf_pool,
+        1,
+        sizeof(node_metrics_t)
+    );
+    single_session->rtt = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__, 
+        &ctx->oritlsf_pool,
+        1,
+        sizeof(oricle_double_t)
+    );
+    single_session->retry = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__, 
+        &ctx->oritlsf_pool,
+        1,
+        sizeof(oricle_double_t)
+    );
+    single_session->healthy = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__, 
+        &ctx->oritlsf_pool,
+        1,
+        sizeof(oricle_double_t)
+    );
+    single_session->avgtt = (oricle_long_double_t *)oritlsf_calloc(__FILE__, __LINE__, 
+        &ctx->oritlsf_pool,
+        1,
+        sizeof(oricle_long_double_t)
+    );
 //----------------------------------------------------------------------
-    initialize_node_metrics(ctx->label, &single_session->metrics);
+    initialize_node_metrics(ctx->label, single_session->metrics);
 //----------------------------------------------------------------------
     setup_control_packet_ack(&single_session->hello1_ack);
     setup_control_packet_ack(&single_session->hello2_ack);
@@ -522,11 +600,11 @@ static inline status_t setup_sio_session(worker_context_t *ctx, sio_c_session_t 
     single_session->heartbeat.heartbeat_openner_timer_id.event_type = TE_GENERAL;
     #endif
 //----------------------------------------------------------------------
-    setup_oricle_double(&single_session->retry, (double)0);
-    setup_oricle_double(&single_session->rtt, (double)0);
-    setup_oricle_double(&single_session->healthy, (double)100);
-    orilink_identity_t *identity = &single_session->identity;
-    orilink_security_t *security = &single_session->security;
+    setup_oricle_double(single_session->retry, (double)0);
+    setup_oricle_double(single_session->rtt, (double)0);
+    setup_oricle_double(single_session->healthy, (double)100);
+    orilink_identity_t *identity = single_session->identity;
+    orilink_security_t *security = single_session->security;
     identity->id_connection = 0xffffffffffffffff;
     memset(&identity->remote_addr, 0, sizeof(struct sockaddr_in6));
     identity->remote_wot = UNKNOWN;
@@ -618,11 +696,11 @@ static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *s
     }
     #endif
 //----------------------------------------------------------------------
-    cleanup_oricle_double(&ctx->oritlsf_pool, &single_session->retry);
-    cleanup_oricle_double(&ctx->oritlsf_pool, &single_session->rtt);
-    cleanup_oricle_double(&ctx->oritlsf_pool, &single_session->healthy);
-    orilink_identity_t *identity = &single_session->identity;
-    orilink_security_t *security = &single_session->security;
+    cleanup_oricle_double(&ctx->oritlsf_pool, single_session->retry);
+    cleanup_oricle_double(&ctx->oritlsf_pool, single_session->rtt);
+    cleanup_oricle_double(&ctx->oritlsf_pool, single_session->healthy);
+    orilink_identity_t *identity = single_session->identity;
+    orilink_security_t *security = single_session->security;
     identity->id_connection = 0xffffffffffffffff;
     memset(&identity->remote_addr, 0, sizeof(struct sockaddr_in6));
     identity->remote_wot = UNKNOWN;
@@ -659,6 +737,13 @@ static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *s
 		oritlsf_free(&ctx->oritlsf_pool, (void **)&security->local_data_nonce[illp]);
 		oritlsf_free(&ctx->oritlsf_pool, (void **)&security->remote_data_nonce[illp]);
 	}
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&single_session->metrics);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&single_session->retry);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&single_session->rtt);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&single_session->healthy);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&single_session->avgtt);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&single_session->identity);
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&single_session->security);
 }
 
 #endif

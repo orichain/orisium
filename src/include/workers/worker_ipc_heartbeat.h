@@ -24,10 +24,10 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
     switch (wot) {
         case COW: {
             cow_c_session_t *session = (cow_c_session_t *)xsession;
-            orilink_identity_t *identity = &session->identity;
-            orilink_security_t *security = &session->security;
+            orilink_identity_t *identity = session->identity;
+            orilink_security_t *security = session->security;
 //======================================================================
-            double hb_interval = node_hb_interval_with_jitter_us(session->rtt.value_prediction, session->retry.value_prediction);
+            double hb_interval = node_hb_interval_with_jitter_us(session->rtt->value_prediction, session->retry->value_prediction);
             session->heartbeat.last_send_heartbeat_interval = hb_interval;
 //======================================================================
             uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
@@ -85,7 +85,7 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
                     identity->local_session_index, 
                     (uint8_t)orilink_protocol,
                     session->heartbeat.heartbeat.sent_try_count,
-                    &session->identity.remote_addr, 
+                    &session->identity->remote_addr, 
                     &session->heartbeat.heartbeat
                 ) != SUCCESS
             )
@@ -102,10 +102,10 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
         }
         case SIO: {
             sio_c_session_t *session = (sio_c_session_t *)xsession;
-            orilink_identity_t *identity = &session->identity;
-            orilink_security_t *security = &session->security;
+            orilink_identity_t *identity = session->identity;
+            orilink_security_t *security = session->security;
 //======================================================================
-            double hb_interval = node_hb_interval_with_jitter_us(session->rtt.value_prediction, session->retry.value_prediction);
+            double hb_interval = node_hb_interval_with_jitter_us(session->rtt->value_prediction, session->retry->value_prediction);
             session->heartbeat.last_send_heartbeat_interval = hb_interval;
 //======================================================================
             uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
@@ -163,7 +163,7 @@ static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsessi
                     identity->local_session_index, 
                     (uint8_t)orilink_protocol,
                     session->heartbeat.heartbeat.sent_try_count,
-                    &session->identity.remote_addr, 
+                    &session->identity->remote_addr, 
                     &session->heartbeat.heartbeat
                 ) != SUCCESS
             )
@@ -189,8 +189,8 @@ static inline status_t send_heartbeat_ack(worker_context_t *worker_ctx, void *xs
     switch (wot) {
         case COW: {
             cow_c_session_t *session = (cow_c_session_t *)xsession;
-            orilink_identity_t *identity = &session->identity;
-            orilink_security_t *security = &session->security;
+            orilink_identity_t *identity = session->identity;
+            orilink_security_t *security = session->security;
 //======================================================================
             uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
             if (current_time.status != SUCCESS) {
@@ -262,8 +262,8 @@ static inline status_t send_heartbeat_ack(worker_context_t *worker_ctx, void *xs
         }
         case SIO: {
             sio_c_session_t *session = (sio_c_session_t *)xsession;
-            orilink_identity_t *identity = &session->identity;
-            orilink_security_t *security = &session->security;
+            orilink_identity_t *identity = session->identity;
+            orilink_security_t *security = session->security;
 //======================================================================
             uint64_t_status_t current_time = get_monotonic_time_ns(worker_ctx->label);
             if (current_time.status != SUCCESS) {
@@ -370,7 +370,7 @@ static inline status_t first_heartbeat_finalization(worker_context_t *worker_ctx
 		double rtt_value = (double)interval_ull;
         calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
         #if !defined(LONGINTV_TEST)
-        printf("%sRTT Hello-4 Ack = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr);
+        printf("%sRTT Hello-4 Ack = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt->value_prediction / 1e6, (unsigned int)session->security->remote_ctr, (unsigned int)session->security->local_ctr);
         #endif
 //----------------------------------------------------------------------
 		session->heartbeat.heartbeat_ack.ack_sent_time = current_time.r_uint64_t;
@@ -724,7 +724,7 @@ static inline status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_cont
     char timebuf[32];
     get_time_str(timebuf, sizeof(timebuf));
     #if !defined(LONGINTV_TEST)
-    printf("%s%s - RTT Heartbeat = %lf ms, Remote Ctr %u, Local Ctr %u, trycount %d\n", worker_ctx->label, timebuf, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr, trycount);
+    printf("%s%s - RTT Heartbeat = %lf ms, Remote Ctr %u, Local Ctr %u, trycount %d\n", worker_ctx->label, timebuf, session->rtt->value_prediction / 1e6, (unsigned int)session->security->remote_ctr, (unsigned int)session->security->local_ctr, trycount);
     #endif
 //======================================================================
     session->heartbeat.heartbeat.ack_rcvd = true;
@@ -1040,7 +1040,7 @@ static inline status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_cont
     char timebuf[32];
     get_time_str(timebuf, sizeof(timebuf));
     #if !defined(LONGINTV_TEST)
-    printf("%s%s - RTT Heartbeat = %lf ms, Remote Ctr %u, Local Ctr %u, trycount %d\n", worker_ctx->label, timebuf, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr, trycount);
+    printf("%s%s - RTT Heartbeat = %lf ms, Remote Ctr %u, Local Ctr %u, trycount %d\n", worker_ctx->label, timebuf, session->rtt->value_prediction / 1e6, (unsigned int)session->security->remote_ctr, (unsigned int)session->security->local_ctr, trycount);
     #endif
 //======================================================================
     session->heartbeat.heartbeat.ack_rcvd = true;

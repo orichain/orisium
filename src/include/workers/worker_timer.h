@@ -32,8 +32,8 @@ static inline status_t retry_transmit(
     switch (wot) {
         case COW: {
             cow_c_session_t *session = (cow_c_session_t *)xsession;
-            orilink_identity_t *identity = &session->identity;
-            orilink_security_t *security = &session->security;
+            orilink_identity_t *identity = session->identity;
+            orilink_security_t *security = session->security;
             worker_type_t c_wot = identity->local_wot;
             uint8_t c_index = identity->local_index;
             uint8_t c_session_index = identity->local_session_index;
@@ -68,8 +68,8 @@ static inline status_t retry_transmit(
         }
         case SIO: {
             sio_c_session_t *session = (sio_c_session_t *)xsession;
-            orilink_identity_t *identity = &session->identity;
-            orilink_security_t *security = &session->security;
+            orilink_identity_t *identity = session->identity;
+            orilink_security_t *security = session->security;
             worker_type_t c_wot = identity->local_wot;
             uint8_t c_index = identity->local_index;
             uint8_t c_session_index = identity->local_session_index;

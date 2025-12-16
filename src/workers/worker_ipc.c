@@ -432,8 +432,8 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
     uint16_t slot_found = icow_connecti->session_index;
     cow_c_session_t *cow_c_session = (cow_c_session_t *)worker_sessions;
     cow_c_session_t *session = &cow_c_session[slot_found];
-    orilink_identity_t *identity = &session->identity;
-    orilink_security_t *security = &session->security;
+    orilink_identity_t *identity = session->identity;
+    orilink_security_t *security = session->security;
     memcpy(&identity->remote_addr, &icow_connecti->remote_addr, sizeof(struct sockaddr_in6));
 //======================================================================
 // Initalize Or FAILURE Now
@@ -1342,7 +1342,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
-    printf("%sRTT Hello-3 Ack = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr);
+    printf("%sRTT Hello-3 Ack = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt->value_prediction / 1e6, (unsigned int)session->security->remote_ctr, (unsigned int)session->security->local_ctr);
     #endif
 //======================================================================
     session->hello4_ack.ack_sent = true;
@@ -1566,7 +1566,7 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
-    printf("%sRTT Hello-2 Ack = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr);
+    printf("%sRTT Hello-2 Ack = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt->value_prediction / 1e6, (unsigned int)session->security->remote_ctr, (unsigned int)session->security->local_ctr);
     #endif
 //======================================================================
     session->hello3_ack.ack_sent = true;
@@ -1778,7 +1778,7 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
-    printf("%sRTT Hello-1 Ack = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr);
+    printf("%sRTT Hello-1 Ack = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt->value_prediction / 1e6, (unsigned int)session->security->remote_ctr, (unsigned int)session->security->local_ctr);
     #endif
 //======================================================================
     session->hello2_ack.ack_sent = true;
@@ -2181,7 +2181,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     session->heartbeat.heartbeat.sent_try_count++;
     session->heartbeat.heartbeat.sent_time = current_time.r_uint64_t;
 //======================================================================
-    double hb_interval = node_hb_interval_with_jitter_us(session->rtt.value_prediction, session->retry.value_prediction);
+    double hb_interval = node_hb_interval_with_jitter_us(session->rtt->value_prediction, session->retry->value_prediction);
     session->heartbeat.last_send_heartbeat_interval = hb_interval;
     #if !defined(LONGINTV_TEST)
     printf("%sSend HB Interval %f us\n", worker_ctx->label, hb_interval);
@@ -2281,7 +2281,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
-    printf("%sRTT Hello-4 = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr);
+    printf("%sRTT Hello-4 = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt->value_prediction / 1e6, (unsigned int)session->security->remote_ctr, (unsigned int)session->security->local_ctr);
     #endif
 //======================================================================
     session->hello4.ack_rcvd = true;
@@ -2547,7 +2547,7 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
-    printf("%sRTT Hello-3 = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr);
+    printf("%sRTT Hello-3 = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt->value_prediction / 1e6, (unsigned int)session->security->remote_ctr, (unsigned int)session->security->local_ctr);
     #endif
 //======================================================================
     session->hello3.ack_rcvd = true;
@@ -2702,7 +2702,7 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
-    printf("%sRTT Hello-2 = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr);
+    printf("%sRTT Hello-2 = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt->value_prediction / 1e6, (unsigned int)session->security->remote_ctr, (unsigned int)session->security->local_ctr);
     #endif
 //======================================================================
     session->hello2.ack_rcvd = true;
@@ -2862,7 +2862,7 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
-    printf("%sRTT Hello-1 = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr);
+    printf("%sRTT Hello-1 = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt->value_prediction / 1e6, (unsigned int)session->security->remote_ctr, (unsigned int)session->security->local_ctr);
     #endif
 //======================================================================
     session->hello1.ack_rcvd = true;
@@ -2878,8 +2878,8 @@ status_t handle_workers_ipc_udp_data_sio(worker_context_t *worker_ctx, void *wor
     uint8_t session_index = iudp_datai->session_index;
     cow_c_session_t *cow_c_session = (cow_c_session_t *)worker_sessions;
     cow_c_session_t *session = &cow_c_session[session_index];
-    orilink_identity_t *identity = &session->identity;
-    orilink_security_t *security = &session->security;
+    orilink_identity_t *identity = session->identity;
+    orilink_security_t *security = session->security;
 //----------------------------------------------------------------------
     struct sockaddr_in6 remote_addr;
     memcpy(&remote_addr, &iudp_datai->remote_addr, sizeof(struct sockaddr_in6));
@@ -2945,8 +2945,8 @@ status_t handle_workers_ipc_udp_data_cow(worker_context_t *worker_ctx, void *wor
     uint8_t session_index = iudp_datai->session_index;
     sio_c_session_t *sio_c_session = (sio_c_session_t *)worker_sessions;
     sio_c_session_t *session = &sio_c_session[session_index];
-    orilink_identity_t *identity = &session->identity;
-    orilink_security_t *security = &session->security;
+    orilink_identity_t *identity = session->identity;
+    orilink_security_t *security = session->security;
 //----------------------------------------------------------------------
     struct sockaddr_in6 remote_addr;
     memcpy(&remote_addr, &iudp_datai->remote_addr, sizeof(struct sockaddr_in6));
@@ -3059,7 +3059,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
     switch ((orilink_protocol_type_t)iudp_data_acki->orilink_protocol) {
         case ORILINK_HELLO1: {
 //======================================================================
-            session->hello1.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
+            session->hello1.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry->value_prediction);
             status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &session->hello1.retry_timer_id);
             if (chst != SUCCESS) {
                 CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
@@ -3071,7 +3071,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
         }
         case ORILINK_HELLO2: {
 //======================================================================
-            session->hello2.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
+            session->hello2.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry->value_prediction);
             status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &session->hello2.retry_timer_id);
             if (chst != SUCCESS) {
                 CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
@@ -3083,7 +3083,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
         }
         case ORILINK_HELLO3: {
 //======================================================================
-            session->hello3.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
+            session->hello3.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry->value_prediction);
             status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &session->hello3.retry_timer_id);
             if (chst != SUCCESS) {
                 CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
@@ -3095,7 +3095,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
         }
         case ORILINK_HELLO4: {
 //======================================================================
-            session->hello4.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
+            session->hello4.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry->value_prediction);
             status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &session->hello4.retry_timer_id);
             if (chst != SUCCESS) {
                 CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
@@ -3117,7 +3117,7 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
             session->heartbeat.heartbeat_ack.ack_sent = true;
             #endif
 //======================================================================
-            session->heartbeat.heartbeat.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
+            session->heartbeat.heartbeat.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry->value_prediction);
             status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id);
             if (chst != SUCCESS) {
                 CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
@@ -3183,7 +3183,7 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
             session->heartbeat.heartbeat_ack.ack_sent = true;
             #endif
 //======================================================================
-            session->heartbeat.heartbeat.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry.value_prediction);
+            session->heartbeat.heartbeat.retry_timer_id.delay_us = retry_interval_with_jitter_us(session->retry->value_prediction);
             status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id);
             if (chst != SUCCESS) {
                 CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
