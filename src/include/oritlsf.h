@@ -7,7 +7,10 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <string.h>
-#include <sys/common_int_limits.h>
+
+#ifdef __NetBSD__
+    #include <sys/common_int_limits.h>
+#endif
 
 #define TLSF_DEBUG
 

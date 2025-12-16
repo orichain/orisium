@@ -7,7 +7,10 @@
 #include <string.h>
 #include <sys/types.h>
 #include <stdio.h>
-#include <sys/errno.h>
+
+#ifdef __NetBSD__
+    #include <sys/errno.h>
+#endif
 
 #include "log.h"
 #include "oritw.h"

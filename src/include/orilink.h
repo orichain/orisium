@@ -12,11 +12,10 @@
 
 #ifdef __NetBSD__
     #include <sys/endian.h>
+    #include <sys/errno.h>
 #else
     #include <endian.h>
 #endif
-
-#include <sys/errno.h>
 
 #include "utilities.h"
 #include "orilink/protocol.h"

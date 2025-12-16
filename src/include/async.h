@@ -5,10 +5,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <sys/errno.h>
-#include <sys/fcntl.h>
 
 #ifdef __NetBSD__
+    #include <sys/errno.h>
+    #include <sys/fcntl.h>
     #include <sys/event.h>
     #include <sys/time.h>
     #include <sys/eventfd.h>

@@ -4,7 +4,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/endian.h>
+
+#ifdef __NetBSD__
+    #include <sys/endian.h>
+#else
+    #include <endian.h>
+#endif
 
 #include "constants.h"
 #include "ipc.h"
