@@ -3,24 +3,29 @@
 
 #include <aes.h>
 #include <arpa/inet.h>
-#include <endian.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fips202.h>
 #include <math.h>
 #include <netdb.h>
+#include <sys/errno.h>
+#include <sys/signal.h>
+#include <sys/time.h>
 
 #ifdef __NetBSD__
     #ifndef AI_V4MAPPED
         #define AI_V4MAPPED 0
     #endif
+    #include <sys/endian.h>
+#else
+    #include <endian.h>
+    #include <stddef.h>
 #endif
 
 #include <netinet/in.h>
 #include <randombytes.h>
 #include <signal.h>
 #include <stdbool.h>
-#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

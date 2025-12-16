@@ -5,7 +5,12 @@
 #include <string.h>
 #include <stdint.h>
 #include <errno.h>
-#include <endian.h>
+
+#ifdef __NetBSD__
+    #include <sys/endian.h>
+#else
+    #include <endian.h>
+#endif
 
 #include "utilities.h"
 #include "orilink/protocol.h"

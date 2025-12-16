@@ -1,10 +1,10 @@
-#include <endian.h>
 #include <errno.h>
 #include <inttypes.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/endian.h>
 
 #include "constants.h"
 #include "ipc.h"
@@ -413,7 +413,7 @@ status_t handle_workers_ipc_info(worker_context_t *worker_ctx, double *initial_d
     return SUCCESS;
 }
 
-status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *worker_sessions, ipc_raw_protocol_t_status_t *ircvdi) {
+status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void **worker_sessions, ipc_raw_protocol_t_status_t *ircvdi) {
     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool, 
         worker_ctx->aes_key, worker_ctx->remote_nonce, &worker_ctx->remote_ctr,
         (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
@@ -430,8 +430,7 @@ status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void *work
     ipc_master_cow_connect_t *icow_connecti = received_protocol->payload.ipc_master_cow_connect;            
 //----------------------------------------------------------------------
     uint16_t slot_found = icow_connecti->session_index;
-    cow_c_session_t *cow_c_session = (cow_c_session_t *)worker_sessions;
-    cow_c_session_t *session = &cow_c_session[slot_found];
+    cow_c_session_t *session = ((cow_c_session_t **)worker_sessions)[slot_found];
     orilink_identity_t *identity = session->identity;
     orilink_security_t *security = session->security;
     memcpy(&identity->remote_addr, &icow_connecti->remote_addr, sizeof(struct sockaddr_in6));
@@ -2873,11 +2872,10 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
     return SUCCESS;
 }
 
-status_t handle_workers_ipc_udp_data_sio(worker_context_t *worker_ctx, void *worker_sessions, ipc_protocol_t* received_protocol) {
+status_t handle_workers_ipc_udp_data_sio(worker_context_t *worker_ctx, void **worker_sessions, ipc_protocol_t* received_protocol) {
     ipc_udp_data_t *iudp_datai = received_protocol->payload.ipc_udp_data;
     uint8_t session_index = iudp_datai->session_index;
-    cow_c_session_t *cow_c_session = (cow_c_session_t *)worker_sessions;
-    cow_c_session_t *session = &cow_c_session[session_index];
+    cow_c_session_t *session = ((cow_c_session_t **)worker_sessions)[session_index];
     orilink_identity_t *identity = session->identity;
     orilink_security_t *security = session->security;
 //----------------------------------------------------------------------
@@ -2940,11 +2938,10 @@ status_t handle_workers_ipc_udp_data_sio(worker_context_t *worker_ctx, void *wor
     return SUCCESS;
 }
 
-status_t handle_workers_ipc_udp_data_cow(worker_context_t *worker_ctx, void *worker_sessions, ipc_protocol_t* received_protocol) {
+status_t handle_workers_ipc_udp_data_cow(worker_context_t *worker_ctx, void **worker_sessions, ipc_protocol_t* received_protocol) {
     ipc_udp_data_t *iudp_datai = received_protocol->payload.ipc_udp_data;
     uint8_t session_index = iudp_datai->session_index;
-    sio_c_session_t *sio_c_session = (sio_c_session_t *)worker_sessions;
-    sio_c_session_t *session = &sio_c_session[session_index];
+    sio_c_session_t *session = ((sio_c_session_t **)worker_sessions)[session_index];
     orilink_identity_t *identity = session->identity;
     orilink_security_t *security = session->security;
 //----------------------------------------------------------------------
@@ -3007,7 +3004,7 @@ status_t handle_workers_ipc_udp_data_cow(worker_context_t *worker_ctx, void *wor
     return SUCCESS;
 }
 
-status_t handle_workers_ipc_udp_data(worker_context_t *worker_ctx, void *worker_sessions, ipc_raw_protocol_t_status_t *ircvdi) {
+status_t handle_workers_ipc_udp_data(worker_context_t *worker_ctx, void **worker_sessions, ipc_raw_protocol_t_status_t *ircvdi) {
     worker_type_t remote_wot = UNKNOWN;
     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool, 
         worker_ctx->aes_key, worker_ctx->remote_nonce, &worker_ctx->remote_ctr,
@@ -3050,12 +3047,11 @@ status_t handle_workers_ipc_udp_data(worker_context_t *worker_ctx, void *worker_
     return SUCCESS;
 }
 
-status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void *worker_sessions, ipc_protocol_t* received_protocol) {
+status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void **worker_sessions, ipc_protocol_t* received_protocol) {
     ipc_udp_data_ack_t *iudp_data_acki = received_protocol->payload.ipc_udp_data_ack;
     uint8_t index = received_protocol->index;
     uint8_t session_index = iudp_data_acki->session_index;
-    cow_c_session_t *cow_c_session = (cow_c_session_t *)worker_sessions;
-    cow_c_session_t *session = &cow_c_session[session_index];
+    cow_c_session_t *session = ((cow_c_session_t **)worker_sessions)[session_index];
     switch ((orilink_protocol_type_t)iudp_data_acki->orilink_protocol) {
         case ORILINK_HELLO1: {
 //======================================================================
@@ -3148,12 +3144,11 @@ status_t handle_workers_ipc_udp_data_ack_cow(worker_context_t *worker_ctx, void 
     return SUCCESS;
 }
 
-status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void *worker_sessions, ipc_protocol_t* received_protocol) {
+status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void **worker_sessions, ipc_protocol_t* received_protocol) {
     ipc_udp_data_ack_t *iudp_data_acki = received_protocol->payload.ipc_udp_data_ack;
     uint8_t index = received_protocol->index;
     uint8_t session_index = iudp_data_acki->session_index;
-    sio_c_session_t *sio_c_session = (sio_c_session_t *)worker_sessions;
-    sio_c_session_t *session = &sio_c_session[session_index];
+    sio_c_session_t *session = ((sio_c_session_t **)worker_sessions)[session_index];
     switch ((orilink_protocol_type_t)iudp_data_acki->orilink_protocol) {
         case ORILINK_HELLO1_ACK: {
             CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
@@ -3214,7 +3209,7 @@ status_t handle_workers_ipc_udp_data_ack_sio(worker_context_t *worker_ctx, void 
     return SUCCESS;
 }
 
-status_t handle_workers_ipc_udp_data_ack(worker_context_t *worker_ctx, void *worker_sessions, ipc_raw_protocol_t_status_t *ircvdi) {
+status_t handle_workers_ipc_udp_data_ack(worker_context_t *worker_ctx, void **worker_sessions, ipc_raw_protocol_t_status_t *ircvdi) {
     worker_type_t rcvd_wot = UNKNOWN;
     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool, 
         worker_ctx->aes_key, worker_ctx->remote_nonce, &worker_ctx->remote_ctr,
@@ -3257,7 +3252,7 @@ status_t handle_workers_ipc_udp_data_ack(worker_context_t *worker_ctx, void *wor
     return SUCCESS;
 }
 
-status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void *worker_sessions, double *initial_delay_ms) {
+status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void **worker_sessions, double *initial_delay_ms) {
     while (true) {
         ipc_raw_protocol_t_status_t ircvdi = receive_ipc_raw_protocol_message(worker_ctx->label, &worker_ctx->oritlsf_pool, worker_ctx->master_uds_fd);
         if (ircvdi.status == FAILURE_EAGNEWBLK) {

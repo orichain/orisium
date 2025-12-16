@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <stdlib.h>
+#include <sys/errno.h>
 
 #include "log.h"
 #include "constants.h"

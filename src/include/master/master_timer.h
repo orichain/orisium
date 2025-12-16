@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <stdio.h>
+#include <sys/errno.h>
 
 #include "log.h"
 #include "oritw.h"

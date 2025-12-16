@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <stdio.h>
+#include <sys/errno.h>
 
 #include "log.h"
 #include "oritw.h"
@@ -110,7 +111,7 @@ static inline status_t retry_transmit(
 
 static inline status_t handle_worker_session_timer_event(
     worker_context_t *worker_ctx, 
-    void *sessions,
+    void **worker_sessions,
     uint8_t *id_session_index,
     timer_event_t *current_event
 )
@@ -120,8 +121,7 @@ static inline status_t handle_worker_session_timer_event(
     switch (wot) {
         case COW: {
             if (*id_session_index >= MAX_CONNECTION_PER_COW_WORKER) return FAILURE;
-            cow_c_session_t *c_sessions = (cow_c_session_t *)sessions;
-            cow_c_session_t *session = &c_sessions[*id_session_index];
+            cow_c_session_t *session = ((cow_c_session_t **)worker_sessions)[*id_session_index];
             if (timer_id == session->hello1.retry_timer_id.id) {
                 oritw_free(&worker_ctx->oritlsf_pool, &worker_ctx->timer, &session->hello1.retry_timer_id.event);
                 status_t result = retry_transmit(worker_ctx, session, &session->hello1, ORILINK_HELLO1);
@@ -170,8 +170,7 @@ static inline status_t handle_worker_session_timer_event(
         }
         case SIO: {
             if (*id_session_index >= MAX_CONNECTION_PER_SIO_WORKER) return FAILURE;
-            sio_c_session_t *c_sessions = (sio_c_session_t *)sessions;
-            sio_c_session_t *session = &c_sessions[*id_session_index];
+            sio_c_session_t *session = ((sio_c_session_t **)worker_sessions)[*id_session_index];
             if (timer_id == session->heartbeat.heartbeat.retry_timer_id.id) {
                 oritw_free(&worker_ctx->oritlsf_pool, &worker_ctx->timer, &session->heartbeat.heartbeat.retry_timer_id.event);
                 status_t result = retry_transmit(worker_ctx, session, &session->heartbeat.heartbeat, ORILINK_HEARTBEAT);
@@ -224,7 +223,7 @@ static inline status_t drain_event_fd(const char *label, int fd) {
     return SUCCESS;
 }
 
-static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, void *worker_sessions, int *current_fd) {
+static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, void **worker_sessions, int *current_fd) {
     if (*current_fd == worker_ctx->timer.add_event_fd) {
         if (drain_event_fd(worker_ctx->label, worker_ctx->timer.add_event_fd) != SUCCESS) return FAILURE;
         timer_id_t *current_add;

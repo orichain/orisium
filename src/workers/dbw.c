@@ -7,19 +7,10 @@
 #include "workers/worker_timer.h"
 #include "workers/worker_ipc.h"
 
-void cleanup_dbw_worker(worker_context_t *worker_ctx) {
-	cleanup_worker(worker_ctx);
-}
-
-status_t setup_dbw_worker(worker_context_t *worker_ctx, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
-    if (setup_worker(worker_ctx, "DBW", wot, index, master_uds_fd) != SUCCESS) return FAILURE;
-    return SUCCESS;
-}
-
 void run_dbw_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd) {
     worker_context_t x_ctx;
     worker_context_t *worker_ctx = &x_ctx;
-    if (setup_dbw_worker(worker_ctx, wot, index, master_uds_fd) != SUCCESS) goto exit;
+    if (setup_worker(worker_ctx, "DBW", wot, index, master_uds_fd) != SUCCESS) goto exit;
     while (!worker_ctx->shutdown_requested) {
         int_status_t snfds = async_wait(worker_ctx->label, &worker_ctx->async);
 		if (snfds.status != SUCCESS) {
@@ -57,5 +48,5 @@ void run_dbw_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
     }
 
 exit:    
-    cleanup_dbw_worker(worker_ctx);
+    cleanup_worker(worker_ctx);
 }

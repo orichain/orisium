@@ -7,10 +7,17 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <endian.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/uio.h>
+
+#ifdef __NetBSD__
+    #include <sys/endian.h>
+#else
+    #include <endian.h>
+#endif
+
+#include <sys/errno.h>
 
 #include "utilities.h"
 #include "ipc/protocol.h"

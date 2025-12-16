@@ -9,6 +9,7 @@
 #include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
+#include <sys/signal.h>
 
 #include "log.h"
 #include "node.h"

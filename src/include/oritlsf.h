@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <string.h>
+#include <sys/common_int_limits.h>
 
 #define TLSF_DEBUG
 

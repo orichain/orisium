@@ -10,6 +10,8 @@
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <sys/common_int_limits.h>
+#include <sys/errno.h>
 
 #include "async.h"
 #include "constants.h"

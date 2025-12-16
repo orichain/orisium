@@ -5,11 +5,18 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
-#include <endian.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+
+#ifdef __NetBSD__
+    #include <sys/endian.h>
+#else
+    #include <endian.h>
+#endif
+
+#include <sys/errno.h>
 
 #include "utilities.h"
 #include "orilink/protocol.h"
