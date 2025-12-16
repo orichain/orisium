@@ -21,6 +21,7 @@
 #include "pqc.h"
 #include "ipc.h"
 #include "oritlsf.h"
+#include "oritw.h"
 
 status_t close_worker(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
     master_worker_session_t *session = get_master_worker_session(master_ctx, wot, index);
@@ -138,39 +139,96 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
 	return SUCCESS;
 }
 
-void close_master_resource(master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
-    master_worker_session_t *session = get_master_worker_session(master_ctx, wot, index);
-    if (session == NULL) {
-        return;
-    }
-    worker_security_t *security = session->security;
-    if (!security) return;
-//----------------------------------------------------------------------
-// Jika di close, kadang terjadi EBADF saat recreate worker dengan cepat
-//----------------------------------------------------------------------
-/*
-    CLOSE_FD(&master_ctx->listen_sock);
-    CLOSE_FD(&master_ctx->master_async.async_fd);
-    CLOSE_FD(&master_ctx->heartbeat_timer_fd);
+void close_master_resource(const char* label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
+    for (uint8_t ixxxx=0;ixxxx<MAX_SIO_WORKERS;++ixxxx) {
+        master_worker_session_t *session = get_master_worker_session(master_ctx, SIO, ixxxx);
+        if (session == NULL) {
+            continue;
+        }
+		if (wot != SIO || index != ixxxx) {
+            CLOSE_UDS(&session->upp->uds[0]);
+            //CLOSE_UDS(&session->upp->uds[1]);
+            oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
+        }
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->rekeying);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->healthy);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->security);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->metrics);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->avgtt);
+	}
+	for (uint8_t ixxxx=0;ixxxx<MAX_LOGIC_WORKERS;++ixxxx) {
+		master_worker_session_t *session = get_master_worker_session(master_ctx, LOGIC, ixxxx);
+        if (session == NULL) {
+            continue;
+        }
+		if (wot != LOGIC || index != ixxxx) {
+            CLOSE_UDS(&session->upp->uds[0]);
+            //CLOSE_UDS(&session->upp->uds[1]);
+            oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
+        }
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->rekeying);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->healthy);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->security);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->metrics);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->avgtt);
+	}
+	for (uint8_t ixxxx=0;ixxxx<MAX_COW_WORKERS;++ixxxx) {
+		master_worker_session_t *session = get_master_worker_session(master_ctx, COW, ixxxx);
+        if (session == NULL) {
+            continue;
+        }
+		if (wot != COW || index != ixxxx) {
+            CLOSE_UDS(&session->upp->uds[0]);
+            //CLOSE_UDS(&session->upp->uds[1]);
+            oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
+        }
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->rekeying);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->healthy);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->security);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->metrics);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->avgtt);
+	}
+	for (uint8_t ixxxx=0;ixxxx<MAX_DBR_WORKERS;++ixxxx) {
+		master_worker_session_t *session = get_master_worker_session(master_ctx, DBR, ixxxx);
+        if (session == NULL) {
+            continue;
+        }
+		if (wot != DBR || index != ixxxx) {
+            CLOSE_UDS(&session->upp->uds[0]);
+            //CLOSE_UDS(&session->upp->uds[1]);
+            oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
+        }
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->rekeying);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->healthy);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->security);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->metrics);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->avgtt);
+	}
+	for (uint8_t ixxxx=0;ixxxx<MAX_DBW_WORKERS;++ixxxx) {
+		master_worker_session_t *session = get_master_worker_session(master_ctx, DBW, ixxxx);
+        if (session == NULL) {
+            continue;
+        }
+		if (wot != DBW || index != ixxxx) {
+            CLOSE_UDS(&session->upp->uds[0]);
+            //CLOSE_UDS(&session->upp->uds[1]);
+            oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
+        }
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->rekeying);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->healthy);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->security);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->metrics);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->avgtt);
+	}
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_c_session);
+    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_c_session);
+    CLOSE_FD(&master_ctx->udp_sock);
     CLOSE_FD(&master_ctx->shutdown_event_fd);
-*/
-//----------------------------------------------------------------------
-    memset(security->kem_publickey, 0, KEM_PUBLICKEY_BYTES);
-    memset(security->kem_ciphertext, 0, KEM_CIPHERTEXT_BYTES);
-    memset(security->kem_sharedsecret, 0, KEM_SHAREDSECRET_BYTES);
-    memset(security->aes_key, 0, HASHES_BYTES);
-    memset(security->mac_key, 0, HASHES_BYTES);
-    memset(security->local_nonce, 0, AES_NONCE_BYTES);
-    security->local_ctr = (uint32_t)0;
-    memset(security->remote_nonce, 0, AES_NONCE_BYTES);
-    security->remote_ctr = (uint32_t)0;
-    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->kem_publickey);
-    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->kem_ciphertext);
-    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->kem_sharedsecret);
-    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->aes_key);
-    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->mac_key);
-    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->local_nonce);
-    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&security->remote_nonce);
+    if (master_ctx->check_healthy_timer_id.event) {
+        oritw_remove_event(label, &master_ctx->oritlsf_pool, &master_ctx->master_async, &master_ctx->timer, &master_ctx->check_healthy_timer_id.event);
+    }
+    oritw_cleanup(label, &master_ctx->oritlsf_pool, &master_ctx->master_async, &master_ctx->timer);
+    CLOSE_FD(&master_ctx->master_async.async_fd);
 }
 
 status_t setup_fork_worker(const char* label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
@@ -185,83 +243,8 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
         LOG_ERROR("%sfork (%s): %s", label, worker_name, strerror(errno));
         return FAILURE;
     } else if (session->upp->pid == 0) {
-        close_master_resource(master_ctx, wot, index);
         CLOSE_UDS(&session->upp->uds[0]);
-        for (uint8_t j = 0; j < MAX_SIO_WORKERS; ++j) {
-            master_worker_session_t *jsession = get_master_worker_session(master_ctx, SIO, j);
-            if (jsession == NULL) {
-                return FAILURE;
-            }
-            if (wot == SIO) {
-                if (j != index) {
-                    CLOSE_UDS(&jsession->upp->uds[0]);
-                    CLOSE_UDS(&jsession->upp->uds[1]);
-                }
-            } else {
-                CLOSE_UDS(&jsession->upp->uds[0]);
-                CLOSE_UDS(&jsession->upp->uds[1]);
-            }
-        }
-        for (int j = 0; j < MAX_LOGIC_WORKERS; ++j) {
-            master_worker_session_t *jsession = get_master_worker_session(master_ctx, LOGIC, j);
-            if (jsession == NULL) {
-                return FAILURE;
-            }
-            if (wot == LOGIC) {
-                if (j != index) {
-                    CLOSE_UDS(&jsession->upp->uds[0]);
-                    CLOSE_UDS(&jsession->upp->uds[1]);
-                }
-            } else {
-                CLOSE_UDS(&jsession->upp->uds[0]);
-                CLOSE_UDS(&jsession->upp->uds[1]);
-            }
-        }
-        for (int j = 0; j < MAX_COW_WORKERS; ++j) {
-            master_worker_session_t *jsession = get_master_worker_session(master_ctx, COW, j);
-            if (jsession == NULL) {
-                return FAILURE;
-            }
-            if (wot == COW) {
-                if (j != index) {
-                    CLOSE_UDS(&jsession->upp->uds[0]);
-                    CLOSE_UDS(&jsession->upp->uds[1]);
-                }
-            } else {
-                CLOSE_UDS(&jsession->upp->uds[0]);
-                CLOSE_UDS(&jsession->upp->uds[1]);
-            }
-        }
-        for (int j = 0; j < MAX_DBR_WORKERS; ++j) {
-            master_worker_session_t *jsession = get_master_worker_session(master_ctx, DBR, j);
-            if (jsession == NULL) {
-                return FAILURE;
-            }
-            if (wot == DBR) {
-                if (j != index) {
-                    CLOSE_UDS(&jsession->upp->uds[0]);
-                    CLOSE_UDS(&jsession->upp->uds[1]);
-                }
-            } else {
-                CLOSE_UDS(&jsession->upp->uds[0]);
-                CLOSE_UDS(&jsession->upp->uds[1]);
-            }
-        }
-        for (int j = 0; j < MAX_DBW_WORKERS; ++j) {
-            master_worker_session_t *jsession = get_master_worker_session(master_ctx, DBW, j);
-            if (jsession == NULL) {
-                return FAILURE;
-            }
-            if (wot == DBW) {
-                if (j != index) {
-                    CLOSE_UDS(&jsession->upp->uds[0]);
-                    CLOSE_UDS(&jsession->upp->uds[1]);
-                }
-            } else {
-                CLOSE_UDS(&jsession->upp->uds[0]);
-                CLOSE_UDS(&jsession->upp->uds[1]);
-            }
-        }
+        close_master_resource(label, master_ctx, wot, index);
         worker_type_t x_wot = wot;
         uint8_t x_index = index;
         double x_initial_delay_ms = initial_delay_ms;
@@ -424,16 +407,10 @@ status_t calculate_avgtt(const char *label, master_context_t *master_ctx, worker
     } else {
         current_avgtt_measurement = (long double)0;
     }
-    char *desc;
 	int needed = snprintf(NULL, 0, "ORICLE => AVGTT %s-%d", worker_name, index);
-    desc = (char *)oritlsf_calloc(__FILE__, __LINE__, 
-        &master_ctx->oritlsf_pool,
-        needed + 1,
-        sizeof(char)
-    );
+    char desc[needed + 1];
 	snprintf(desc, needed + 1, "ORICLE => AVGTT %s-%d", worker_name, index);
     calculate_oricle_long_double(label, &master_ctx->oritlsf_pool, desc, oricle, current_avgtt_measurement, (long double)0);
-    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&desc);
     return SUCCESS;
 }
 
@@ -463,20 +440,14 @@ status_t calculate_healthy(const char* label, master_context_t *master_ctx, work
         current_health_measurement = metrics->count_ack / expected_count_ack;
     }
     current_health_measurement *= (double)100;    
-    char *desc;
 	int needed = snprintf(NULL, 0, "ORICLE => HEALTHY %s-%d", worker_name, index);
-	desc = (char *)oritlsf_calloc(__FILE__, __LINE__, 
-        &master_ctx->oritlsf_pool,
-        needed + 1,
-        sizeof(char)
-    );
+	char desc[needed + 1];
 	snprintf(desc, needed + 1, "ORICLE => HEALTHY %s-%d", worker_name, index);
     #if defined(LONGINTV_TEST)
     calculate_oricle_doubleX(label, &master_ctx->oritlsf_pool, desc, oricle, current_health_measurement, (double)200);
     #else
     calculate_oricle_double(label, &master_ctx->oritlsf_pool, desc, oricle, current_health_measurement, (double)200);
     #endif
-    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&desc);
     *ishealthy = (oricle->value_prediction >= HEALTHY_THRESHOLD);
     metrics->last_checkhealthy = now_ns;
     metrics->count_ack = (double)0;

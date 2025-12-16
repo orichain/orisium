@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/errno.h>
+#include <sys/fcntl.h>
 
 #ifdef __NetBSD__
     #include <sys/types.h>
@@ -30,7 +32,7 @@
 #ifdef __NetBSD__
     typedef struct {
         int async_fd;
-        struct kevent event_change;
+        struct kevent event_change[2];
         struct kevent events[MAX_EVENTS];
     } async_type_t;
     
@@ -39,7 +41,6 @@
     #define ASYNC_EPOLLHUP_FLAG (1 << 2)
     #define ASYNC_EPOLLERR_FLAG (1 << 3)
     #define ASYNC_EPOLLRDHUP_FLAG (1 << 4)
-    #define ASYNC_EPOLLET_FLAG (1 << 5)
 #else
     typedef struct {
         int async_fd;
@@ -63,9 +64,6 @@
     }
     static inline bool async_event_is_EPOLLOUT(uint32_t events_flags) {
         return events_flags & ASYNC_EPOLLOUT_FLAG;
-    }
-    static inline bool async_event_is_EPOLLET(uint32_t events_flags) {
-        return false;
     }
 #else
     static inline bool async_event_is_EPOLLHUP(uint32_t events) {
@@ -97,7 +95,7 @@ static inline int_status_t async_getfd(const char* label, async_type_t *async, i
         return result;
     }
 #ifdef __NetBSD__
-    result.r_int = async->events[n].ident;
+    result.r_int = (int)async->events[n].ident;
 #else
     result.r_int = async->events[n].data.fd;
 #endif
@@ -229,19 +227,33 @@ static inline status_t async_set_timerfd_time(const char* label, int *timer_fd,
     return SUCCESS;
 }
 
-static inline status_t async_create_incoming_event(const char* label, async_type_t *async, int *fd_to_add) {
+static inline status_t
+async_create_incoming_event(const char* label,
+                            async_type_t *async,
+                            int *fd)
+{
 #ifdef __NetBSD__
-    EV_SET(&async->event_change, *fd_to_add, EVFILT_READ,
-            EV_ADD | EV_ENABLE | EV_CLEAR, 0, 0, NULL);
-    if (kevent(async->async_fd, &async->event_change, 1, NULL, 0, NULL) == -1) {
-        LOG_ERROR("%sGagal menambahkan event ke kqueue: %s", label, strerror(errno));
+    EV_SET(&async->event_change[0], *fd,
+           EVFILT_READ,
+           EV_ADD | EV_ENABLE | EV_CLEAR,
+           0, 0, NULL);
+    if (kevent(async->async_fd,
+               &async->event_change[0], 1,
+               NULL, 0, NULL) == -1) {
+        LOG_ERROR("%skqueue READ add failed: %s",
+                  label, strerror(errno));
         return FAILURE;
     }
 #else
-    async->event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
-    async->event.data.fd = *fd_to_add;
-    if (epoll_ctl(async->async_fd, EPOLL_CTL_ADD, *fd_to_add, &async->event) == -1) {
-        LOG_ERROR("%sGagal menambahkan event ke epoll: %s", label, strerror(errno));
+    async->event.events = EPOLLIN | EPOLLRDHUP | EPOLLET;
+    async->event.data.fd = *fd;
+
+    if (epoll_ctl(async->async_fd,
+                   EPOLL_CTL_ADD,
+                   *fd,
+                   &async->event) == -1) {
+        LOG_ERROR("%sepoll add failed: %s",
+                  label, strerror(errno));
         return FAILURE;
     }
 #endif
@@ -251,12 +263,12 @@ static inline status_t async_create_incoming_event(const char* label, async_type
 static inline status_t async_delete_event(const char* label, async_type_t *async, int *fd_to_delete) {
     if (*fd_to_delete != -1) {
 #ifdef __NetBSD__
-        EV_SET(&async->event_change, *fd_to_delete, EVFILT_READ, EV_DELETE, 0, 0, NULL);
-        if (kevent(async->async_fd, &async->event_change, 1, NULL, 0, NULL) == -1) {
-            EV_SET(&async->event_change, *fd_to_delete, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
-            if (kevent(async->async_fd, &async->event_change, 1, NULL, 0, NULL) == -1) {
-                 LOG_DEBUG("%sGagal menghapus event (mungkin sudah ditutup): %s", label, strerror(errno));
-            }
+        struct kevent *ch = async->event_change;
+        EV_SET(&ch[0], *fd_to_delete, EVFILT_READ,  EV_DELETE, 0, 0, NULL);
+        EV_SET(&ch[1], *fd_to_delete, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+        if (kevent(async->async_fd, ch, 2, NULL, 0, NULL) == -1) {
+            LOG_DEBUG("%sGagal menghapus event (mungkin sudah ditutup): %s",
+                      label, strerror(errno));
         }
 #else
         if (epoll_ctl(async->async_fd, EPOLL_CTL_DEL, *fd_to_delete, NULL) == -1) {
