@@ -9,6 +9,10 @@
 #include <sys/types.h>
 #include <stdlib.h>
 
+#ifdef __NetBSD__
+    #include <sys/errno.h>
+#endif
+
 #include "log.h"
 #include "constants.h"
 #include "async.h"

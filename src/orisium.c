@@ -10,6 +10,10 @@
 #include <signal.h>
 #include <stdio.h>
 
+#ifdef __NetBSD__
+    #include <sys/signal.h>
+#endif
+
 #include "log.h"
 #include "node.h"
 #include "master/master.h"

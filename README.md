@@ -101,7 +101,7 @@ Internal communication (`master` $\leftrightarrow$ `logic` $\leftrightarrow$ `co
 
 ## Installation
 
-The main development and testing environment currently uses **Rocky Linux 10** and **CentOS Stream 9**.
+The main development and testing environment currently uses **NetBSD-10.1** and **Rocky-10.1**.
 
 ```bash
 git clone https://github.com/orichain/orisium.git
