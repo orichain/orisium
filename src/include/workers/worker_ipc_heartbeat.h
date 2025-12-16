@@ -370,7 +370,7 @@ static inline status_t first_heartbeat_finalization(worker_context_t *worker_ctx
 		double rtt_value = (double)interval_ull;
         calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
         #if !defined(LONGINTV_TEST)
-        printf("%sRTT Hello-4 Ack = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
+        printf("%sRTT Hello-4 Ack = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr);
         #endif
 //----------------------------------------------------------------------
 		session->heartbeat.heartbeat_ack.ack_sent_time = current_time.r_uint64_t;
@@ -724,7 +724,7 @@ static inline status_t handle_workers_ipc_udp_data_cow_heartbeat_ack(worker_cont
     char timebuf[32];
     get_time_str(timebuf, sizeof(timebuf));
     #if !defined(LONGINTV_TEST)
-    printf("%s%s - RTT Heartbeat = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 ", trycount %d\n", worker_ctx->label, timebuf, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr, trycount);
+    printf("%s%s - RTT Heartbeat = %lf ms, Remote Ctr %u, Local Ctr %u, trycount %d\n", worker_ctx->label, timebuf, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr, trycount);
     #endif
 //======================================================================
     session->heartbeat.heartbeat.ack_rcvd = true;
@@ -1040,7 +1040,7 @@ static inline status_t handle_workers_ipc_udp_data_sio_heartbeat_ack(worker_cont
     char timebuf[32];
     get_time_str(timebuf, sizeof(timebuf));
     #if !defined(LONGINTV_TEST)
-    printf("%s%s - RTT Heartbeat = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 ", trycount %d\n", worker_ctx->label, timebuf, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr, trycount);
+    printf("%s%s - RTT Heartbeat = %lf ms, Remote Ctr %u, Local Ctr %u, trycount %d\n", worker_ctx->label, timebuf, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr, trycount);
     #endif
 //======================================================================
     session->heartbeat.heartbeat.ack_rcvd = true;

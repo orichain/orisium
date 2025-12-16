@@ -74,7 +74,7 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                                 return FAILURE;
                             }
                             if (c_session->id_connection == id_connection) {
-                                LOG_ERROR("%sId Connection %" PRIu64 " Already Exist.", label, c_session->id_connection);
+                                LOG_ERROR("%sId Connection %llu Already Exist.", label, (unsigned long long)c_session->id_connection);
                                 CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &orcvdo.r_orilink_raw_protocol_t);
                                 return FAILURE;
                             }
@@ -123,7 +123,7 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                             return FAILURE;
                         }
                         if (c_session->id_connection != id_connection) {
-                            LOG_ERROR("%sDiferent Id Connection %" PRIu64 ".", label, c_session->id_connection);
+                            LOG_ERROR("%sDiferent Id Connection %llu.", label, (unsigned long long)c_session->id_connection);
                             CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &orcvdo.r_orilink_raw_protocol_t);
                             return FAILURE;
                         }
@@ -190,7 +190,7 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                                 }
                             }
                             if (not_exist) {
-                                LOG_ERROR("%sNo Connection Exist From Ip Address %s Port %s Id Connection %" PRIu64 ".", label, host_str, port_str, id_connection);
+                                LOG_ERROR("%sNo Connection Exist From Ip Address %s Port %s Id Connection %llu.", label, host_str, port_str, (unsigned long long)id_connection);
                                 CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &orcvdo.r_orilink_raw_protocol_t);
                                 return FAILURE;
                             }
@@ -220,7 +220,7 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                                 }
                             }
                             if (not_exist) {
-                                LOG_ERROR("%sNo Connection Exist From Ip Address %s Port %s Id Connection %" PRIu64 ".", label, host_str, port_str, id_connection);
+                                LOG_ERROR("%sNo Connection Exist From Ip Address %s Port %s Id Connection %llu.", label, host_str, port_str, (unsigned long long)id_connection);
                                 CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &orcvdo.r_orilink_raw_protocol_t);
                                 return FAILURE;
                             }

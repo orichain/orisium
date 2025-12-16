@@ -147,7 +147,9 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
         }
 		if (wot != SIO || index != ixxxx) {
             CLOSE_UDS(&session->upp->uds[0]);
-            //CLOSE_UDS(&session->upp->uds[1]);
+#ifndef __NetBSD__
+            CLOSE_UDS(&session->upp->uds[1]);
+#endif
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
         }
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->rekeying);
@@ -163,7 +165,9 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
         }
 		if (wot != LOGIC || index != ixxxx) {
             CLOSE_UDS(&session->upp->uds[0]);
-            //CLOSE_UDS(&session->upp->uds[1]);
+#ifndef __NetBSD__
+            CLOSE_UDS(&session->upp->uds[1]);
+#endif
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
         }
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->rekeying);
@@ -179,7 +183,9 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
         }
 		if (wot != COW || index != ixxxx) {
             CLOSE_UDS(&session->upp->uds[0]);
-            //CLOSE_UDS(&session->upp->uds[1]);
+#ifndef __NetBSD__
+            CLOSE_UDS(&session->upp->uds[1]);
+#endif
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
         }
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->rekeying);
@@ -195,7 +201,9 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
         }
 		if (wot != DBR || index != ixxxx) {
             CLOSE_UDS(&session->upp->uds[0]);
-            //CLOSE_UDS(&session->upp->uds[1]);
+#ifndef __NetBSD__
+            CLOSE_UDS(&session->upp->uds[1]);
+#endif
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
         }
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->rekeying);
@@ -211,7 +219,9 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
         }
 		if (wot != DBW || index != ixxxx) {
             CLOSE_UDS(&session->upp->uds[0]);
-            //CLOSE_UDS(&session->upp->uds[1]);
+#ifndef __NetBSD__
+            CLOSE_UDS(&session->upp->uds[1]);
+#endif
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
         }
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->rekeying);

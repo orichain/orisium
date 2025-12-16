@@ -7,7 +7,6 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <string.h>
-#include <inttypes.h>
 
 #define TLSF_DEBUG
 
@@ -575,7 +574,7 @@ static inline size_t tlsf_check_leaks_and_report(const char *label, const oritls
             if (in_pool(pool, footer_ptr) && footer_ptr + FOOTER_SIZE <= pool->pool_end) {
                 uint64_t f = *(uint64_t*)footer_ptr;
                 if (f != GUARD_MAGIC) {
-                    fprintf(stderr, "%sFOOTER CORRUPTED at %p (got 0x%016" PRIx64 ")\n", label, (void*)bh, f);
+                    fprintf(stderr, "%sFOOTER CORRUPTED at %p (got %llu)\n", label, (void*)bh, (unsigned long long)f);
                 }
             }
         }

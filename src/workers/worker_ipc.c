@@ -1342,7 +1342,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
-    printf("%sRTT Hello-3 Ack = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
+    printf("%sRTT Hello-3 Ack = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr);
     #endif
 //======================================================================
     session->hello4_ack.ack_sent = true;
@@ -1566,7 +1566,7 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
-    printf("%sRTT Hello-2 Ack = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
+    printf("%sRTT Hello-2 Ack = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr);
     #endif
 //======================================================================
     session->hello3_ack.ack_sent = true;
@@ -1778,7 +1778,7 @@ status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ip
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
-    printf("%sRTT Hello-1 Ack = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
+    printf("%sRTT Hello-1 Ack = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr);
     #endif
 //======================================================================
     session->hello2_ack.ack_sent = true;
@@ -2281,7 +2281,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
-    printf("%sRTT Hello-4 = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
+    printf("%sRTT Hello-4 = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr);
     #endif
 //======================================================================
     session->hello4.ack_rcvd = true;
@@ -2547,7 +2547,7 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
-    printf("%sRTT Hello-3 = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
+    printf("%sRTT Hello-3 = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr);
     #endif
 //======================================================================
     session->hello3.ack_rcvd = true;
@@ -2702,7 +2702,7 @@ status_t handle_workers_ipc_udp_data_sio_hello2_ack(worker_context_t *worker_ctx
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
-    printf("%sRTT Hello-2 = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
+    printf("%sRTT Hello-2 = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr);
     #endif
 //======================================================================
     session->hello2.ack_rcvd = true;
@@ -2862,7 +2862,7 @@ status_t handle_workers_ipc_udp_data_sio_hello1_ack(worker_context_t *worker_ctx
     double rtt_value = (double)interval_ull;
     calculate_rtt(worker_ctx, session, identity->local_wot, rtt_value);
     #if !defined(LONGINTV_TEST)
-    printf("%sRTT Hello-1 = %lf ms, Remote Ctr %" PRIu32 ", Local Ctr %" PRIu32 "\n", worker_ctx->label, session->rtt.value_prediction / 1e6, session->security.remote_ctr, session->security.local_ctr);
+    printf("%sRTT Hello-1 = %lf ms, Remote Ctr %u, Local Ctr %u\n", worker_ctx->label, session->rtt.value_prediction / 1e6, (unsigned int)session->security.remote_ctr, (unsigned int)session->security.local_ctr);
     #endif
 //======================================================================
     session->hello1.ack_rcvd = true;

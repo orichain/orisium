@@ -92,8 +92,8 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
     if (temp_best_idx_t2 != 0xff) {
         if (min_longest_task_time > 0ULL) {
             selected_worker_idx = temp_best_idx_t2;
-            LOG_DEBUG("%sSelecting %s worker %d based on lowest Longest Task Time: %" PRIu64, 
-                      label, worker_name, selected_worker_idx, min_longest_task_time);
+            LOG_DEBUG("%sSelecting %s worker %d based on lowest Longest Task Time: %llu", 
+                      label, worker_name, selected_worker_idx, (unsigned long long)min_longest_task_time);
             return selected_worker_idx; 
         }
         LOG_DEBUG("%sAll not-full %s workers have 0 Longest Task Time. Falling back to Round Robin.", label, worker_name);
