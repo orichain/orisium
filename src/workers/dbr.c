@@ -30,9 +30,9 @@ void run_dbr_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
 			if (events_status.status != SUCCESS) continue;
 			uint32_t current_events = events_status.r_uint32_t;
             if (current_fd == *worker_ctx->master_uds_fd) {
-                if (async_event_is_EPOLLHUP(current_events) ||
-                    async_event_is_EPOLLERR(current_events) ||
-                    async_event_is_EPOLLRDHUP(current_events))
+                if (async_event_is_HUP(current_events) ||
+                    async_event_is_ERR(current_events) ||
+                    async_event_is_RDHUP(current_events))
                 {
                     handle_workers_ipc_closed_event(worker_ctx);
                     continue;

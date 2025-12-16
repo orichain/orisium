@@ -5,20 +5,18 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
+#include <sys/eventfd.h>
+#include <sys/timerfd.h>
 
 #ifdef __NetBSD__
     #include <sys/errno.h>
-    #include <sys/fcntl.h>
     #include <sys/event.h>
     #include <sys/time.h>
-    #include <sys/eventfd.h>
-    #include <sys/timerfd.h>
-    #include <time.h>
+
+    #include "utilities.h"
 #else
     #include <sys/epoll.h>
-    #include <sys/eventfd.h>
-    #include <sys/timerfd.h>
-    #include <time.h>
 #endif
 
 #include "constants.h"
@@ -32,11 +30,11 @@
         struct kevent events[MAX_EVENTS];
     } async_type_t;
     
-    #define ASYNC_EPOLLIN_FLAG  (1 << 0)
-    #define ASYNC_EPOLLOUT_FLAG (1 << 1)
-    #define ASYNC_EPOLLHUP_FLAG (1 << 2)
-    #define ASYNC_EPOLLERR_FLAG (1 << 3)
-    #define ASYNC_EPOLLRDHUP_FLAG (1 << 4)
+    #define ASYNC_IN_FLAG  (1 << 0)
+    #define ASYNC_OUT_FLAG (1 << 1)
+    #define ASYNC_HUP_FLAG (1 << 2)
+    #define ASYNC_ERR_FLAG (1 << 3)
+    #define ASYNC_RDHUP_FLAG (1 << 4)
 #else
     typedef struct {
         int async_fd;
@@ -46,39 +44,36 @@
 #endif
 
 #ifdef __NetBSD__
-    static inline bool async_event_is_EPOLLHUP(uint32_t events_flags) {
-        return events_flags & ASYNC_EPOLLHUP_FLAG;
+    static inline bool async_event_is_HUP(uint32_t events_flags) {
+        return events_flags & ASYNC_HUP_FLAG;
     }
-    static inline bool async_event_is_EPOLLERR(uint32_t events_flags) {
-        return events_flags & ASYNC_EPOLLERR_FLAG;
+    static inline bool async_event_is_ERR(uint32_t events_flags) {
+        return events_flags & ASYNC_ERR_FLAG;
     }
-    static inline bool async_event_is_EPOLLRDHUP(uint32_t events_flags) {
-        return events_flags & ASYNC_EPOLLRDHUP_FLAG;
+    static inline bool async_event_is_RDHUP(uint32_t events_flags) {
+        return events_flags & ASYNC_RDHUP_FLAG;
     }
-    static inline bool async_event_is_EPOLLIN(uint32_t events_flags) {
-        return events_flags & ASYNC_EPOLLIN_FLAG;
+    static inline bool async_event_is_IN(uint32_t events_flags) {
+        return events_flags & ASYNC_IN_FLAG;
     }
-    static inline bool async_event_is_EPOLLOUT(uint32_t events_flags) {
-        return events_flags & ASYNC_EPOLLOUT_FLAG;
+    static inline bool async_event_is_OUT(uint32_t events_flags) {
+        return events_flags & ASYNC_OUT_FLAG;
     }
 #else
-    static inline bool async_event_is_EPOLLHUP(uint32_t events) {
+    static inline bool async_event_is_HUP(uint32_t events) {
         return events & EPOLLHUP;
     }
-    static inline bool async_event_is_EPOLLERR(uint32_t events) {
+    static inline bool async_event_is_ERR(uint32_t events) {
         return events & EPOLLERR;
     }
-    static inline bool async_event_is_EPOLLRDHUP(uint32_t events) {
+    static inline bool async_event_is_RDHUP(uint32_t events) {
         return events & EPOLLRDHUP;
     }
-    static inline bool async_event_is_EPOLLIN(uint32_t events) {
+    static inline bool async_event_is_IN(uint32_t events) {
         return events & EPOLLIN;
     }
-    static inline bool async_event_is_EPOLLOUT(uint32_t events) {
+    static inline bool async_event_is_OUT(uint32_t events) {
         return events & EPOLLOUT;
-    }
-    static inline bool async_event_is_EPOLLET(uint32_t events) {
-        return events & EPOLLET;
     }
 #endif
 
@@ -114,16 +109,16 @@ static inline uint32_t_status_t async_getevents(const char* label, async_type_t 
     }
 #ifdef __NetBSD__
     if (async->events[n].filter == EVFILT_READ) {
-        result.r_uint32_t |= ASYNC_EPOLLIN_FLAG;
+        result.r_uint32_t |= ASYNC_IN_FLAG;
     }
     if (async->events[n].filter == EVFILT_WRITE) {
-        result.r_uint32_t |= ASYNC_EPOLLOUT_FLAG;
+        result.r_uint32_t |= ASYNC_OUT_FLAG;
     }
     if (async->events[n].flags & EV_EOF) {
-        result.r_uint32_t |= ASYNC_EPOLLHUP_FLAG | ASYNC_EPOLLRDHUP_FLAG;
+        result.r_uint32_t |= ASYNC_HUP_FLAG | ASYNC_RDHUP_FLAG;
     }
     if (async->events[n].flags & EV_ERROR) {
-        result.r_uint32_t |= ASYNC_EPOLLERR_FLAG;
+        result.r_uint32_t |= ASYNC_ERR_FLAG;
     }
 #else
     result.r_uint32_t = async->events[n].events;
@@ -193,7 +188,7 @@ static inline status_t async_create_timerfd(const char* label, int *timer_fd) {
         LOG_ERROR("%sGagal membuat timerfd: %s", label, strerror(errno));
         return FAILURE;
     }
-    if (fcntl(*timer_fd, F_SETFL, fcntl(*timer_fd, F_GETFL, 0) | O_NONBLOCK) == -1) {
+    if (set_nonblocking(label, *timer_fd) != SUCCESS) {
         LOG_WARN("%sGagal set timerfd ke non-blocking: %s", label, strerror(errno));
     }
 #else
@@ -272,6 +267,41 @@ static inline status_t async_delete_event(const char* label, async_type_t *async
             return FAILURE;
         }
 #endif
+    }
+    return SUCCESS;
+}
+
+static inline status_t async_create_timer_oneshot(const char* label, async_type_t *async , int *file_descriptor, double timer_interval) {
+    bool closed = (*file_descriptor == -1);
+    if (closed) {
+        if (async_create_timerfd(label, file_descriptor) != SUCCESS) {
+            return FAILURE;
+        }
+    }
+    if (async_set_timerfd_time(label, file_descriptor,
+        (time_t)timer_interval,
+        (long)((timer_interval - (time_t)timer_interval) * 1e9),
+        (time_t)0,
+        (long)0) != SUCCESS)
+    {
+        return FAILURE;
+    }
+    if (closed) {
+        if (async_create_incoming_event(label, async, file_descriptor) != SUCCESS) {
+            return FAILURE;
+        }
+    }
+    return SUCCESS;
+}
+
+static inline status_t async_update_timer_oneshot(const char* label, int *file_descriptor, double timer_interval) {
+    if (async_set_timerfd_time(label, file_descriptor,
+        (time_t)timer_interval,
+        (long)((timer_interval - (time_t)timer_interval) * 1e9),
+        (time_t)0,
+        (long)0) != SUCCESS)
+    {
+        return FAILURE;
     }
     return SUCCESS;
 }

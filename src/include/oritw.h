@@ -184,7 +184,7 @@ static inline status_t oritw_reschedule_main_timer(
             if (async_create_event(label, &timer->timeout_event_fd) != SUCCESS) return FAILURE;
             if (async_create_incoming_event(label, async, &timer->timeout_event_fd) != SUCCESS) return FAILURE;
         }
-        if (create_timer_oneshot(label, async, &timer->tick_event_fd, delay_s) != SUCCESS) {
+        if (async_create_timer_oneshot(label, async, &timer->tick_event_fd, delay_s) != SUCCESS) {
             LOG_ERROR("%sFailed to re-arm main tick timer (delay_us=%.2f).", label, delay_us);
             return FAILURE;
         }
@@ -192,7 +192,7 @@ static inline status_t oritw_reschedule_main_timer(
         timer->last_delay_us = 0.0;
         timer->next_expiration_tick = ULLONG_MAX;
         if (timer->tick_event_fd != -1) {
-            if (update_timer_oneshot(label, &timer->tick_event_fd, 0.0) != SUCCESS) {
+            if (async_update_timer_oneshot(label, &timer->tick_event_fd, 0.0) != SUCCESS) {
                 LOG_ERROR("%sFailed to disarm main tick timer.", label);
                 return FAILURE;
             }

@@ -37,7 +37,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "async.h"
 #include "constants.h"
 #include "log.h"
 #include "poly1305-donna.h"
@@ -134,41 +133,6 @@ static inline void print_hex(const char* label, const uint8_t* data, size_t len,
         printf(fmt, data[i]);
     }
     printf("\n");
-}
-
-static inline status_t create_timer_oneshot(const char* label, async_type_t *async , int *file_descriptor, double timer_interval) {
-    bool closed = (*file_descriptor == -1);
-    if (closed) {
-        if (async_create_timerfd(label, file_descriptor) != SUCCESS) {
-            return FAILURE;
-        }
-    }
-    if (async_set_timerfd_time(label, file_descriptor,
-        (time_t)timer_interval,
-        (long)((timer_interval - (time_t)timer_interval) * 1e9),
-        (time_t)0,
-        (long)0) != SUCCESS)
-    {
-        return FAILURE;
-    }
-    if (closed) {
-        if (async_create_incoming_event(label, async, file_descriptor) != SUCCESS) {
-            return FAILURE;
-        }
-    }
-    return SUCCESS;
-}
-
-static inline status_t update_timer_oneshot(const char* label, int *file_descriptor, double timer_interval) {
-    if (async_set_timerfd_time(label, file_descriptor,
-        (time_t)timer_interval,
-        (long)((timer_interval - (time_t)timer_interval) * 1e9),
-        (time_t)0,
-        (long)0) != SUCCESS)
-    {
-        return FAILURE;
-    }
-    return SUCCESS;
 }
 
 static void increment_ctr(uint32_t *ctr, uint8_t *nonce) {

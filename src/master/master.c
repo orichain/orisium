@@ -426,9 +426,9 @@ void run_master(const char *label, master_context_t *master_ctx) {
 				master_workers_info(label, master_ctx,IT_SHUTDOWN);
 				continue;
 			} else if (current_fd == master_ctx->udp_sock) {
-                if (async_event_is_EPOLLHUP(current_events) ||
-                    async_event_is_EPOLLERR(current_events) ||
-                    async_event_is_EPOLLRDHUP(current_events))
+                if (async_event_is_HUP(current_events) ||
+                    async_event_is_ERR(current_events) ||
+                    async_event_is_RDHUP(current_events))
                 {
                     CLOSE_FD(&current_fd);
                 } else {
@@ -515,9 +515,9 @@ void run_master(const char *label, master_context_t *master_ctx) {
                     }
                 }
                 if (event_founded_in_uds) {
-                    if (async_event_is_EPOLLHUP(current_events) ||
-                        async_event_is_EPOLLERR(current_events) ||
-                        async_event_is_EPOLLRDHUP(current_events))
+                    if (async_event_is_HUP(current_events) ||
+                        async_event_is_ERR(current_events) ||
+                        async_event_is_RDHUP(current_events))
                     {
                         if (handle_master_ipc_closed_event(label, master_ctx, wot, index, file_descriptor) != SUCCESS) {
                             continue;
