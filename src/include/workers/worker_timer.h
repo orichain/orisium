@@ -215,42 +215,9 @@ static inline status_t handle_worker_session_timer_event(
 static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, void **worker_sessions, int *current_fd, uint32_t *current_events) {
     if (*current_fd == worker_ctx->timer.add_event_fd->fd) {
         if (async_event_is_IN(*current_events)) {
-            bool rfailure = false;
-            bool rpartial = true;
-            if (worker_ctx->timer.add_event_fd->buffer->in_size_tb == 0) {
-                worker_ctx->timer.add_event_fd->buffer->in_size_tb = sizeof(uint64_t);
-                worker_ctx->timer.add_event_fd->buffer->buffer_in = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-                    &worker_ctx->oritlsf_pool,
-                    worker_ctx->timer.add_event_fd->buffer->in_size_tb,
-                    sizeof(uint8_t)
-                );
-            }
-            while (true) {
-                ssize_t rsize = read(worker_ctx->timer.add_event_fd->fd, worker_ctx->timer.add_event_fd->buffer->buffer_in + worker_ctx->timer.add_event_fd->buffer->in_size_c, worker_ctx->timer.add_event_fd->buffer->in_size_tb-worker_ctx->timer.add_event_fd->buffer->in_size_c);
-                if (rsize < 0) {
-                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        if (worker_ctx->timer.add_event_fd->buffer->in_size_tb == worker_ctx->timer.add_event_fd->buffer->in_size_c) {
-                            rpartial = false;
-                        }
-                        break;
-                    } else {
-                        oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&worker_ctx->timer.add_event_fd->buffer->buffer_in);
-                        worker_ctx->timer.add_event_fd->buffer->in_size_tb = 0;
-                        worker_ctx->timer.add_event_fd->buffer->in_size_c = 0;
-                        rfailure = true;
-                        break;
-                    }
-                } 
-                if (rsize > 0) {
-                    worker_ctx->timer.add_event_fd->buffer->in_size_c += rsize;
-                }
-                if (worker_ctx->timer.add_event_fd->buffer->in_size_tb == worker_ctx->timer.add_event_fd->buffer->in_size_c) {
-                    rpartial = false;
-                    break;
-                }
-            }
-            if (!rfailure) {
-                if (!rpartial) {
+            et_result_t retr = async_read_event(&worker_ctx->oritlsf_pool, worker_ctx->timer.add_event_fd);
+            if (!retr.failure) {
+                if (!retr.partial) {
                     timer_id_t *current_add;
                     status_t handler_result = SUCCESS;
                     do {
@@ -273,43 +240,15 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
                     worker_ctx->timer.add_event_fd->buffer->in_size_tb = 0;
                     worker_ctx->timer.add_event_fd->buffer->in_size_c = 0;
                     return handler_result;
-                } else {
-                    return SUCCESS;
                 }
-            } else {
-                return FAILURE;
             }
+            return retr.status;
         }
         if (async_event_is_OUT(*current_events)) {
             if (worker_ctx->timer.add_event_fd->buffer->out_size_tb != 0) {
-                bool wfailure = false;
-                bool wpartial = true;
-                while (true) {
-                    ssize_t wsize = write(worker_ctx->timer.add_event_fd->fd, worker_ctx->timer.add_event_fd->buffer->buffer_out + worker_ctx->timer.add_event_fd->buffer->out_size_c, worker_ctx->timer.add_event_fd->buffer->out_size_tb - worker_ctx->timer.add_event_fd->buffer->out_size_c);
-                    if (wsize < 0) {
-                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                            if (worker_ctx->timer.add_event_fd->buffer->out_size_tb == worker_ctx->timer.add_event_fd->buffer->out_size_c) {
-                                wpartial = false;
-                            }
-                            break;
-                        } else {
-                            oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&worker_ctx->timer.add_event_fd->buffer->buffer_out);
-                            worker_ctx->timer.add_event_fd->buffer->out_size_tb = 0;
-                            worker_ctx->timer.add_event_fd->buffer->out_size_c = 0;
-                            wfailure = true;
-                            break;
-                        }
-                    } 
-                    if (wsize > 0) {
-                        worker_ctx->timer.add_event_fd->buffer->out_size_c += wsize;
-                    }
-                    if (worker_ctx->timer.add_event_fd->buffer->out_size_tb == worker_ctx->timer.add_event_fd->buffer->out_size_c) {
-                        wpartial = false;
-                        break;
-                    }
-                }
-                if (!wfailure) {
-                    if (!wpartial) {
+                et_result_t wetr = async_write_event(&worker_ctx->oritlsf_pool, worker_ctx->timer.add_event_fd, true);
+                if (!wetr.failure) {
+                    if (!wetr.partial) {
                         oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&worker_ctx->timer.add_event_fd->buffer->buffer_out);
                         worker_ctx->timer.add_event_fd->buffer->out_size_tb = 0;
                         worker_ctx->timer.add_event_fd->buffer->out_size_c = 0;
@@ -322,90 +261,14 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
         ori_timer_wheel_t *timer = worker_ctx->timer.timer[llv];
         if (*current_fd == timer->tick_event_fd->fd) {
             if (async_event_is_IN(*current_events)) {
-                bool rfailure = false;
-                bool rpartial = true;
-                if (timer->tick_event_fd->buffer->in_size_tb == 0) {
-                    timer->tick_event_fd->buffer->in_size_tb = sizeof(uint64_t);
-                    timer->tick_event_fd->buffer->buffer_in = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-                        &worker_ctx->oritlsf_pool,
-                        timer->tick_event_fd->buffer->in_size_tb,
-                        sizeof(uint8_t)
-                    );
-                }
-                while (true) {
-                    ssize_t rsize = read(timer->tick_event_fd->fd, timer->tick_event_fd->buffer->buffer_in + timer->tick_event_fd->buffer->in_size_c, timer->tick_event_fd->buffer->in_size_tb-timer->tick_event_fd->buffer->in_size_c);
-                    if (rsize < 0) {
-                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                            if (timer->tick_event_fd->buffer->in_size_tb == timer->tick_event_fd->buffer->in_size_c) {
-                                rpartial = false;
-                            }
-                            break;
-                        } else {
-                            oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&timer->tick_event_fd->buffer->buffer_in);
-                            timer->tick_event_fd->buffer->in_size_tb = 0;
-                            timer->tick_event_fd->buffer->in_size_c = 0;
-                            rfailure = true;
-                            break;
-                        }
-                    } 
-                    if (rsize > 0) {
-                        timer->tick_event_fd->buffer->in_size_c += rsize;
-                    }
-                    if (timer->tick_event_fd->buffer->in_size_tb == timer->tick_event_fd->buffer->in_size_c) {
-                        rpartial = false;
-                        break;
-                    }
-                }
-                if (!rfailure) {
-                    if (!rpartial) {
+                et_result_t retr = async_read_event(&worker_ctx->oritlsf_pool, timer->tick_event_fd);
+                if (!retr.failure) {
+                    if (!retr.partial) {
                         uint64_t advance_ticks = (uint64_t)(timer->last_delay_us);
                         if (oritw_advance_time_and_process_expired(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, llv, advance_ticks) != SUCCESS) return FAILURE;
-                        bool wfailure = false;
-                        bool wpartial = true;
-                        uint64_t u = 1ULL;
-                        if (timer->timeout_event_fd->buffer->out_size_tb == 0) {
-                            timer->timeout_event_fd->buffer->out_size_tb = sizeof(uint64_t);
-                            timer->timeout_event_fd->buffer->buffer_out = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-                                &worker_ctx->oritlsf_pool,
-                                timer->timeout_event_fd->buffer->out_size_tb,
-                                sizeof(uint8_t)
-                            );
-                            memcpy(timer->timeout_event_fd->buffer->buffer_out, &u, sizeof(uint64_t));
-                        } else {
-                            timer->timeout_event_fd->buffer->out_size_tb += sizeof(uint64_t);
-                            timer->timeout_event_fd->buffer->buffer_out = (uint8_t *)oritlsf_realloc(__FILE__, __LINE__, 
-                                &worker_ctx->oritlsf_pool,
-                                timer->timeout_event_fd->buffer->buffer_out,
-                                timer->timeout_event_fd->buffer->out_size_tb * sizeof(uint8_t)
-                            );
-                            memcpy(timer->timeout_event_fd->buffer->buffer_out + sizeof(uint64_t), &u, sizeof(uint64_t));
-                        }
-                        while (true) {
-                            ssize_t wsize = write(timer->timeout_event_fd->fd, timer->timeout_event_fd->buffer->buffer_out + timer->timeout_event_fd->buffer->out_size_c, timer->timeout_event_fd->buffer->out_size_tb - timer->timeout_event_fd->buffer->out_size_c);
-                            if (wsize < 0) {
-                                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                                    if (timer->timeout_event_fd->buffer->out_size_tb == timer->timeout_event_fd->buffer->out_size_c) {
-                                        wpartial = false;
-                                    }
-                                    break;
-                                } else {
-                                    oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&timer->timeout_event_fd->buffer->buffer_out);
-                                    timer->timeout_event_fd->buffer->out_size_tb = 0;
-                                    timer->timeout_event_fd->buffer->out_size_c = 0;
-                                    wfailure = true;
-                                    break;
-                                }
-                            } 
-                            if (wsize > 0) {
-                                timer->timeout_event_fd->buffer->out_size_c += wsize;
-                            }
-                            if (timer->timeout_event_fd->buffer->out_size_tb == timer->timeout_event_fd->buffer->out_size_c) {
-                                wpartial = false;
-                                break;
-                            }
-                        }
-                        if (!wfailure) {
-                            if (!wpartial) {
+                        et_result_t wetr = async_write_event(&worker_ctx->oritlsf_pool, timer->timeout_event_fd, false);
+                        if (!wetr.failure) {
+                            if (!wetr.partial) {
                                 oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&timer->timeout_event_fd->buffer->buffer_out);
                                 timer->timeout_event_fd->buffer->out_size_tb = 0;
                                 timer->timeout_event_fd->buffer->out_size_c = 0;
@@ -416,51 +279,15 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
                         timer->tick_event_fd->buffer->in_size_tb = 0;
                         timer->tick_event_fd->buffer->in_size_c = 0;
                         return SUCCESS;
-                    } else {
-                        return SUCCESS;
                     }
-                } else {
-                    return FAILURE;
                 }
+                return retr.status;
             }
         } else if (*current_fd == timer->timeout_event_fd->fd) {
             if (async_event_is_IN(*current_events)) {
-                bool rfailure = false;
-                bool rpartial = true;
-                if (timer->timeout_event_fd->buffer->in_size_tb == 0) {
-                    timer->timeout_event_fd->buffer->in_size_tb = sizeof(uint64_t);
-                    timer->timeout_event_fd->buffer->buffer_in = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-                        &worker_ctx->oritlsf_pool,
-                        timer->timeout_event_fd->buffer->in_size_tb,
-                        sizeof(uint8_t)
-                    );
-                }
-                while (true) {
-                    ssize_t rsize = read(timer->timeout_event_fd->fd, timer->timeout_event_fd->buffer->buffer_in + timer->timeout_event_fd->buffer->in_size_c, timer->timeout_event_fd->buffer->in_size_tb-timer->timeout_event_fd->buffer->in_size_c);
-                    if (rsize < 0) {
-                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                            if (timer->timeout_event_fd->buffer->in_size_tb == timer->timeout_event_fd->buffer->in_size_c) {
-                                rpartial = false;
-                            }
-                            break;
-                        } else {
-                            oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&timer->timeout_event_fd->buffer->buffer_in);
-                            timer->timeout_event_fd->buffer->in_size_tb = 0;
-                            timer->timeout_event_fd->buffer->in_size_c = 0;
-                            rfailure = true;
-                            break;
-                        }
-                    } 
-                    if (rsize > 0) {
-                        timer->timeout_event_fd->buffer->in_size_c += rsize;
-                    }
-                    if (timer->timeout_event_fd->buffer->in_size_tb == timer->timeout_event_fd->buffer->in_size_c) {
-                        rpartial = false;
-                        break;
-                    }
-                }
-                if (!rfailure) {
-                    if (!rpartial) {
+                et_result_t retr = async_read_event(&worker_ctx->oritlsf_pool, timer->timeout_event_fd);
+                if (!retr.failure) {
+                    if (!retr.partial) {
                         timer_event_t *current_event;
                         status_t handler_result = SUCCESS;
                         do {
@@ -506,43 +333,15 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
                         timer->timeout_event_fd->buffer->in_size_tb = 0;
                         timer->timeout_event_fd->buffer->in_size_c = 0;
                         return handler_result;
-                    } else {
-                        return SUCCESS;
                     }
-                } else {
-                    return FAILURE;
                 }
+                return retr.status;
             }
             if (async_event_is_OUT(*current_events)) {
                 if (timer->timeout_event_fd->buffer->out_size_tb != 0) {
-                    bool wfailure = false;
-                    bool wpartial = true;
-                    while (true) {
-                        ssize_t wsize = write(timer->timeout_event_fd->fd, timer->timeout_event_fd->buffer->buffer_out + timer->timeout_event_fd->buffer->out_size_c, timer->timeout_event_fd->buffer->out_size_tb - timer->timeout_event_fd->buffer->out_size_c);
-                        if (wsize < 0) {
-                            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                                if (timer->timeout_event_fd->buffer->out_size_tb == timer->timeout_event_fd->buffer->out_size_c) {
-                                    wpartial = false;
-                                }
-                                break;
-                            } else {
-                                oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&timer->timeout_event_fd->buffer->buffer_out);
-                                timer->timeout_event_fd->buffer->out_size_tb = 0;
-                                timer->timeout_event_fd->buffer->out_size_c = 0;
-                                wfailure = true;
-                                break;
-                            }
-                        } 
-                        if (wsize > 0) {
-                            timer->timeout_event_fd->buffer->out_size_c += wsize;
-                        }
-                        if (timer->timeout_event_fd->buffer->out_size_tb == timer->timeout_event_fd->buffer->out_size_c) {
-                            wpartial = false;
-                            break;
-                        }
-                    }
-                    if (!wfailure) {
-                        if (!wpartial) {
+                    et_result_t wetr = async_write_event(&worker_ctx->oritlsf_pool, timer->timeout_event_fd, true);
+                    if (!wetr.failure) {
+                        if (!wetr.partial) {
                             oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&timer->timeout_event_fd->buffer->buffer_out);
                             timer->timeout_event_fd->buffer->out_size_tb = 0;
                             timer->timeout_event_fd->buffer->out_size_c = 0;

@@ -8,6 +8,8 @@
 #include <time.h>
 #include <sys/eventfd.h>
 #include <sys/timerfd.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #ifdef __NetBSD__
     #include <sys/errno.h>
@@ -22,6 +24,7 @@
 #include "constants.h"
 #include "log.h"
 #include "types.h"
+#include "oritlsf.h"
 
 #ifdef __NetBSD__
     typedef struct {
@@ -342,6 +345,124 @@ static inline status_t async_update_timer_oneshot(const char* label, int *file_d
         return FAILURE;
     }
     return SUCCESS;
+}
+
+static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, et_buffered_fd_t *et_buffered_fd, bool on_out_ready) {
+    et_result_t wetr;
+    wetr.failure = false;
+    wetr.partial = true;
+    wetr.status = FAILURE;
+    if (on_out_ready && et_buffered_fd->buffer->out_size_tb == 0) {
+        wetr.failure = false;
+        wetr.partial = false;
+        wetr.status = SUCCESS;
+        return wetr;
+    }
+    if (!on_out_ready) {
+        uint64_t u = 1ULL;
+        if (et_buffered_fd->buffer->out_size_tb == 0) {
+            et_buffered_fd->buffer->out_size_tb = sizeof(uint64_t);
+            et_buffered_fd->buffer->buffer_out = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
+                oritlsf_pool,
+                et_buffered_fd->buffer->out_size_tb,
+                sizeof(uint8_t)
+            );
+            memcpy(et_buffered_fd->buffer->buffer_out, &u, sizeof(uint64_t));
+        } else {
+            et_buffered_fd->buffer->out_size_tb += sizeof(uint64_t);
+            et_buffered_fd->buffer->buffer_out = (uint8_t *)oritlsf_realloc(__FILE__, __LINE__, 
+                oritlsf_pool,
+                et_buffered_fd->buffer->buffer_out,
+                et_buffered_fd->buffer->out_size_tb * sizeof(uint8_t)
+            );
+            memcpy(et_buffered_fd->buffer->buffer_out + sizeof(uint64_t), &u, sizeof(uint64_t));
+        }
+    }
+    while (true) {
+        ssize_t wsize = write(et_buffered_fd->fd, et_buffered_fd->buffer->buffer_out + et_buffered_fd->buffer->out_size_c, et_buffered_fd->buffer->out_size_tb - et_buffered_fd->buffer->out_size_c);
+        if (wsize < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                if (et_buffered_fd->buffer->out_size_tb == et_buffered_fd->buffer->out_size_c) {
+                    wetr.failure = false;
+                    wetr.partial = false;
+                    wetr.status = SUCCESS;
+                } else {
+                    wetr.failure = false;
+                    wetr.partial = true;
+                    wetr.status = FAILURE_EAGNEWBLK;
+                }
+                break;
+            } else {
+                oritlsf_free(oritlsf_pool, (void **)&et_buffered_fd->buffer->buffer_out);
+                et_buffered_fd->buffer->out_size_tb = 0;
+                et_buffered_fd->buffer->out_size_c = 0;
+                wetr.failure = true;
+                wetr.partial = true;
+                wetr.status = FAILURE;
+                break;
+            }
+        } 
+        if (wsize > 0) {
+            et_buffered_fd->buffer->out_size_c += wsize;
+        }
+        if (et_buffered_fd->buffer->out_size_tb == et_buffered_fd->buffer->out_size_c) {
+            wetr.failure = false;
+            wetr.partial = false;
+            wetr.status = SUCCESS;
+            break;
+        }
+    }
+    return wetr;
+}
+
+static inline et_result_t async_read_event(oritlsf_pool_t *oritlsf_pool, et_buffered_fd_t *et_buffered_fd) {
+    et_result_t retr;
+    retr.failure = false;
+    retr.partial = true;
+    retr.status = FAILURE;
+    if (et_buffered_fd->buffer->in_size_tb == 0) {
+        et_buffered_fd->buffer->in_size_tb = sizeof(uint64_t);
+        et_buffered_fd->buffer->buffer_in = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
+            oritlsf_pool,
+            et_buffered_fd->buffer->in_size_tb,
+            sizeof(uint8_t)
+        );
+    }
+    while (true) {
+        ssize_t rsize = read(et_buffered_fd->fd, et_buffered_fd->buffer->buffer_in + et_buffered_fd->buffer->in_size_c, et_buffered_fd->buffer->in_size_tb-et_buffered_fd->buffer->in_size_c);
+        if (rsize < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                if (et_buffered_fd->buffer->in_size_tb == et_buffered_fd->buffer->in_size_c) {
+                    retr.failure = false;
+                    retr.partial = false;
+                    retr.status = SUCCESS;
+                } else {
+                    retr.failure = false;
+                    retr.partial = true;
+                    retr.status = FAILURE_EAGNEWBLK;
+                }
+                break;
+            } else {
+                oritlsf_free(oritlsf_pool, (void **)&et_buffered_fd->buffer->buffer_in);
+                et_buffered_fd->buffer->in_size_tb = 0;
+                et_buffered_fd->buffer->in_size_c = 0;
+                retr.failure = true;
+                retr.partial = true;
+                retr.status = FAILURE;
+                break;
+            }
+        } 
+        if (rsize > 0) {
+            et_buffered_fd->buffer->in_size_c += rsize;
+        }
+        if (et_buffered_fd->buffer->in_size_tb == et_buffered_fd->buffer->in_size_c) {
+            retr.failure = false;
+            retr.partial = false;
+            retr.status = SUCCESS;
+            break;
+        }
+    }
+    return retr;
 }
 
 #endif

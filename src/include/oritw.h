@@ -387,61 +387,15 @@ static inline status_t oritw_add_event(
             if (async_create_event(label, &timers->add_event_fd->fd) != SUCCESS) return FAILURE;
             if (async_create_inout_event(label, async, &timers->add_event_fd->fd) != SUCCESS) return FAILURE;
         }
-        bool wfailure = false;
-        bool wpartial = true;
-        uint64_t u = 1ULL;
-        if (timers->add_event_fd->buffer->out_size_tb == 0) {
-            timers->add_event_fd->buffer->out_size_tb = sizeof(uint64_t);
-            timers->add_event_fd->buffer->buffer_out = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-                pool,
-                timers->add_event_fd->buffer->out_size_tb,
-                sizeof(uint8_t)
-            );
-            memcpy(timers->add_event_fd->buffer->buffer_out, &u, sizeof(uint64_t));
-        } else {
-            timers->add_event_fd->buffer->out_size_tb += sizeof(uint64_t);
-            timers->add_event_fd->buffer->buffer_out = (uint8_t *)oritlsf_realloc(__FILE__, __LINE__, 
-                pool,
-                timers->add_event_fd->buffer->buffer_out,
-                timers->add_event_fd->buffer->out_size_tb * sizeof(uint8_t)
-            );
-            memcpy(timers->add_event_fd->buffer->buffer_out + sizeof(uint64_t), &u, sizeof(uint64_t));
-        }
-        while (true) {
-            ssize_t wsize = write(timers->add_event_fd->fd, timers->add_event_fd->buffer->buffer_out + timers->add_event_fd->buffer->out_size_c, timers->add_event_fd->buffer->out_size_tb - timers->add_event_fd->buffer->out_size_c);
-            if (wsize < 0) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    if (timers->add_event_fd->buffer->out_size_tb == timers->add_event_fd->buffer->out_size_c) {
-                        wpartial = false;
-                    }
-                    break;
-                } else {
-                    oritlsf_free(pool, (void **)&timers->add_event_fd->buffer->buffer_out);
-                    timers->add_event_fd->buffer->out_size_tb = 0;
-                    timers->add_event_fd->buffer->out_size_c = 0;
-                    wfailure = true;
-                    break;
-                }
-            } 
-            if (wsize > 0) {
-                timers->add_event_fd->buffer->out_size_c += wsize;
-            }
-            if (timers->add_event_fd->buffer->out_size_tb == timers->add_event_fd->buffer->out_size_c) {
-                wpartial = false;
-                break;
-            }
-        }
-        if (!wfailure) {
-            if (!wpartial) {
+        et_result_t wetr = async_write_event(pool, timers->add_event_fd, true);
+        if (!wetr.failure) {
+            if (!wetr.partial) {
                 oritlsf_free(pool, (void **)&timers->add_event_fd->buffer->buffer_out);
                 timers->add_event_fd->buffer->out_size_tb = 0;
                 timers->add_event_fd->buffer->out_size_c = 0;
-            } else {
-                return FAILURE;
             }
-        } else {
-            return FAILURE;
         }
+        return wetr.status;
     }
     new_event->timer_id = timer_id->id;
     timer_id->event = new_event;

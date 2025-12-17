@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/types.h>
+#include <stdbool.h>
 
 typedef enum {
 //----------------------------------------------------------------------
@@ -124,5 +125,11 @@ typedef struct {
     int fd;
     et_buffer_t *buffer;
 } et_buffered_fd_t;
+
+typedef struct {
+    bool failure;
+    bool partial;
+    status_t status;
+} et_result_t;
 
 #endif

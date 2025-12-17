@@ -5,13 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <signal.h>
-#include <errno.h>
-#include <sys/types.h>
 #include <stdlib.h>
-
-#ifdef __NetBSD__
-    #include <sys/errno.h>
-#endif
 
 #include "log.h"
 #include "constants.h"
@@ -40,52 +34,9 @@ oritlsf_pool_t *oritlsf_pool = NULL;
 void sigint_handler(int signum) {
     shutdown_requested = 1ULL;
     if (shutdown_event_fd && shutdown_event_fd->fd != -1) {
-        bool wfailure = false;
-        bool wpartial = true;
-        uint64_t u = 1ULL;
-        if (shutdown_event_fd->buffer->out_size_tb == 0) {
-            shutdown_event_fd->buffer->out_size_tb = sizeof(uint64_t);
-            shutdown_event_fd->buffer->buffer_out = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-                oritlsf_pool,
-                shutdown_event_fd->buffer->out_size_tb,
-                sizeof(uint8_t)
-            );
-            memcpy(shutdown_event_fd->buffer->buffer_out, &u, sizeof(uint64_t));
-        } else {
-            shutdown_event_fd->buffer->out_size_tb += sizeof(uint64_t);
-            shutdown_event_fd->buffer->buffer_out = (uint8_t *)oritlsf_realloc(__FILE__, __LINE__, 
-                oritlsf_pool,
-                shutdown_event_fd->buffer->buffer_out,
-                shutdown_event_fd->buffer->out_size_tb * sizeof(uint8_t)
-            );
-            memcpy(shutdown_event_fd->buffer->buffer_out + sizeof(uint64_t), &u, sizeof(uint64_t));
-        }
-        while (true) {
-            ssize_t wsize = write(shutdown_event_fd->fd, shutdown_event_fd->buffer->buffer_out + shutdown_event_fd->buffer->out_size_c, shutdown_event_fd->buffer->out_size_tb - shutdown_event_fd->buffer->out_size_c);
-            if (wsize < 0) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    if (shutdown_event_fd->buffer->out_size_tb == shutdown_event_fd->buffer->out_size_c) {
-                        wpartial = false;
-                    }
-                    break;
-                } else {
-                    oritlsf_free(oritlsf_pool, (void **)&shutdown_event_fd->buffer->buffer_out);
-                    shutdown_event_fd->buffer->out_size_tb = 0;
-                    shutdown_event_fd->buffer->out_size_c = 0;
-                    wfailure = true;
-                    break;
-                }
-            } 
-            if (wsize > 0) {
-                shutdown_event_fd->buffer->out_size_c += wsize;
-            }
-            if (shutdown_event_fd->buffer->out_size_tb == shutdown_event_fd->buffer->out_size_c) {
-                wpartial = false;
-                break;
-            }
-        }
-        if (!wfailure) {
-            if (!wpartial) {
+        et_result_t wetr = async_write_event(oritlsf_pool, shutdown_event_fd, false);
+        if (!wetr.failure) {
+            if (!wetr.partial) {
                 oritlsf_free(oritlsf_pool, (void **)&shutdown_event_fd->buffer->buffer_out);
                 shutdown_event_fd->buffer->out_size_tb = 0;
                 shutdown_event_fd->buffer->out_size_c = 0;
@@ -492,42 +443,9 @@ void run_master(const char *label, master_context_t *master_ctx) {
 			uint32_t current_events = events_status.r_uint32_t;	
 			if (current_fd == master_ctx->shutdown_event_fd->fd) {
                 if (async_event_is_IN(current_events)) {
-                    bool rfailure = false;
-                    bool rpartial = true;
-                    if (master_ctx->shutdown_event_fd->buffer->in_size_tb == 0) {
-                        master_ctx->shutdown_event_fd->buffer->in_size_tb = sizeof(uint64_t);
-                        master_ctx->shutdown_event_fd->buffer->buffer_in = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-                            &master_ctx->oritlsf_pool,
-                            master_ctx->shutdown_event_fd->buffer->in_size_tb,
-                            sizeof(uint8_t)
-                        );
-                    }
-                    while (true) {
-                        ssize_t rsize = read(master_ctx->shutdown_event_fd->fd, master_ctx->shutdown_event_fd->buffer->buffer_in + master_ctx->shutdown_event_fd->buffer->in_size_c, master_ctx->shutdown_event_fd->buffer->in_size_tb-master_ctx->shutdown_event_fd->buffer->in_size_c);
-                        if (rsize < 0) {
-                            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                                if (master_ctx->shutdown_event_fd->buffer->in_size_tb == master_ctx->shutdown_event_fd->buffer->in_size_c) {
-                                    rpartial = false;
-                                }
-                                break;
-                            } else {
-                                oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->shutdown_event_fd->buffer->buffer_in);
-                                master_ctx->shutdown_event_fd->buffer->in_size_tb = 0;
-                                master_ctx->shutdown_event_fd->buffer->in_size_c = 0;
-                                rfailure = true;
-                                break;
-                            }
-                        } 
-                        if (rsize > 0) {
-                            master_ctx->shutdown_event_fd->buffer->in_size_c += rsize;
-                        }
-                        if (master_ctx->shutdown_event_fd->buffer->in_size_tb == master_ctx->shutdown_event_fd->buffer->in_size_c) {
-                            rpartial = false;
-                            break;
-                        }
-                    }
-                    if (!rfailure) {
-                        if (!rpartial) {
+                    et_result_t retr = async_read_event(&master_ctx->oritlsf_pool, master_ctx->shutdown_event_fd);
+                    if (!retr.failure) {
+                        if (!retr.partial) {
                             LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
                             master_ctx->shutdown_requested = 1;
                             master_workers_info(label, master_ctx,IT_SHUTDOWN);
@@ -539,34 +457,9 @@ void run_master(const char *label, master_context_t *master_ctx) {
                 }
                 if (async_event_is_OUT(current_events)) {
                     if (master_ctx->shutdown_event_fd->buffer->out_size_tb != 0) {
-                        bool wfailure = false;
-                        bool wpartial = true;
-                        while (true) {
-                            ssize_t wsize = write(master_ctx->shutdown_event_fd->fd, master_ctx->shutdown_event_fd->buffer->buffer_out + master_ctx->shutdown_event_fd->buffer->out_size_c, master_ctx->shutdown_event_fd->buffer->out_size_tb - master_ctx->shutdown_event_fd->buffer->out_size_c);
-                            if (wsize < 0) {
-                                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                                    if (master_ctx->shutdown_event_fd->buffer->out_size_tb == master_ctx->shutdown_event_fd->buffer->out_size_c) {
-                                        wpartial = false;
-                                    }
-                                    break;
-                                } else {
-                                    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->shutdown_event_fd->buffer->buffer_out);
-                                    master_ctx->shutdown_event_fd->buffer->out_size_tb = 0;
-                                    master_ctx->shutdown_event_fd->buffer->out_size_c = 0;
-                                    wfailure = true;
-                                    break;
-                                }
-                            } 
-                            if (wsize > 0) {
-                                master_ctx->shutdown_event_fd->buffer->out_size_c += wsize;
-                            }
-                            if (master_ctx->shutdown_event_fd->buffer->out_size_tb == master_ctx->shutdown_event_fd->buffer->out_size_c) {
-                                wpartial = false;
-                                break;
-                            }
-                        }
-                        if (!wfailure) {
-                            if (!wpartial) {
+                        et_result_t wetr = async_write_event(&master_ctx->oritlsf_pool, master_ctx->shutdown_event_fd, true);
+                        if (!wetr.failure) {
+                            if (!wetr.partial) {
                                 oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->shutdown_event_fd->buffer->buffer_out);
                                 master_ctx->shutdown_event_fd->buffer->out_size_tb = 0;
                                 master_ctx->shutdown_event_fd->buffer->out_size_c = 0;
