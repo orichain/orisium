@@ -814,6 +814,15 @@ static inline et_result_t receive_ipc_raw_protocol_message(oritlsf_pool_t *pool,
                 buffer->in_size_tb,
                 sizeof(uint8_t)
             );
+            if (!buffer->buffer_in) {
+                buffer->read_step = 0;
+                buffer->in_size_tb = 0;
+                buffer->in_size_c = 0;
+                retr.failure = true;
+                retr.partial = true;
+                retr.status = FAILURE_NOMEM;
+                return retr;
+            }
         }
         while (true) {
             struct msghdr msg_prefix = {0};
@@ -908,6 +917,15 @@ static inline et_result_t receive_ipc_raw_protocol_message(oritlsf_pool_t *pool,
                     buffer->in_size_tb,
                     sizeof(uint8_t)
                 );
+                if (!buffer->buffer_in) {
+                    buffer->read_step = 0;
+                    buffer->in_size_tb = 0;
+                    buffer->in_size_c = 0;
+                    retr.failure = true;
+                    retr.partial = true;
+                    retr.status = FAILURE_NOMEM;
+                    return retr;
+                }
             }
         }
     }
