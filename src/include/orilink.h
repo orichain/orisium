@@ -1273,7 +1273,13 @@ static inline orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packe
     }
     socklen_t source_addr_len = sizeof(struct sockaddr_in6);
     uint8_t temp_buffer[ORILINK_MAX_PACKET_SIZE];
-    ssize_t bytes_read_payload = recvfrom(*sock_fd, temp_buffer, ORILINK_MAX_PACKET_SIZE, 0, (struct sockaddr * restrict)source_addr, &source_addr_len);
+    ssize_t bytes_read_payload = recvfrom(
+        *sock_fd, 
+        temp_buffer, 
+        ORILINK_MAX_PACKET_SIZE, 
+        MSG_TRUNC, 
+        (struct sockaddr * restrict)source_addr, &source_addr_len
+    );
     const size_t min_size = AES_TAG_BYTES + 
                             sizeof(uint32_t) + 
                             ORILINK_VERSION_BYTES + 
@@ -1290,6 +1296,9 @@ static inline orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packe
                             sizeof(uint8_t) + 
                             sizeof(uint8_t);
     if (bytes_read_payload < 0) {
+//======================================================================
+//--- Atomic Datagrams (All or Nothing)
+//======================================================================
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
 			oritlsf_free(pool, (void **)&result.r_orilink_raw_protocol_t);
             result.status = FAILURE_EAGNEWBLK;

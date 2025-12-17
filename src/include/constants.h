@@ -90,6 +90,7 @@
 // 1200 Paling aman dari fragmentasi
 //======================================================================
 #define ORILINK_MAX_PACKET_SIZE 1200
+#define IPC_MAX_PACKET_SIZE (1024 * 1024)
 
 #define MAX_SESSIONS 10
 #define MAX_EPOLL_EVENTS 10

@@ -873,6 +873,31 @@ static inline et_result_t receive_ipc_raw_protocol_message(oritlsf_pool_t *pool,
                 uint32_t total_ipc_payload_len_be;
                 memcpy(&total_ipc_payload_len_be, buffer->buffer_in, buffer->in_size_tb);
                 uint32_t total_ipc_payload_len = be32toh(total_ipc_payload_len_be);                
+                const size_t min_size = AES_TAG_BYTES +
+                                        sizeof(uint32_t) +
+                                        IPC_VERSION_BYTES +
+                                        sizeof(uint8_t) +
+                                        sizeof(uint8_t) +
+                                        sizeof(uint8_t);
+                if (total_ipc_payload_len < (uint32_t)min_size) {
+                    oritlsf_free(pool, (void **)&buffer->buffer_in);
+                    buffer->read_step = 0;
+                    buffer->in_size_tb = 0;
+                    buffer->in_size_c = 0;
+                    retr.failure = true;
+                    retr.partial = true;
+                    retr.status = FAILURE;
+                    return retr;
+                } else if (total_ipc_payload_len > (uint32_t)IPC_MAX_PACKET_SIZE) {
+                    oritlsf_free(pool, (void **)&buffer->buffer_in);
+                    buffer->read_step = 0;
+                    buffer->in_size_tb = 0;
+                    buffer->in_size_c = 0;
+                    retr.failure = true;
+                    retr.partial = true;
+                    retr.status = FAILURE;
+                    return retr;
+                }
                 oritlsf_free(pool, (void **)&buffer->buffer_in);
                 buffer->read_step = 1;
                 buffer->in_size_tb = 0;
