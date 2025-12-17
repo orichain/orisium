@@ -368,7 +368,6 @@ static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, et_buf
                 sizeof(uint8_t)
             );
             if (!et_buffered_fd->buffer->buffer_out) {
-                et_buffered_fd->buffer->read_step = 0;
                 et_buffered_fd->buffer->out_size_tb = 0;
                 et_buffered_fd->buffer->out_size_c = 0;
                 wetr.failure = true;
@@ -378,6 +377,7 @@ static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, et_buf
             }
             memcpy(et_buffered_fd->buffer->buffer_out, &u, sizeof(uint64_t));
         } else {
+            ssize_t old_out_size_tb = et_buffered_fd->buffer->out_size_tb;
             et_buffered_fd->buffer->out_size_tb += sizeof(uint64_t);
             et_buffered_fd->buffer->buffer_out = (uint8_t *)oritlsf_realloc(__FILE__, __LINE__, 
                 oritlsf_pool,
@@ -385,7 +385,6 @@ static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, et_buf
                 et_buffered_fd->buffer->out_size_tb * sizeof(uint8_t)
             );
             if (!et_buffered_fd->buffer->buffer_out) {
-                et_buffered_fd->buffer->read_step = 0;
                 et_buffered_fd->buffer->out_size_tb = 0;
                 et_buffered_fd->buffer->out_size_c = 0;
                 wetr.failure = true;
@@ -393,7 +392,7 @@ static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, et_buf
                 wetr.status = FAILURE_NOMEM;
                 return wetr;
             }
-            memcpy(et_buffered_fd->buffer->buffer_out + sizeof(uint64_t), &u, sizeof(uint64_t));
+            memcpy(et_buffered_fd->buffer->buffer_out + old_out_size_tb, &u, sizeof(uint64_t));
         }
     }
     while (true) {
@@ -412,7 +411,6 @@ static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, et_buf
                 break;
             } else {
                 oritlsf_free(oritlsf_pool, (void **)&et_buffered_fd->buffer->buffer_out);
-                et_buffered_fd->buffer->read_step = 0;
                 et_buffered_fd->buffer->out_size_tb = 0;
                 et_buffered_fd->buffer->out_size_c = 0;
                 wetr.failure = true;
@@ -426,7 +424,6 @@ static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, et_buf
         }
         if (wsize == 0) {
             oritlsf_free(oritlsf_pool, (void **)&et_buffered_fd->buffer->buffer_out);
-            et_buffered_fd->buffer->read_step = 0;
             et_buffered_fd->buffer->out_size_tb = 0;
             et_buffered_fd->buffer->out_size_c = 0;
             wetr.failure = true;

@@ -602,7 +602,6 @@ static inline et_result_t write_ipc_protocol_message(
                 sizeof(uint8_t)
             );
             if (!buffer->buffer_out) {
-                buffer->read_step = 0;
                 buffer->out_size_tb = 0;
                 buffer->out_size_c = 0;
                 wetr.failure = true;
@@ -612,6 +611,7 @@ static inline et_result_t write_ipc_protocol_message(
             }
             memcpy(buffer->buffer_out, data, len);
         } else {
+            ssize_t old_out_size_tb = buffer->out_size_tb;
             buffer->out_size_tb += len;
             buffer->buffer_out = (uint8_t *)oritlsf_realloc(__FILE__, __LINE__, 
                 oritlsf_pool,
@@ -619,7 +619,6 @@ static inline et_result_t write_ipc_protocol_message(
                 buffer->out_size_tb * sizeof(uint8_t)
             );
             if (!buffer->buffer_out) {
-                buffer->read_step = 0;
                 buffer->out_size_tb = 0;
                 buffer->out_size_c = 0;
                 wetr.failure = true;
@@ -627,7 +626,7 @@ static inline et_result_t write_ipc_protocol_message(
                 wetr.status = FAILURE_NOMEM;
                 return wetr;
             }
-            memcpy(buffer->buffer_out + len, data, len);
+            memcpy(buffer->buffer_out + old_out_size_tb, data, len);
         }
     }
     while (true) {
@@ -654,7 +653,6 @@ static inline et_result_t write_ipc_protocol_message(
                 break;
             } else {
                 oritlsf_free(oritlsf_pool, (void **)&buffer->buffer_out);
-                buffer->read_step = 0;
                 buffer->out_size_tb = 0;
                 buffer->out_size_c = 0;
                 wetr.failure = true;
@@ -668,7 +666,6 @@ static inline et_result_t write_ipc_protocol_message(
         }
         if (wsize == 0) {
             oritlsf_free(oritlsf_pool, (void **)&buffer->buffer_out);
-            buffer->read_step = 0;
             buffer->out_size_tb = 0;
             buffer->out_size_c = 0;
             wetr.failure = true;
