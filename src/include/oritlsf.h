@@ -102,14 +102,7 @@ static inline int ffs_size_t(size_t x) {
 
 static inline int msb_index_size_t(size_t x) {
     if (x == 0) return -1;
-#if defined(__GNUC__) || defined(__clang__)
-    return (int)((sizeof(unsigned long long)*8 - 1) - __builtin_clzll((unsigned long long)x));
-#else
-    int msb = 0;
-    size_t tmp = x;
-    while (tmp >>= 1) { msb++; }
-    return msb;
-#endif
+    return (int)(sizeof(size_t) * 8 - 1) - __builtin_clzll((unsigned long long)x);
 }
 
 static inline void get_indices(size_t size, int *out_fl, int *out_sl) {
