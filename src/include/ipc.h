@@ -574,16 +574,131 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, oritlsf
     return result;
 }
 
+static inline et_result_t write_ipc_protocol_message(
+    oritlsf_pool_t *oritlsf_pool, 
+    int *uds_fd,
+    et_buffer_t *buffer, 
+    size_t len,
+    uint8_t *data,
+    bool on_out_ready
+)
+{
+    et_result_t wetr;
+    wetr.failure = false;
+    wetr.partial = true;
+    wetr.status = FAILURE;
+    if (on_out_ready && buffer->out_size_tb == 0) {
+        wetr.failure = false;
+        wetr.partial = false;
+        wetr.status = SUCCESS;
+        return wetr;
+    }
+    if (!on_out_ready) {
+        if (buffer->out_size_tb == 0) {
+            buffer->out_size_tb = len;
+            buffer->buffer_out = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
+                oritlsf_pool,
+                buffer->out_size_tb,
+                sizeof(uint8_t)
+            );
+            if (!buffer->buffer_out) {
+                buffer->read_step = 0;
+                buffer->out_size_tb = 0;
+                buffer->out_size_c = 0;
+                wetr.failure = true;
+                wetr.partial = true;
+                wetr.status = FAILURE_NOMEM;
+                return wetr;
+            }
+            memcpy(buffer->buffer_out, data, len);
+        } else {
+            buffer->out_size_tb += len;
+            buffer->buffer_out = (uint8_t *)oritlsf_realloc(__FILE__, __LINE__, 
+                oritlsf_pool,
+                buffer->buffer_out,
+                buffer->out_size_tb * sizeof(uint8_t)
+            );
+            if (!buffer->buffer_out) {
+                buffer->read_step = 0;
+                buffer->out_size_tb = 0;
+                buffer->out_size_c = 0;
+                wetr.failure = true;
+                wetr.partial = true;
+                wetr.status = FAILURE_NOMEM;
+                return wetr;
+            }
+            memcpy(buffer->buffer_out + len, data, len);
+        }
+    }
+    while (true) {
+        struct msghdr msg = {0};
+        struct iovec iov[1];
+        iov[0].iov_base = buffer->buffer_out + buffer->out_size_c;
+        iov[0].iov_len = buffer->out_size_tb - buffer->out_size_c;
+        msg.msg_iov = iov;
+        msg.msg_iovlen = 1;
+        msg.msg_control = NULL;
+        msg.msg_controllen = 0;
+        ssize_t wsize = sendmsg(*uds_fd, &msg, 0);
+        if (wsize < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                if (buffer->out_size_tb == buffer->out_size_c) {
+                    wetr.failure = false;
+                    wetr.partial = false;
+                    wetr.status = SUCCESS_EAGNEWBLK;
+                } else {
+                    wetr.failure = false;
+                    wetr.partial = true;
+                    wetr.status = FAILURE_EAGNEWBLK;
+                }
+                break;
+            } else {
+                oritlsf_free(oritlsf_pool, (void **)&buffer->buffer_out);
+                buffer->read_step = 0;
+                buffer->out_size_tb = 0;
+                buffer->out_size_c = 0;
+                wetr.failure = true;
+                wetr.partial = true;
+                wetr.status = FAILURE;
+                break;
+            }
+        } 
+        if (wsize > 0) {
+            buffer->out_size_c += wsize;
+        }
+        if (wsize == 0) {
+            oritlsf_free(oritlsf_pool, (void **)&buffer->buffer_out);
+            buffer->read_step = 0;
+            buffer->out_size_tb = 0;
+            buffer->out_size_c = 0;
+            wetr.failure = true;
+            wetr.partial = true;
+            wetr.status = FAILURE;
+            break;
+        }
+        if (buffer->out_size_tb == buffer->out_size_c) {
+            wetr.failure = false;
+            wetr.partial = false;
+            wetr.status = SUCCESS;
+            break;
+        }
+    }
+    return wetr;
+}
+
 static inline ssize_t_status_t send_ipc_protocol_message(const char *label, oritlsf_pool_t *pool, uint8_t* key_aes, uint8_t* key_mac, uint8_t* nonce, uint32_t *ctr, int *uds_fd, et_buffer_t *buffer, const ipc_protocol_t* p) {
 	ssize_t_status_t result;
     result.r_ssize_t = 0;
     result.status = FAILURE;
-    
     size_t_status_t psize = calculate_ipc_payload_size(label, p);
     if (psize.status != SUCCESS) {
 		return result;
 	}
     size_t serialized_ipc_data_len = psize.r_size_t;
+    if (serialized_ipc_data_len > IPC_MAX_PACKET_SIZE) {
+        LOG_ERROR("%sipc_serialize error. Serialized_ipc_data_len: %d, IPC_MAX_PACKET_SIZE %d.", label, serialized_ipc_data_len, IPC_MAX_PACKET_SIZE);
+        return result;
+    }
     if (serialized_ipc_data_len == 0) {
         LOG_ERROR("%sCalculated required size is 0.", label);
         return result;
@@ -611,42 +726,25 @@ static inline ssize_t_status_t send_ipc_protocol_message(const char *label, orit
     memcpy(final_send_buffer + offset, &ipc_protocol_data_len_be, IPC_LENGTH_PREFIX_BYTES);
     offset += IPC_LENGTH_PREFIX_BYTES;
     memcpy(final_send_buffer + offset, serialized_ipc_data_buffer, serialized_ipc_data_len);
-    LOG_DEBUG("%sTotal pesan untuk dikirim: %zu byte (Prefix %zu + IPC Data %zu).",
-            label, total_message_len_to_send, IPC_LENGTH_PREFIX_BYTES, serialized_ipc_data_len);
-    struct msghdr msg = {0};
-    struct iovec iov[1];
-    iov[0].iov_base = final_send_buffer;
-    iov[0].iov_len = total_message_len_to_send;
-    msg.msg_iov = iov;
-    msg.msg_iovlen = 1;
-    msg.msg_control = NULL;
-    msg.msg_controllen = 0;
-    do {
-        result.r_ssize_t = sendmsg(*uds_fd, &msg, 0);
-    } while (result.r_ssize_t == -1 && errno == EINTR);
-    if (result.r_ssize_t == -1) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            oritlsf_free(pool, (void **)&final_send_buffer);
-            oritlsf_free(pool, (void **)&serialized_ipc_data_buffer);
-            result.status = SUCCESS;
-            return result;
-        }
-        LOG_ERROR("%ssend_ipc_protocol_message sendmsg. %s", label, strerror(errno));
-        oritlsf_free(pool, (void **)&final_send_buffer);
-        oritlsf_free(pool, (void **)&serialized_ipc_data_buffer);
-        result.status = FAILURE;
-        return result;
-    }
-    if (result.r_ssize_t != (ssize_t)total_message_len_to_send) {
-        LOG_ERROR("%ssend_ipc_protocol_message sendmsg partial write %zd from %zu byte!",
-                label, result.r_ssize_t, total_message_len_to_send);
-        oritlsf_free(pool, (void **)&final_send_buffer);
-        oritlsf_free(pool, (void **)&serialized_ipc_data_buffer);
-        result.status = FAILURE;
-        return result;
-    }    
+    LOG_DEBUG("%sTotal pesan untuk dikirim: %zu byte (Prefix %zu + IPC Data %zu).", label, total_message_len_to_send, IPC_LENGTH_PREFIX_BYTES, serialized_ipc_data_len);
+    et_result_t wetr = write_ipc_protocol_message(
+        pool, 
+        uds_fd,
+        buffer, 
+        total_message_len_to_send,
+        final_send_buffer,
+        false
+    );
     oritlsf_free(pool, (void **)&final_send_buffer);
     oritlsf_free(pool, (void **)&serialized_ipc_data_buffer);
+    if (!wetr.failure) {
+        if (!wetr.partial) {
+            oritlsf_free(pool, (void **)&buffer->buffer_out);
+            buffer->out_size_tb = 0;
+            buffer->out_size_c = 0;
+        }
+    }
+    result.r_ssize_t = buffer->out_size_c;
     result.status = SUCCESS;
     return result;
 }

@@ -2,15 +2,7 @@
 #define WORKERS_WORKER_TIMER_H
 
 #include <inttypes.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/types.h>
 #include <stdio.h>
-
-#ifdef __NetBSD__
-    #include <sys/errno.h>
-#endif
 
 #include "log.h"
 #include "oritw.h"
@@ -220,7 +212,7 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
             retr.partial = true;
             retr.status = FAILURE;
             do {
-                retr = async_read_eventX(&worker_ctx->oritlsf_pool, worker_ctx->timer.add_event_fd);
+                retr = async_read_event(&worker_ctx->oritlsf_pool, worker_ctx->timer.add_event_fd);
                 if (!retr.failure) {
                     if (!retr.partial) {
                         timer_id_t *current_add;
@@ -272,7 +264,7 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
                 retr.partial = true;
                 retr.status = FAILURE;
                 do {
-                    retr = async_read_eventX(&worker_ctx->oritlsf_pool, timer->tick_event_fd);
+                    retr = async_read_event(&worker_ctx->oritlsf_pool, timer->tick_event_fd);
                     if (!retr.failure) {
                         if (!retr.partial) {
                             uint64_t advance_ticks = (uint64_t)(timer->last_delay_us);
@@ -302,7 +294,7 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
                 retr.partial = true;
                 retr.status = FAILURE;
                 do {
-                    retr = async_read_eventX(&worker_ctx->oritlsf_pool, timer->timeout_event_fd);
+                    retr = async_read_event(&worker_ctx->oritlsf_pool, timer->timeout_event_fd);
                     if (!retr.failure) {
                         if (!retr.partial) {
                             timer_event_t *current_event;

@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stddef.h>
 
 #include "async.h"
 #include "types.h"
@@ -7,6 +8,8 @@
 #include "workers/worker_timer.h"
 #include "workers/worker_ipc.h"
 #include "oritlsf.h"
+#include "ipc.h"
+#include "stdbool.h"
 
 void run_cow_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms, int *master_uds_fd) {
     worker_context_t x_ctx;
@@ -51,6 +54,23 @@ void run_cow_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
                 } else {
                     if (async_event_is_IN(current_events)) {
                         handle_workers_ipc_event(worker_ctx, (void **)sessions, initial_delay_ms);
+                    }
+                    if (async_event_is_OUT(current_events)) {
+                        et_result_t wetr = write_ipc_protocol_message(
+                            &worker_ctx->oritlsf_pool, 
+                            &current_fd,
+                            worker_ctx->buffer, 
+                            0,
+                            NULL,
+                            true
+                        );
+                        if (!wetr.failure) {
+                            if (!wetr.partial) {
+                                oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&worker_ctx->buffer->buffer_out);
+                                worker_ctx->buffer->out_size_tb = 0;
+                                worker_ctx->buffer->out_size_c = 0;
+                            }
+                        }
                     }
                     continue;
                 }

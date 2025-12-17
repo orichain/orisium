@@ -26,6 +26,7 @@
 #include "oritlsf.h"
 #include "oritw/timer_event.h"
 #include "kalman.h"
+#include "ipc.h"
 
 volatile sig_atomic_t shutdown_requested = 0;
 et_buffered_fd_t *shutdown_event_fd = NULL;
@@ -554,7 +555,7 @@ void run_master(const char *label, master_context_t *master_ctx) {
                     retr.partial = true;
                     retr.status = FAILURE;
                     do {
-                        retr = async_read_eventX(&master_ctx->oritlsf_pool, master_ctx->shutdown_event_fd);
+                        retr = async_read_event(&master_ctx->oritlsf_pool, master_ctx->shutdown_event_fd);
                         if (!retr.failure) {
                             if (!retr.partial) {
                                 LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
@@ -796,6 +797,23 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                 continue;
                             } else {
                                 continue;
+                            }
+                        }
+                        if (async_event_is_OUT(current_events)) {
+                            et_result_t wetr = write_ipc_protocol_message(
+                                &master_ctx->oritlsf_pool, 
+                                file_descriptor,
+                                buffer, 
+                                0,
+                                NULL,
+                                true
+                            );
+                            if (!wetr.failure) {
+                                if (!wetr.partial) {
+                                    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&buffer->buffer_out);
+                                    buffer->out_size_tb = 0;
+                                    buffer->out_size_c = 0;
+                                }
                             }
                         }
                     }

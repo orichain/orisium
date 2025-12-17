@@ -23,8 +23,10 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
 	char host_str[NI_MAXHOST];
     char port_str[NI_MAXSERV];
     
-    while (true) {
-        orilink_raw_protocol_t_status_t orcvdo = receive_orilink_raw_protocol_packet(
+    orilink_raw_protocol_t_status_t orcvdo;
+    orcvdo.status = FAILURE;
+    do {
+        orcvdo = receive_orilink_raw_protocol_packet(
             label,
             &master_ctx->oritlsf_pool,
             &master_ctx->udp_sock,
@@ -255,6 +257,6 @@ status_t handle_master_udp_sock_event(const char *label, master_context_t *maste
                     CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &orcvdo.r_orilink_raw_protocol_t);
             }
         }
-    }
-	return SUCCESS;
+    } while (orcvdo.status == SUCCESS);
+    return SUCCESS;
 }

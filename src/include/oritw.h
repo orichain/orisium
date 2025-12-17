@@ -6,14 +6,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 #ifdef __NetBSD__
     #include <sys/common_int_limits.h>
-    #include <sys/errno.h>
 #endif
 
 #include "async.h"
