@@ -52,6 +52,20 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
     ctx->heartbeat_timer_id.delay_us = 0.0;
     ctx->heartbeat_timer_id.event_type = TE_HEARTBEAT;
 //----------------------------------------------------------------------
+    ctx->buffer = (et_buffer_t *)oritlsf_calloc(__FILE__, __LINE__, 
+        &ctx->oritlsf_pool,
+        1,
+        sizeof(et_buffer_t)
+    );
+    et_buffer_t *buffer = ctx->buffer;
+    buffer->read_step = 0;
+    buffer->buffer_in = NULL;
+    buffer->in_size_tb = 0;
+    buffer->in_size_c = 0;
+    buffer->buffer_out = NULL;
+    buffer->out_size_tb = 0;
+    buffer->out_size_c = 0;
+//----------------------------------------------------------------------
 // Setup IPC security
 //----------------------------------------------------------------------
     ctx->kem_privatekey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
@@ -157,6 +171,14 @@ void cleanup_worker(worker_context_t *ctx) {
 //----------------------------------------------------------------------
     CLOSE_FD(&ctx->async.async_fd);
     oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->label);
+//----------------------------------------------------------------------
+    if (ctx->buffer->buffer_in != NULL) {
+        oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->buffer->buffer_in);
+    }
+    if (ctx->buffer->buffer_out != NULL) {
+        oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->buffer->buffer_out);
+    }
+    oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->buffer);
 //----------------------------------------------------------------------
 	void *reclaimed_buffer = oritlsf_cleanup_pool(llabel, &ctx->oritlsf_pool);
     if (reclaimed_buffer != ctx->arena_buffer) {

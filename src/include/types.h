@@ -11,6 +11,7 @@ typedef enum {
     SUCCESS = (uint8_t)0x00,
 //----------------------------------------------------------------------
     SUCCESS_WRKSRDY = (uint8_t)0x01,
+    SUCCESS_EAGNEWBLK = (uint8_t)0x02,
 //----------------------------------------------------------------------
     FAILURE_NOTFOUND = (uint8_t)0xe5,
     FAILURE_IVLDTRY = (uint8_t)0xe6,
@@ -113,6 +114,7 @@ typedef struct {
 } p8zs_t;
 
 typedef struct {
+    uint8_t read_step;
     uint8_t *buffer_in;
     ssize_t in_size_tb;
     ssize_t in_size_c;

@@ -532,6 +532,7 @@ static inline status_t oritw_setup(const char *label, oritlsf_pool_t *pool, asyn
         1,
         sizeof(et_buffer_t)
     );
+    timers->add_event_fd->buffer->read_step = 0;
     timers->add_event_fd->buffer->buffer_in = NULL;
     timers->add_event_fd->buffer->in_size_tb = 0;
     timers->add_event_fd->buffer->in_size_c = 0;
@@ -555,6 +556,7 @@ static inline status_t oritw_setup(const char *label, oritlsf_pool_t *pool, asyn
             1,
             sizeof(et_buffer_t)
         );
+        tw->tick_event_fd->buffer->read_step = 0;
         tw->tick_event_fd->buffer->buffer_in = NULL;
         tw->tick_event_fd->buffer->in_size_tb = 0;
         tw->tick_event_fd->buffer->in_size_c = 0;
@@ -572,6 +574,7 @@ static inline status_t oritw_setup(const char *label, oritlsf_pool_t *pool, asyn
             1,
             sizeof(et_buffer_t)
         );
+        tw->timeout_event_fd->buffer->read_step = 0;
         tw->timeout_event_fd->buffer->buffer_in = NULL;
         tw->timeout_event_fd->buffer->in_size_tb = 0;
         tw->timeout_event_fd->buffer->in_size_c = 0;

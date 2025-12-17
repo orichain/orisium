@@ -801,97 +801,157 @@ static inline status_t ipc_read_cleartext_header(const char *label, ipc_raw_prot
     return SUCCESS;
 }
 
-static inline ipc_raw_protocol_t_status_t receive_ipc_raw_protocol_message(const char *label, oritlsf_pool_t *pool, int *uds_fd, et_buffer_t *buffer) {
-	ipc_raw_protocol_t_status_t result;
-    result.status = FAILURE;
-    result.r_ipc_raw_protocol_t = (ipc_raw_protocol_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_raw_protocol_t));
-    if (!result.r_ipc_raw_protocol_t) {
-        result.status = FAILURE_NOMEM;
-        return result;
-    }
-    
-    uint32_t total_ipc_payload_len_be;
-    char temp_len_prefix_buf[IPC_LENGTH_PREFIX_BYTES];
-    struct msghdr msg_prefix = {0};
-    struct iovec iov_prefix[1];
-    iov_prefix[0].iov_base = temp_len_prefix_buf;
-    iov_prefix[0].iov_len = IPC_LENGTH_PREFIX_BYTES;
-    msg_prefix.msg_iov = iov_prefix;
-    msg_prefix.msg_iovlen = 1;
-    char cmsgbuf_prefix[CMSG_SPACE(sizeof(int))];
-    msg_prefix.msg_control = cmsgbuf_prefix;
-    msg_prefix.msg_controllen = sizeof(cmsgbuf_prefix);
-    ssize_t bytes_read_prefix_and_fd = recvmsg(*uds_fd, &msg_prefix, MSG_WAITALL);
-    if (bytes_read_prefix_and_fd < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-			oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
-			result.status = FAILURE_EAGNEWBLK;
-            return result;
-        } else {
-            oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
-            result.status = FAILURE;
-            return result;
+static inline et_result_t receive_ipc_raw_protocol_message(oritlsf_pool_t *pool, int *uds_fd, et_buffer_t *buffer) {
+    et_result_t retr;
+    retr.failure = false;
+    retr.partial = true;
+    retr.status = FAILURE;
+    if (buffer->read_step == 0) {
+        if (buffer->in_size_tb == 0) {
+            buffer->in_size_tb = IPC_LENGTH_PREFIX_BYTES;
+            buffer->buffer_in = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
+                pool,
+                buffer->in_size_tb,
+                sizeof(uint8_t)
+            );
+        }
+        while (true) {
+            struct msghdr msg_prefix = {0};
+            struct iovec iov_prefix[1];
+            iov_prefix[0].iov_base = buffer->buffer_in + buffer->in_size_c;
+            iov_prefix[0].iov_len = buffer->in_size_tb - buffer->in_size_c;
+            msg_prefix.msg_iov = iov_prefix;
+            msg_prefix.msg_iovlen = 1;
+            msg_prefix.msg_control = NULL;
+            msg_prefix.msg_controllen = 0;
+            ssize_t rsize = recvmsg(*uds_fd, &msg_prefix, 0);
+            if (rsize < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    if (buffer->in_size_tb == buffer->in_size_c) {
+                        retr.failure = false;
+                        retr.partial = false;
+                        retr.status = SUCCESS_EAGNEWBLK;
+                    } else {
+                        retr.failure = false;
+                        retr.partial = true;
+                        retr.status = FAILURE_EAGNEWBLK;
+                    }
+                    break;
+                } else {
+                    oritlsf_free(pool, (void **)&buffer->buffer_in);
+                    buffer->read_step = 0;
+                    buffer->in_size_tb = 0;
+                    buffer->in_size_c = 0;
+                    retr.failure = true;
+                    retr.partial = true;
+                    retr.status = FAILURE;
+                    break;
+                }
+            } 
+            if (rsize > 0) {
+                buffer->in_size_c += rsize;
+            }
+            if (rsize == 0) {
+                oritlsf_free(pool, (void **)&buffer->buffer_in);
+                buffer->read_step = 0;
+                buffer->in_size_tb = 0;
+                buffer->in_size_c = 0;
+                retr.failure = true;
+                retr.partial = true;
+                retr.status = FAILURE;
+                break;
+            }
+            if (buffer->in_size_tb == buffer->in_size_c) {
+                retr.failure = false;
+                retr.partial = false;
+                retr.status = SUCCESS;
+                break;
+            }
+        }
+        if (!retr.failure) {
+            if (!retr.partial) {
+                uint32_t total_ipc_payload_len_be;
+                memcpy(&total_ipc_payload_len_be, buffer->buffer_in, buffer->in_size_tb);
+                uint32_t total_ipc_payload_len = be32toh(total_ipc_payload_len_be);                
+                oritlsf_free(pool, (void **)&buffer->buffer_in);
+                buffer->read_step = 1;
+                buffer->in_size_tb = 0;
+                buffer->in_size_c = 0;
+                buffer->in_size_tb = (ssize_t)total_ipc_payload_len;
+                buffer->buffer_in = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
+                    pool,
+                    buffer->in_size_tb,
+                    sizeof(uint8_t)
+                );
+            }
         }
     }
-    if (bytes_read_prefix_and_fd != (ssize_t)IPC_LENGTH_PREFIX_BYTES) {
-        oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
-        result.status = FAILURE_OOBUF;
-        return result;
-    }
-    memcpy(&total_ipc_payload_len_be, temp_len_prefix_buf, IPC_LENGTH_PREFIX_BYTES);
-    uint32_t total_ipc_payload_len = be32toh(total_ipc_payload_len_be);
-    if (total_ipc_payload_len == 0) {
-        oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
-        result.status = FAILURE_BAD_PROTOCOL;
-        return result;
-    }
-    result.r_ipc_raw_protocol_t->n = (uint32_t)total_ipc_payload_len;
-    result.r_ipc_raw_protocol_t->recv_buffer = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, total_ipc_payload_len);
-    if (!result.r_ipc_raw_protocol_t->recv_buffer) {
-		oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
-        result.status = FAILURE_NOMEM;
-        return result;
-    }
-    struct msghdr msg_payload = {0};
-    struct iovec iov_payload[1];
-    iov_payload[0].iov_base = result.r_ipc_raw_protocol_t->recv_buffer;
-    iov_payload[0].iov_len = total_ipc_payload_len;
-    msg_payload.msg_iov = iov_payload;
-    msg_payload.msg_iovlen = 1;
-    msg_payload.msg_control = NULL;
-    msg_payload.msg_controllen = 0;
-    ssize_t bytes_read_payload = recvmsg(*uds_fd, &msg_payload, MSG_WAITALL);
-    const size_t min_size = AES_TAG_BYTES +
-                            sizeof(uint32_t) +
-                            IPC_VERSION_BYTES +
-                            sizeof(uint8_t) +
-                            sizeof(uint8_t) +
-                            sizeof(uint8_t);
-    if (bytes_read_payload < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-			if (result.r_ipc_raw_protocol_t) oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t->recv_buffer);
-			oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
-			result.status = FAILURE_EAGNEWBLK;
-            return result;
-        } else {
-            if (result.r_ipc_raw_protocol_t) oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t->recv_buffer);
-			oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
-			result.status = FAILURE;
-			return result;
+    if (buffer->read_step == 1) {
+        if (buffer->in_size_tb == 0) {
+            oritlsf_free(pool, (void **)&buffer->buffer_in);
+            buffer->read_step = 0;
+            buffer->in_size_tb = 0;
+            buffer->in_size_c = 0;
+            retr.failure = true;
+            retr.partial = true;
+            retr.status = FAILURE;
+            return retr;
         }
-    } else if (bytes_read_payload < (ssize_t)min_size) {
-        if (result.r_ipc_raw_protocol_t) oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t->recv_buffer);
-		oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
-        result.status = FAILURE_OOBUF;
-        return result;
-    } else if (bytes_read_payload != (ssize_t)total_ipc_payload_len) {
-        if (result.r_ipc_raw_protocol_t) oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t->recv_buffer);
-		oritlsf_free(pool, (void **)&result.r_ipc_raw_protocol_t);
-        result.status = FAILURE_OOBUF;
-        return result;
+        while (true) {
+            struct msghdr msg_payload = {0};
+            struct iovec iov_payload[1];
+            iov_payload[0].iov_base = buffer->buffer_in + buffer->in_size_c;
+            iov_payload[0].iov_len = buffer->in_size_tb - buffer->in_size_c;
+            msg_payload.msg_iov = iov_payload;
+            msg_payload.msg_iovlen = 1;
+            msg_payload.msg_control = NULL;
+            msg_payload.msg_controllen = 0;
+            ssize_t rsize = recvmsg(*uds_fd, &msg_payload, 0);
+            if (rsize < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    if (buffer->in_size_tb == buffer->in_size_c) {
+                        retr.failure = false;
+                        retr.partial = false;
+                        retr.status = SUCCESS_EAGNEWBLK;
+                    } else {
+                        retr.failure = false;
+                        retr.partial = true;
+                        retr.status = FAILURE_EAGNEWBLK;
+                    }
+                    break;
+                } else {
+                    oritlsf_free(pool, (void **)&buffer->buffer_in);
+                    buffer->read_step = 0;
+                    buffer->in_size_tb = 0;
+                    buffer->in_size_c = 0;
+                    retr.failure = true;
+                    retr.partial = true;
+                    retr.status = FAILURE;
+                    break;
+                }
+            } 
+            if (rsize > 0) {
+                buffer->in_size_c += rsize;
+            }
+            if (rsize == 0) {
+                oritlsf_free(pool, (void **)&buffer->buffer_in);
+                buffer->read_step = 0;
+                buffer->in_size_tb = 0;
+                buffer->in_size_c = 0;
+                retr.failure = true;
+                retr.partial = true;
+                retr.status = FAILURE;
+                break;
+            }
+            if (buffer->in_size_tb == buffer->in_size_c) {
+                retr.failure = false;
+                retr.partial = false;
+                retr.status = SUCCESS;
+                break;
+            }
+        }
     }
-    result.status = SUCCESS;
-    return result;
+    return retr;
 }
 
 static inline status_t ipc_add_tail_protocol_queue_internal(

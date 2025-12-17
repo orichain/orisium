@@ -385,7 +385,7 @@ static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, et_buf
                 if (et_buffered_fd->buffer->out_size_tb == et_buffered_fd->buffer->out_size_c) {
                     wetr.failure = false;
                     wetr.partial = false;
-                    wetr.status = SUCCESS;
+                    wetr.status = SUCCESS_EAGNEWBLK;
                 } else {
                     wetr.failure = false;
                     wetr.partial = true;
@@ -394,6 +394,7 @@ static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, et_buf
                 break;
             } else {
                 oritlsf_free(oritlsf_pool, (void **)&et_buffered_fd->buffer->buffer_out);
+                et_buffered_fd->buffer->read_step = 0;
                 et_buffered_fd->buffer->out_size_tb = 0;
                 et_buffered_fd->buffer->out_size_c = 0;
                 wetr.failure = true;
@@ -405,6 +406,16 @@ static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, et_buf
         if (wsize > 0) {
             et_buffered_fd->buffer->out_size_c += wsize;
         }
+        if (wsize == 0) {
+            oritlsf_free(oritlsf_pool, (void **)&et_buffered_fd->buffer->buffer_out);
+            et_buffered_fd->buffer->read_step = 0;
+            et_buffered_fd->buffer->out_size_tb = 0;
+            et_buffered_fd->buffer->out_size_c = 0;
+            wetr.failure = true;
+            wetr.partial = true;
+            wetr.status = FAILURE;
+            break;
+        }
         if (et_buffered_fd->buffer->out_size_tb == et_buffered_fd->buffer->out_size_c) {
             wetr.failure = false;
             wetr.partial = false;
@@ -415,7 +426,7 @@ static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, et_buf
     return wetr;
 }
 
-static inline et_result_t async_read_event(oritlsf_pool_t *oritlsf_pool, et_buffered_fd_t *et_buffered_fd) {
+static inline et_result_t async_read_eventX(oritlsf_pool_t *oritlsf_pool, et_buffered_fd_t *et_buffered_fd) {
     et_result_t retr;
     retr.failure = false;
     retr.partial = true;
@@ -435,7 +446,7 @@ static inline et_result_t async_read_event(oritlsf_pool_t *oritlsf_pool, et_buff
                 if (et_buffered_fd->buffer->in_size_tb == et_buffered_fd->buffer->in_size_c) {
                     retr.failure = false;
                     retr.partial = false;
-                    retr.status = SUCCESS;
+                    retr.status = SUCCESS_EAGNEWBLK;
                 } else {
                     retr.failure = false;
                     retr.partial = true;
@@ -444,6 +455,7 @@ static inline et_result_t async_read_event(oritlsf_pool_t *oritlsf_pool, et_buff
                 break;
             } else {
                 oritlsf_free(oritlsf_pool, (void **)&et_buffered_fd->buffer->buffer_in);
+                et_buffered_fd->buffer->read_step = 0;
                 et_buffered_fd->buffer->in_size_tb = 0;
                 et_buffered_fd->buffer->in_size_c = 0;
                 retr.failure = true;
@@ -454,6 +466,16 @@ static inline et_result_t async_read_event(oritlsf_pool_t *oritlsf_pool, et_buff
         } 
         if (rsize > 0) {
             et_buffered_fd->buffer->in_size_c += rsize;
+        }
+        if (rsize == 0) {
+            oritlsf_free(oritlsf_pool, (void **)&et_buffered_fd->buffer->buffer_in);
+            et_buffered_fd->buffer->read_step = 0;
+            et_buffered_fd->buffer->in_size_tb = 0;
+            et_buffered_fd->buffer->in_size_c = 0;
+            retr.failure = true;
+            retr.partial = true;
+            retr.status = FAILURE;
+            break;
         }
         if (et_buffered_fd->buffer->in_size_tb == et_buffered_fd->buffer->in_size_c) {
             retr.failure = false;
