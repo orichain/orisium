@@ -133,125 +133,70 @@ define install_pkg
 	fi
 endef
 
-dev-libraries:
-	@echo "Menginstall library development Orisium untuk $(DISTRO_ID) menggunakan $(PKG_MANAGER)..."
-ifeq ($(DISTRO_ID),netbsd)
-	$(call install_pkg,gcc14)
-	@if [ ! -e ./gcc ]; then \
-		echo ">> Membuat symlink ./gcc -> gcc14.3..."; \
-		$(USE_SUDO) ln -s /usr/pkg/gcc14/bin/gcc ./gcc; \
-	else \
-		echo ">> ./gcc sudah ada. Symlink dilewati."; \
-	fi
-	$(call install_pkg,json-c)
-	$(call install_pkg,pkg-config)
-	$(call install_pkg,python312)
-	@if [ ! -e ./python ]; then \
-		echo ">> Membuat symlink ./python -> python3.12..."; \
-		$(USE_SUDO) ln -s /usr/pkg/bin/python3.12 ./python; \
-	else \
-		echo ">> ./python sudah ada. Symlink dilewati."; \
-	fi
-else ifeq ($(DISTRO_ID),freebsd)
-	$(call install_pkg,gcc14)
-	@if [ ! -e ./gcc ]; then \
-		echo ">> Membuat symlink ./gcc -> gcc14.2..."; \
-		$(USE_SUDO) ln -s /usr/local/bin/gcc14 ./gcc; \
-	else \
-		echo ">> ./gcc sudah ada. Symlink dilewati."; \
-	fi
-	$(call install_pkg,json-c)
-	$(call install_pkg,pkgconf)
-	$(call install_pkg,python3)
-	@if [ ! -e ./python ]; then \
-		echo ">> Membuat symlink ./python -> python3.11..."; \
-		$(USE_SUDO) ln -s /usr/local/bin/python3.11 ./python; \
-	else \
-		echo ">> ./python sudah ada. Symlink dilewati."; \
-	fi
-else ifeq ($(DISTRO_ID),rocky)
-	@if [ ! -e ./gcc ]; then \
-		echo ">> Membuat symlink ./gcc -> gcc14.3..."; \
-		$(USE_SUDO) ln -s /usr/bin/gcc ./gcc; \
-	else \
-		echo ">> ./gcc sudah ada. Symlink dilewati."; \
-	fi
-	$(call install_pkg,json-c)
-	$(call install_pkg,pkg-config)
-	$(call install_pkg,json-c-devel)
-	$(call install_pkg,python3)
-	@if [ ! -e ./python ]; then \
-		echo ">> Membuat symlink ./python -> python3.12..."; \
-		$(USE_SUDO) ln -s /usr/bin/python3.12 ./python; \
-	else \
-		echo ">> ./python sudah ada. Symlink dilewati."; \
-	fi
-endif
-
-prod-libraries:
+libraries:
 	@echo "Menginstall library production Orisium untuk $(DISTRO_ID) menggunakan $(PKG_MANAGER)..."
 ifeq ($(DISTRO_ID),netbsd)
 	$(call install_pkg,gcc14)
 	@if [ ! -e ./gcc ]; then \
-		echo ">> Membuat symlink ./gcc -> gcc14.3..."; \
+		echo ">> Membuat symlink ./gcc..."; \
 		$(USE_SUDO) ln -s /usr/pkg/gcc14/bin/gcc ./gcc; \
 	else \
-		echo ">> ./gcc sudah ada. Symlink dilewati."; \
+		echo ">> ./gcc sudah ada."; \
 	fi
 	$(call install_pkg,json-c)
 	$(call install_pkg,pkg-config)
 	$(call install_pkg,python312)
 	@if [ ! -e ./python ]; then \
-		echo ">> Membuat symlink ./python -> python3.12..."; \
+		echo ">> Membuat symlink ./python..."; \
 		$(USE_SUDO) ln -s /usr/pkg/bin/python3.12 ./python; \
 	else \
-		echo ">> ./python sudah ada. Symlink dilewati."; \
+		echo ">> ./python sudah ada."; \
 	fi
 else ifeq ($(DISTRO_ID),freebsd)
 	$(call install_pkg,gcc14)
 	@if [ ! -e ./gcc ]; then \
-		echo ">> Membuat symlink ./gcc -> gcc14.2..."; \
+		echo ">> Membuat symlink ./gcc..."; \
 		$(USE_SUDO) ln -s /usr/local/bin/gcc14 ./gcc; \
 	else \
-		echo ">> ./gcc sudah ada. Symlink dilewati."; \
+		echo ">> ./gcc sudah ada."; \
 	fi
 	$(call install_pkg,json-c)
 	$(call install_pkg,pkgconf)
 	$(call install_pkg,python3)
 	@if [ ! -e ./python ]; then \
-		echo ">> Membuat symlink /usr/local/bin/python -> python3.11..."; \
-		$(USE_SUDO) ln -s /usr/local/bin/python3.11 ./python; \
+		echo ">> Membuat symlink ./python..."; \
+		$(USE_SUDO) ln -s /usr/local/bin/python3 ./python; \
 	else \
-		echo ">> ./python sudah ada. Symlink dilewati."; \
+		echo ">> ./python sudah ada."; \
 	fi
 else ifeq ($(DISTRO_ID),rocky)
 	@if [ ! -e ./gcc ]; then \
-		echo ">> Membuat symlink ./gcc -> gcc14.3..."; \
+		echo ">> Membuat symlink ./gcc..."; \
 		$(USE_SUDO) ln -s /usr/bin/gcc ./gcc; \
 	else \
-		echo ">> ./gcc sudah ada. Symlink dilewati."; \
+		echo ">> ./gcc sudah ada."; \
 	fi
 	$(call install_pkg,json-c)
 	$(call install_pkg,pkg-config)
 	$(call install_pkg,json-c-devel)
 	$(call install_pkg,python3)
 	@if [ ! -e ./python ]; then \
-		echo ">> Membuat symlink ./python -> python3.12..."; \
-		$(USE_SUDO) ln -s /usr/bin/python3.12 ./python; \
+		echo ">> Membuat symlink ./python..."; \
+		$(USE_SUDO) ln -s /usr/bin/python3 ./python; \
 	else \
-		echo ">> ./python sudah ada. Symlink dilewati."; \
+		echo ">> ./python sudah ada."; \
 	fi
 endif	
 
 dev:
-	$(MAKE) dev-libraries check_iwyu_h check_iwyu_c $(TARGET)
+	$(MAKE) libraries check_iwyu_h check_iwyu_c $(TARGET)
 	@echo "-------------------------------------"
 	@echo "orisium dikompilasi dalam mode DEVELOPMENT!"
 	@echo "Executable: $(TARGET)"
 	@echo "-------------------------------------"
 
 prod:
-	$(MAKE) prod-libraries check_iwyu_h check_iwyu_c $(TARGET) BUILD_MODE=PRODUCTION
+	$(MAKE) libraries check_iwyu_h check_iwyu_c $(TARGET) BUILD_MODE=PRODUCTION
 	@echo "-------------------------------------"
 	@echo "orisium dikompilasi dalam mode PRODUCTION!"
 	@echo "Executable: $(TARGET)"
