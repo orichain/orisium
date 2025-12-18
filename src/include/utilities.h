@@ -8,7 +8,6 @@
 #include <fips202.h>
 #include <math.h>
 #include <netdb.h>
-#include <sys/_clock_id.h>
 #include <sys/signal.h>
 
 #if defined(__NetBSD__)
@@ -20,6 +19,7 @@
     #include <sys/time.h>
     #include <sys/endian.h>
 #elif defined(__FreeBSD__)
+    #include <sys/_clock_id.h>
     #include <x86/endian.h>
 #else
     #include <endian.h>

@@ -6,7 +6,6 @@
 #include <json_tokener.h>
 #include <json_types.h>
 #include <stdint.h>
-#include <arpa/inet.h>
 
 #include "log.h"
 #include "constants.h"
