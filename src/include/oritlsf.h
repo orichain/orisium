@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <string.h>
+#include <x86/_stdint.h>
 
 #ifdef __NetBSD__
     #include <sys/common_int_limits.h>

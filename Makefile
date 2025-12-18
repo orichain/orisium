@@ -2,7 +2,7 @@ TARGET = orisium
 SRC_DIR = src
 OBJ_DIR = obj
 
-CC = gcc
+CC = ./gcc
 
 JSONC_CFLAGS :=
 JSONC_LIBS := -ljson-c
@@ -15,7 +15,7 @@ endif
 COMMON_CFLAGS = -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration -lm $(JSONC_CFLAGS)
 LDFLAGS = -pthread $(JSONC_LIBS)
 
-GCC_INCLUDE_DIRS := $(shell echo '' | gcc -E -x c - -v 2>&1 | awk '/^ \/.*\/include/ { print "-I" $$1 }')
+GCC_INCLUDE_DIRS := $(shell echo '' | $(CC) -E -x c - -v 2>&1 | awk '/^ \/.*\/include/ { print "-I" $$1 }')
 INCLUDE_DIR = $(GCC_INCLUDE_DIRS) -I./$(SRC_DIR)/include -I./PQClean -I./PQClean/common -I./lmdb/libraries/liblmdb
 COMMON_CFLAGS += $(INCLUDE_DIR)
 
@@ -35,12 +35,15 @@ endif
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),NetBSD)
 	DISTRO_ID := netbsd
+else ifeq ($(UNAME_S),FreeBSD)
+	DISTRO_ID := freebsd
 else
 	DISTRO_ID := $(shell . /etc/os-release 2>/dev/null && echo $$ID || echo unknown)
 endif
 
 PKG_MANAGER := $(shell \
 	if [ "$(DISTRO_ID)" = "netbsd" ]; then echo "pkgin"; \
+	elif [ "$(DISTRO_ID)" = "freebsd" ]; then echo "pkg"; \
 	elif [ "$(DISTRO_ID)" = "rocky" ] || [ "$(DISTRO_ID)" = "fedora" ]; then echo "dnf"; \
 	elif [ "$(DISTRO_ID)" = "centos" ] || [ "$(DISTRO_ID)" = "rhel" ]; then \
 		if command -v dnf >/dev/null 2>&1; then echo "dnf"; else echo "yum"; fi; \
@@ -111,10 +114,17 @@ define install_pkg
 		echo "!! Distribusi tidak didukung. Install $(1) manual."; \
 	elif [ "$(PKG_MANAGER)" = "pkgin" ]; then \
 		if pkg_info -e $(1) >/dev/null 2>&1; then \
-			echo ">> $(1) sudah terinstal (pkgsrc)."; \
+			echo ">> $(1) sudah terinstal (paket)."; \
 		else \
 			echo ">> Menginstal $(1) via pkgin..."; \
 			$(USE_SUDO) pkgin -y install $(1) || true; \
+		fi; \
+	elif [ "$(PKG_MANAGER)" = "pkg" ]; then \
+		if pkg info -e $(1) >/dev/null 2>&1; then \
+			echo ">> $(1) sudah terinstal (paket)."; \
+		else \
+			echo ">> Menginstal $(1) via pkg..."; \
+			$(USE_SUDO) pkg install -y $(1) || true; \
 		fi; \
 	elif [ "$(PKG_MANAGER)" = "apt" ]; then \
 		if dpkg-query -W -f='${Status}' $(1) 2>/dev/null | grep -q "installed"; then \
@@ -158,70 +168,126 @@ endef
 
 dev-libraries:
 	@echo "Menginstall library development Orisium untuk $(DISTRO_ID) menggunakan $(PKG_MANAGER)..."
-	$(call install_pkg,pkg-config)
-	$(call install_pkg,json-c)
 ifeq ($(DISTRO_ID),netbsd)
-	$(call install_pkg,python312)
-	@if [ ! -e /usr/bin/python ]; then \
-		echo ">> Membuat symlink /usr/bin/python -> python3.12..."; \
-		$(USE_SUDO) ln -s /usr/pkg/bin/python3.12 /usr/bin/python; \
+	$(call install_pkg,gcc14)
+	@if [ ! -e ./gcc ]; then \
+		echo ">> Membuat symlink ./gcc -> gcc14.3..."; \
+		$(USE_SUDO) ln -s /usr/pkg/gcc14/bin/gcc ./gcc; \
 	else \
-		echo ">> /usr/bin/python sudah ada. Symlink dilewati."; \
+		echo ">> ./gcc sudah ada. Symlink dilewati."; \
 	fi
-	@if [ ! -e /usr/bin/python3 ]; then \
-		echo ">> Membuat symlink /usr/bin/python3 -> python3.12..."; \
-		$(USE_SUDO) ln -s /usr/pkg/bin/python3.12 /usr/bin/python3; \
+	$(call install_pkg,json-c)
+	$(call install_pkg,pkg-config)
+	$(call install_pkg,python312)
+	@if [ ! -e ./python ]; then \
+		echo ">> Membuat symlink ./python -> python3.12..."; \
+		$(USE_SUDO) ln -s /usr/pkg/bin/python3.12 ./python; \
 	else \
-		echo ">> /usr/bin/python3 sudah ada. Symlink dilewati."; \
+		echo ">> ./python sudah ada. Symlink dilewati."; \
+	fi
+else ifeq ($(DISTRO_ID),freebsd)
+	$(call install_pkg,gcc14)
+	@if [ ! -e ./gcc ]; then \
+		echo ">> Membuat symlink ./gcc -> gcc14.2..."; \
+		$(USE_SUDO) ln -s /usr/local/bin/gcc14 ./gcc; \
+	else \
+		echo ">> ./gcc sudah ada. Symlink dilewati."; \
+	fi
+	$(call install_pkg,json-c)
+	$(call install_pkg,pkgconf)
+	$(call install_pkg,python3)
+	@if [ ! -e ./python ]; then \
+		echo ">> Membuat symlink ./python -> python3.11..."; \
+		$(USE_SUDO) ln -s /usr/local/bin/python3.11 ./python; \
+	else \
+		echo ">> ./python sudah ada. Symlink dilewati."; \
 	fi
 else ifeq ($(DISTRO_ID),debian)
+	$(call install_pkg,json-c)
+	$(call install_pkg,pkg-config)
 	$(call install_pkg,libjson-c-dev)
 	$(call install_pkg,python3)
 else ifeq ($(DISTRO_ID),ubuntu)
+	$(call install_pkg,json-c)
+	$(call install_pkg,pkg-config)
 	$(call install_pkg,libjson-c-dev)
 	$(call install_pkg,python3)
 else ifeq ($(DISTRO_ID),fedora)
+	$(call install_pkg,json-c)
+	$(call install_pkg,pkg-config)
 	$(call install_pkg,json-c-devel)
 	$(call install_pkg,python3)
 else ifeq ($(DISTRO_ID),rocky)
+	$(call install_pkg,json-c)
+	$(call install_pkg,pkg-config)
 	$(call install_pkg,json-c-devel)
 	$(call install_pkg,python3)
 else ifeq ($(DISTRO_ID),centos)
+	$(call install_pkg,json-c)
+	$(call install_pkg,pkg-config)
 	$(call install_pkg,json-c-devel)
 	$(call install_pkg,python3)
 endif
 
 prod-libraries:
 	@echo "Menginstall library production Orisium untuk $(DISTRO_ID) menggunakan $(PKG_MANAGER)..."
-	$(call install_pkg,pkg-config)
-	$(call install_pkg,json-c)
 ifeq ($(DISTRO_ID),netbsd)
-	$(call install_pkg,python312)
-	@if [ ! -e /usr/bin/python ]; then \
-		echo ">> Membuat symlink /usr/bin/python -> python3.12..."; \
-		$(USE_SUDO) ln -s /usr/pkg/bin/python3.12 /usr/bin/python; \
+	$(call install_pkg,gcc14)
+	@if [ ! -e ./gcc ]; then \
+		echo ">> Membuat symlink ./gcc -> gcc14.3..."; \
+		$(USE_SUDO) ln -s /usr/pkg/gcc14/bin/gcc ./gcc; \
 	else \
-		echo ">> /usr/bin/python sudah ada. Symlink dilewati."; \
+		echo ">> ./gcc sudah ada. Symlink dilewati."; \
 	fi
-	@if [ ! -e /usr/bin/python3 ]; then \
-		echo ">> Membuat symlink /usr/bin/python3 -> python3.12..."; \
-		$(USE_SUDO) ln -s /usr/pkg/bin/python3.12 /usr/bin/python3; \
+	$(call install_pkg,json-c)
+	$(call install_pkg,pkg-config)
+	$(call install_pkg,python312)
+	@if [ ! -e ./python ]; then \
+		echo ">> Membuat symlink ./python -> python3.12..."; \
+		$(USE_SUDO) ln -s /usr/pkg/bin/python3.12 ./python; \
 	else \
-		echo ">> /usr/bin/python3 sudah ada. Symlink dilewati."; \
+		echo ">> ./python sudah ada. Symlink dilewati."; \
+	fi
+else ifeq ($(DISTRO_ID),freebsd)
+	$(call install_pkg,gcc14)
+	@if [ ! -e ./gcc ]; then \
+		echo ">> Membuat symlink ./gcc -> gcc14.2..."; \
+		$(USE_SUDO) ln -s /usr/local/bin/gcc14 ./gcc; \
+	else \
+		echo ">> ./gcc sudah ada. Symlink dilewati."; \
+	fi
+	$(call install_pkg,json-c)
+	$(call install_pkg,pkgconf)
+	$(call install_pkg,python3)
+	@if [ ! -e ./python ]; then \
+		echo ">> Membuat symlink /usr/local/bin/python -> python3.11..."; \
+		$(USE_SUDO) ln -s /usr/local/bin/python3.11 ./python; \
+	else \
+		echo ">> ./python sudah ada. Symlink dilewati."; \
 	fi
 else ifeq ($(DISTRO_ID),debian)
+	$(call install_pkg,json-c)
+	$(call install_pkg,pkg-config)
 	$(call install_pkg,libjson-c-dev)
 	$(call install_pkg,python3)
 else ifeq ($(DISTRO_ID),ubuntu)
+	$(call install_pkg,json-c)
+	$(call install_pkg,pkg-config)
 	$(call install_pkg,libjson-c-dev)
 	$(call install_pkg,python3)
 else ifeq ($(DISTRO_ID),fedora)
+	$(call install_pkg,json-c)
+	$(call install_pkg,pkg-config)
 	$(call install_pkg,json-c-devel)
 	$(call install_pkg,python3)
 else ifeq ($(DISTRO_ID),rocky)
+	$(call install_pkg,json-c)
+	$(call install_pkg,pkg-config)
 	$(call install_pkg,json-c-devel)
 	$(call install_pkg,python3)
 else ifeq ($(DISTRO_ID),centos)
+	$(call install_pkg,json-c)
+	$(call install_pkg,pkg-config)
 	$(call install_pkg,json-c-devel)
 	$(call install_pkg,python3)
 endif	
@@ -317,7 +383,7 @@ check_iwyu_c: $(IWYU_BIN_PATH)
 			echo "IWYU error in $$file" | tee -a iwyu_failed_c.log; \
 			cat /tmp/iwyu.tmp >> iwyu_failed_c.log; \
 			echo "" >> iwyu_failed_c.log; \
-			python3 $(IWYU_DIR)/fix_includes.py < /tmp/iwyu.tmp >> iwyu_applied_c.log 2>&1; \
+			./python $(IWYU_DIR)/fix_includes.py < /tmp/iwyu.tmp >> iwyu_applied_c.log 2>&1; \
 			echo "FIX applied to $$file" >> iwyu_applied_c.log; \
 		else \
 			echo "Tidak ada masalah di $$file."; \
@@ -340,7 +406,7 @@ check_iwyu_h: $(IWYU_BIN_PATH)
 			echo "IWYU error in $$file" | tee -a iwyu_failed_h.log; \
 			cat /tmp/iwyu.tmp >> iwyu_failed_h.log; \
 			echo "" >> iwyu_failed_h.log; \
-			python3 $(IWYU_DIR)/fix_includes.py < /tmp/iwyu.tmp >> iwyu_applied_h.log 2>&1; \
+			./python $(IWYU_DIR)/fix_includes.py < /tmp/iwyu.tmp >> iwyu_applied_h.log 2>&1; \
 			echo "FIX applied to $$file" >> iwyu_applied_h.log; \
 		else \
 			echo "Tidak ada masalah di $$file."; \
@@ -366,6 +432,8 @@ $(IWYU_BIN_PATH):
 			exit 1; \
 		elif [ "$(PKG_MANAGER)" = "pkgin" ]; then \
 			$(USE_SUDO) pkgin update && $(USE_SUDO) pkgin -y install wget cmake clang llvm; \
+		elif [ "$(PKG_MANAGER)" = "pkg" ]; then \
+			$(USE_SUDO) pkg update && $(USE_SUDO) pkg install -y wget cmake llvm; \
 		elif [ "$(PKG_MANAGER)" = "apt" ]; then \
 			$(USE_SUDO) apt update && $(USE_SUDO) apt -y install wget cmake clang llvm || true; \
 		elif [ "$(PKG_MANAGER)" = "dnf" ] || [ "$(PKG_MANAGER)" = "yum" ]; then \
@@ -379,6 +447,11 @@ $(IWYU_BIN_PATH):
 		CLANG_MAJOR_VER=$$(clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \
 		IWYU_VER=$$(expr $$CLANG_MAJOR_VER + 4); \
 		echo "Deteksi Clang versi $$CLANG_MAJOR_VER"; \
+		\
+		LLVM_ROOT=$$(if [ "$(DISTRO_ID)" = "freebsd" ]; then echo "/usr/local/llvm$$CLANG_MAJOR_VER"; else echo "/usr"; fi); \
+		LLVM_CMAKE_DIR=$$(if [ "$(DISTRO_ID)" = "freebsd" ]; then echo "$$LLVM_ROOT/lib/cmake/llvm"; else echo "/usr/lib64/cmake/llvm"; fi); \
+		CLANG_CMAKE_DIR=$$(if [ "$(DISTRO_ID)" = "freebsd" ]; then echo "$$LLVM_ROOT/lib/cmake/clang"; else echo ""; fi); \
+		\
 		wget -q -O iwyu.tar.gz https://github.com/include-what-you-use/include-what-you-use/archive/refs/tags/0.$$IWYU_VER.tar.gz && \
 		tar -xzf iwyu.tar.gz -C iwyu --strip-components=1 && \
 		rm -f iwyu.tar.gz && \
@@ -391,7 +464,8 @@ $(IWYU_BIN_PATH):
 		-DCMAKE_CXX_COMPILER=clang++ \
 		-DCMAKE_BUILD_TYPE="Release" \
 		-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-		-DLLVM_DIR=/usr/lib64/cmake/llvm \
+		-DLLVM_DIR=$$LLVM_CMAKE_DIR \
+		$$( [ -n "$$CLANG_CMAKE_DIR" ] && echo "-DClang_DIR=$$CLANG_CMAKE_DIR" ) \
 		.. && \
 		$(MAKE) -j4; \
 	else \

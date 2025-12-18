@@ -7,7 +7,7 @@
 #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
     #include <dirent.h>
     
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__FreeBSD__)
     #include <sys/dirent.h>
 #endif
 

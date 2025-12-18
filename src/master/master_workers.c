@@ -1,4 +1,4 @@
-#include <string.h>      // for memset, strncpy
+#include <string.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <sys/socket.h>

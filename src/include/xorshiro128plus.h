@@ -6,8 +6,10 @@
 #include <stdint.h>
 #include <string.h>
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__)
     #include <sys/endian.h>
+#elif defined(__FreeBSD__)
+    #include <x86/endian.h>
 #else
     #include <endian.h>
 #endif

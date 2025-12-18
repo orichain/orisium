@@ -5,10 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__)
     #include <sys/endian.h>
-#else
-    #include <endian.h>
+#elif defined(__FreeBSD__)
+    #include <x86/endian.h>
 #endif
 
 #include "constants.h"

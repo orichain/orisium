@@ -2,10 +2,11 @@
 #include <netinet/in.h>
 #include <stdio.h>
 #include <string.h>
-#include <json-c/json_object.h>
-#include <json-c/json_tokener.h>
-#include <json-c/json_types.h>
+#include <json_object.h>
+#include <json_tokener.h>
+#include <json_types.h>
 #include <stdint.h>
+#include <arpa/inet.h>
 
 #include "log.h"
 #include "constants.h"

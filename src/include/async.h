@@ -11,12 +11,13 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#ifdef __NetBSD__
-    #include <sys/errno.h>
+#if defined(__NetBSD__)
     #include <sys/event.h>
+    #include <sys/errno.h>
     #include <sys/time.h>
-
-    #include "utilities.h"
+#elif defined(__FreeBSD__)
+    #include <sys/event.h>
+    #include <sys/_clock_id.h>
 #else
     #include <sys/epoll.h>
 #endif
@@ -26,7 +27,7 @@
 #include "types.h"
 #include "oritlsf.h"
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__FreeBSD__)
     typedef struct {
         int async_fd;
         struct kevent event_change[2];
@@ -46,7 +47,7 @@
     } async_type_t;
 #endif
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__FreeBSD__)
     static inline bool async_event_is_HUP(uint32_t events_flags) {
         return events_flags & ASYNC_HUP_FLAG;
     }
@@ -88,7 +89,7 @@ static inline int_status_t async_getfd(const char* label, async_type_t *async, i
         result.status = FAILURE_OOIDX;
         return result;
     }
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__FreeBSD__)
     result.r_int = (int)async->events[n].ident;
 #else
     result.r_int = async->events[n].data.fd;
@@ -110,7 +111,7 @@ static inline uint32_t_status_t async_getevents(const char* label, async_type_t 
         result.status = FAILURE_OOIDX;
         return result;
     }
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__FreeBSD__)
     if (async->events[n].filter == EVFILT_READ) {
         result.r_uint32_t |= ASYNC_IN_FLAG;
     }
@@ -133,7 +134,7 @@ static inline uint32_t_status_t async_getevents(const char* label, async_type_t 
 static inline int_status_t async_wait(const char* label, async_type_t *async) {
     int_status_t result;
     result.r_int = -1;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__FreeBSD__)
     struct timespec *timeout = NULL;
     result.r_int = kevent(async->async_fd, NULL, 0, async->events, MAX_EVENTS, timeout);
 #else
@@ -157,7 +158,7 @@ static inline int_status_t async_wait(const char* label, async_type_t *async) {
 }
 
 static inline status_t async_create(const char* label, async_type_t *async) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__FreeBSD__)
     async->async_fd = kqueue();
     if (async->async_fd == -1) {
         LOG_ERROR("%sGagal membuat kqueue fd: %s", label, strerror(errno));
@@ -185,22 +186,11 @@ static inline status_t async_create_event(const char* label, int *event_fd) {
 }
 
 static inline status_t async_create_timerfd(const char* label, int *timer_fd) {
-#ifdef __NetBSD__
-    *timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
-    if (*timer_fd == -1) {
-        LOG_ERROR("%sGagal membuat timerfd: %s", label, strerror(errno));
-        return FAILURE;
-    }
-    if (set_nonblocking(label, *timer_fd) != SUCCESS) {
-        LOG_WARN("%sGagal set timerfd ke non-blocking: %s", label, strerror(errno));
-    }
-#else
     *timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
     if (*timer_fd == -1) {
         LOG_ERROR("%sGagal membuat timerfd: %s", label, strerror(errno));
         return FAILURE;
     }
-#endif
     return SUCCESS;
 }
 
@@ -227,7 +217,7 @@ static inline status_t async_create_in_event(
     int *fd
 )
 {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__FreeBSD__)
     EV_SET(&async->event_change[0], *fd,
            EVFILT_READ,
            EV_ADD | EV_ENABLE | EV_CLEAR,
@@ -261,7 +251,7 @@ static inline status_t async_create_inout_event(
     int *fd
 )
 {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__FreeBSD__)
     EV_SET(&async->event_change[0], *fd,
             EVFILT_READ,
             EV_ADD | EV_ENABLE | EV_CLEAR,
@@ -294,7 +284,7 @@ static inline status_t async_create_inout_event(
 
 static inline status_t async_delete_event(const char* label, async_type_t *async, int *fd_to_delete) {
     if (*fd_to_delete != -1) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__FreeBSD__)
         struct kevent *ch = async->event_change;
         EV_SET(&ch[0], *fd_to_delete, EVFILT_READ,  EV_DELETE, 0, 0, NULL);
         EV_SET(&ch[1], *fd_to_delete, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
