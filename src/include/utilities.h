@@ -8,17 +8,17 @@
 #include <fips202.h>
 #include <math.h>
 #include <netdb.h>
-#include <sys/signal.h>
 
 #if defined(__NetBSD__)
     #ifndef AI_V4MAPPED
         #define AI_V4MAPPED 0
     #endif
-    #include <sys/errno.h>
     #include <sys/signal.h>
+    #include <sys/errno.h>
     #include <sys/time.h>
     #include <sys/endian.h>
 #elif defined(__FreeBSD__)
+    #include <sys/signal.h>
     #include <sys/_clock_id.h>
     #include <x86/endian.h>
 #else
