@@ -2,9 +2,17 @@
 #include <netinet/in.h>
 #include <stdio.h>
 #include <string.h>
-#include <json_object.h>
-#include <json_tokener.h>
-#include <json_types.h>
+
+#if defined(__NetBSD__) || defined(__FreeBSD__)
+    #include <json_object.h>
+    #include <json_tokener.h>
+    #include <json_types.h>
+#else
+    #include <json-c/json_object.h>
+    #include <json-c/json_tokener.h>
+    #include <json-c/json_types.h>
+#endif
+
 #include <stdint.h>
 
 #include "log.h"

@@ -9,6 +9,8 @@
     #include <sys/endian.h>
 #elif defined(__FreeBSD__)
     #include <x86/endian.h>
+#else
+    #include <endian.h>
 #endif
 
 #include "constants.h"

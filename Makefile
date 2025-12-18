@@ -45,11 +45,6 @@ PKG_MANAGER := $(shell \
 	if [ "$(DISTRO_ID)" = "netbsd" ]; then echo "pkgin"; \
 	elif [ "$(DISTRO_ID)" = "freebsd" ]; then echo "pkg"; \
 	elif [ "$(DISTRO_ID)" = "rocky" ] || [ "$(DISTRO_ID)" = "fedora" ]; then echo "dnf"; \
-	elif [ "$(DISTRO_ID)" = "centos" ] || [ "$(DISTRO_ID)" = "rhel" ]; then \
-		if command -v dnf >/dev/null 2>&1; then echo "dnf"; else echo "yum"; fi; \
-	elif [ "$(DISTRO_ID)" = "debian" ] || [ "$(DISTRO_ID)" = "ubuntu" ]; then echo "apt"; \
-	elif [ "$(DISTRO_ID)" = "arch" ]; then echo "pacman"; \
-	elif [ "$(DISTRO_ID)" = "opensuse" ]; then echo "zypper"; \
 	else echo "unsupported"; fi)
 
 USE_SUDO := $(shell command -v sudo >/dev/null 2>&1 && echo sudo || echo "")
@@ -126,40 +121,12 @@ define install_pkg
 			echo ">> Menginstal $(1) via pkg..."; \
 			$(USE_SUDO) pkg install -y $(1) || true; \
 		fi; \
-	elif [ "$(PKG_MANAGER)" = "apt" ]; then \
-		if dpkg-query -W -f='${Status}' $(1) 2>/dev/null | grep -q "installed"; then \
-			echo ">> $(1) sudah terinstal (paket)."; \
-		else \
-			echo ">> Menginstal $(1) via apt..."; \
-			$(USE_SUDO) apt-get update && $(USE_SUDO) apt-get -y install $(1) || true; \
-		fi; \
 	elif [ "$(PKG_MANAGER)" = "dnf" ]; then \
 		if dnf list installed $(1) >/dev/null 2>&1; then \
 			echo ">> $(1) sudah terinstal (paket)."; \
 		else \
 			echo ">> Menginstal $(1) via dnf..."; \
 			$(USE_SUDO) dnf -y install $(1) || true; \
-		fi; \
-	elif [ "$(PKG_MANAGER)" = "yum" ]; then \
-		if yum list installed $(1) >/dev/null 2>&1; then \
-			echo ">> $(1) sudah terinstal (paket)."; \
-		else \
-			echo ">> Menginstal $(1) via yum..."; \
-			$(USE_SUDO) yum -y install $(1) || true; \
-		fi; \
-	elif [ "$(PKG_MANAGER)" = "pacman" ]; then \
-		if pacman -Qi $(1) >/dev/null 2>&1; then \
-			echo ">> $(1) sudah terinstal (paket)."; \
-		else \
-			echo ">> Menginstal $(1) via pacman..."; \
-			$(USE_SUDO) pacman -Sy --noconfirm $(1) || true; \
-		fi; \
-	elif [ "$(PKG_MANAGER)" = "zypper" ]; then \
-		if rpm -q $(1) >/dev/null 2>&1; then \
-			echo ">> $(1) sudah terinstal (paket)."; \
-		else \
-			echo ">> Menginstal $(1) via zypper..."; \
-			$(USE_SUDO) zypper --non-interactive install $(1) || true; \
 		fi; \
 	else \
 		echo "!! Package manager tidak dikenali."; \
@@ -202,31 +169,23 @@ else ifeq ($(DISTRO_ID),freebsd)
 	else \
 		echo ">> ./python sudah ada. Symlink dilewati."; \
 	fi
-else ifeq ($(DISTRO_ID),debian)
-	$(call install_pkg,json-c)
-	$(call install_pkg,pkg-config)
-	$(call install_pkg,libjson-c-dev)
-	$(call install_pkg,python3)
-else ifeq ($(DISTRO_ID),ubuntu)
-	$(call install_pkg,json-c)
-	$(call install_pkg,pkg-config)
-	$(call install_pkg,libjson-c-dev)
-	$(call install_pkg,python3)
-else ifeq ($(DISTRO_ID),fedora)
-	$(call install_pkg,json-c)
-	$(call install_pkg,pkg-config)
-	$(call install_pkg,json-c-devel)
-	$(call install_pkg,python3)
 else ifeq ($(DISTRO_ID),rocky)
+	@if [ ! -e ./gcc ]; then \
+		echo ">> Membuat symlink ./gcc -> gcc14.3..."; \
+		$(USE_SUDO) ln -s /usr/bin/gcc ./gcc; \
+	else \
+		echo ">> ./gcc sudah ada. Symlink dilewati."; \
+	fi
 	$(call install_pkg,json-c)
 	$(call install_pkg,pkg-config)
 	$(call install_pkg,json-c-devel)
 	$(call install_pkg,python3)
-else ifeq ($(DISTRO_ID),centos)
-	$(call install_pkg,json-c)
-	$(call install_pkg,pkg-config)
-	$(call install_pkg,json-c-devel)
-	$(call install_pkg,python3)
+	@if [ ! -e ./python ]; then \
+		echo ">> Membuat symlink ./python -> python3.12..."; \
+		$(USE_SUDO) ln -s /usr/bin/python3.12 ./python; \
+	else \
+		echo ">> ./python sudah ada. Symlink dilewati."; \
+	fi
 endif
 
 prod-libraries:
@@ -265,31 +224,23 @@ else ifeq ($(DISTRO_ID),freebsd)
 	else \
 		echo ">> ./python sudah ada. Symlink dilewati."; \
 	fi
-else ifeq ($(DISTRO_ID),debian)
-	$(call install_pkg,json-c)
-	$(call install_pkg,pkg-config)
-	$(call install_pkg,libjson-c-dev)
-	$(call install_pkg,python3)
-else ifeq ($(DISTRO_ID),ubuntu)
-	$(call install_pkg,json-c)
-	$(call install_pkg,pkg-config)
-	$(call install_pkg,libjson-c-dev)
-	$(call install_pkg,python3)
-else ifeq ($(DISTRO_ID),fedora)
-	$(call install_pkg,json-c)
-	$(call install_pkg,pkg-config)
-	$(call install_pkg,json-c-devel)
-	$(call install_pkg,python3)
 else ifeq ($(DISTRO_ID),rocky)
+	@if [ ! -e ./gcc ]; then \
+		echo ">> Membuat symlink ./gcc -> gcc14.3..."; \
+		$(USE_SUDO) ln -s /usr/bin/gcc ./gcc; \
+	else \
+		echo ">> ./gcc sudah ada. Symlink dilewati."; \
+	fi
 	$(call install_pkg,json-c)
 	$(call install_pkg,pkg-config)
 	$(call install_pkg,json-c-devel)
 	$(call install_pkg,python3)
-else ifeq ($(DISTRO_ID),centos)
-	$(call install_pkg,json-c)
-	$(call install_pkg,pkg-config)
-	$(call install_pkg,json-c-devel)
-	$(call install_pkg,python3)
+	@if [ ! -e ./python ]; then \
+		echo ">> Membuat symlink ./python -> python3.12..."; \
+		$(USE_SUDO) ln -s /usr/bin/python3.12 ./python; \
+	else \
+		echo ">> ./python sudah ada. Symlink dilewati."; \
+	fi
 endif	
 
 dev:
@@ -434,14 +385,8 @@ $(IWYU_BIN_PATH):
 			$(USE_SUDO) pkgin update && $(USE_SUDO) pkgin -y install wget cmake clang llvm; \
 		elif [ "$(PKG_MANAGER)" = "pkg" ]; then \
 			$(USE_SUDO) pkg update && $(USE_SUDO) pkg install -y wget cmake llvm; \
-		elif [ "$(PKG_MANAGER)" = "apt" ]; then \
-			$(USE_SUDO) apt update && $(USE_SUDO) apt -y install wget cmake clang llvm || true; \
 		elif [ "$(PKG_MANAGER)" = "dnf" ] || [ "$(PKG_MANAGER)" = "yum" ]; then \
 			$(USE_SUDO) $(PKG_MANAGER) -y install wget cmake clang llvm clang-devel llvm-devel || true; \
-		elif [ "$(PKG_MANAGER)" = "pacman" ]; then \
-			$(USE_SUDO) pacman -Syu --noconfirm wget cmake clang llvm || true; \
-		elif [ "$(PKG_MANAGER)" = "zypper" ]; then \
-			$(USE_SUDO) zypper -y install wget cmake clang llvm || true; \
 		fi; \
 		\
 		CLANG_MAJOR_VER=$$(clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \
