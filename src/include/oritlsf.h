@@ -91,13 +91,7 @@ static inline bool header_aligned(const void *p) {
 
 static inline int ffs_size_t(size_t x) {
     if (x == 0) return 0;
-#if defined(__GNUC__) || defined(__clang__)
     return __builtin_ffsll((unsigned long long)x);
-#else
-    int i = 1;
-    while ((x & 1u) == 0) { x >>= 1; ++i; }
-    return i;
-#endif
 }
 
 static inline int msb_index_size_t(size_t x) {

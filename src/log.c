@@ -50,13 +50,6 @@
         }
     }
 
-    static void get_time_str(char *buf, size_t len) {
-        time_t t = time(NULL);
-        struct tm tm_info;
-        localtime_r(&t, &tm_info);
-        strftime(buf, len, "%Y-%m-%d %H:%M:%S", &tm_info);
-    }
-
     void cleanup_old_logs(int max_age_days) {
         DIR *dir = opendir("logs");
         if (!dir) {
