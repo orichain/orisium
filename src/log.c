@@ -1,19 +1,24 @@
-#include <stdarg.h> // for va_end, va_list, va_start
-#include <stdio.h>  // for fprintf, vfprintf, FILE, NULL, stderr, stdout
-#include <time.h>   // for localtime, strftime, time, time_t
+#include <stdarg.h>
+#include <stdio.h>
+#include <time.h>
 
-#include "log.h"    // for log_write
+#include "log.h"
 
 #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
-    #include <dirent.h>     // for dirent, closedir, opendir, readdir, DIR, DT_REG
-    #include <errno.h>      // for errno
-    #include <stdint.h>     // for uint64_t
-    #include <stdlib.h>     // for exit, EXIT_FAILURE
-    #include <string.h>     // for strerror, strlen, strncmp
-    #include <sys/stat.h>   // for stat, mkdir
+    #include <dirent.h>
+    
+#ifdef __NetBSD__
+    #include <sys/dirent.h>
+#endif
 
-    #include "globals.h"    // for shutdown_requested
-    #include "utilities.h"  // for get_monotonic_time_ns, sleep_s
+    #include <errno.h>
+    #include <stdint.h>
+    #include <stdlib.h>
+    #include <string.h>
+    #include <sys/stat.h>
+
+    #include "globals.h"
+    #include "utilities.h"
     #include "types.h"
 
     static FILE *log_fp = NULL;

@@ -12,6 +12,9 @@
 
 #ifdef __NetBSD__
     #include <sys/signal.h>
+    #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
+        #include <pthread_types.h>
+    #endif
 #endif
 
 #include "log.h"
