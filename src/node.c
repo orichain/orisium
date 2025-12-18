@@ -3,7 +3,12 @@
 #include <stdio.h>
 #include <string.h>
 
-#if defined(__NetBSD__) || defined(__FreeBSD__)
+#if defined(__NetBSD__)
+    #include <json_object.h>
+    #include <json_tokener.h>
+    #include <json_types.h>
+#elif defined(__FreeBSD__)
+    #include <arpa/inet.h>
     #include <json_object.h>
     #include <json_tokener.h>
     #include <json_types.h>

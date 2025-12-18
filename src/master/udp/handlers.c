@@ -5,6 +5,10 @@
 #include <string.h>
 #include <inttypes.h>
 
+#if defined(__FreeBSD__)
+    #include <arpa/inet.h>
+#endif
+
 #include "log.h"
 #include "orilink.h"
 #include "types.h"
