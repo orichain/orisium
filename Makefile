@@ -367,7 +367,7 @@ $(LMDB_LIB_PATH):
 	@if [ -f "$(LMDB_LIB_PATH)" ]; then \
 		echo "LMDB library sudah ada. Melewati build."; \
 	else \
-		$(MAKE) -C $(LMDB_DIR); \
+		$(MAKE) CC=../../../gcc -C $(LMDB_DIR); \
 	fi
 
 # =============================
