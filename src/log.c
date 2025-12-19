@@ -66,11 +66,12 @@
         time_t now = time(NULL);
 
         while ((entry = readdir(dir)) != NULL) {
-            if (entry->d_type != DT_REG) continue; // skip non-regular files
-            if (strncmp(entry->d_name, "20", 2) != 0) continue; // must start with year
-            if (strlen(entry->d_name) != 14) continue; // "YYYY-MM-DD.log"
+            if (entry->d_type != DT_REG) continue;
+            
+            if (strlen(entry->d_name) != 14) continue;
+            if (strstr(entry->d_name, ".log") == NULL) continue;
+            if (entry->d_name[0] < '0' || entry->d_name[0] > '9') continue;
 
-            // Parse date from filename
             int year, month, day;
             if (sscanf(entry->d_name, "%4d-%2d-%2d.log", &year, &month, &day) != 3)
                 continue;
@@ -170,18 +171,18 @@
         void log_write(const char *level, const char *file, const char *func, int line, const char *fmt, ...) {
             va_list args;
             va_start(args, fmt);
-
-            time_t now = time(NULL);
-            struct tm *t = localtime(&now);
-            char time_buf[32];
-            strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", t);
+            
+            time_t t = time(NULL);
+            struct tm tm_info;
+            localtime_r(&t, &tm_info);
+            size_t time_buf_len = 32;
+            char time_buf[time_buf_len];
+            strftime(time_buf, time_buf_len, "%Y-%m-%d %H:%M:%S", &tm_info);
 
             FILE *out = (level[0] == 'E' || level[0] == 'W') ? stderr : stdout;
-
-            // Format: [TIMESTAMP] [LEVEL] (FILE:FUNCTION:LINE)\nMESSAGE\n
             fprintf(out, "[%s] [%s] (%s:%s:%d)\n", time_buf, level, file, func, line);
             vfprintf(out, fmt, args);
-            fprintf(out, "\n"); // Tambahkan newline setelah pesan log
+            fprintf(out, "\n");
             va_end(args);
         }
     #elif defined(TOFILE)
