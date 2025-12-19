@@ -189,7 +189,7 @@ static inline status_t oritw_reschedule_main_timer(
         timer->last_delay_us = 0.0;
         timer->next_expiration_tick = ULLONG_MAX;
         if (timer->tick_event_fd->event_id != -1) {
-            if (async_update_timer_oneshot(label, &timer->tick_event_fd->event_id, 0.0) != SUCCESS) {
+            if (async_update_timer_oneshot(label, async, &timer->tick_event_fd->event_id, 0.0, timer->tick_event_fd->event_type) != SUCCESS) {
                 LOG_ERROR("%sFailed to disarm main tick timer.", label);
                 return FAILURE;
             }
@@ -553,7 +553,11 @@ static inline status_t oritw_setup(const char *label, oritlsf_pool_t *pool, asyn
             sizeof(et_buffered_event_id_t)
         );
         tw->tick_event_fd->event_id = -1;
+    #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+        tw->tick_event_fd->event_type = EIT_TIMER;
+    #else
         tw->tick_event_fd->event_type = EIT_FD;
+    #endif
         tw->tick_event_fd->buffer = (et_buffer_t *)oritlsf_calloc(__FILE__, __LINE__, 
             pool,
             1,
