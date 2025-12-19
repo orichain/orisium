@@ -122,7 +122,7 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
     ctx->rekeying_queue_tail = NULL;
 //----------------------------------------------------------------------
 	if (async_create(ctx->label, &ctx->async) != SUCCESS) return FAILURE;
-	if (async_create_inout_event(ctx->label, &ctx->async, ctx->master_uds_fd) != SUCCESS) return FAILURE;
+	if (async_create_inout_event(ctx->label, &ctx->async, ctx->master_uds_fd, EIT_FD) != SUCCESS) return FAILURE;
 //----------------------------------------------------------------------
     if (oritw_setup(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer) != SUCCESS) return FAILURE;
 //----------------------------------------------------------------------
@@ -154,8 +154,8 @@ void cleanup_worker(worker_context_t *ctx) {
     ctx->hello2_ack_rcvd = false;
     ctx->is_rekeying = false;
     ipc_cleanup_protocol_queue(&ctx->oritlsf_pool, &ctx->rekeying_queue_head, &ctx->rekeying_queue_tail);
-    async_delete_event(ctx->label, &ctx->async, ctx->master_uds_fd);
-    CLOSE_FD(ctx->master_uds_fd);
+    async_delete_event(ctx->label, &ctx->async, ctx->master_uds_fd, EIT_FD);
+    CLOSE_UDS(ctx->master_uds_fd);
 //----------------------------------------------------------------------
     if (ctx->heartbeat_timer_id.event) {
         oritw_remove_event(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer, &ctx->heartbeat_timer_id.event);
@@ -172,13 +172,7 @@ void cleanup_worker(worker_context_t *ctx) {
     CLOSE_FD(&ctx->async.async_fd);
     oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->label);
 //----------------------------------------------------------------------
-    if (ctx->buffer->buffer_in != NULL) {
-        oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->buffer->buffer_in);
-    }
-    if (ctx->buffer->buffer_out != NULL) {
-        oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->buffer->buffer_out);
-    }
-    oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->buffer);
+    CLOSE_ET_BUFFER(&ctx->oritlsf_pool, &ctx->buffer);
 //----------------------------------------------------------------------
 	void *reclaimed_buffer = oritlsf_cleanup_pool(llabel, &ctx->oritlsf_pool);
     if (reclaimed_buffer != ctx->arena_buffer) {

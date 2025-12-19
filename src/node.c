@@ -5,10 +5,12 @@
 #include <unistd.h>
 
 #if defined(__NetBSD__)
+    #include <sys/unistd.h>
     #include <json_object.h>
     #include <json_tokener.h>
     #include <json_types.h>
 #elif defined(__FreeBSD__)
+    #include <sys/unistd.h>
     #include <arpa/inet.h>
     #include <json_object.h>
     #include <json_tokener.h>

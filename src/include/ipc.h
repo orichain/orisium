@@ -588,6 +588,7 @@ static inline et_result_t write_ipc_protocol_message(
     et_result_t wetr;
     wetr.failure = false;
     wetr.partial = true;
+    wetr.event_type = EIT_FD;
     wetr.status = FAILURE;
     if (on_out_ready && buffer->out_size_tb == 0) {
         wetr.failure = false;
@@ -902,6 +903,7 @@ static inline et_result_t receive_ipc_raw_protocol_message(oritlsf_pool_t *pool,
     et_result_t retr;
     retr.failure = false;
     retr.partial = true;
+    retr.event_type = EIT_FD;
     retr.status = FAILURE;
     if (buffer->read_step == 0) {
         if (buffer->in_size_tb == 0) {

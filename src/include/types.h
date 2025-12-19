@@ -123,14 +123,22 @@ typedef struct {
     ssize_t out_size_c;
 } et_buffer_t;
 
+typedef enum {
+	EIT_FD = (uint8_t)0x00,
+    EIT_USER = (uint8_t)0x01,
+    EIT_TIMER = (uint8_t)0x02
+} event_type_t;
+
 typedef struct {
-    int fd;
+    int event_id;
+    event_type_t event_type;
     et_buffer_t *buffer;
-} et_buffered_fd_t;
+} et_buffered_event_id_t;
 
 typedef struct {
     bool failure;
     bool partial;
+    event_type_t event_type;
     status_t status;
 } et_result_t;
 

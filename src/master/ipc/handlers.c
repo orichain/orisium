@@ -20,6 +20,7 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
     et_result_t retr;
     retr.failure = false;
     retr.partial = true;
+    retr.event_type = EIT_FD;
     retr.status = FAILURE;
     do {
         retr = receive_ipc_raw_protocol_message(&master_ctx->oritlsf_pool, file_descriptor, buffer);
@@ -131,6 +132,6 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
 //======================================================================
 // !!!!!!Drain Sampe Kering!!!!!!
 //======================================================================
-    } while (retr.status == SUCCESS);
+    } while (retr.status == SUCCESS && retr.event_type == EIT_FD);
 	return SUCCESS;
 }

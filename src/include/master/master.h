@@ -92,7 +92,7 @@ typedef struct {
 	int master_pid;
     int udp_sock;
     timer_id_t check_healthy_timer_id;
-    et_buffered_fd_t *shutdown_event_fd;
+    et_buffered_event_id_t *shutdown_event_fd;
     async_type_t master_async;
 //----------------------------------------------------------------------
     uint8_t last_sio_rr_idx;

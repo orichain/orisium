@@ -58,7 +58,7 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
     security->hello2_ack_sent = false;
     rekeying->is_rekeying = false;
     ipc_cleanup_protocol_queue(&master_ctx->oritlsf_pool, &rekeying->rekeying_queue_head, &rekeying->rekeying_queue_tail);
-    async_delete_event(label, &master_ctx->master_async, &upp->uds[0]);
+    async_delete_event(label, &master_ctx->master_async, &upp->uds[0], EIT_FD);
     CLOSE_UDS(&upp->uds[0]);
     CLOSE_UDS(&upp->uds[1]);
     CLOSE_PID(&upp->pid);
@@ -146,10 +146,9 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
             continue;
         }
 		if (wot != SIO || index != ixxxx) {
+            async_delete_event(label, &master_ctx->master_async, &session->upp->uds[0], EIT_FD);
             CLOSE_UDS(&session->upp->uds[0]);
-#ifndef __NetBSD__
             CLOSE_UDS(&session->upp->uds[1]);
-#endif
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
         }
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->rekeying);
@@ -157,6 +156,7 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->security);
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->metrics);
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->avgtt);
+        CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &session->buffer);
 	}
 	for (uint8_t ixxxx=0;ixxxx<MAX_LOGIC_WORKERS;++ixxxx) {
 		master_worker_session_t *session = get_master_worker_session(master_ctx, LOGIC, ixxxx);
@@ -164,10 +164,9 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
             continue;
         }
 		if (wot != LOGIC || index != ixxxx) {
+            async_delete_event(label, &master_ctx->master_async, &session->upp->uds[0], EIT_FD);
             CLOSE_UDS(&session->upp->uds[0]);
-#ifndef __NetBSD__
             CLOSE_UDS(&session->upp->uds[1]);
-#endif
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
         }
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->rekeying);
@@ -175,6 +174,7 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->security);
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->metrics);
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->avgtt);
+        CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &session->buffer);
 	}
 	for (uint8_t ixxxx=0;ixxxx<MAX_COW_WORKERS;++ixxxx) {
 		master_worker_session_t *session = get_master_worker_session(master_ctx, COW, ixxxx);
@@ -182,10 +182,9 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
             continue;
         }
 		if (wot != COW || index != ixxxx) {
+            async_delete_event(label, &master_ctx->master_async, &session->upp->uds[0], EIT_FD);
             CLOSE_UDS(&session->upp->uds[0]);
-#ifndef __NetBSD__
             CLOSE_UDS(&session->upp->uds[1]);
-#endif
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
         }
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->rekeying);
@@ -193,6 +192,7 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->security);
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->metrics);
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->avgtt);
+        CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &session->buffer);
 	}
 	for (uint8_t ixxxx=0;ixxxx<MAX_DBR_WORKERS;++ixxxx) {
 		master_worker_session_t *session = get_master_worker_session(master_ctx, DBR, ixxxx);
@@ -200,10 +200,9 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
             continue;
         }
 		if (wot != DBR || index != ixxxx) {
+            async_delete_event(label, &master_ctx->master_async, &session->upp->uds[0], EIT_FD);
             CLOSE_UDS(&session->upp->uds[0]);
-#ifndef __NetBSD__
             CLOSE_UDS(&session->upp->uds[1]);
-#endif
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
         }
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->rekeying);
@@ -211,6 +210,7 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->security);
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->metrics);
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->avgtt);
+        CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &session->buffer);
 	}
 	for (uint8_t ixxxx=0;ixxxx<MAX_DBW_WORKERS;++ixxxx) {
 		master_worker_session_t *session = get_master_worker_session(master_ctx, DBW, ixxxx);
@@ -218,10 +218,9 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
             continue;
         }
 		if (wot != DBW || index != ixxxx) {
+            async_delete_event(label, &master_ctx->master_async, &session->upp->uds[0], EIT_FD);
             CLOSE_UDS(&session->upp->uds[0]);
-#ifndef __NetBSD__
             CLOSE_UDS(&session->upp->uds[1]);
-#endif
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
         }
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->rekeying);
@@ -229,19 +228,14 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->security);
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->metrics);
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->avgtt);
+        CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &session->buffer);
 	}
     oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_c_session);
     oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_c_session);
+    async_delete_event(label, &master_ctx->master_async, &master_ctx->udp_sock, EIT_FD);
     CLOSE_FD(&master_ctx->udp_sock);
-    CLOSE_FD(&master_ctx->shutdown_event_fd->fd);
-    if (master_ctx->shutdown_event_fd->buffer->buffer_in != NULL) {
-        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->shutdown_event_fd->buffer->buffer_in);
-    }
-    if (master_ctx->shutdown_event_fd->buffer->buffer_out != NULL) {
-        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->shutdown_event_fd->buffer->buffer_out);
-    }
-    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->shutdown_event_fd->buffer);
-    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->shutdown_event_fd);
+    async_delete_event(label, &master_ctx->master_async, &master_ctx->shutdown_event_fd->event_id, master_ctx->shutdown_event_fd->event_type);
+    CLOSE_EVENT_ID(&master_ctx->oritlsf_pool, &master_ctx->shutdown_event_fd);
     if (master_ctx->check_healthy_timer_id.event) {
         oritw_remove_event(label, &master_ctx->oritlsf_pool, &master_ctx->master_async, &master_ctx->timer, &master_ctx->check_healthy_timer_id.event);
     }
@@ -302,7 +296,8 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
         async_create_inout_event(
             label,
             &master_ctx->master_async,
-            &session->upp->uds[0]
+            &session->upp->uds[0],
+            EIT_FD
         );
         LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, session->upp->pid);
     }

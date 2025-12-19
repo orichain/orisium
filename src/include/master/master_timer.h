@@ -18,11 +18,12 @@
 #include "oritlsf.h"
 
 static inline status_t handle_master_timer_event(const char *label, master_context_t *master_ctx, int *current_fd, uint32_t *current_events) {
-    if (*current_fd == master_ctx->timer.add_event_fd->fd) {
+    if (*current_fd == master_ctx->timer.add_event_fd->event_id) {
         if (async_event_is_IN(*current_events)) {
             et_result_t retr;
             retr.failure = false;
             retr.partial = true;
+            retr.event_type = EIT_FD;
             retr.status = FAILURE;
             do {
                 retr = async_read_event(&master_ctx->oritlsf_pool, master_ctx->timer.add_event_fd);
@@ -46,18 +47,18 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                             master_ctx->timer.add_queue_head = NULL;
                             master_ctx->timer.add_queue_tail = NULL;
                         }
-                        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->timer.add_event_fd->buffer->buffer_in);
+                        if (retr.event_type == EIT_FD) oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->timer.add_event_fd->buffer->buffer_in);
                         master_ctx->timer.add_event_fd->buffer->in_size_tb = 0;
                         master_ctx->timer.add_event_fd->buffer->in_size_c = 0;
                         return handler_result;
                     }
                 }
-            } while (retr.status == SUCCESS);
+            } while (retr.status == SUCCESS && retr.event_type == EIT_FD);
             return retr.status;
         }
         if (async_event_is_OUT(*current_events)) {
             if (master_ctx->timer.add_event_fd->buffer->out_size_tb != 0) {
-                et_result_t wetr = async_write_event(&master_ctx->oritlsf_pool, master_ctx->timer.add_event_fd, true);
+                et_result_t wetr = async_write_event(&master_ctx->oritlsf_pool, &master_ctx->master_async, master_ctx->timer.add_event_fd, true);
                 if (!wetr.failure) {
                     if (!wetr.partial) {
                         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->timer.add_event_fd->buffer->buffer_out);
@@ -70,11 +71,12 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
     }
     for (uint32_t llv = 0; llv < MAX_TIMER_LEVELS; ++llv) {
         ori_timer_wheel_t *timer = master_ctx->timer.timer[llv];
-        if (*current_fd == timer->tick_event_fd->fd) {
+        if (*current_fd == timer->tick_event_fd->event_id) {
             if (async_event_is_IN(*current_events)) {
                 et_result_t retr;
                 retr.failure = false;
                 retr.partial = true;
+                retr.event_type = EIT_FD;
                 retr.status = FAILURE;
                 do {
                     retr = async_read_event(&master_ctx->oritlsf_pool, timer->tick_event_fd);
@@ -82,7 +84,7 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                         if (!retr.partial) {
                             uint64_t advance_ticks = (uint64_t)(timer->last_delay_us);
                             if (oritw_advance_time_and_process_expired(label, &master_ctx->master_async, &master_ctx->timer, llv, advance_ticks) != SUCCESS) return FAILURE;                        
-                            et_result_t wetr = async_write_event(&master_ctx->oritlsf_pool, timer->timeout_event_fd, false);
+                            et_result_t wetr = async_write_event(&master_ctx->oritlsf_pool, &master_ctx->master_async, timer->timeout_event_fd, false);
                             if (!wetr.failure) {
                                 if (!wetr.partial) {
                                     oritlsf_free(&master_ctx->oritlsf_pool, (void **)&timer->timeout_event_fd->buffer->buffer_out);
@@ -91,20 +93,21 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                                 }
                             }
                             //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
-                            oritlsf_free(&master_ctx->oritlsf_pool, (void **)&timer->tick_event_fd->buffer->buffer_in);
+                            if (retr.event_type == EIT_FD) oritlsf_free(&master_ctx->oritlsf_pool, (void **)&timer->tick_event_fd->buffer->buffer_in);
                             timer->tick_event_fd->buffer->in_size_tb = 0;
                             timer->tick_event_fd->buffer->in_size_c = 0;
                             return SUCCESS;
                         }
                     }
-                } while (retr.status == SUCCESS);
+                } while (retr.status == SUCCESS && retr.event_type == EIT_FD);
                 return retr.status;
             }
-        } else if (*current_fd == timer->timeout_event_fd->fd) {
+        } else if (*current_fd == timer->timeout_event_fd->event_id) {
             if (async_event_is_IN(*current_events)) {
                 et_result_t retr;
                 retr.failure = false;
                 retr.partial = true;
+                retr.event_type = EIT_FD;
                 retr.status = FAILURE;
                 do {
                     retr = async_read_event(&master_ctx->oritlsf_pool, timer->timeout_event_fd);
@@ -176,18 +179,18 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                                 timer->ready_queue_tail = NULL;
                             }
                             //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
-                            oritlsf_free(&master_ctx->oritlsf_pool, (void **)&timer->timeout_event_fd->buffer->buffer_in);
+                            if (retr.event_type == EIT_FD) oritlsf_free(&master_ctx->oritlsf_pool, (void **)&timer->timeout_event_fd->buffer->buffer_in);
                             timer->timeout_event_fd->buffer->in_size_tb = 0;
                             timer->timeout_event_fd->buffer->in_size_c = 0;
                             return handler_result;
                         }
                     }
-                } while (retr.status == SUCCESS);
+                } while (retr.status == SUCCESS && retr.event_type == EIT_FD);
                 return retr.status;
             }
             if (async_event_is_OUT(*current_events)) {
                 if (timer->timeout_event_fd->buffer->out_size_tb != 0) {
-                    et_result_t wetr = async_write_event(&master_ctx->oritlsf_pool, timer->timeout_event_fd, true);
+                    et_result_t wetr = async_write_event(&master_ctx->oritlsf_pool, &master_ctx->master_async, timer->timeout_event_fd, true);
                     if (!wetr.failure) {
                         if (!wetr.partial) {
                             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&timer->timeout_event_fd->buffer->buffer_out);

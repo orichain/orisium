@@ -3270,6 +3270,7 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void **worker_se
     et_result_t retr;
     retr.failure = false;
     retr.partial = true;
+    retr.event_type = EIT_FD;
     retr.status = FAILURE;
     do {
         retr = receive_ipc_raw_protocol_message(&worker_ctx->oritlsf_pool, worker_ctx->master_uds_fd, worker_ctx->buffer);
@@ -3368,6 +3369,6 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void **worker_se
 //======================================================================
 // !!!!!!Drain Sampe Kering!!!!!!
 //======================================================================
-    } while (retr.status == SUCCESS);
+    } while (retr.status == SUCCESS && retr.event_type == EIT_FD);
 	return SUCCESS;
 }

@@ -46,6 +46,7 @@
 #include "poly1305-donna.h"
 #include "types.h"
 #include "oritlsf.h"
+#include "xorshiro128plus.h"
 
 static inline void insertion_sort_uint64(uint64_t *arr, size_t n) {
     for (size_t i = 1; i < n; ++i) {
@@ -985,6 +986,39 @@ static inline void CLOSE_FD(int *fd) {
         close(*fd);
         *fd = -1;
     }
+}
+//Huruf_besar biar selalu ingat karena akan sering digunakan
+static inline void CLOSE_ET_BUFFER(oritlsf_pool_t *pool, et_buffer_t **eb) {
+    et_buffer_t *buffer = *eb;
+    if (buffer == NULL) return;
+    if (buffer->buffer_in != NULL) {
+        oritlsf_free(pool, (void **)&buffer->buffer_in);
+    }
+    if (buffer->buffer_out != NULL) {
+        oritlsf_free(pool, (void **)&buffer->buffer_out);
+    }
+    oritlsf_free(pool, (void **)eb);
+}
+//Huruf_besar biar selalu ingat karena akan sering digunakan
+static inline int GENERATE_EVENT_ID() {
+    int new_id;
+    do {
+        generate_fast_salt((uint8_t *)&new_id, 4);
+    } while (new_id == -1); 
+    return new_id;
+}
+//Huruf_besar biar selalu ingat karena akan sering digunakan
+static inline void CLOSE_EVENT_ID(oritlsf_pool_t *pool, et_buffered_event_id_t **eb_event_id) {
+    et_buffered_event_id_t *ee_id = *eb_event_id;
+    if (ee_id == NULL) return;
+    if (ee_id->event_id != -1) {
+        if (ee_id->event_type == EIT_FD) {
+            close(ee_id->event_id);
+        }
+        ee_id->event_id = -1;
+    }
+    CLOSE_ET_BUFFER(pool, &ee_id->buffer);
+    oritlsf_free(pool, (void **)eb_event_id);
 }
 //Huruf_besar biar selalu ingat karena akan sering digunakan
 static inline void CLOSE_UDS(int *uds_fd) {

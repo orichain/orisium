@@ -29,13 +29,14 @@
 #include "ipc.h"
 
 volatile sig_atomic_t shutdown_requested = 0;
-et_buffered_fd_t *shutdown_event_fd = NULL;
+et_buffered_event_id_t *shutdown_event_fd = NULL;
 oritlsf_pool_t *oritlsf_pool = NULL;
+async_type_t *master_async = NULL;
 
 void sigint_handler(int signum) {
     shutdown_requested = 1ULL;
-    if (shutdown_event_fd && shutdown_event_fd->fd != -1) {
-        et_result_t wetr = async_write_event(oritlsf_pool, shutdown_event_fd, false);
+    if (shutdown_event_fd && shutdown_event_fd->event_id != -1) {
+        et_result_t wetr = async_write_event(oritlsf_pool, master_async, shutdown_event_fd, false);
         if (!wetr.failure) {
             if (!wetr.partial) {
                 oritlsf_free(oritlsf_pool, (void **)&shutdown_event_fd->buffer->buffer_out);
@@ -54,12 +55,17 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
         return FAILURE;
     }
     oritlsf_pool = &master_ctx->oritlsf_pool;
-    master_ctx->shutdown_event_fd = (et_buffered_fd_t *)oritlsf_calloc(__FILE__, __LINE__, 
+    master_ctx->shutdown_event_fd = (et_buffered_event_id_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &master_ctx->oritlsf_pool,
         1,
-        sizeof(et_buffered_fd_t)
+        sizeof(et_buffered_event_id_t)
     );
-    master_ctx->shutdown_event_fd->fd = -1;
+    master_ctx->shutdown_event_fd->event_id = -1;
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+    master_ctx->shutdown_event_fd->event_type = EIT_USER;
+#else
+    master_ctx->shutdown_event_fd->event_type = EIT_FD;
+#endif
     master_ctx->shutdown_event_fd->buffer = (et_buffer_t *)oritlsf_calloc(__FILE__, __LINE__, 
         &master_ctx->oritlsf_pool,
         1,
@@ -373,10 +379,11 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
 	if (async_create(label, &master_ctx->master_async) != SUCCESS) {
         return FAILURE;
 	}
-	if (async_create_event(label, &master_ctx->shutdown_event_fd->fd) != SUCCESS) {
+    master_async = &master_ctx->master_async;
+	if (async_create_event(label, &master_ctx->shutdown_event_fd->event_id, master_ctx->shutdown_event_fd->event_type) != SUCCESS) {
         return FAILURE;
 	}
-	if (async_create_inout_event(label, &master_ctx->master_async, &master_ctx->shutdown_event_fd->fd) != SUCCESS) {
+	if (async_create_inout_event(label, &master_ctx->master_async, &master_ctx->shutdown_event_fd->event_id, master_ctx->shutdown_event_fd->event_type) != SUCCESS) {
         return FAILURE;
 	}
     shutdown_event_fd = master_ctx->shutdown_event_fd;
@@ -392,14 +399,7 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_session[ixxxx].security);
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_session[ixxxx].metrics);
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_session[ixxxx].avgtt);
-        et_buffer_t *buffer = master_ctx->sio_session[ixxxx].buffer;
-        if (buffer->buffer_in != NULL) {
-            oritlsf_free(&master_ctx->oritlsf_pool, (void **)&buffer->buffer_in);
-        }
-        if (buffer->buffer_out != NULL) {
-            oritlsf_free(&master_ctx->oritlsf_pool, (void **)&buffer->buffer_out);
-        }
-        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&buffer);
+        CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &master_ctx->sio_session[ixxxx].buffer);
 	}
 	for (uint8_t ixxxx=0;ixxxx<MAX_LOGIC_WORKERS;++ixxxx) {
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session[ixxxx].rekeying);
@@ -408,14 +408,7 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session[ixxxx].security);
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session[ixxxx].metrics);
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session[ixxxx].avgtt);
-        et_buffer_t *buffer = master_ctx->logic_session[ixxxx].buffer;
-        if (buffer->buffer_in != NULL) {
-            oritlsf_free(&master_ctx->oritlsf_pool, (void **)&buffer->buffer_in);
-        }
-        if (buffer->buffer_out != NULL) {
-            oritlsf_free(&master_ctx->oritlsf_pool, (void **)&buffer->buffer_out);
-        }
-        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&buffer);
+        CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &master_ctx->logic_session[ixxxx].buffer);
 	}
 	for (uint8_t ixxxx=0;ixxxx<MAX_COW_WORKERS;++ixxxx) {
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_session[ixxxx].rekeying);
@@ -424,14 +417,7 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_session[ixxxx].security);
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_session[ixxxx].metrics);
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_session[ixxxx].avgtt);
-        et_buffer_t *buffer = master_ctx->cow_session[ixxxx].buffer;
-        if (buffer->buffer_in != NULL) {
-            oritlsf_free(&master_ctx->oritlsf_pool, (void **)&buffer->buffer_in);
-        }
-        if (buffer->buffer_out != NULL) {
-            oritlsf_free(&master_ctx->oritlsf_pool, (void **)&buffer->buffer_out);
-        }
-        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&buffer);
+        CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &master_ctx->cow_session[ixxxx].buffer);
 	}
 	for (uint8_t ixxxx=0;ixxxx<MAX_DBR_WORKERS;++ixxxx) {
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbr_session[ixxxx].rekeying);
@@ -440,14 +426,7 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbr_session[ixxxx].security);
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbr_session[ixxxx].metrics);
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbr_session[ixxxx].avgtt);
-        et_buffer_t *buffer = master_ctx->dbr_session[ixxxx].buffer;
-        if (buffer->buffer_in != NULL) {
-            oritlsf_free(&master_ctx->oritlsf_pool, (void **)&buffer->buffer_in);
-        }
-        if (buffer->buffer_out != NULL) {
-            oritlsf_free(&master_ctx->oritlsf_pool, (void **)&buffer->buffer_out);
-        }
-        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&buffer);
+        CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &master_ctx->dbr_session[ixxxx].buffer);
 	}
 	for (uint8_t ixxxx=0;ixxxx<MAX_DBW_WORKERS;++ixxxx) {
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbw_session[ixxxx].rekeying);
@@ -456,14 +435,7 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbw_session[ixxxx].security);
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbw_session[ixxxx].metrics);
 		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbw_session[ixxxx].avgtt);
-        et_buffer_t *buffer = master_ctx->dbw_session[ixxxx].buffer;
-        if (buffer->buffer_in != NULL) {
-            oritlsf_free(&master_ctx->oritlsf_pool, (void **)&buffer->buffer_in);
-        }
-        if (buffer->buffer_out != NULL) {
-            oritlsf_free(&master_ctx->oritlsf_pool, (void **)&buffer->buffer_out);
-        }
-        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&buffer);
+        CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &master_ctx->dbw_session[ixxxx].buffer);
 	}
     oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_session);
     oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session);
@@ -494,18 +466,10 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     master_ctx->all_workers_is_ready = false;
     master_ctx->last_sio_rr_idx = 0;
     master_ctx->last_cow_rr_idx = 0;
-    async_delete_event(label, &master_ctx->master_async, &master_ctx->udp_sock);
+    async_delete_event(label, &master_ctx->master_async, &master_ctx->udp_sock, EIT_FD);
     CLOSE_FD(&master_ctx->udp_sock);
-    async_delete_event(label, &master_ctx->master_async, &master_ctx->shutdown_event_fd->fd);
-    CLOSE_FD(&master_ctx->shutdown_event_fd->fd);
-    if (master_ctx->shutdown_event_fd->buffer->buffer_in != NULL) {
-        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->shutdown_event_fd->buffer->buffer_in);
-    }
-    if (master_ctx->shutdown_event_fd->buffer->buffer_out != NULL) {
-        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->shutdown_event_fd->buffer->buffer_out);
-    }
-    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->shutdown_event_fd->buffer);
-    oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->shutdown_event_fd);
+    async_delete_event(label, &master_ctx->master_async, &master_ctx->shutdown_event_fd->event_id, master_ctx->shutdown_event_fd->event_type);
+    CLOSE_EVENT_ID(&master_ctx->oritlsf_pool, &master_ctx->shutdown_event_fd);
 //----------------------------------------------------------------------
     if (master_ctx->check_healthy_timer_id.event) {
         oritw_remove_event(label, &master_ctx->oritlsf_pool, &master_ctx->master_async, &master_ctx->timer, &master_ctx->check_healthy_timer_id.event);
@@ -548,11 +512,12 @@ void run_master(const char *label, master_context_t *master_ctx) {
 			uint32_t_status_t events_status = async_getevents(label, &master_ctx->master_async, n);
 			if (events_status.status != SUCCESS) continue;
 			uint32_t current_events = events_status.r_uint32_t;	
-			if (current_fd == master_ctx->shutdown_event_fd->fd) {
+			if (current_fd == master_ctx->shutdown_event_fd->event_id) {
                 if (async_event_is_IN(current_events)) {
                     et_result_t retr;
                     retr.failure = false;
                     retr.partial = true;
+                    retr.event_type = EIT_FD;
                     retr.status = FAILURE;
                     do {
                         retr = async_read_event(&master_ctx->oritlsf_pool, master_ctx->shutdown_event_fd);
@@ -561,16 +526,16 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                 LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", label);
                                 master_ctx->shutdown_requested = 1;
                                 master_workers_info(label, master_ctx,IT_SHUTDOWN);
-                                oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->shutdown_event_fd->buffer->buffer_in);
+                                if (retr.event_type == EIT_FD) oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->shutdown_event_fd->buffer->buffer_in);
                                 master_ctx->shutdown_event_fd->buffer->in_size_tb = 0;
                                 master_ctx->shutdown_event_fd->buffer->in_size_c = 0;
                             }
                         }
-                    } while (retr.status == SUCCESS);
+                    } while (retr.status == SUCCESS && retr.event_type == EIT_FD);
                 }
                 if (async_event_is_OUT(current_events)) {
                     if (master_ctx->shutdown_event_fd->buffer->out_size_tb != 0) {
-                        et_result_t wetr = async_write_event(&master_ctx->oritlsf_pool, master_ctx->shutdown_event_fd, true);
+                        et_result_t wetr = async_write_event(&master_ctx->oritlsf_pool, &master_ctx->master_async, master_ctx->shutdown_event_fd, true);
                         if (!wetr.failure) {
                             if (!wetr.partial) {
                                 oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->shutdown_event_fd->buffer->buffer_out);
@@ -781,7 +746,7 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                         master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                         continue;
                                     }	
-                                    if (async_create_in_event(label, &master_ctx->master_async, &master_ctx->udp_sock) != SUCCESS) {
+                                    if (async_create_in_event(label, &master_ctx->master_async, &master_ctx->udp_sock, EIT_FD) != SUCCESS) {
                                         LOG_ERROR("%sFailed to async_create_inout_event socket_udp. Initiating graceful shutdown...", label);
                                         master_ctx->shutdown_requested = 1;
                                         master_workers_info(label, master_ctx, IT_SHUTDOWN);

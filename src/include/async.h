@@ -26,6 +26,7 @@
 #include "log.h"
 #include "types.h"
 #include "oritlsf.h"
+#include "utilities.h"
 
 #if defined(__NetBSD__) || defined(__FreeBSD__)
     typedef struct {
@@ -112,7 +113,12 @@ static inline uint32_t_status_t async_getevents(const char* label, async_type_t 
         return result;
     }
 #if defined(__NetBSD__) || defined(__FreeBSD__)
-    if (async->events[n].filter == EVFILT_READ) {
+    if (
+        async->events[n].filter == EVFILT_READ ||
+        async->events[n].filter == EVFILT_USER ||
+        async->events[n].filter == EVFILT_TIMER
+    )
+    {
         result.r_uint32_t |= ASYNC_IN_FLAG;
     }
     if (async->events[n].filter == EVFILT_WRITE) {
@@ -175,21 +181,38 @@ static inline status_t async_create(const char* label, async_type_t *async) {
     return SUCCESS;
 }
 
-static inline status_t async_create_event(const char* label, int *event_fd) {
-    *event_fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
-    if (*event_fd == -1) {
-        LOG_ERROR("%sGagal membuat eventfd: %s", label, strerror(errno));
-        return FAILURE;
+static inline status_t async_create_event(const char* label, int *event_fd, event_type_t event_type) {
+    if (event_type == EIT_FD) {
+        *event_fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+        if (*event_fd == -1) {
+            LOG_ERROR("%sGagal membuat eventfd: %s", label, strerror(errno));
+            return FAILURE;
+        }
+        LOG_DEBUG("%sBerhasil membuat eventfd %d", label, *event_fd);
+    } else {
+        *event_fd = GENERATE_EVENT_ID();
+        if (*event_fd == -1) {
+            LOG_ERROR("%sGagal membuat eventfd", label);
+            return FAILURE;
+        }
+        LOG_DEBUG("%sBerhasil membuat eventfd %d", label, *event_fd);
     }
-    LOG_DEBUG("%sBerhasil membuat event fd %d", label, *event_fd);
     return SUCCESS;
 }
 
-static inline status_t async_create_timerfd(const char* label, int *timer_fd) {
-    *timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
-    if (*timer_fd == -1) {
-        LOG_ERROR("%sGagal membuat timerfd: %s", label, strerror(errno));
-        return FAILURE;
+static inline status_t async_create_timerfd(const char* label, int *timer_fd, event_type_t event_type) {
+    if (event_type == EIT_FD) {
+        *timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
+        if (*timer_fd == -1) {
+            LOG_ERROR("%sGagal membuat timerfd: %s", label, strerror(errno));
+            return FAILURE;
+        }
+    } else {
+        *timer_fd = GENERATE_EVENT_ID();
+        if (*timer_fd == -1) {
+            LOG_ERROR("%sGagal membuat timerfd", label);
+            return FAILURE;
+        }
     }
     return SUCCESS;
 }
@@ -214,7 +237,8 @@ static inline status_t async_set_timerfd_time(const char* label, int *timer_fd,
 static inline status_t async_create_in_event(
     const char* label,
     async_type_t *async,
-    int *fd
+    int *fd,
+    event_type_t event_type
 )
 {
 #if defined(__NetBSD__) || defined(__FreeBSD__)
@@ -248,47 +272,77 @@ static inline status_t async_create_in_event(
 static inline status_t async_create_inout_event(
     const char* label,
     async_type_t *async,
-    int *fd
+    int *fd,
+    event_type_t event_type
 )
 {
-#if defined(__NetBSD__) || defined(__FreeBSD__)
-    EV_SET(&async->event_change[0], *fd,
-            EVFILT_READ,
-            EV_ADD | EV_ENABLE | EV_CLEAR,
-            0, 0, NULL);
-    EV_SET(&async->event_change[1], *fd,
-            EVFILT_WRITE,
-            EV_ADD | EV_ENABLE | EV_CLEAR,
-            0, 0, NULL);
-    if (kevent(async->async_fd,
-                async->event_change, 2,
-                NULL, 0, NULL) == -1) {
-        LOG_ERROR("%skqueue READ/WRITE add failed: %s", label, strerror(errno));
-        return FAILURE;
+    if (event_type == EIT_FD) {
+    #if defined(__NetBSD__) || defined(__FreeBSD__)
+        EV_SET(&async->event_change[0], *fd,
+                EVFILT_READ,
+                EV_ADD | EV_ENABLE | EV_CLEAR,
+                0, 0, NULL);
+        EV_SET(&async->event_change[1], *fd,
+                EVFILT_WRITE,
+                EV_ADD | EV_ENABLE | EV_CLEAR,
+                0, 0, NULL);
+        if (kevent(async->async_fd,
+                    async->event_change, 2,
+                    NULL, 0, NULL) == -1) {
+            LOG_ERROR("%skqueue READ/WRITE add failed: %s", label, strerror(errno));
+            return FAILURE;
+        }
+    #else
+        async->event.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLET;
+        async->event.data.fd = *fd;
+        if (epoll_ctl(async->async_fd,
+                        EPOLL_CTL_ADD,
+                        *fd,
+                        &async->event) == -1) {
+            LOG_ERROR("%sepoll add failed: %s",
+                        label, strerror(errno));
+            return FAILURE;
+        }
+    #endif
+    } else {
+    #if defined(__NetBSD__) || defined(__FreeBSD__)
+        EV_SET(&async->event_change[0], *fd,
+                EVFILT_USER, 
+                EV_ADD | EV_ENABLE | EV_CLEAR, 
+                0, 0, NULL);
+        if (kevent(async->async_fd,
+                    async->event_change, 1,
+                    NULL, 0, NULL) == -1) {
+            LOG_ERROR("%skqueue USER add failed: %s", label, strerror(errno));
+            return FAILURE;
+        }
+    #endif
     }
-#else
-    async->event.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLET;
-    async->event.data.fd = *fd;
-
-    if (epoll_ctl(async->async_fd,
-                    EPOLL_CTL_ADD,
-                    *fd,
-                    &async->event) == -1) {
-        LOG_ERROR("%sepoll add failed: %s",
-                    label, strerror(errno));
-        return FAILURE;
-    }
-#endif
     return SUCCESS;
 }
 
-static inline status_t async_delete_event(const char* label, async_type_t *async, int *fd_to_delete) {
+static inline status_t async_delete_event(const char* label, async_type_t *async, int *fd_to_delete, event_type_t event_type) {
     if (*fd_to_delete != -1) {
 #if defined(__NetBSD__) || defined(__FreeBSD__)
         struct kevent *ch = async->event_change;
-        EV_SET(&ch[0], *fd_to_delete, EVFILT_READ,  EV_DELETE, 0, 0, NULL);
-        EV_SET(&ch[1], *fd_to_delete, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
-        if (kevent(async->async_fd, ch, 2, NULL, 0, NULL) == -1) {
+        int chc = 1;
+        switch (event_type) {
+            case EIT_USER: {
+                EV_SET(&ch[0], *fd_to_delete, EVFILT_USER, EV_DELETE, 0, 0, NULL);
+                chc = 1;
+                break;
+            }
+            case EIT_TIMER: {
+                EV_SET(&ch[0], *fd_to_delete, EVFILT_TIMER, EV_DELETE, 0, 0, NULL);
+                chc = 1;
+                break;
+            }
+            default:
+                EV_SET(&ch[0], *fd_to_delete, EVFILT_READ,  EV_DELETE, 0, 0, NULL);
+                EV_SET(&ch[1], *fd_to_delete, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+                chc = 2;
+        }
+        if (kevent(async->async_fd, ch, chc, NULL, 0, NULL) == -1) {
             LOG_DEBUG("%sGagal menghapus event (mungkin sudah ditutup): %s",
                       label, strerror(errno));
         }
@@ -302,10 +356,10 @@ static inline status_t async_delete_event(const char* label, async_type_t *async
     return SUCCESS;
 }
 
-static inline status_t async_create_timer_oneshot(const char* label, async_type_t *async , int *file_descriptor, double timer_interval) {
+static inline status_t async_create_timer_oneshot(const char* label, async_type_t *async , int *file_descriptor, double timer_interval, event_type_t event_type) {
     bool closed = (*file_descriptor == -1);
     if (closed) {
-        if (async_create_timerfd(label, file_descriptor) != SUCCESS) {
+        if (async_create_timerfd(label, file_descriptor, event_type) != SUCCESS) {
             return FAILURE;
         }
     }
@@ -318,7 +372,7 @@ static inline status_t async_create_timer_oneshot(const char* label, async_type_
         return FAILURE;
     }
     if (closed) {
-        if (async_create_in_event(label, async, file_descriptor) != SUCCESS) {
+        if (async_create_in_event(label, async, file_descriptor, event_type) != SUCCESS) {
             return FAILURE;
         }
     }
@@ -337,165 +391,192 @@ static inline status_t async_update_timer_oneshot(const char* label, int *file_d
     return SUCCESS;
 }
 
-static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, et_buffered_fd_t *et_buffered_fd, bool on_out_ready) {
+static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, async_type_t *async, et_buffered_event_id_t *et_buffered_event_id, bool on_out_ready) {
     et_result_t wetr;
     wetr.failure = false;
     wetr.partial = true;
+    wetr.event_type = et_buffered_event_id->event_type;
     wetr.status = FAILURE;
-    if (on_out_ready && et_buffered_fd->buffer->out_size_tb == 0) {
+    
+    if (wetr.event_type == EIT_USER) {
+    #if defined(__NetBSD__) || defined(__FreeBSD__)
+        EV_SET(&async->event_change[0], et_buffered_event_id->event_id, EVFILT_USER, 0, NOTE_TRIGGER, 0, NULL);
+        if (kevent(async->async_fd, &async->event_change[0], 1, NULL, 0, NULL) == -1) {
+            wetr.failure = true;
+            wetr.partial = true;
+            wetr.status = FAILURE;
+            return wetr;
+        }
         wetr.failure = false;
         wetr.partial = false;
         wetr.status = SUCCESS;
-        return wetr;
-    }
-    if (!on_out_ready) {
-        uint64_t u = 1ULL;
-        if (et_buffered_fd->buffer->out_size_tb == 0) {
-            et_buffered_fd->buffer->out_size_tb = sizeof(uint64_t);
-            et_buffered_fd->buffer->buffer_out = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-                oritlsf_pool,
-                et_buffered_fd->buffer->out_size_tb,
-                sizeof(uint8_t)
-            );
-            if (!et_buffered_fd->buffer->buffer_out) {
-                et_buffered_fd->buffer->out_size_tb = 0;
-                et_buffered_fd->buffer->out_size_c = 0;
-                wetr.failure = true;
-                wetr.partial = true;
-                wetr.status = FAILURE_NOMEM;
-                return wetr;
-            }
-            memcpy(et_buffered_fd->buffer->buffer_out, &u, sizeof(uint64_t));
-        } else {
-            ssize_t old_out_size_tb = et_buffered_fd->buffer->out_size_tb;
-            et_buffered_fd->buffer->out_size_tb += sizeof(uint64_t);
-            et_buffered_fd->buffer->buffer_out = (uint8_t *)oritlsf_realloc(__FILE__, __LINE__, 
-                oritlsf_pool,
-                et_buffered_fd->buffer->buffer_out,
-                et_buffered_fd->buffer->out_size_tb * sizeof(uint8_t)
-            );
-            if (!et_buffered_fd->buffer->buffer_out) {
-                et_buffered_fd->buffer->out_size_tb = 0;
-                et_buffered_fd->buffer->out_size_c = 0;
-                wetr.failure = true;
-                wetr.partial = true;
-                wetr.status = FAILURE_NOMEM;
-                return wetr;
-            }
-            memcpy(et_buffered_fd->buffer->buffer_out + old_out_size_tb, &u, sizeof(uint64_t));
+    #endif
+    } else {
+        if (on_out_ready && et_buffered_event_id->buffer->out_size_tb == 0) {
+            wetr.failure = false;
+            wetr.partial = false;
+            wetr.status = SUCCESS;
+            return wetr;
         }
-    }
-    while (true) {
-        ssize_t wsize = write(et_buffered_fd->fd, et_buffered_fd->buffer->buffer_out + et_buffered_fd->buffer->out_size_c, et_buffered_fd->buffer->out_size_tb - et_buffered_fd->buffer->out_size_c);
-        if (wsize < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                if (et_buffered_fd->buffer->out_size_tb == et_buffered_fd->buffer->out_size_c) {
-                    wetr.failure = false;
-                    wetr.partial = false;
-                    wetr.status = SUCCESS_EAGNEWBLK;
-                } else {
-                    wetr.failure = false;
+        if (!on_out_ready) {
+            uint64_t u = 1ULL;
+            if (et_buffered_event_id->buffer->out_size_tb == 0) {
+                et_buffered_event_id->buffer->out_size_tb = sizeof(uint64_t);
+                et_buffered_event_id->buffer->buffer_out = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
+                    oritlsf_pool,
+                    et_buffered_event_id->buffer->out_size_tb,
+                    sizeof(uint8_t)
+                );
+                if (!et_buffered_event_id->buffer->buffer_out) {
+                    et_buffered_event_id->buffer->out_size_tb = 0;
+                    et_buffered_event_id->buffer->out_size_c = 0;
+                    wetr.failure = true;
                     wetr.partial = true;
-                    wetr.status = FAILURE_EAGNEWBLK;
+                    wetr.status = FAILURE_NOMEM;
+                    return wetr;
                 }
-                break;
+                memcpy(et_buffered_event_id->buffer->buffer_out, &u, sizeof(uint64_t));
             } else {
-                oritlsf_free(oritlsf_pool, (void **)&et_buffered_fd->buffer->buffer_out);
-                et_buffered_fd->buffer->out_size_tb = 0;
-                et_buffered_fd->buffer->out_size_c = 0;
+                ssize_t old_out_size_tb = et_buffered_event_id->buffer->out_size_tb;
+                et_buffered_event_id->buffer->out_size_tb += sizeof(uint64_t);
+                et_buffered_event_id->buffer->buffer_out = (uint8_t *)oritlsf_realloc(__FILE__, __LINE__, 
+                    oritlsf_pool,
+                    et_buffered_event_id->buffer->buffer_out,
+                    et_buffered_event_id->buffer->out_size_tb * sizeof(uint8_t)
+                );
+                if (!et_buffered_event_id->buffer->buffer_out) {
+                    et_buffered_event_id->buffer->out_size_tb = 0;
+                    et_buffered_event_id->buffer->out_size_c = 0;
+                    wetr.failure = true;
+                    wetr.partial = true;
+                    wetr.status = FAILURE_NOMEM;
+                    return wetr;
+                }
+                memcpy(et_buffered_event_id->buffer->buffer_out + old_out_size_tb, &u, sizeof(uint64_t));
+            }
+        }
+        while (true) {
+            ssize_t wsize = write(et_buffered_event_id->event_id, et_buffered_event_id->buffer->buffer_out + et_buffered_event_id->buffer->out_size_c, et_buffered_event_id->buffer->out_size_tb - et_buffered_event_id->buffer->out_size_c);
+            if (wsize < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    if (et_buffered_event_id->buffer->out_size_tb == et_buffered_event_id->buffer->out_size_c) {
+                        wetr.failure = false;
+                        wetr.partial = false;
+                        wetr.status = SUCCESS_EAGNEWBLK;
+                    } else {
+                        wetr.failure = false;
+                        wetr.partial = true;
+                        wetr.status = FAILURE_EAGNEWBLK;
+                    }
+                    break;
+                } else {
+                    oritlsf_free(oritlsf_pool, (void **)&et_buffered_event_id->buffer->buffer_out);
+                    et_buffered_event_id->buffer->out_size_tb = 0;
+                    et_buffered_event_id->buffer->out_size_c = 0;
+                    wetr.failure = true;
+                    wetr.partial = true;
+                    wetr.status = FAILURE;
+                    break;
+                }
+            } 
+            if (wsize > 0) {
+                et_buffered_event_id->buffer->out_size_c += wsize;
+            }
+            if (wsize == 0) {
+                oritlsf_free(oritlsf_pool, (void **)&et_buffered_event_id->buffer->buffer_out);
+                et_buffered_event_id->buffer->out_size_tb = 0;
+                et_buffered_event_id->buffer->out_size_c = 0;
                 wetr.failure = true;
                 wetr.partial = true;
                 wetr.status = FAILURE;
                 break;
             }
-        } 
-        if (wsize > 0) {
-            et_buffered_fd->buffer->out_size_c += wsize;
-        }
-        if (wsize == 0) {
-            oritlsf_free(oritlsf_pool, (void **)&et_buffered_fd->buffer->buffer_out);
-            et_buffered_fd->buffer->out_size_tb = 0;
-            et_buffered_fd->buffer->out_size_c = 0;
-            wetr.failure = true;
-            wetr.partial = true;
-            wetr.status = FAILURE;
-            break;
-        }
-        if (et_buffered_fd->buffer->out_size_tb == et_buffered_fd->buffer->out_size_c) {
-            wetr.failure = false;
-            wetr.partial = false;
-            wetr.status = SUCCESS;
-            break;
+            if (et_buffered_event_id->buffer->out_size_tb == et_buffered_event_id->buffer->out_size_c) {
+                wetr.failure = false;
+                wetr.partial = false;
+                wetr.status = SUCCESS;
+                break;
+            }
         }
     }
     return wetr;
 }
 
-static inline et_result_t async_read_event(oritlsf_pool_t *oritlsf_pool, et_buffered_fd_t *et_buffered_fd) {
+static inline et_result_t async_read_event(oritlsf_pool_t *oritlsf_pool, et_buffered_event_id_t *et_buffered_event_id) {
     et_result_t retr;
     retr.failure = false;
     retr.partial = true;
+    retr.event_type = et_buffered_event_id->event_type;
     retr.status = FAILURE;
-    if (et_buffered_fd->buffer->in_size_tb == 0) {
-        et_buffered_fd->buffer->in_size_tb = sizeof(uint64_t);
-        et_buffered_fd->buffer->buffer_in = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-            oritlsf_pool,
-            et_buffered_fd->buffer->in_size_tb,
-            sizeof(uint8_t)
-        );
-        if (!et_buffered_fd->buffer->buffer_in) {
-            et_buffered_fd->buffer->read_step = 0;
-            et_buffered_fd->buffer->out_size_tb = 0;
-            et_buffered_fd->buffer->out_size_c = 0;
-            retr.failure = true;
-            retr.partial = true;
-            retr.status = FAILURE_NOMEM;
-            return retr;
+    
+    if (retr.event_type == EIT_USER) {
+    #if defined(__NetBSD__) || defined(__FreeBSD__)
+        retr.failure = false;
+        retr.partial = false;
+        retr.status = SUCCESS;
+    #endif
+    } else {
+        if (et_buffered_event_id->buffer->in_size_tb == 0) {
+            et_buffered_event_id->buffer->in_size_tb = sizeof(uint64_t);
+            et_buffered_event_id->buffer->buffer_in = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
+                oritlsf_pool,
+                et_buffered_event_id->buffer->in_size_tb,
+                sizeof(uint8_t)
+            );
+            if (!et_buffered_event_id->buffer->buffer_in) {
+                et_buffered_event_id->buffer->read_step = 0;
+                et_buffered_event_id->buffer->out_size_tb = 0;
+                et_buffered_event_id->buffer->out_size_c = 0;
+                retr.failure = true;
+                retr.partial = true;
+                retr.status = FAILURE_NOMEM;
+                return retr;
+            }
         }
-    }
-    while (true) {
-        ssize_t rsize = read(et_buffered_fd->fd, et_buffered_fd->buffer->buffer_in + et_buffered_fd->buffer->in_size_c, et_buffered_fd->buffer->in_size_tb-et_buffered_fd->buffer->in_size_c);
-        if (rsize < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                if (et_buffered_fd->buffer->in_size_tb == et_buffered_fd->buffer->in_size_c) {
-                    retr.failure = false;
-                    retr.partial = false;
-                    retr.status = SUCCESS_EAGNEWBLK;
+        while (true) {
+            ssize_t rsize = read(et_buffered_event_id->event_id, et_buffered_event_id->buffer->buffer_in + et_buffered_event_id->buffer->in_size_c, et_buffered_event_id->buffer->in_size_tb-et_buffered_event_id->buffer->in_size_c);
+            if (rsize < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    if (et_buffered_event_id->buffer->in_size_tb == et_buffered_event_id->buffer->in_size_c) {
+                        retr.failure = false;
+                        retr.partial = false;
+                        retr.status = SUCCESS_EAGNEWBLK;
+                    } else {
+                        retr.failure = false;
+                        retr.partial = true;
+                        retr.status = FAILURE_EAGNEWBLK;
+                    }
+                    break;
                 } else {
-                    retr.failure = false;
+                    oritlsf_free(oritlsf_pool, (void **)&et_buffered_event_id->buffer->buffer_in);
+                    et_buffered_event_id->buffer->read_step = 0;
+                    et_buffered_event_id->buffer->in_size_tb = 0;
+                    et_buffered_event_id->buffer->in_size_c = 0;
+                    retr.failure = true;
                     retr.partial = true;
-                    retr.status = FAILURE_EAGNEWBLK;
+                    retr.status = FAILURE;
+                    break;
                 }
-                break;
-            } else {
-                oritlsf_free(oritlsf_pool, (void **)&et_buffered_fd->buffer->buffer_in);
-                et_buffered_fd->buffer->read_step = 0;
-                et_buffered_fd->buffer->in_size_tb = 0;
-                et_buffered_fd->buffer->in_size_c = 0;
+            } 
+            if (rsize > 0) {
+                et_buffered_event_id->buffer->in_size_c += rsize;
+            }
+            if (rsize == 0) {
+                oritlsf_free(oritlsf_pool, (void **)&et_buffered_event_id->buffer->buffer_in);
+                et_buffered_event_id->buffer->read_step = 0;
+                et_buffered_event_id->buffer->in_size_tb = 0;
+                et_buffered_event_id->buffer->in_size_c = 0;
                 retr.failure = true;
                 retr.partial = true;
                 retr.status = FAILURE;
                 break;
             }
-        } 
-        if (rsize > 0) {
-            et_buffered_fd->buffer->in_size_c += rsize;
-        }
-        if (rsize == 0) {
-            oritlsf_free(oritlsf_pool, (void **)&et_buffered_fd->buffer->buffer_in);
-            et_buffered_fd->buffer->read_step = 0;
-            et_buffered_fd->buffer->in_size_tb = 0;
-            et_buffered_fd->buffer->in_size_c = 0;
-            retr.failure = true;
-            retr.partial = true;
-            retr.status = FAILURE;
-            break;
-        }
-        if (et_buffered_fd->buffer->in_size_tb == et_buffered_fd->buffer->in_size_c) {
-            retr.failure = false;
-            retr.partial = false;
-            retr.status = SUCCESS;
-            break;
+            if (et_buffered_event_id->buffer->in_size_tb == et_buffered_event_id->buffer->in_size_c) {
+                retr.failure = false;
+                retr.partial = false;
+                retr.status = SUCCESS;
+                break;
+            }
         }
     }
     return retr;
