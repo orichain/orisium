@@ -8,7 +8,6 @@
 #include <fips202.h>
 #include <math.h>
 #include <netdb.h>
-#include <sys/_time.h>
 
 #if defined(__NetBSD__)
     #ifndef AI_V4MAPPED
@@ -22,6 +21,7 @@
     #ifndef AI_V4MAPPED
         #define AI_V4MAPPED 0
     #endif
+    #include <sys/_time.h>
     #include <sys/signal.h>
     #include <sys/errno.h>
     #include <sys/endian.h>
