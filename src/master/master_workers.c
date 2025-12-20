@@ -146,7 +146,6 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
             continue;
         }
 		if (wot != SIO || index != ixxxx) {
-            async_delete_event(label, &master_ctx->master_async, &session->upp->uds[0], EIT_FD);
             CLOSE_UDS(&session->upp->uds[0]);
             CLOSE_UDS(&session->upp->uds[1]);
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
@@ -164,7 +163,6 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
             continue;
         }
 		if (wot != LOGIC || index != ixxxx) {
-            async_delete_event(label, &master_ctx->master_async, &session->upp->uds[0], EIT_FD);
             CLOSE_UDS(&session->upp->uds[0]);
             CLOSE_UDS(&session->upp->uds[1]);
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
@@ -182,7 +180,6 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
             continue;
         }
 		if (wot != COW || index != ixxxx) {
-            async_delete_event(label, &master_ctx->master_async, &session->upp->uds[0], EIT_FD);
             CLOSE_UDS(&session->upp->uds[0]);
             CLOSE_UDS(&session->upp->uds[1]);
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
@@ -200,7 +197,6 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
             continue;
         }
 		if (wot != DBR || index != ixxxx) {
-            async_delete_event(label, &master_ctx->master_async, &session->upp->uds[0], EIT_FD);
             CLOSE_UDS(&session->upp->uds[0]);
             CLOSE_UDS(&session->upp->uds[1]);
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
@@ -218,7 +214,6 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
             continue;
         }
 		if (wot != DBW || index != ixxxx) {
-            async_delete_event(label, &master_ctx->master_async, &session->upp->uds[0], EIT_FD);
             CLOSE_UDS(&session->upp->uds[0]);
             CLOSE_UDS(&session->upp->uds[1]);
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
@@ -232,9 +227,7 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
 	}
     oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_c_session);
     oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_c_session);
-    async_delete_event(label, &master_ctx->master_async, &master_ctx->udp_sock, EIT_FD);
     CLOSE_FD(&master_ctx->udp_sock);
-    async_delete_event(label, &master_ctx->master_async, &master_ctx->shutdown_event_fd->event_id, master_ctx->shutdown_event_fd->event_type);
     CLOSE_EVENT_ID(&master_ctx->oritlsf_pool, &master_ctx->shutdown_event_fd);
     if (master_ctx->check_healthy_timer_id.event) {
         oritw_remove_event(label, &master_ctx->oritlsf_pool, &master_ctx->master_async, &master_ctx->timer, &master_ctx->check_healthy_timer_id.event);
