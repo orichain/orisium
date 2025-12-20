@@ -13,6 +13,7 @@
 
 #if defined(__NetBSD__)
     #include <sys/endian.h>
+    #include <sys/errno.h>
 #elif defined(__OpenBSD__)
     #include <sys/endian.h>
     #include <sys/errno.h>
