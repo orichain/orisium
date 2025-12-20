@@ -1,11 +1,11 @@
 #ifndef ORITW_H
 #define ORITW_H
 
-#include <limits.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <sys/limits.h>
 
 #if defined(__NetBSD__)
     #include <sys/common_int_limits.h>

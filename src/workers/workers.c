@@ -166,7 +166,7 @@ void cleanup_worker(worker_context_t *ctx) {
 //----------------------------------------------------------------------
 	int needed = strlen(ctx->label);
     char llabel[needed + 1];
-    strcpy(llabel, ctx->label);
+    strlcpy(llabel, ctx->label, needed + 1);
     oritw_cleanup(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer);
 //----------------------------------------------------------------------
     CLOSE_FD(&ctx->async.async_fd);

@@ -1,7 +1,7 @@
 #include <inttypes.h>
 #include <float.h>
-#include <limits.h>
 #include <stddef.h>
+#include <sys/limits.h>
 
 #include "log.h"
 #include "constants.h"

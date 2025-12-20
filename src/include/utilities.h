@@ -494,7 +494,9 @@ static inline bool is_gc_ctr(const char* label, oritlsf_pool_t *pool, uint8_t *d
 }
 
 static inline double add_jitter(double value) {
-    double jitter_amount = ((double)random() / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
+    uint64_t r;
+    arc4random_buf(&r, sizeof(r));
+    double jitter_amount = (((double)r * 0x1p-64) / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
     value *= (1.0 + jitter_amount);
     return value;
 }

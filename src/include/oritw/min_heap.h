@@ -1,9 +1,9 @@
 #ifndef ORITW_MIN_HEAP_H
 #define ORITW_MIN_HEAP_H
 
-#include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <sys/limits.h>
 
 #include "constants.h"
 

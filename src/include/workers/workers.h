@@ -230,7 +230,7 @@ static inline void calculate_retry(worker_context_t *ctx, void *void_session, wo
             break;
         }
         default:
-            
+            return;
     }
 }
 
@@ -255,7 +255,7 @@ static inline void calculate_rtt(worker_context_t *ctx, void *void_session, work
             break;
         }
         default:
-            
+            return;
     }
 }
 
