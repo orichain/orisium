@@ -1,30 +1,33 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 if [ ! -d ".git" ]; then
-  echo "Error: Ini bukan direktori Git."
-  exit 1
+    echo "Error: Ini bukan direktori Git."
+    exit 1
 fi
 
 FILE_TO_IGNORE="config.json"
 
-echo "Menandai '$FILE_TO_IGNORE' sebagai 'assume-unchanged' secara lokal..."
-git update-index --assume-unchanged "$FILE_TO_IGNORE"
+if [ -f "$FILE_TO_IGNORE" ]; then
+    git update-index --assume-unchanged "$FILE_TO_IGNORE"
+    echo "Info: '$FILE_TO_IGNORE' ditandai sebagai assume-unchanged."
+fi
 
-echo "Staging semua file yang berubah..."
 git add .
 
 echo ""
-read -p "Masukkan Pesan Commit (Contoh: fix(core): Perbaikan logika timeout): " COMMIT_MESSAGE
+printf "Masukkan Pesan Commit: "
+read COMMIT_MESSAGE
 
 if [ -z "$COMMIT_MESSAGE" ]; then
-  echo "Commit dibatalkan: Pesan commit tidak boleh kosong."
-  git reset
-  exit 1
+    echo "Error: Pesan commit kosong, membatalkan..."
+    git reset
+    exit 1
 fi
 
-echo ""
-echo "Membuat commit dengan pesan: '$COMMIT_MESSAGE'"
-git commit -m "$COMMIT_MESSAGE"
-
-echo ""
-echo "Selesai! $FILE_TO_IGNORE sekarang diabaikan secara lokal dan commit telah dibuat."
+if git commit -m "$COMMIT_MESSAGE"; then
+    echo ""
+    echo "Sukses: Commit berhasil dibuat di $(uname -s)."
+else
+    echo "Error: Gagal membuat commit."
+    exit 1
+fi

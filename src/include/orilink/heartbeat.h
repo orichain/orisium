@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <errno.h>
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
     #include <sys/endian.h>
 #else
     #include <endian.h>

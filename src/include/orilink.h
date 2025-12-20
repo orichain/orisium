@@ -10,7 +10,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
-#if defined(__NetBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__)
     #include <sys/endian.h>
     #include <sys/errno.h>
 #elif defined(__FreeBSD__)

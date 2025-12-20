@@ -6,8 +6,12 @@
 #include <string.h>
 
 #if defined(__NetBSD__)
+    #include <endian.h>
+    #include <sys/endian.h>
+#elif defined(__OpenBSD__)
     #include <sys/endian.h>
 #elif defined(__FreeBSD__)
+    #include <endian.h>
     #include <x86/endian.h>
 #else
     #include <endian.h>

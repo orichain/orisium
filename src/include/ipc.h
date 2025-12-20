@@ -12,10 +12,16 @@
 #include <sys/uio.h>
 
 #if defined(__NetBSD__)
+    #include <endian.h>
+    #include <sys/endian.h>
+    #include <sys/errno.h>
+#elif defined(__OpenBSD__)
     #include <sys/endian.h>
     #include <sys/errno.h>
 #elif defined(__FreeBSD__)
+    #include <endian.h>
     #include <x86/endian.h>
+    #include <sys/errno.h>
 #else
     #include <endian.h>
 #endif
