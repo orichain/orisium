@@ -364,7 +364,8 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
     master_ctx->last_sio_rr_idx = 0;
     master_ctx->last_cow_rr_idx = 0;
 	master_ctx->master_pid = 0;
-    master_ctx->udp_sock = -1;
+    master_ctx->ipv4_udp = -1;
+    master_ctx->ipv6_udp = -1;
 //----------------------------------------------------------------------
     generate_uint64_t_id(label, &master_ctx->check_healthy_timer_id.id);
     master_ctx->check_healthy_timer_id.event = NULL;
@@ -466,8 +467,10 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     master_ctx->all_workers_is_ready = false;
     master_ctx->last_sio_rr_idx = 0;
     master_ctx->last_cow_rr_idx = 0;
-    async_delete_event(label, &master_ctx->master_async, &master_ctx->udp_sock, EIT_FD);
-    CLOSE_FD(&master_ctx->udp_sock);
+    async_delete_event(label, &master_ctx->master_async, &master_ctx->ipv4_udp, EIT_FD);
+    CLOSE_FD(&master_ctx->ipv4_udp);
+    async_delete_event(label, &master_ctx->master_async, &master_ctx->ipv6_udp, EIT_FD);
+    CLOSE_FD(&master_ctx->ipv6_udp);
     async_delete_event(label, &master_ctx->master_async, &master_ctx->shutdown_event_fd->event_id, master_ctx->shutdown_event_fd->event_type);
     CLOSE_EVENT_ID(&master_ctx->oritlsf_pool, &master_ctx->shutdown_event_fd);
 //----------------------------------------------------------------------
@@ -546,12 +549,22 @@ void run_master(const char *label, master_context_t *master_ctx) {
                     }
                 }
 				continue;
-			} else if (current_fd == master_ctx->udp_sock) {
+			} else if (current_fd == master_ctx->ipv4_udp) {
                 if (async_event_is_ERR(current_events)) {
-                    CLOSE_FD(&current_fd);
+                    CLOSE_FD(&master_ctx->ipv4_udp);
                 } else {
                     if (async_event_is_IN(current_events)) {
-                        if (handle_master_udp_sock_event(label, master_ctx) != SUCCESS) {
+                        if (handle_master_ipv4_udp_sock_event(label, master_ctx) != SUCCESS) {
+                            continue;
+                        }
+                    }
+                }
+            } else if (current_fd == master_ctx->ipv6_udp) {
+                if (async_event_is_ERR(current_events)) {
+                    CLOSE_FD(&master_ctx->ipv6_udp);
+                } else {
+                    if (async_event_is_IN(current_events)) {
+                        if (handle_master_ipv6_udp_sock_event(label, master_ctx) != SUCCESS) {
                             continue;
                         }
                     }
@@ -746,7 +759,13 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                         master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                         continue;
                                     }	
-                                    if (async_create_in_event(label, &master_ctx->master_async, &master_ctx->udp_sock) != SUCCESS) {
+                                    if (async_create_in_event(label, &master_ctx->master_async, &master_ctx->ipv4_udp) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to async_create_inout_event socket_udp. Initiating graceful shutdown...", label);
+                                        master_ctx->shutdown_requested = 1;
+                                        master_workers_info(label, master_ctx, IT_SHUTDOWN);
+                                        continue;
+                                    }
+                                    if (async_create_in_event(label, &master_ctx->master_async, &master_ctx->ipv6_udp) != SUCCESS) {
                                         LOG_ERROR("%sFailed to async_create_inout_event socket_udp. Initiating graceful shutdown...", label);
                                         master_ctx->shutdown_requested = 1;
                                         master_workers_info(label, master_ctx, IT_SHUTDOWN);

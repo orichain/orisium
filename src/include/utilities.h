@@ -759,6 +759,39 @@ static inline status_t convert_str_to_sockaddr_in6(const char *ip_str, uint16_t 
     return FAILURE;
 }
 
+static inline bool is_ipv4_mapped_in6(const struct sockaddr_in6 *addr) {
+    if (!addr) return false;
+    return IN6_IS_ADDR_V4MAPPED(&addr->sin6_addr);
+}
+
+static inline bool extract_ipv4_from_in6(
+    const struct sockaddr_in6 *addr,
+    struct in_addr *out)
+{
+    if (!addr || !out) return false;
+    if (!IN6_IS_ADDR_V4MAPPED(&addr->sin6_addr)) return false;
+
+    memcpy(&out->s_addr, &addr->sin6_addr.s6_addr[12], sizeof(out->s_addr));
+    return true;
+}
+
+static inline bool convert_ipv4_to_v4mapped_v6(
+    const struct sockaddr_in *src,
+    struct sockaddr_in6 *dst)
+{
+    if (!src || !dst) return false;
+    memset(dst, 0, sizeof(*dst));
+    dst->sin6_family = AF_INET6;
+    dst->sin6_port   = src->sin_port;
+    dst->sin6_addr.s6_addr[10] = 0xff;
+    dst->sin6_addr.s6_addr[11] = 0xff;
+    memcpy(&dst->sin6_addr.s6_addr[12], &src->sin_addr.s_addr, 4);
+#ifdef __OpenBSD__
+    dst->sin6_len = sizeof(*dst);
+#endif
+    return true;
+}
+
 static inline void serialize_sockaddr_in6(const struct sockaddr_in6 *addr, uint8_t *buffer) {
     uint16_t family_be = htobe16(addr->sin6_family);
     uint16_t port_be = htobe16(addr->sin6_port);

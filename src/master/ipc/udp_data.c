@@ -1,5 +1,8 @@
 #include <string.h>
 #include <stdint.h>
+#include <netinet/in.h>
+#include <stdbool.h>
+#include <sys/socket.h>
 
 #include "log.h"
 #include "ipc.h"
@@ -10,6 +13,7 @@
 #include "orilink.h"
 #include "ipc/protocol.h"
 #include "oritlsf.h"
+#include "utilities.h"
 
 status_t handle_master_ipc_udp_data(const char *label, master_context_t *master_ctx, worker_security_t *security, ipc_raw_protocol_t_status_t *ircvdi) {
     worker_type_t rcvd_wot = ircvdi->r_ipc_raw_protocol_t->wot;
@@ -46,13 +50,37 @@ status_t handle_master_ipc_udp_data(const char *label, master_context_t *master_
     uint8_t session_index = iudpi->session_index;
     uint8_t orilink_protocol = iudpi->orilink_protocol;
     uint8_t trycount = iudpi->trycount;
-    ssize_t_status_t send_result = send_orilink_raw_protocol_packet(
-        label,
-        &master_ctx->oritlsf_pool,
-        &orpp,
-        &master_ctx->udp_sock,
-        &iudpi->remote_addr
-    );
+    ssize_t_status_t send_result;
+    bool i4m6 = is_ipv4_mapped_in6(&iudpi->remote_addr);
+    if (i4m6) {
+        struct sockaddr_in remote_addr;
+        memset(&remote_addr, 0, sizeof(remote_addr));
+        remote_addr.sin_family = AF_INET;
+        remote_addr.sin_port = iudpi->remote_addr.sin6_port;
+        extract_ipv4_from_in6(&iudpi->remote_addr, &remote_addr.sin_addr);
+    #ifdef __OpenBSD__
+        remote_addr.sin_len = sizeof(remote_addr);
+    #endif
+        socklen_t addr_len = sizeof(remote_addr);
+        send_result = send_orilink_raw_protocol_packet(
+            label,
+            &master_ctx->oritlsf_pool,
+            &orpp,
+            &master_ctx->ipv4_udp,
+            (const struct sockaddr *)&remote_addr,
+            addr_len
+        );
+    } else {
+        socklen_t addr_len = sizeof(struct sockaddr_in6);
+        send_result = send_orilink_raw_protocol_packet(
+            label,
+            &master_ctx->oritlsf_pool,
+            &orpp,
+            &master_ctx->ipv6_udp,
+            (const struct sockaddr *)&iudpi->remote_addr,
+            addr_len
+        );
+    }
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to send_orilink_raw_protocol_packet.", label);
         CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);

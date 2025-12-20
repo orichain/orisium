@@ -7,7 +7,6 @@
 #include <sys/types.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <netinet/in.h>
 #include <sys/socket.h>
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -869,7 +868,7 @@ static inline p8zs_t *create_orilink_raw_protocol_packet(const char *label, orit
     return result;
 }
 
-static inline ssize_t_status_t send_orilink_raw_protocol_packet(const char *label, oritlsf_pool_t *pool, p8zs_t **pr, int *sock_fd, const struct sockaddr_in6 *dest_addr) {
+static inline ssize_t_status_t send_orilink_raw_protocol_packet(const char *label, oritlsf_pool_t *pool, p8zs_t **pr, int *sock_fd, const struct sockaddr *dest_addr, socklen_t dest_addr_len) {
 	ssize_t_status_t result;
     result.r_ssize_t = 0;
     result.status = FAILURE;
@@ -881,9 +880,8 @@ static inline ssize_t_status_t send_orilink_raw_protocol_packet(const char *labe
 		*pr = NULL;
 		return result;
 	}
-    socklen_t dest_addr_len = sizeof(struct sockaddr_in6);
     do {
-        result.r_ssize_t = sendto(*sock_fd, r->data, r->len, 0, (const struct sockaddr *)dest_addr, dest_addr_len);
+        result.r_ssize_t = sendto(*sock_fd, r->data, r->len, 0, dest_addr, dest_addr_len);
     } while (result.r_ssize_t == -1 && errno == EINTR);
     if (result.r_ssize_t == -1) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -1263,7 +1261,8 @@ static inline orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packe
     const char *label, 
     oritlsf_pool_t *pool,
     int *sock_fd,
-    struct sockaddr_in6 *source_addr
+    struct sockaddr *source_addr,
+    socklen_t source_addr_len
 )
 {
     orilink_raw_protocol_t_status_t result;
@@ -1273,14 +1272,13 @@ static inline orilink_raw_protocol_t_status_t receive_orilink_raw_protocol_packe
         result.status = FAILURE_NOMEM;
         return result;
     }
-    socklen_t source_addr_len = sizeof(struct sockaddr_in6);
     uint8_t temp_buffer[ORILINK_MAX_PACKET_SIZE];
     ssize_t bytes_read_payload = recvfrom(
         *sock_fd, 
         temp_buffer, 
         ORILINK_MAX_PACKET_SIZE, 
         MSG_TRUNC, 
-        (struct sockaddr * restrict)source_addr, &source_addr_len
+        source_addr, &source_addr_len
     );
     const size_t min_size = AES_TAG_BYTES + 
                             sizeof(uint32_t) + 

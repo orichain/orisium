@@ -227,7 +227,8 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
 	}
     oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_c_session);
     oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_c_session);
-    CLOSE_FD(&master_ctx->udp_sock);
+    CLOSE_FD(&master_ctx->ipv4_udp);
+    CLOSE_FD(&master_ctx->ipv6_udp);
     CLOSE_EVENT_ID(&master_ctx->oritlsf_pool, &master_ctx->shutdown_event_fd);
     if (master_ctx->check_healthy_timer_id.event) {
         oritw_remove_event(label, &master_ctx->oritlsf_pool, &master_ctx->master_async, &master_ctx->timer, &master_ctx->check_healthy_timer_id.event);
