@@ -8,17 +8,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#if defined(__NetBSD__)
-    #include <time.h>
-    #include <sys/event.h>
-    #include <sys/errno.h>
-    #include <sys/time.h>
-#elif defined(__OpenBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__)
     #include <sys/event.h>
     #include <sys/errno.h>
 #elif defined(__FreeBSD__)
     #include <sys/event.h>
-    #include <sys/_clock_id.h>
 #else
     #include <time.h>
     #include <sys/epoll.h>
