@@ -14,7 +14,7 @@ endif
 
 COMMON_CFLAGS = -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration $(JSONC_CFLAGS)
 LDFLAGS = -pthread $(JSONC_LIBS) -lm
-CLANG_INCLUDE_DIRS := $(shell echo '' | $(CC) -E -x c - -v < /dev/null 2>&1 | awk '/^ \// {print "-I" $1}')
+CLANG_INCLUDE_DIRS := $(shell echo '' | $(CC) -E -x c - -v 2>&1 | awk '/^ \// { print "-I" $$1 }')
 INCLUDE_DIR = $(CLANG_INCLUDE_DIRS) -I./$(SRC_DIR)/include -I./PQClean -I./PQClean/common -I./lmdb/libraries/liblmdb
 COMMON_CFLAGS += $(INCLUDE_DIR)
 
@@ -148,6 +148,7 @@ libraries:
 ifeq ($(DISTRO_ID),netbsd)
 	$(call install_pkg,clang)
 	@if [ ! -e ./clang ]; then \
+		$(USE_SUDO) $(PKG_MANAGER) -y install llvm; \
 		echo ">> Membuat symlink ./clang..."; \
 		$(USE_SUDO) ln -s /usr/pkg/bin/clang ./clang; \
 	else \
@@ -164,6 +165,7 @@ ifeq ($(DISTRO_ID),netbsd)
 	fi
 else ifeq ($(DISTRO_ID),freebsd)
 	@if [ ! -e ./clang ]; then \
+		$(USE_SUDO) $(PKG_MANAGER) install -y llvm; \
 		echo ">> Membuat symlink ./clang..."; \
 		$(USE_SUDO) ln -s /usr/bin/clang ./clang; \
 	else \
@@ -180,6 +182,11 @@ else ifeq ($(DISTRO_ID),freebsd)
 	fi
 else ifeq ($(DISTRO_ID),openbsd)
 	@if [ ! -e ./clang ]; then \
+		CLLVMVER=$$(clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \
+		echo "================================"; \
+		echo "!!--- PILIH llvm$$CLLVMVER ---!!"; \
+		echo "================================"; \
+		$(USE_SUDO) $(PKG_MANAGER) llvm; \
 		echo ">> Membuat symlink ./clang..."; \
 		$(USE_SUDO) ln -s /usr/bin/clang ./clang; \
 	else \
@@ -201,6 +208,7 @@ else ifeq ($(DISTRO_ID),openbsd)
 else ifeq ($(DISTRO_ID),rocky)
 	$(call install_pkg,clang)
 	@if [ ! -e ./clang ]; then \
+		$(USE_SUDO) $(PKG_MANAGER) -y install llvm; \
 		echo ">> Membuat symlink ./clang..."; \
 		$(USE_SUDO) ln -s /usr/bin/clang ./clang; \
 	else \
@@ -357,18 +365,13 @@ $(IWYU_BIN_PATH):
 			echo "Tidak bisa install dependensi. Distribusi tidak didukung."; \
 			exit 1; \
 		elif [ "$(PKG_MANAGER)" = "pkgin" ]; then \
-			$(USE_SUDO) $(PKG_MANAGER) update && $(USE_SUDO) $(PKG_MANAGER) -y install wget cmake llvm; \
+			$(USE_SUDO) $(PKG_MANAGER) update && $(USE_SUDO) $(PKG_MANAGER) -y install wget cmake; \
 		elif [ "$(PKG_MANAGER)" = "pkg" ]; then \
-			$(USE_SUDO) $(PKG_MANAGER) update && $(USE_SUDO) $(PKG_MANAGER) install -y wget cmake llvm; \
+			$(USE_SUDO) $(PKG_MANAGER) update && $(USE_SUDO) $(PKG_MANAGER) install -y wget cmake; \
 		elif [ "$(PKG_MANAGER)" = "pkg_add" ]; then \
 			$(USE_SUDO) $(PKG_MANAGER) -u && $(USE_SUDO) $(PKG_MANAGER) wget gtar cmake; \
-			CLLVMVER=$$(clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \
-			echo "================================"; \
-			echo "!!--- PILIH llvm$$CLLVMVER ---!!"; \
-			echo "================================"; \
-			$(USE_SUDO) $(PKG_MANAGER) llvm; \
 		elif [ "$(PKG_MANAGER)" = "dnf" ]; then \
-			$(USE_SUDO) $(PKG_MANAGER) update && $(USE_SUDO) $(PKG_MANAGER) -y install wget cmake llvm clang-devel llvm-devel; \
+			$(USE_SUDO) $(PKG_MANAGER) update && $(USE_SUDO) $(PKG_MANAGER) -y install wget cmake clang-devel llvm-devel; \
 		fi; \
 		\
 		CLANG_MAJOR_VER=$$(clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \

@@ -5,12 +5,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <sys/limits.h>
 
-#if defined(__NetBSD__)
-    #include <sys/common_int_limits.h>
-#elif defined(__FreeBSD__)
-    #include <x86/_stdint.h>
+#if defined(__OpenBSD__)
+    #include <sys/limits.h>
+#else
+    #include <limits.h>
+    #if defined(__NetBSD__)
+        #include <sys/common_int_limits.h>
+    #elif defined(__FreeBSD__)
+        #include <x86/_stdint.h>
+    #endif
 #endif
 
 #include "async.h"

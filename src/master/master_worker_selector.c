@@ -1,7 +1,12 @@
 #include <inttypes.h>
 #include <float.h>
 #include <stddef.h>
-#include <sys/limits.h>
+
+#if defined(__OpenBSD__)
+    #include <sys/limits.h>
+#else
+    #include <limits.h>
+#endif
 
 #include "log.h"
 #include "constants.h"
