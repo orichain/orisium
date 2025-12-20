@@ -10,11 +10,13 @@
 #include <signal.h>
 #include <stdio.h>
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__)
     #include <sys/signal.h>
     #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
         #include <pthread_types.h>
     #endif
+#elif defined(__OpenBSD__)
+    #include <sys/signal.h>
 #elif defined(__FreeBSD__)
     #include <sys/signal.h>
     #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
