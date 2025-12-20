@@ -786,7 +786,7 @@ static inline bool convert_ipv4_to_v4mapped_v6(
     dst->sin6_addr.s6_addr[10] = 0xff;
     dst->sin6_addr.s6_addr[11] = 0xff;
     memcpy(&dst->sin6_addr.s6_addr[12], &src->sin_addr.s_addr, 4);
-#ifdef __OpenBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
     dst->sin6_len = sizeof(*dst);
 #endif
     return true;

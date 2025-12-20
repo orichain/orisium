@@ -58,7 +58,7 @@ status_t handle_master_ipc_udp_data(const char *label, master_context_t *master_
         remote_addr.sin_family = AF_INET;
         remote_addr.sin_port = iudpi->remote_addr.sin6_port;
         extract_ipv4_from_in6(&iudpi->remote_addr, &remote_addr.sin_addr);
-    #ifdef __OpenBSD__
+    #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
         remote_addr.sin_len = sizeof(remote_addr);
     #endif
         socklen_t addr_len = sizeof(remote_addr);
