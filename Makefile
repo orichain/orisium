@@ -22,8 +22,7 @@ BUILD_MODE ?= DEVELOPMENT
 DEBUG_MODE ?= DEVELOPMENT
 LOG_TO ?= SCREEN
 ifeq ($(BUILD_MODE), PRODUCTION)
-	FINAL_CFLAGS = $(COMMON_CFLAGS) -O3 -flto -march=native -fomit-frame-pointer -fvectorize -DNDEBUG -DPRODUCTION
-	LDFLAGS += -flto
+	FINAL_CFLAGS = $(COMMON_CFLAGS) -O3 -march=native -fomit-frame-pointer -fvectorize -DNDEBUG -DPRODUCTION
 else
 	ifeq ($(LOG_TO), FILE)
 		FINAL_CFLAGS = $(COMMON_CFLAGS) -g -O3 -Werror -DDEVELOPMENT -DTOFILE
