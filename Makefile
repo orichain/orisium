@@ -37,6 +37,8 @@ ifeq ($(UNAME_S),NetBSD)
 	DISTRO_ID := netbsd
 else ifeq ($(UNAME_S),FreeBSD)
 	DISTRO_ID := freebsd
+else ifeq ($(UNAME_S),OpenBSD)
+	DISTRO_ID := openbsd
 else
 	DISTRO_ID := $(shell . /etc/os-release 2>/dev/null && echo $$ID || echo unknown)
 endif
@@ -44,7 +46,8 @@ endif
 PKG_MANAGER := $(shell \
 	if [ "$(DISTRO_ID)" = "netbsd" ]; then echo "pkgin"; \
 	elif [ "$(DISTRO_ID)" = "freebsd" ]; then echo "pkg"; \
-	elif [ "$(DISTRO_ID)" = "rocky" ] || [ "$(DISTRO_ID)" = "fedora" ]; then echo "dnf"; \
+	elif [ "$(DISTRO_ID)" = "openbsd" ]; then echo "pkg_add"; \
+	elif [ "$(DISTRO_ID)" = "rocky" ]; then echo "dnf"; \
 	else echo "unsupported"; fi)
 
 USE_SUDO := $(shell command -v sudo >/dev/null 2>&1 && echo sudo || echo "")
@@ -111,22 +114,29 @@ define install_pkg
 		if pkg_info -e $(1) >/dev/null 2>&1; then \
 			echo ">> $(1) sudah terinstal (paket)."; \
 		else \
-			echo ">> Menginstal $(1) via pkgin..."; \
-			$(USE_SUDO) pkgin -y install $(1) || true; \
+			echo ">> Menginstal $(1) via $(PKG_MANAGER)..."; \
+			$(USE_SUDO) $(PKG_MANAGER) -y install $(1) || true; \
 		fi; \
 	elif [ "$(PKG_MANAGER)" = "pkg" ]; then \
 		if pkg info -e $(1) >/dev/null 2>&1; then \
 			echo ">> $(1) sudah terinstal (paket)."; \
 		else \
-			echo ">> Menginstal $(1) via pkg..."; \
-			$(USE_SUDO) pkg install -y $(1) || true; \
+			echo ">> Menginstal $(1) via $(PKG_MANAGER)..."; \
+			$(USE_SUDO) $(PKG_MANAGER) install -y $(1) || true; \
+		fi; \
+	elif [ "$(PKG_MANAGER)" = "pkg_add" ]; then \
+		if pkg_info -e $(1)-* >/dev/null 2>&1; then \
+			echo ">> $(1) sudah terinstal (paket)."; \
+		else \
+			echo ">> Menginstal $(1) via $(PKG_MANAGER)..."; \
+			$(USE_SUDO) $(PKG_MANAGER) $(1) || true; \
 		fi; \
 	elif [ "$(PKG_MANAGER)" = "dnf" ]; then \
 		if dnf list installed $(1) >/dev/null 2>&1; then \
 			echo ">> $(1) sudah terinstal (paket)."; \
 		else \
-			echo ">> Menginstal $(1) via dnf..."; \
-			$(USE_SUDO) dnf -y install $(1) || true; \
+			echo ">> Menginstal $(1) via $(PKG_MANAGER)..."; \
+			$(USE_SUDO) $(PKG_MANAGER) -y install $(1) || true; \
 		fi; \
 	else \
 		echo "!! Package manager tidak dikenali."; \
@@ -163,6 +173,32 @@ else ifeq ($(DISTRO_ID),freebsd)
 	$(call install_pkg,json-c)
 	$(call install_pkg,pkgconf)
 	$(call install_pkg,python3)
+	@if [ ! -e ./python ]; then \
+		echo ">> Membuat symlink ./python..."; \
+		$(USE_SUDO) ln -s /usr/local/bin/python3 ./python; \
+	else \
+		echo ">> ./python sudah ada."; \
+	fi
+else ifeq ($(DISTRO_ID),openbsd)
+	@if [ ! -e ./gcc ]; then \
+		echo "======================================"; \
+		echo "!!--- PILIH gcc11 / LEBIH TINGGI ---!!"; \
+		echo "======================================"; \
+	fi
+	$(call install_pkg,gcc)
+	@if [ ! -e ./gcc ]; then \
+		echo ">> Membuat symlink ./gcc..."; \
+		$(USE_SUDO) ln -s /usr/local/bin/egcc ./gcc; \
+	else \
+		echo ">> ./gcc sudah ada."; \
+	fi
+	$(call install_pkg,json-c)
+	@if [ ! -e ./python ]; then \
+		echo "========================="; \
+		echo "!!--- PILIH python3 ---!!"; \
+		echo "========================="; \
+	fi
+	$(call install_pkg,python)
 	@if [ ! -e ./python ]; then \
 		echo ">> Membuat symlink ./python..."; \
 		$(USE_SUDO) ln -s /usr/local/bin/python3 ./python; \
@@ -327,23 +363,43 @@ $(IWYU_BIN_PATH):
 			echo "Tidak bisa install dependensi. Distribusi tidak didukung."; \
 			exit 1; \
 		elif [ "$(PKG_MANAGER)" = "pkgin" ]; then \
-			$(USE_SUDO) pkgin update && $(USE_SUDO) pkgin -y install wget cmake clang llvm; \
+			$(USE_SUDO) $(PKG_MANAGER) update && $(USE_SUDO) $(PKG_MANAGER) -y install wget cmake clang llvm; \
 		elif [ "$(PKG_MANAGER)" = "pkg" ]; then \
-			$(USE_SUDO) pkg update && $(USE_SUDO) pkg install -y wget cmake llvm; \
-		elif [ "$(PKG_MANAGER)" = "dnf" ] || [ "$(PKG_MANAGER)" = "yum" ]; then \
-			$(USE_SUDO) $(PKG_MANAGER) -y install wget cmake clang llvm clang-devel llvm-devel || true; \
+			$(USE_SUDO) $(PKG_MANAGER) update && $(USE_SUDO) $(PKG_MANAGER) install -y wget cmake llvm; \
+		elif [ "$(PKG_MANAGER)" = "pkg_add" ]; then \
+			$(USE_SUDO) $(PKG_MANAGER) -u && $(USE_SUDO) $(PKG_MANAGER) wget gtar cmake; \
+			CLLVMVER=$$(clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \
+			echo "================================"; \
+			echo "!!--- PILIH llvm$$CLLVMVER ---!!"; \
+			echo "================================"; \
+			$(USE_SUDO) $(PKG_MANAGER) llvm; \
+		elif [ "$(PKG_MANAGER)" = "dnf" ]; then \
+			$(USE_SUDO) $(PKG_MANAGER) update && $(USE_SUDO) $(PKG_MANAGER) -y install wget cmake clang llvm clang-devel llvm-devel; \
 		fi; \
 		\
 		CLANG_MAJOR_VER=$$(clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \
 		IWYU_VER=$$(expr $$CLANG_MAJOR_VER + 4); \
 		echo "Deteksi Clang versi $$CLANG_MAJOR_VER"; \
 		\
-		LLVM_ROOT=$$(if [ "$(DISTRO_ID)" = "freebsd" ]; then echo "/usr/local/llvm$$CLANG_MAJOR_VER"; else echo "/usr"; fi); \
-		LLVM_CMAKE_DIR=$$(if [ "$(DISTRO_ID)" = "freebsd" ]; then echo "$$LLVM_ROOT/lib/cmake/llvm"; else echo "/usr/lib64/cmake/llvm"; fi); \
-		CLANG_CMAKE_DIR=$$(if [ "$(DISTRO_ID)" = "freebsd" ]; then echo "$$LLVM_ROOT/lib/cmake/clang"; else echo ""; fi); \
+		LLVM_ROOT=$$(if [ "$(DISTRO_ID)" = "freebsd" ] || [ "$(DISTRO_ID)" = "openbsd" ]; \
+			then echo "/usr/local/llvm$$CLANG_MAJOR_VER"; \
+			else echo "/usr"; \
+			fi); \
+		LLVM_CMAKE_DIR=$$(if [ "$(DISTRO_ID)" = "freebsd" ] || [ "$(DISTRO_ID)" = "openbsd" ]; \
+			then echo "$$LLVM_ROOT/lib/cmake/llvm"; \
+			else echo "/usr/lib64/cmake/llvm"; \
+			fi); \
+		CLANG_CMAKE_DIR=$$(if [ "$(DISTRO_ID)" = "freebsd" ] || [ "$(DISTRO_ID)" = "openbsd" ]; \
+			then echo "$$LLVM_ROOT/lib/cmake/clang"; \
+			else echo ""; \
+			fi); \
 		\
-		wget -q -O iwyu.tar.gz https://github.com/include-what-you-use/include-what-you-use/archive/refs/tags/0.$$IWYU_VER.tar.gz && \
-		tar -xzf iwyu.tar.gz -C iwyu --strip-components=1 && \
+		wget -q -O iwyu.tar.gz https://github.com/include-what-you-use/include-what-you-use/archive/refs/tags/0.$$IWYU_VER.tar.gz; \
+		if [ "$(DISTRO_ID)" = "openbsd" ]; then \
+			gtar -xzf iwyu.tar.gz -C iwyu --strip-components=1; \
+		else \
+			tar -xzf iwyu.tar.gz -C iwyu --strip-components=1; \
+		fi; \
 		rm -f iwyu.tar.gz && \
 		cd $(IWYU_DIR) && \
 		mkdir -p $(IWYU_BUILD) && \
@@ -357,7 +413,7 @@ $(IWYU_BIN_PATH):
 		-DLLVM_DIR=$$LLVM_CMAKE_DIR \
 		$$( [ -n "$$CLANG_CMAKE_DIR" ] && echo "-DClang_DIR=$$CLANG_CMAKE_DIR" ) \
 		.. && \
-		$(MAKE) -j4; \
+		$(MAKE) -j2; \
 	else \
 		echo "IWYU sudah tersedia."; \
 	fi
