@@ -29,6 +29,7 @@
 #include "master/master.h"
 #include "utilities.h"
 #include "types.h"
+#include "globals.h"
 
 int main() {
 	printf("[Orisium]: ==========================================================\n");
@@ -94,7 +95,8 @@ int main() {
 exit1:
     cleanup_master("[Master]: ", &master_ctx);
 exit2:
-#if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))    
+#if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
+    shutdown_requested = 1;
 	pthread_join(cleaner_thread, NULL);
     log_close();
 #endif
