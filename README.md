@@ -101,7 +101,7 @@ Internal communication (`master` $\leftrightarrow$ `logic` $\leftrightarrow$ `co
 
 ## Installation
 
-The main development and testing environment currently uses **NetBSD-10.1**, **FreeBSD-15.0** and **Rocky-10.1**.
+The main development and testing environment currently uses **OpenBSD-7.8**, **NetBSD-10.1**, **FreeBSD-15.0** and **Rocky-10.1**.
 
 ```bash
 git clone https://github.com/orichain/orisium.git
