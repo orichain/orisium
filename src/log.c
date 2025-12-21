@@ -118,7 +118,7 @@
 				if (grtns_result.status == SUCCESS) {
 					current_time = grtns_result.r_uint64_t;
 					if ((current_time - start_time) > clean_every) {
-						cleanup_old_logs(7);
+						if (!shutdown_requested) cleanup_old_logs(7);
 						start_time = current_time;
 					}
 					if (sleep_s(1) != SUCCESS) {
