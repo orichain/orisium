@@ -560,7 +560,7 @@ status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_pro
 // Temporary Key
 //----------------------------------------------------------------------
     uint8_t aes_key[HASHES_BYTES];
-    kdf(aes_key, HASHES_BYTES, worker_ctx->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, "aes_key");
+    kdf(aes_key, HASHES_BYTES, worker_ctx->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, (uint8_t *)"aes_key", 7);
     uint8_t local_nonce[AES_NONCE_BYTES];
     if (generate_nonce(worker_ctx->label, local_nonce) != SUCCESS) {
         LOG_ERROR("%sFailed to generate_nonce. Worker error. Initiating graceful shutdown...", worker_ctx->label);
@@ -572,7 +572,7 @@ status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_pro
 //----------------------------------------------------------------------
 // HELLO2 Memakai mac_key baru
 //----------------------------------------------------------------------
-	kdf(worker_ctx->mac_key, HASHES_BYTES, worker_ctx->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, "mac_key");
+	kdf(worker_ctx->mac_key, HASHES_BYTES, worker_ctx->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, (uint8_t *)"mac_key", 7);
 //----------------------------------------------------------------------
     uint8_t wot_index[sizeof(uint8_t) + sizeof(uint8_t)];
     uint8_t encrypted_wot_index[sizeof(uint8_t) + sizeof(uint8_t)];   
@@ -667,7 +667,7 @@ status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_pro
 // Tmp aes_key
 //----------------------------------------------------------------------
     uint8_t aes_key[HASHES_BYTES];
-    kdf(aes_key, HASHES_BYTES, worker_ctx->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, "aes_key");
+    kdf(aes_key, HASHES_BYTES, worker_ctx->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, (uint8_t *)"aes_key", 7);
 //----------------------------------------------------------------------
 // cek Mac
 //----------------------------------------------------------------------  
@@ -1069,7 +1069,7 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
 //----------------------------------------------------------------------
 // Temporary Key
 //----------------------------------------------------------------------
-	kdf(aes_key, HASHES_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, "aes_key");
+	kdf(aes_key, HASHES_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, (uint8_t *)"aes_key", 7);
 //----------------------------------------------------------------------
 // cek Mac
 //----------------------------------------------------------------------  
@@ -1332,8 +1332,8 @@ status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ip
 		int remote_needed = snprintf(NULL, 0, "remote_nonce_data_%d", illp);
 		char remote_info[remote_needed + 1];
 		snprintf(remote_info, remote_needed + 1, "remote_nonce_data_%d", illp);  
-		kdf(security->local_data_nonce[illp], AES_NONCE_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, local_info);
-		kdf(security->remote_data_nonce[illp], AES_NONCE_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, remote_info);
+		kdf(security->local_data_nonce[illp], AES_NONCE_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, (uint8_t *)local_info, local_needed);
+		kdf(security->remote_data_nonce[illp], AES_NONCE_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, (uint8_t *)remote_info, remote_needed);
 		security->local_data_ctr[illp] = security->local_ctr;
 		security->remote_data_ctr[illp] = security->remote_ctr;
 	}
@@ -1443,7 +1443,7 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
 //======================================================================
         memcpy(security->local_nonce, tmp_local_nonce, AES_NONCE_BYTES);
         memset(tmp_local_nonce, 0, AES_NONCE_BYTES);
-        kdf(security->mac_key, HASHES_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, "mac_key");
+        kdf(security->mac_key, HASHES_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, (uint8_t *)"mac_key", 7);
 //----------------------------------------------------------------------
         return SUCCESS;
     }
@@ -1560,7 +1560,7 @@ status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ip
 // 1. HELLO4 harus sudah pakai mac_key baru
 // 2. HELLO4 harus masih memakai aes_key lama
 //----------------------------------------------------------------------
-    kdf(security->mac_key, HASHES_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, "mac_key");
+    kdf(security->mac_key, HASHES_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, (uint8_t *)"mac_key", 7);
 //======================================================================
     session->hello3_ack.rcvd_time = current_time.r_uint64_t;
     uint64_t interval_ull;
@@ -2040,7 +2040,7 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
 // Tmp aes_key
 //----------------------------------------------------------------------
     uint8_t aes_key[HASHES_BYTES];
-    kdf(aes_key, HASHES_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, "aes_key");
+    kdf(aes_key, HASHES_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, (uint8_t *)"aes_key", 7);
 //----------------------------------------------------------------------
 // cek Mac
 //----------------------------------------------------------------------  
@@ -2271,14 +2271,14 @@ status_t handle_workers_ipc_udp_data_sio_hello4_ack(worker_context_t *worker_ctx
     identity->remote_id = remote_id;
     security->remote_ctr = remote_ctr;
     for (uint16_t illp=0;illp<PARALLEL_DATA_WINDOW_SIZE;++illp) {
-		int local_needed = snprintf(NULL, 0, "local_nonce_data_%d", illp);
+        int local_needed = snprintf(NULL, 0, "local_nonce_data_%d", illp);
 		char local_info[local_needed + 1];
 		snprintf(local_info, local_needed + 1, "local_nonce_data_%d", illp);  
 		int remote_needed = snprintf(NULL, 0, "remote_nonce_data_%d", illp);
 		char remote_info[remote_needed + 1];
 		snprintf(remote_info, remote_needed + 1, "remote_nonce_data_%d", illp);  
-		kdf(security->local_data_nonce[illp], AES_NONCE_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, local_info);
-		kdf(security->remote_data_nonce[illp], AES_NONCE_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, remote_info);
+		kdf(security->local_data_nonce[illp], AES_NONCE_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, (uint8_t *)local_info, local_needed);
+		kdf(security->remote_data_nonce[illp], AES_NONCE_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, (uint8_t *)remote_info, remote_needed);
 		security->local_data_ctr[illp] = security->local_ctr;
 		security->remote_data_ctr[illp] = security->remote_ctr;
 	}
@@ -2394,7 +2394,7 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
 //----------------------------------------------------------------------
 // Temporary Key
 //----------------------------------------------------------------------
-	kdf(aes_key, HASHES_BYTES, kem_sharedsecret, KEM_SHAREDSECRET_BYTES, "aes_key");
+	kdf(aes_key, HASHES_BYTES, kem_sharedsecret, KEM_SHAREDSECRET_BYTES, (uint8_t *)"aes_key", 7);
     if (generate_nonce(worker_ctx->label, local_nonce) != SUCCESS) {
         LOG_ERROR("%sFailed to generate_nonce.", worker_ctx->label);
         CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
@@ -2404,7 +2404,7 @@ status_t handle_workers_ipc_udp_data_sio_hello3_ack(worker_context_t *worker_ctx
 //----------------------------------------------------------------------
 // HELLO4 Memakai mac_key baru
 //----------------------------------------------------------------------
-	kdf(mac_key, HASHES_BYTES, kem_sharedsecret, KEM_SHAREDSECRET_BYTES, "mac_key");
+	kdf(mac_key, HASHES_BYTES, kem_sharedsecret, KEM_SHAREDSECRET_BYTES, (uint8_t *)"mac_key", 7);
 //----------------------------------------------------------------------
     uint8_t local_identity[
         sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint64_t)

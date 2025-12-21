@@ -74,7 +74,7 @@ status_t handle_master_ipc_hello1(const char *label, master_context_t *master_ct
 // 1. HELLO2 harus sudah pakai mac_key baru
 // 2. HELLO2 harus masih memakai aes_key lama
 //----------------------------------------------------------------------
-    kdf(security->mac_key, HASHES_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, "mac_key");
+    kdf(security->mac_key, HASHES_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, (uint8_t *)"mac_key", 7);
 //----------------------------------------------------------------------
     security->hello1_rcvd = true;
     CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);

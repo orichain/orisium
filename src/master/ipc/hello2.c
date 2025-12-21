@@ -60,7 +60,7 @@ status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ct
 // Temporary Key
 //----------------------------------------------------------------------
     uint8_t aes_key[HASHES_BYTES];
-    kdf(aes_key, HASHES_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, "aes_key");
+    kdf(aes_key, HASHES_BYTES, security->kem_sharedsecret, KEM_SHAREDSECRET_BYTES, (uint8_t *)"aes_key", 7);
 //----------------------------------------------------------------------
 // cek Mac
 //----------------------------------------------------------------------  

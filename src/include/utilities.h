@@ -129,6 +129,35 @@ static inline void oritw_sort_uint64(uint64_t *arr, size_t n) {
     #endif
 }
 
+static inline int hexchr2bin(char c, uint8_t *out) {
+    if (__builtin_expect(out == NULL, 0)) return 0;
+    uint8_t v = (uint8_t)c;
+    uint8_t d = (uint8_t)(v - '0');
+    uint8_t u = (uint8_t)(v - 'A');
+    uint8_t l = (uint8_t)(v - 'a');
+    uint8_t is_d = (uint8_t)(d <= 9);
+    uint8_t is_u = (uint8_t)(u <= 5);
+    uint8_t is_l = (uint8_t)(l <= 5);
+    *out = (uint8_t)((is_d * d) |
+                     (is_u * (u + 10)) |
+                     (is_l * (l + 10)));
+    return (is_d | is_u | is_l);
+}
+
+static inline int hexs2bin(const char *hex, size_t hexlen, uint8_t *out, size_t outlen) {
+    if (__builtin_expect(!hex || !out, 0)) return -1;
+    if (__builtin_expect(hexlen < outlen * 2, 0)) return -1;
+    for (size_t i = 0; i < outlen; i++) {
+        uint8_t hi, lo;
+        if (!hexchr2bin(hex[2*i], &hi) ||
+            !hexchr2bin(hex[2*i + 1], &lo))
+            return -1;
+
+        out[i] = (uint8_t)((hi << 4) | lo);
+    }
+    return 0;
+}
+
 static inline void get_time_str(char *buf, size_t len) {
     time_t t = time(NULL);
     struct tm tm_info;
@@ -211,7 +240,7 @@ static inline status_t encrypt_decrypt_256(
  * the counter is processed logically (1, 2, 3, etc.), preventing byte-ordering 
  * confusion regardless of the Host system's native endianness (e.g., big-endian systems).
 */
-    uint32_t ctr_le = htole32(*(uint32_t *)ctr);
+    uint32_t ctr_le = htole32(*ctr);
     memcpy(iv + AES_NONCE_BYTES, &ctr_le, sizeof(uint32_t));
     aes256_ctr(keystream_buffer, data_len, iv, &aes_ctx);
     for (size_t i = 0; i < data_len; i++) {
@@ -252,7 +281,7 @@ static status_t encrypt_decrypt_128(
  * the counter is processed logically (1, 2, 3, etc.), preventing byte-ordering 
  * confusion regardless of the Host system's native endianness (e.g., big-endian systems).
 */
-    uint32_t ctr_le = htole32(*(uint32_t *)ctr);
+    uint32_t ctr_le = htole32(*ctr);
     memcpy(iv + AES_NONCE_BYTES, &ctr_le, sizeof(uint32_t));
     aes128_ctr(keystream_buffer, data_len, iv, &aes_ctx);
     for (size_t i = 0; i < data_len; i++) {
@@ -605,40 +634,43 @@ static inline bool is_1lower_ctr(const char* label, oritlsf_pool_t *pool, uint8_
     return islwr;
 }
 
-static inline void kdf(
-    uint8_t *out, size_t outlen,
+static inline int kdf(uint8_t *out, size_t outlen,
     const uint8_t *key, size_t key_len,
-    const char *info_string
-)
+    const uint8_t *info, size_t info_len)
 {
+    if ((key_len > UINT32_MAX) ||
+        (info_len > UINT32_MAX))
+        return -1;
+    if (!out && outlen)
+        return -1;
     shake256incctx st;
-    size_t info_len = info_string ? strlen(info_string) : 0;
     uint8_t buffer[4];
     shake256_inc_init(&st);
     const uint8_t tag = 0xFF;
     shake256_inc_absorb(&st, &tag, 1);
-    uint8_t key_header = 0x01;
+    const uint8_t key_header = 0x01;
     shake256_inc_absorb(&st, &key_header, 1);
-    uint32_t klen_be = (uint32_t)key_len;
-    buffer[0] = (uint8_t)(klen_be >> 24);
-    buffer[1] = (uint8_t)(klen_be >> 16);
-    buffer[2] = (uint8_t)(klen_be >> 8);
-    buffer[3] = (uint8_t)(klen_be);
+    buffer[0] = (uint8_t)(key_len >> 24);
+    buffer[1] = (uint8_t)(key_len >> 16);
+    buffer[2] = (uint8_t)(key_len >> 8);
+    buffer[3] = (uint8_t)(key_len);
     shake256_inc_absorb(&st, buffer, 4);
-    if (key && key_len) shake256_inc_absorb(&st, key, key_len);
-    uint8_t info_header = 0x02;
+    if (key && key_len)
+        shake256_inc_absorb(&st, key, key_len);
+    const uint8_t info_header = 0x02;
     shake256_inc_absorb(&st, &info_header, 1);
-    uint32_t ilen_be = (uint32_t)info_len;
-    buffer[0] = (uint8_t)(ilen_be >> 24);
-    buffer[1] = (uint8_t)(ilen_be >> 16);
-    buffer[2] = (uint8_t)(ilen_be >> 8);
-    buffer[3] = (uint8_t)(ilen_be);
+    buffer[0] = (uint8_t)(info_len >> 24);
+    buffer[1] = (uint8_t)(info_len >> 16);
+    buffer[2] = (uint8_t)(info_len >> 8);
+    buffer[3] = (uint8_t)(info_len);
     shake256_inc_absorb(&st, buffer, 4);
-    if (info_len) shake256_inc_absorb(&st, (const uint8_t *)info_string, info_len);
+    if (info && info_len)
+        shake256_inc_absorb(&st, info, info_len);
     shake256_inc_finalize(&st);
     shake256_inc_squeeze(out, outlen, &st);
     shake256_inc_ctx_release(&st);
-    memset(buffer, 0, sizeof(buffer));
+    explicit_bzero(buffer, sizeof(buffer));
+    return 0;
 }
 
 static inline status_t generate_nonce(const char* label, uint8_t *out_nonce) {

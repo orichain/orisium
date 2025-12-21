@@ -29,6 +29,7 @@
 #include "master/master.h"
 #include "utilities.h"
 #include "types.h"
+#include "pqc.h"
 
 int main() {
 	printf("[Orisium]: ==========================================================\n");
@@ -56,8 +57,19 @@ int main() {
 //======================================================================
 	master_context_t master_ctx;
     master_ctx.listen_port = (uint16_t)0;
+    uint8_t config_bsignature[SIGN_GENERATE_SIGNATURE_BBYTES];
+    uint8_t config_signature[SIGN_GENERATE_SIGNATURE_BBYTES];
     memset(&master_ctx.bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
-    if (read_listen_port_and_bootstrap_nodes_from_json("[Orisium]: ", "config.json", &master_ctx.listen_port, &master_ctx.bootstrap_nodes) != SUCCESS) {
+    if (read_listen_port_and_bootstrap_nodes_from_json(
+        "[Orisium]: ", 
+        "config.json", 
+        &master_ctx.listen_port, 
+        config_bsignature,
+        config_signature,
+        &master_ctx.bootstrap_nodes
+        ) != SUCCESS
+    )
+    {
         LOG_ERROR("[Master]: Gagal membaca konfigurasi dari %s.", "config.json");
         goto exit;
     }
