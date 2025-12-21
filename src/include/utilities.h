@@ -17,6 +17,7 @@
     #include <sys/errno.h>
     #include <sys/time.h>
     #include <sys/endian.h>
+    #include <sys/common_int_limits.h>
 #elif defined(__OpenBSD__)
     #ifndef AI_V4MAPPED
         #define AI_V4MAPPED 0
@@ -29,6 +30,8 @@
     #include <sys/signal.h>
     #include <sys/_clock_id.h>
     #include <x86/endian.h>
+    #include <strings.h>
+    #include <x86/_stdint.h>
 #else
     #include <endian.h>
     #include <stddef.h>
@@ -685,7 +688,11 @@ static inline int kdf(uint8_t *out, size_t outlen,
     shake256_inc_finalize(&st);
     shake256_inc_squeeze(out, outlen, &st);
     shake256_inc_ctx_release(&st);
+#if defined(__NetBSD__)
+    explicit_memset(buffer, 0, sizeof(buffer));
+#else
     explicit_bzero(buffer, sizeof(buffer));
+#endif
     return 0;
 }
 
