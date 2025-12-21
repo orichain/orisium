@@ -64,6 +64,7 @@ status_t read_listen_port_and_bootstrap_nodes_from_json(
     struct json_object *bnodes_obj = NULL;
     struct json_object *bsignature_obj = NULL;
     struct json_object *signature_obj = NULL;
+    struct json_object *time_obj = NULL;
     uint8_t n_signature[SIGN_GENERATE_SIGNATURE_BBYTES];
     uint8_t c_signature[SIGN_GENERATE_SIGNATURE_BBYTES];
     uint8_t gns_publickey[SIGN_PUBLICKEY_BYTES];
@@ -90,6 +91,14 @@ status_t read_listen_port_and_bootstrap_nodes_from_json(
         if (root_obj == NULL) {
             LOG_ERROR("%sGagal mem-parsing JSON dari file: %s", label, filename);
             return FAILURE;
+        }
+        if (json_object_object_get_ex(root_obj, "timestamp", &time_obj)) {
+            const char *config_time = json_object_get_string(time_obj);
+            if (strcmp(config_time, GENESIS_MIN_TSTMP) < 0) {
+                LOG_ERROR("%sKonfigurasi terlalu lama (outdated). Minimal: %s", label, GENESIS_MIN_TSTMP);
+                json_object_put(root_obj);
+                return FAILURE;
+            }
         }
         if (!json_object_object_get_ex(root_obj, "listen", &listen_obj) || !json_object_is_type(listen_obj, json_type_int)) {
             LOG_ERROR("%sKunci 'listen' tidak ditemukan atau tidak valid.", label);

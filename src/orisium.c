@@ -14,13 +14,22 @@
     #include <sys/signal.h>
     #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
         #include <pthread_types.h>
+        #include "globals.h"
     #endif
 #elif defined(__OpenBSD__)
     #include <sys/signal.h>
+    #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
+        #include "globals.h"
+    #endif
 #elif defined(__FreeBSD__)
     #include <sys/signal.h>
     #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
         #include <sys/_pthreadtypes.h>
+        #include "globals.h"
+    #endif
+#else
+    #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
+        #include "globals.h"
     #endif
 #endif
 
@@ -29,7 +38,6 @@
 #include "master/master.h"
 #include "utilities.h"
 #include "types.h"
-#include "globals.h"
 
 int main() {
 	printf("[Orisium]: ==========================================================\n");
