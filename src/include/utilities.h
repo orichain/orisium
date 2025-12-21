@@ -146,16 +146,32 @@ static inline int hexchr2bin(char c, uint8_t *out) {
 
 static inline int hexs2bin(const char *hex, size_t hexlen, uint8_t *out, size_t outlen) {
     if (__builtin_expect(!hex || !out, 0)) return -1;
-    if (__builtin_expect(hexlen < outlen * 2, 0)) return -1;
+    if (__builtin_expect(hexlen / 2 < outlen, 0)) return -1;
     for (size_t i = 0; i < outlen; i++) {
         uint8_t hi, lo;
         if (!hexchr2bin(hex[2*i], &hi) ||
-            !hexchr2bin(hex[2*i + 1], &lo))
-            return -1;
-
+            !hexchr2bin(hex[2*i + 1], &lo)) return -1;
         out[i] = (uint8_t)((hi << 4) | lo);
     }
     return 0;
+}
+
+static inline void bin2hexs(const uint8_t *bin, size_t binlen, char *out) {
+    if (__builtin_expect(!bin || !out, 0)) return;
+    for (size_t i = 0; i < binlen; i++) {
+        uint8_t nibbles[2];
+        nibbles[0] = bin[i] >> 4; 
+        nibbles[1] = bin[i] & 0x0F;
+
+        for (int j = 0; j < 2; j++) {
+            uint8_t v = nibbles[j];
+            uint8_t is_digit = (uint8_t)(v <= 9);
+            uint8_t is_letter = (uint8_t)(v >= 10);
+            out[i * 2 + j] = (char)((is_digit * ('0' + v)) | 
+                                    (is_letter * ('a' + (v - 10))));
+        }
+    }
+    out[binlen * 2] = '\0';
 }
 
 static inline void get_time_str(char *buf, size_t len) {

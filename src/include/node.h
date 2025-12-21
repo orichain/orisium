@@ -16,8 +16,6 @@ status_t read_listen_port_and_bootstrap_nodes_from_json(
     const char* label, 
     const char* filename, 
     uint16_t *listen_port,
-    uint8_t *bootstrap_signature, 
-    uint8_t *config_signature,
     bootstrap_nodes_t* bootstrap_nodes
 );
 

@@ -29,7 +29,6 @@
 #include "master/master.h"
 #include "utilities.h"
 #include "types.h"
-#include "pqc.h"
 
 int main() {
 	printf("[Orisium]: ==========================================================\n");
@@ -43,7 +42,7 @@ int main() {
 //======================================================================
 // Configuring node and bootstrap
 //======================================================================
-	if (ensure_directory_exists("[Orisium]: ", "./database") != SUCCESS) goto exit;
+	if (ensure_directory_exists("[Orisium]: ", "./database") != SUCCESS) goto exit2;
 //======================================================================
 // Install sigint handler
 //======================================================================    
@@ -57,21 +56,17 @@ int main() {
 //======================================================================
 	master_context_t master_ctx;
     master_ctx.listen_port = (uint16_t)0;
-    uint8_t config_bsignature[SIGN_GENERATE_SIGNATURE_BBYTES];
-    uint8_t config_signature[SIGN_GENERATE_SIGNATURE_BBYTES];
     memset(&master_ctx.bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
     if (read_listen_port_and_bootstrap_nodes_from_json(
         "[Orisium]: ", 
         "config.json", 
         &master_ctx.listen_port, 
-        config_bsignature,
-        config_signature,
         &master_ctx.bootstrap_nodes
         ) != SUCCESS
     )
     {
         LOG_ERROR("[Master]: Gagal membaca konfigurasi dari %s.", "config.json");
-        goto exit;
+        goto exit2;
     }
     printf("[Master]: --- Node Configuration ---\n");
     printf("[Master]: Listen Port: %d\n", master_ctx.listen_port);
@@ -86,18 +81,19 @@ int main() {
                           );
         if (getname_res != 0) {
             LOG_ERROR("[Master]: getnameinfo failed. %s", strerror(errno));
-            goto exit;
+            goto exit2;
         }
         printf("[Master]:   - Node %d: IP %s, Port %s\n", i + 1, host_str, port_str);
     }
     printf("[Master]: -------------------------\n");
-    if (setup_master("[Master]: ", &master_ctx) != SUCCESS) goto exit;
+    if (setup_master("[Master]: ", &master_ctx) != SUCCESS) goto exit1;
     run_master("[Master]: ", &master_ctx);
 //======================================================================
 // Cleanup
 //======================================================================
-exit:
+exit1:
     cleanup_master("[Master]: ", &master_ctx);
+exit2:
 #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))    
 	pthread_join(cleaner_thread, NULL);
     log_close();
@@ -105,6 +101,5 @@ exit:
 	printf("[Orisium]: ==========================================================\n");
     printf("[Orisium]: Orisium selesai dijalankan.\n");
     printf("[Orisium]: ==========================================================\n");
-    //CLOSE_PID(&master_ctx.master_pid);
     return 0;
 }
