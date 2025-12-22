@@ -166,7 +166,6 @@ static inline void init_free_block(block_header_t *block, size_t size, block_hea
     block->next_free = block->prev_free = NULL;
 }
 
-
 static inline void tlsf_insert_block(oritlsf_pool_t *pool, block_header_t *block) {
     if (!pool || !block) return;
     block->status = 0;

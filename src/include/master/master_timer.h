@@ -91,7 +91,7 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                     }
                 } while (retr.status == SUCCESS && retr.event_type == EIT_FD);
                 uint64_t advance_ticks = (uint64_t)(timer->last_delay_us);
-                if (oritw_advance_time_and_process_expired(label, &master_ctx->oritlsf_pool, &master_ctx->master_async, &master_ctx->timer, llv, advance_ticks) != SUCCESS) return FAILURE;
+                if (oritw_advance_time_and_process_expired(label, &master_ctx->master_async, &master_ctx->timer, llv, advance_ticks) != SUCCESS) return FAILURE;
                 et_result_t wetr = async_write_event(&master_ctx->oritlsf_pool, &master_ctx->master_async, timer->timeout_event_fd, false);
                 if (!wetr.failure) {
                     if (!wetr.partial) {

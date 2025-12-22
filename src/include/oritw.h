@@ -449,16 +449,10 @@ static inline timer_event_t *oritw_pop_ready_queue(ori_timer_wheel_t *timer) {
 }
 
 static inline status_t oritw_process_expired_level(
-    const char *label,
-    oritlsf_pool_t *pool,
-    async_type_t *async,
-    ori_timer_wheels_t *timers,
-    uint32_t shard_index,
+    ori_timer_wheel_t *timer,
     uint16_t start_index,
     uint16_t end_index
 ) {
-    ori_timer_wheel_t *timer = timers->timer[shard_index];
-    if (!timer) return FAILURE;
     timer_wheel_t *wheel = &timer->timer_wheel;
     uint16_t current_bucket_index = start_index;
     while (true) {
@@ -521,9 +515,6 @@ static inline status_t oritw_process_expired_level(
 }
 
 static inline status_t oritw_advance_time_and_process_expired_internal(
-    const char *label,
-    oritlsf_pool_t *pool,
-    async_type_t *async,
     ori_timer_wheels_t *timers,
     uint32_t shard_index,
     uint64_t ticks_to_advance
@@ -540,7 +531,7 @@ static inline status_t oritw_advance_time_and_process_expired_internal(
         uint16_t level_end_index = (level_start_index + chunk_advance) & WHEEL_MASK;
         timer->timer_wheel.current_index = level_end_index;
         timer->global_current_tick += chunk_advance;
-        if (oritw_process_expired_level(label, pool, async, timers, shard_index, level_start_index, level_end_index) != SUCCESS) {
+        if (oritw_process_expired_level(timer, level_start_index, level_end_index) != SUCCESS) {
             return FAILURE;
         }
         remaining_ticks -= chunk_advance;
@@ -550,7 +541,6 @@ static inline status_t oritw_advance_time_and_process_expired_internal(
 
 static inline status_t oritw_advance_time_and_process_expired(
     const char *label,
-    oritlsf_pool_t *pool,
     async_type_t *async,
     ori_timer_wheels_t *timers,
     uint32_t shard_index,
@@ -560,7 +550,7 @@ static inline status_t oritw_advance_time_and_process_expired(
     if (ticks_to_advance == 0) return SUCCESS;
     ori_timer_wheel_t *timer = timers->timer[shard_index];
     if (!timer) return FAILURE;
-    if (oritw_advance_time_and_process_expired_internal(label, pool, async, timers, shard_index, ticks_to_advance) != SUCCESS) return FAILURE;
+    if (oritw_advance_time_and_process_expired_internal(timers, shard_index, ticks_to_advance) != SUCCESS) return FAILURE;
     uint64_t min_abs_expiration = min_heap_get_min(&timer->timer_wheel.min_heap);
     if (min_abs_expiration != ULLONG_MAX) {
         uint64_t_status_t system_tick = get_monotonic_time_ns(label);
@@ -572,7 +562,7 @@ static inline status_t oritw_advance_time_and_process_expired(
         ull_system_tick -= timer->initial_system_tick;
         if (ull_system_tick > timer->global_current_tick) {
             uint64_t tta_plus = ull_system_tick - timer->global_current_tick;
-            if (oritw_advance_time_and_process_expired_internal(label, pool, async, timers, shard_index, tta_plus) != SUCCESS) return FAILURE;
+            if (oritw_advance_time_and_process_expired_internal(timers, shard_index, tta_plus) != SUCCESS) return FAILURE;
         }
     }
     return oritw_reschedule_main_timer(label, async, timers, shard_index);
