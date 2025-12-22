@@ -1,6 +1,21 @@
 #ifndef ORITW_H
 #define ORITW_H
 
+/*
+ori_timer_wheels_t
+└── timer[tmr_index]  ← engine selector (bukan level!)
+    └── ori_timer_wheel_t
+        ├── timer_wheel_t
+        │   ├── buckets[WHEEL_SIZE]
+        │   ├── current_index
+        │   ├── tick_factor
+        │   └── min_heap (bucket → min expiration)
+        ├── sorting_queue (global order constraint)
+        ├── ready_queue
+        ├── global_current_tick   ← logical time
+        └── initial_system_tick   ← anchor ke monotonic clock
+*/
+
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -108,7 +123,7 @@ static inline timer_event_t *oritw_alloc(oritlsf_pool_t *pool, ori_timer_wheel_t
     event->prev = NULL;
     event->sorting_next = NULL;
     event->sorting_prev = NULL;
-    event->slot_index = WHEEL_SIZE;
+    event->bucket_index = WHEEL_SIZE;
     event->level_index = MAX_TIMER_LEVELS;
     event->expiration_tick = 0;
     event->timer_id = 0;
@@ -124,7 +139,7 @@ static inline void oritw_free_internal(oritlsf_pool_t *pool, ori_timer_wheel_t *
 	}
     event->expiration_tick = 0;
     event->timer_id = 0;
-    event->slot_index = WHEEL_SIZE;
+    event->bucket_index = WHEEL_SIZE;
     event->level_index = MAX_TIMER_LEVELS;
     timer_event_remove(&timer->ready_queue_head, &timer->ready_queue_tail, event);
     oritlsf_free(pool, (void **)pevent);
@@ -137,7 +152,7 @@ static inline void oritw_free(oritlsf_pool_t *pool, ori_timer_wheels_t *timers, 
 		*pevent = NULL;
 		return;
 	}
-    if (event->timer_id == 0 || event->slot_index >= WHEEL_SIZE || event->level_index >= MAX_TIMER_LEVELS) {
+    if (event->timer_id == 0 || event->bucket_index >= WHEEL_SIZE || event->level_index >= MAX_TIMER_LEVELS) {
 		*pevent = NULL;
 		return;
 	}
@@ -165,10 +180,10 @@ static inline status_t oritw_reschedule_main_timer(
     const char *label,
     async_type_t *async,
     ori_timer_wheels_t *timers,
-    uint32_t level
+    uint32_t tmr_index
 )
 {
-    ori_timer_wheel_t *timer = timers->timer[level];
+    ori_timer_wheel_t *timer = timers->timer[tmr_index];
     if (!timer) return FAILURE;
     uint64_t next_expiration_tick;
     bool earliest_event_found = oritw_find_earliest_event(timer, &next_expiration_tick);
@@ -210,17 +225,17 @@ static inline void oritw_remove_event_internal(oritlsf_pool_t *pool, ori_timer_w
 		return;
 	}
     uint64_t expire = event_to_remove->expiration_tick;
-    uint64_t current_min_exp = min_heap_get_min(&timer->timer_wheel.min_heap);
+    timer_wheel_t *wheel = &timer->timer_wheel;
+    timer_bucket_t *bucket = &wheel->buckets[event_to_remove->bucket_index];
+    uint64_t current_min_exp = min_heap_get_min(&wheel->min_heap);
     *should_reschedule = (expire <= current_min_exp);
-    timer_wheel_t *timer_wheel = &timer->timer_wheel;
-    timer_bucket_t *bucket = &timer_wheel->buckets[event_to_remove->slot_index];
     timer_event_remove(&bucket->head, &bucket->tail, event_to_remove);
     timer_event_sorting_remove(&timer->sorting_queue_head, &timer->sorting_queue_tail, event_to_remove);
     if (bucket->head == NULL) {
         bucket->min_expiration = ULLONG_MAX;
     }
-    min_heap_update(&timer_wheel->min_heap, event_to_remove->slot_index, bucket->min_expiration);
-    event_to_remove->slot_index = WHEEL_SIZE;
+    min_heap_update(&wheel->min_heap, event_to_remove->bucket_index, bucket->min_expiration);
+    event_to_remove->bucket_index = WHEEL_SIZE;
     oritw_free_internal(pool, timer, pevent_to_remove);
 }
 
@@ -259,10 +274,10 @@ static inline timer_event_t *oritw_validate_min_gap_and_long_jump(
 	oritlsf_pool_t *pool, 
     ori_timer_wheels_t *timers,
     uint64_t delay_us,
-    uint32_t level,
+    uint32_t tmr_index,
     bool *reschedule
 ) {
-    ori_timer_wheel_t *timer = timers->timer[level];
+    ori_timer_wheel_t *timer = timers->timer[tmr_index];
     if (!timer) return NULL;
     uint64_t min_gap_us = (uint64_t)MIN_GAP_US;
     uint64_t expire;
@@ -276,7 +291,7 @@ static inline timer_event_t *oritw_validate_min_gap_and_long_jump(
             return NULL;
         }
         new_event->expiration_tick = expire;
-        new_event->level_index = level;
+        new_event->level_index = tmr_index;
         new_event->next = NULL;
         new_event->prev = NULL;
         new_event->sorting_next = NULL;
@@ -298,7 +313,7 @@ static inline timer_event_t *oritw_validate_min_gap_and_long_jump(
             return NULL;
         }
         new_event->expiration_tick = expire;
-        new_event->level_index = level;
+        new_event->level_index = tmr_index;
         new_event->next = NULL;
         new_event->prev = NULL;
         new_event->sorting_next = NULL;
@@ -351,17 +366,17 @@ static inline timer_event_t *oritw_calculate_level(
     return NULL;
 }
 
-static inline void oritw_calculate_slot(
+static inline void oritw_calculate_bucket(
     ori_timer_wheel_t *timer,
     uint64_t expiration_tick,
-    uint32_t *slot_index
+    uint32_t *bucket_index
 )
 {
-    timer_wheel_t *level = &timer->timer_wheel;
-    uint64_t abs_slot_index = expiration_tick / level->tick_factor;
-    *slot_index = (uint32_t)(abs_slot_index & WHEEL_MASK);
+    timer_wheel_t *wheel = &timer->timer_wheel;
+    uint64_t abs_bucket_index = expiration_tick / wheel->tick_factor;
+    *bucket_index = (uint32_t)(abs_bucket_index & WHEEL_MASK);
     if (expiration_tick <= timer->global_current_tick) {
-        *slot_index = level->current_index;
+        *bucket_index = wheel->current_index;
     }
 }
 
@@ -402,17 +417,17 @@ static inline status_t oritw_add_event(
     timer_id->event = new_event;
     ori_timer_wheel_t *timer = timers->timer[level_index];
     if (!timer) return FAILURE;
-    uint32_t slot_index;
-    oritw_calculate_slot(timer, new_event->expiration_tick, &slot_index);
+    uint32_t bucket_index;
+    oritw_calculate_bucket(timer, new_event->expiration_tick, &bucket_index);
     timer_wheel_t *wheel = &timer->timer_wheel;
-    timer_bucket_t *bucket = &wheel->buckets[slot_index];
-    new_event->slot_index = (uint16_t)slot_index;
+    timer_bucket_t *bucket = &wheel->buckets[bucket_index];
+    new_event->bucket_index = (uint16_t)bucket_index;
     timer_event_add_tail(&bucket->head, &bucket->tail, new_event); 
     if (new_event->expiration_tick < bucket->min_expiration) {
         bucket->min_expiration = new_event->expiration_tick;
-        min_heap_update(&wheel->min_heap, (uint16_t)slot_index, bucket->min_expiration);
+        min_heap_update(&wheel->min_heap, (uint16_t)bucket_index, bucket->min_expiration);
     }
-    timer->next_expiration_tick = min_heap_get_min(&timer->timer_wheel.min_heap);
+    timer->next_expiration_tick = min_heap_get_min(&wheel->min_heap);
     if (should_reschedule) {
         uint64_t_status_t system_tick = get_monotonic_time_ns(label);
         if (system_tick.status != SUCCESS) {
@@ -431,10 +446,10 @@ static inline status_t oritw_process_expired_level(
     uint32_t start_index,
     uint32_t end_index
 ) {
-    timer_wheel_t *level = &timer->timer_wheel;
-    uint32_t current_slot_index = start_index;
+    timer_wheel_t *wheel = &timer->timer_wheel;
+    uint32_t current_bucket_index = start_index;
     while (true) {
-        timer_bucket_t *bucket = &level->buckets[current_slot_index];
+        timer_bucket_t *bucket = &wheel->buckets[current_bucket_index];
         timer_event_t *cur = bucket->head;
         uint64_t new_min_exp = ULLONG_MAX;
         while (cur) {
@@ -445,7 +460,7 @@ static inline status_t oritw_process_expired_level(
                 timer_event_add_tail(&timer->ready_queue_head, &timer->ready_queue_tail, cur);
             } else {
                 timer_event_add_tail(&bucket->head, &bucket->tail, cur);
-                cur->slot_index = (uint16_t)current_slot_index;
+                cur->bucket_index = (uint16_t)current_bucket_index;
                 if (cur->expiration_tick < new_min_exp) {
                     new_min_exp = cur->expiration_tick;
                 }
@@ -453,9 +468,9 @@ static inline status_t oritw_process_expired_level(
             cur = next;
         }
         bucket->min_expiration = new_min_exp;
-        min_heap_update(&level->min_heap, (uint16_t)current_slot_index, bucket->min_expiration);
-        if (current_slot_index == end_index) break;
-        current_slot_index = (current_slot_index + 1) & WHEEL_MASK;
+        min_heap_update(&wheel->min_heap, (uint16_t)current_bucket_index, bucket->min_expiration);
+        if (current_bucket_index == end_index) break;
+        current_bucket_index = (current_bucket_index + 1) & WHEEL_MASK;
     }
     oritw_find_earliest_event(timer, NULL);
     return SUCCESS;
@@ -469,16 +484,16 @@ static inline status_t oritw_advance_time_and_process_expired_internal(
     const char *label,
     async_type_t *async,
     ori_timer_wheels_t *timers,
-    uint32_t level,
+    uint32_t tmr_index,
     uint64_t ticks_to_advance
 )
 {
-    ori_timer_wheel_t *timer = timers->timer[level];
+    ori_timer_wheel_t *timer = timers->timer[tmr_index];
     uint64_t remaining_ticks = ticks_to_advance;
     while (remaining_ticks > 0) {
         uint32_t level_start_index = timer->timer_wheel.current_index;
-        uint64_t slots_until_wrap = WHEEL_SIZE - level_start_index;
-        uint64_t chunk_advance = remaining_ticks < slots_until_wrap ? remaining_ticks : slots_until_wrap;
+        uint64_t buckets_until_wrap = WHEEL_SIZE - level_start_index;
+        uint64_t chunk_advance = remaining_ticks < buckets_until_wrap ? remaining_ticks : buckets_until_wrap;
         if (chunk_advance == 0) break;
         uint32_t level_end_index = (level_start_index + (uint32_t)chunk_advance) & WHEEL_MASK;
         timer->timer_wheel.current_index = (uint16_t)level_end_index;
@@ -495,14 +510,14 @@ static inline status_t oritw_advance_time_and_process_expired(
     const char *label,
     async_type_t *async,
     ori_timer_wheels_t *timers,
-    uint32_t level,
+    uint32_t tmr_index,
     uint64_t ticks_to_advance
 )
 {
     if (ticks_to_advance == 0) return SUCCESS;
-    ori_timer_wheel_t *timer = timers->timer[level];
+    ori_timer_wheel_t *timer = timers->timer[tmr_index];
     if (!timer) return FAILURE;
-    if (oritw_advance_time_and_process_expired_internal(label, async, timers, level, ticks_to_advance) != SUCCESS) return FAILURE;
+    if (oritw_advance_time_and_process_expired_internal(label, async, timers, tmr_index, ticks_to_advance) != SUCCESS) return FAILURE;
     uint64_t min_abs_expiration = min_heap_get_min(&timer->timer_wheel.min_heap);
     if (min_abs_expiration != ULLONG_MAX) {
         uint64_t_status_t system_tick = get_monotonic_time_ns(label);
@@ -514,10 +529,10 @@ static inline status_t oritw_advance_time_and_process_expired(
         ull_system_tick -= timer->initial_system_tick;
         if (ull_system_tick > timer->global_current_tick) {
             uint64_t tta_plus = ull_system_tick - timer->global_current_tick;
-            if (oritw_advance_time_and_process_expired_internal(label, async, timers, level, tta_plus) != SUCCESS) return FAILURE;
+            if (oritw_advance_time_and_process_expired_internal(label, async, timers, tmr_index, tta_plus) != SUCCESS) return FAILURE;
         }
     }
-    return oritw_reschedule_main_timer(label, async, timers, level);
+    return oritw_reschedule_main_timer(label, async, timers, tmr_index);
 }
 
 static inline status_t oritw_setup(const char *label, oritlsf_pool_t *pool, async_type_t *async, ori_timer_wheels_t *timers) {

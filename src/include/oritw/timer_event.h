@@ -15,7 +15,7 @@ typedef struct timer_event_t {
     uint64_t expiration_tick;
     uint64_t timer_id;
     uint32_t level_index;
-    uint16_t slot_index;
+    uint16_t bucket_index;
 } timer_event_t;
 
 typedef enum {
@@ -201,7 +201,7 @@ static inline void timer_event_cleanup(oritlsf_pool_t *pool, timer_event_t **hea
         timer_event_t *next = cur->next;
         cur->expiration_tick = 0;
         cur->timer_id = 0;
-        cur->slot_index = WHEEL_SIZE;
+        cur->bucket_index = WHEEL_SIZE;
         cur->level_index = MAX_TIMER_LEVELS;
         oritlsf_free(pool, (void **)&cur);
         cur = next;
