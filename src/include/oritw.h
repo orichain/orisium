@@ -336,42 +336,32 @@ static inline timer_event_t *oritw_calculate_shard_index(
     timer_event_type_t event_type
 )
 {
-    uint16_t llvl_min = 0;
-    uint16_t llvl_cnt = 0;
+    uint16_t shrd_min = 0;
+    uint16_t shrd_cnt = 0;
     switch (event_type) {
         case TE_CHECKHEALTHY: {
-            llvl_min = 0;
-            llvl_cnt = 1;
+            shrd_min = 0;
+            shrd_cnt = 1;
             break;
         }
         case TE_HEARTBEAT: {
-            llvl_min = 0;
-            llvl_cnt = 3;
+            shrd_min = 1;
+            shrd_cnt = 4;
             break;
         }
-        case TE_SENDER: {
-            llvl_min = 3;
-            llvl_cnt = 3;
-            break;
-        }
-        case TE_RETRY: {
-            llvl_min = 6;
-            llvl_cnt = 3;
-            break;
-        }
-        case TE_OPENNER: {
-            llvl_min = 9;
-            llvl_cnt = 3;
+        case TE_GENERAL: {
+            shrd_min = 5;
+            shrd_cnt = 10;
             break;
         }
         default:
             LOG_ERROR("UNKNOWN TIMER _EVENT TYPE!!!");
             return NULL;
     }
-    for (uint16_t llvl=llvl_min;llvl<(llvl_min+llvl_cnt);++llvl) {
-        timer_event_t *new_event = oritw_validate_min_gap_and_long_jump(pool, timers, delay_us, llvl, reschedule, event_type);
+    for (uint16_t shrd=shrd_min;shrd<(shrd_min+shrd_cnt);++shrd) {
+        timer_event_t *new_event = oritw_validate_min_gap_and_long_jump(pool, timers, delay_us, shrd, reschedule, event_type);
         if (new_event) {
-            *shard_index = llvl;
+            *shard_index = shrd;
             return new_event;
         }
     }

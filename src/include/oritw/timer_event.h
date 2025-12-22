@@ -13,9 +13,7 @@ typedef enum {
     TE_CHECKHEALTHY = (uint8_t)0x01,
     TE_HEARTBEAT = (uint8_t)0x02,
 //----------------------------------------------------------------------
-    TE_SENDER = (uint8_t)0x03,
-    TE_RETRY = (uint8_t)0x04,
-    TE_OPENNER = (uint8_t)0x05
+    TE_GENERAL = (uint8_t)0x03
 //----------------------------------------------------------------------
 } timer_event_type_t;
 

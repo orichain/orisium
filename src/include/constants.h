@@ -31,9 +31,9 @@
 #define LONGINTV_TEST
 #undef LONGINTV_TEST
 
-#define MAX_TIMER_SHARD 12
-#define WHEEL_SIZE 256
-#define MIN_GAP_US 5000
+#define MAX_TIMER_SHARD 15
+#define WHEEL_SIZE 1024
+#define MIN_GAP_US 1000
 //----------------------------------------------------------------------
 #define KALMAN_CALIBRATION_SAMPLES 50
 //----------------------------------------------------------------------
