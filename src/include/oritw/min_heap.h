@@ -23,9 +23,9 @@ typedef struct {
     uint16_t bucket_to_heap_index[WHEEL_SIZE];
 } min_heap_t;
 
-static inline void min_heap_swap(min_heap_t *heap, uint32_t i, uint32_t j) {
-    heap->bucket_to_heap_index[heap->nodes[i].bucket_index] = (uint16_t)j;
-    heap->bucket_to_heap_index[heap->nodes[j].bucket_index] = (uint16_t)i;
+static inline void min_heap_swap(min_heap_t *heap, uint16_t i, uint16_t j) {
+    heap->bucket_to_heap_index[heap->nodes[i].bucket_index] = j;
+    heap->bucket_to_heap_index[heap->nodes[j].bucket_index] = i;
     min_heap_node_t temp = heap->nodes[i];
     heap->nodes[i] = heap->nodes[j];
     heap->nodes[j] = temp;
@@ -69,10 +69,10 @@ static inline void min_heapify_up(min_heap_t *heap, uint32_t i) {
 
 static inline void min_heap_init(min_heap_t *heap) {
     heap->size = WHEEL_SIZE;
-    for (uint32_t i = 0; i < WHEEL_SIZE; ++i) {
+    for (uint16_t i = 0; i < WHEEL_SIZE; ++i) {
         heap->nodes[i].expiration_tick = ULLONG_MAX;
-        heap->nodes[i].bucket_index = (uint16_t)i;
-        heap->bucket_to_heap_index[i] = (uint16_t)i;
+        heap->nodes[i].bucket_index = i;
+        heap->bucket_to_heap_index[i] = i;
     }
 }
 

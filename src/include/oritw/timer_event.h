@@ -7,6 +7,18 @@
 #include "constants.h"
 #include "oritlsf.h"
 
+typedef enum {
+    TE_UNKNOWN = (uint8_t)0x00,
+//----------------------------------------------------------------------    
+    TE_CHECKHEALTHY = (uint8_t)0x01,
+    TE_HEARTBEAT = (uint8_t)0x02,
+//----------------------------------------------------------------------
+    TE_SENDER = (uint8_t)0x03,
+    TE_RETRY = (uint8_t)0x04,
+    TE_OPENNER = (uint8_t)0x05
+//----------------------------------------------------------------------
+} timer_event_type_t;
+
 typedef struct timer_event_t {
     struct timer_event_t *next;
     struct timer_event_t *prev;
@@ -14,19 +26,10 @@ typedef struct timer_event_t {
     struct timer_event_t *sorting_prev;
     uint64_t expiration_tick;
     uint64_t timer_id;
-    uint32_t level_index;
+    timer_event_type_t event_type;
+    uint32_t shard_index;
     uint16_t bucket_index;
 } timer_event_t;
-
-typedef enum {
-    TE_UNKNOWN = (uint8_t)0x00,
-//----------------------------------------------------------------------    
-    TE_CHECKHEALTHY = (uint8_t)0x01,
-    TE_HEARTBEAT = (uint8_t)0x02,
-//----------------------------------------------------------------------
-    TE_GENERAL = (uint8_t)0x08
-//----------------------------------------------------------------------
-} timer_event_type_t;
 
 static inline void timer_event_add_tail(timer_event_t **head, timer_event_t **tail, timer_event_t *event) {
     event->next = NULL;
@@ -202,7 +205,7 @@ static inline void timer_event_cleanup(oritlsf_pool_t *pool, timer_event_t **hea
         cur->expiration_tick = 0;
         cur->timer_id = 0;
         cur->bucket_index = WHEEL_SIZE;
-        cur->level_index = MAX_TIMER_LEVELS;
+        cur->shard_index = MAX_TIMER_SHARD;
         oritlsf_free(pool, (void **)&cur);
         cur = next;
     }

@@ -216,31 +216,31 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
                 retr = async_read_event(&worker_ctx->oritlsf_pool, worker_ctx->timer.add_event_fd);
                 if (!retr.failure) {
                     if (!retr.partial) {
-                        timer_id_t *current_add;
-                        status_t handler_result = SUCCESS;
-                        do {
-                            current_add = oritw_pop_timer_id_queue(&worker_ctx->timer);
-                            if (current_add == NULL) {
-                                handler_result = FAILURE;
-                                break;
-                            }
-                            handler_result = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, current_add);
-                            oritw_id_free(&worker_ctx->oritlsf_pool, &worker_ctx->timer, &current_add);
-                            if (handler_result != SUCCESS) {
-                                break;
-                            }
-                        } while (current_add != NULL);
-                        if (handler_result == SUCCESS) {
-                            worker_ctx->timer.add_queue_head = NULL;
-                            worker_ctx->timer.add_queue_tail = NULL;
-                        }
                         if (retr.event_type == EIT_FD) oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&worker_ctx->timer.add_event_fd->buffer->buffer_in);
                         worker_ctx->timer.add_event_fd->buffer->in_size_tb = 0;
                         worker_ctx->timer.add_event_fd->buffer->in_size_c = 0;
-                        return handler_result;
+                        retr.status = SUCCESS;
                     }
                 }
             } while (retr.status == SUCCESS && retr.event_type == EIT_FD);
+            timer_id_t *current_add;
+            status_t handler_result = SUCCESS;
+            do {
+                current_add = oritw_pop_timer_id_queue(&worker_ctx->timer);
+                if (current_add == NULL) {
+                    handler_result = FAILURE;
+                    break;
+                }
+                handler_result = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, current_add);
+                oritw_id_free(&worker_ctx->oritlsf_pool, &worker_ctx->timer, &current_add);
+                if (handler_result != SUCCESS) {
+                    break;
+                }
+            } while (current_add != NULL);
+            if (handler_result == SUCCESS) {
+                worker_ctx->timer.add_queue_head = NULL;
+                worker_ctx->timer.add_queue_tail = NULL;
+            }
             return retr.status;
         }
         if (async_event_is_OUT(*current_events)) {
@@ -256,7 +256,7 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
             }
         }
     }
-    for (uint32_t llv = 0; llv < MAX_TIMER_LEVELS; ++llv) {
+    for (uint32_t llv = 0; llv < MAX_TIMER_SHARD; ++llv) {
         ori_timer_wheel_t *timer = worker_ctx->timer.timer[llv];
         if (*current_fd == timer->tick_event_fd->event_id) {
             if (async_event_is_IN(*current_events)) {
@@ -269,24 +269,24 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
                     retr = async_read_event(&worker_ctx->oritlsf_pool, timer->tick_event_fd);
                     if (!retr.failure) {
                         if (!retr.partial) {
-                            uint64_t advance_ticks = (uint64_t)(timer->last_delay_us);
-                            if (oritw_advance_time_and_process_expired(worker_ctx->label, &worker_ctx->async, &worker_ctx->timer, llv, advance_ticks) != SUCCESS) return FAILURE;
-                            et_result_t wetr = async_write_event(&worker_ctx->oritlsf_pool, &worker_ctx->async, timer->timeout_event_fd, false);
-                            if (!wetr.failure) {
-                                if (!wetr.partial) {
-                                    oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&timer->timeout_event_fd->buffer->buffer_out);
-                                    timer->timeout_event_fd->buffer->out_size_tb = 0;
-                                    timer->timeout_event_fd->buffer->out_size_c = 0;
-                                }
-                            }
                             //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
                             if (retr.event_type == EIT_FD) oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&timer->tick_event_fd->buffer->buffer_in);
                             timer->tick_event_fd->buffer->in_size_tb = 0;
                             timer->tick_event_fd->buffer->in_size_c = 0;
-                            return SUCCESS;
+                            retr.status = SUCCESS;
                         }
                     }
                 } while (retr.status == SUCCESS && retr.event_type == EIT_FD);
+                uint64_t advance_ticks = (uint64_t)(timer->last_delay_us);
+                if (oritw_advance_time_and_process_expired(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, llv, advance_ticks) != SUCCESS) return FAILURE;
+                et_result_t wetr = async_write_event(&worker_ctx->oritlsf_pool, &worker_ctx->async, timer->timeout_event_fd, false);
+                if (!wetr.failure) {
+                    if (!wetr.partial) {
+                        oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&timer->timeout_event_fd->buffer->buffer_out);
+                        timer->timeout_event_fd->buffer->out_size_tb = 0;
+                        timer->timeout_event_fd->buffer->out_size_c = 0;
+                    }
+                }
                 return retr.status;
             }
         } else if (*current_fd == timer->timeout_event_fd->event_id) {
@@ -300,54 +300,54 @@ static inline status_t handle_worker_timer_event(worker_context_t *worker_ctx, v
                     retr = async_read_event(&worker_ctx->oritlsf_pool, timer->timeout_event_fd);
                     if (!retr.failure) {
                         if (!retr.partial) {
-                            timer_event_t *current_event;
-                            status_t handler_result = SUCCESS;
-                            do {
-                                current_event = oritw_pop_ready_queue(timer);
-                                if (current_event == NULL) {
-                                    handler_result = FAILURE;
-                                    break;
-                                }
-                                uint64_t expired_timer_id = current_event->timer_id;
-                                if (expired_timer_id == worker_ctx->heartbeat_timer_id.id) {
-                                    oritw_free(&worker_ctx->oritlsf_pool, &worker_ctx->timer, &worker_ctx->heartbeat_timer_id.event);
-                                    worker_ctx->heartbeat_timer_id.delay_us = worker_hb_interval_with_jitter_us();
-                                    double new_heartbeat_interval_double_ms = worker_ctx->heartbeat_timer_id.delay_us / (double)1e3;
-                                    status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &worker_ctx->heartbeat_timer_id);
-                                    if (chst != SUCCESS) {
-                                        LOG_ERROR("%sWorker error oritw_add_event for heartbeat.", worker_ctx->label);
-                                        handler_result = FAILURE;
-                                        break;
-                                    }
-                                    if (worker_master_heartbeat(worker_ctx, new_heartbeat_interval_double_ms) != SUCCESS) {
-                                        handler_result = FAILURE;
-                                        break;
-                                    }
-                                } else if (worker_sessions != NULL) {
-                                    uint8_t id_session_index;
-                                    handler_result = read_id_si(worker_ctx->label, expired_timer_id, &id_session_index);
-                                    handler_result = handle_worker_session_timer_event(worker_ctx, worker_sessions, &id_session_index, current_event);
-                                    if (handler_result != SUCCESS) {
-                                        break;
-                                    }
-                                } else {
-                                    handler_result = FAILURE;
-                                    oritw_free(&worker_ctx->oritlsf_pool, &worker_ctx->timer, &current_event);
-                                    break;
-                                }
-                            } while (current_event != NULL);
-                            if (handler_result == SUCCESS) {
-                                timer->ready_queue_head = NULL;
-                                timer->ready_queue_tail = NULL;
-                            }
                             //LOG_DEVEL_DEBUG("Timer event handled for fd=%d done", *current_fd);
                             if (retr.event_type == EIT_FD) oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&timer->timeout_event_fd->buffer->buffer_in);
                             timer->timeout_event_fd->buffer->in_size_tb = 0;
                             timer->timeout_event_fd->buffer->in_size_c = 0;
-                            return handler_result;
+                            retr.status = SUCCESS;
                         }
                     }
                 } while (retr.status == SUCCESS && retr.event_type == EIT_FD);
+                timer_event_t *current_event;
+                status_t handler_result = SUCCESS;
+                do {
+                    current_event = oritw_pop_ready_queue(timer);
+                    if (current_event == NULL) {
+                        handler_result = FAILURE;
+                        break;
+                    }
+                    uint64_t expired_timer_id = current_event->timer_id;
+                    if (expired_timer_id == worker_ctx->heartbeat_timer_id.id) {
+                        oritw_free(&worker_ctx->oritlsf_pool, &worker_ctx->timer, &worker_ctx->heartbeat_timer_id.event);
+                        worker_ctx->heartbeat_timer_id.delay_us = worker_hb_interval_with_jitter_us();
+                        double new_heartbeat_interval_double_ms = worker_ctx->heartbeat_timer_id.delay_us / (double)1e3;
+                        status_t chst = oritw_add_event(worker_ctx->label, &worker_ctx->oritlsf_pool, &worker_ctx->async, &worker_ctx->timer, &worker_ctx->heartbeat_timer_id);
+                        if (chst != SUCCESS) {
+                            LOG_ERROR("%sWorker error oritw_add_event for heartbeat.", worker_ctx->label);
+                            handler_result = FAILURE;
+                            break;
+                        }
+                        if (worker_master_heartbeat(worker_ctx, new_heartbeat_interval_double_ms) != SUCCESS) {
+                            handler_result = FAILURE;
+                            break;
+                        }
+                    } else if (worker_sessions != NULL) {
+                        uint8_t id_session_index;
+                        handler_result = read_id_si(worker_ctx->label, expired_timer_id, &id_session_index);
+                        handler_result = handle_worker_session_timer_event(worker_ctx, worker_sessions, &id_session_index, current_event);
+                        if (handler_result != SUCCESS) {
+                            break;
+                        }
+                    } else {
+                        handler_result = FAILURE;
+                        oritw_free(&worker_ctx->oritlsf_pool, &worker_ctx->timer, &current_event);
+                        break;
+                    }
+                } while (current_event != NULL);
+                if (handler_result == SUCCESS) {
+                    timer->ready_queue_head = NULL;
+                    timer->ready_queue_tail = NULL;
+                }
                 return retr.status;
             }
             if (async_event_is_OUT(*current_events)) {
