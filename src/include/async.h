@@ -205,7 +205,7 @@ static inline status_t async_create_event(const char* label, int *event_fd, even
 static inline status_t async_create_timerfd(const char* label, int *timer_fd, event_type_t event_type) {
     if (event_type == EIT_FD) {
     #if !defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__FreeBSD__)
-        *timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | EFD_CLOEXEC);
+        *timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
         if (*timer_fd == -1) {
             LOG_ERROR("%sGagal membuat timerfd: %s", label, strerror(errno));
             return FAILURE;
