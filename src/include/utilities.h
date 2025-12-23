@@ -13,8 +13,12 @@
     #ifndef AI_V4MAPPED
         #define AI_V4MAPPED 0
     #endif
-    #include <sys/signal.h>
-    #include <sys/errno.h>
+    #if defined(__clang__)
+        #if __clang_major__ < 21
+            #include <sys/signal.h>
+            #include <sys/errno.h>
+        #endif
+    #endif
     #include <sys/time.h>
     #include <sys/endian.h>
     #include <sys/common_int_limits.h>
@@ -22,12 +26,20 @@
     #ifndef AI_V4MAPPED
         #define AI_V4MAPPED 0
     #endif
+    #if defined(__clang__)
+        #if __clang_major__ < 21
+            #include <sys/signal.h>
+            #include <sys/errno.h>
+        #endif
+    #endif
     #include <sys/_time.h>
-    #include <sys/signal.h>
-    #include <sys/errno.h>
     #include <sys/endian.h>
 #elif defined(__FreeBSD__)
-    #include <sys/signal.h>
+    #if defined(__clang__)
+        #if __clang_major__ < 21
+            #include <sys/signal.h>
+        #endif
+    #endif
     #include <sys/_clock_id.h>
     #include <x86/endian.h>
     #include <strings.h>

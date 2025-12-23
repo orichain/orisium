@@ -2,7 +2,13 @@
 #define ORILINK_ORILINK_H
 
 #include <errno.h>
-#include <stdio.h>
+
+#if defined(__clang__)
+    #if __clang_major__ < 21
+        #include <stdio.h>
+    #endif
+#endif
+
 #include <string.h>
 #include <sys/types.h>
 #include <stdbool.h>
@@ -11,7 +17,11 @@
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
     #include <sys/endian.h>
-    #include <sys/errno.h>
+    #if defined(__clang__)
+        #if __clang_major__ < 21
+            #include <sys/errno.h>
+        #endif
+    #endif
 #elif defined(__FreeBSD__)
     #include <x86/endian.h>
 #else

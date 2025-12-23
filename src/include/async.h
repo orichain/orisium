@@ -10,7 +10,11 @@
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
     #include <sys/event.h>
-    #include <sys/errno.h>
+    #if defined(__clang__)
+        #if __clang_major__ < 21
+            #include <sys/errno.h>
+        #endif
+    #endif
 #elif defined(__FreeBSD__)
     #include <sys/event.h>
 #else

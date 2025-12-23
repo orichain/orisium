@@ -3,7 +3,13 @@
 
 #include <netinet/in.h>
 #include <stdint.h>
-#include <stdlib.h>
+
+#if defined(__clang__)
+    #if __clang_major__ < 21
+        #include <stdlib.h>
+    #endif
+#endif
+
 #include <string.h>
 
 #include "constants.h"

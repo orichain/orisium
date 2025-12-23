@@ -11,20 +11,34 @@
 #include <stdio.h>
 
 #if defined(__NetBSD__)
-    #include <sys/signal.h>
+    #if defined(__clang__)
+        #if __clang_major__ < 21
+            #include <sys/signal.h>
+        #endif
+    #endif
     #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
         #include <pthread_types.h>
+
         #include "globals.h"
     #endif
 #elif defined(__OpenBSD__)
-    #include <sys/signal.h>
+    #if defined(__clang__)
+        #if __clang_major__ < 21
+            #include <sys/signal.h>
+        #endif
+    #endif
     #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
         #include "globals.h"
     #endif
 #elif defined(__FreeBSD__)
-    #include <sys/signal.h>
+    #if defined(__clang__)
+        #if __clang_major__ < 21
+            #include <sys/signal.h>
+        #endif
+    #endif
     #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
         #include <sys/_pthreadtypes.h>
+
         #include "globals.h"
     #endif
 #else

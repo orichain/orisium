@@ -1,9 +1,14 @@
+#if defined(__clang__)
+    #if __clang_major__ < 21
+        #include <stdio.h>
+    #endif
+#endif
+
 #include <stdbool.h>
 #include <unistd.h>
 #include <stdint.h>
 #include <netinet/in.h>
 #include <string.h>
-#include <stdio.h>
 #include <signal.h>
 #include <stdlib.h>
 

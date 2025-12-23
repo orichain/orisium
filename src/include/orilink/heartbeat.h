@@ -1,7 +1,12 @@
 #ifndef ORILINK_HEARTBEAT_H
 #define ORILINK_HEARTBEAT_H
 
-#include <stdio.h>
+#if defined(__clang__)
+    #if __clang_major__ < 21
+        #include <stdio.h>
+    #endif
+#endif
+
 #include <string.h>
 #include <stdint.h>
 #include <errno.h>

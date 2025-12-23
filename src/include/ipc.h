@@ -1,8 +1,13 @@
 #ifndef IPC_H
 #define IPC_H
 
+#if defined(__clang__)
+    #if __clang_major__ < 21
+        #include <stdio.h>
+    #endif
+#endif
+
 #include <errno.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -13,10 +18,18 @@
 
 #if defined(__NetBSD__)
     #include <sys/endian.h>
-    #include <sys/errno.h>
+    #if defined(__clang__)
+        #if __clang_major__ < 21
+            #include <sys/errno.h>
+        #endif
+    #endif
 #elif defined(__OpenBSD__)
     #include <sys/endian.h>
-    #include <sys/errno.h>
+    #if defined(__clang__)
+        #if __clang_major__ < 21
+            #include <sys/errno.h>
+        #endif
+    #endif
 #elif defined(__FreeBSD__)
     #include <x86/endian.h>
 #else

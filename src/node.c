@@ -5,17 +5,29 @@
 #include <unistd.h>
 
 #if defined(__NetBSD__)
-    #include <sys/unistd.h>
+    #if defined(__clang__)
+        #if __clang_major__ < 21
+            #include <sys/unistd.h>
+        #endif
+    #endif
     #include <json_object.h>
     #include <json_tokener.h>
     #include <json_types.h>
 #elif defined(__OpenBSD__)
-    #include <sys/unistd.h>
+    #if defined(__clang__)
+        #if __clang_major__ < 21
+            #include <sys/unistd.h>
+        #endif
+    #endif
     #include <json_object.h>
     #include <json_tokener.h>
     #include <json_types.h>
 #elif defined(__FreeBSD__)
-    #include <sys/unistd.h>
+    #if defined(__clang__)
+        #if __clang_major__ < 21
+            #include <sys/unistd.h>
+        #endif
+    #endif
     #include <json_object.h>
     #include <json_tokener.h>
     #include <json_types.h>

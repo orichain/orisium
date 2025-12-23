@@ -2,7 +2,10 @@ TARGET = orisium
 SRC_DIR = src
 OBJ_DIR = obj
 
-CC = ./clang
+ROOT_DIR := $(shell pwd)
+CC = $(ROOT_DIR)/clang
+CXX = $(ROOT_DIR)/clang++
+PY = $(ROOT_DIR)/python
 
 JSONC_CFLAGS :=
 JSONC_LIBS := -ljson-c
@@ -146,82 +149,106 @@ libraries:
 	@echo "Menginstall library production Orisium untuk $(DISTRO_ID) menggunakan $(PKG_MANAGER)..."
 ifeq ($(DISTRO_ID),netbsd)
 	$(call install_pkg,clang)
-	@if [ ! -e ./clang ]; then \
+	@if [ ! -e $(CC) ]; then \
 		$(USE_SUDO) $(PKG_MANAGER) -y install llvm; \
-		echo ">> Membuat symlink ./clang..."; \
-		$(USE_SUDO) ln -s /usr/pkg/bin/clang ./clang; \
+		echo ">> Membuat symlink $(CC)..."; \
+		$(USE_SUDO) ln -s /usr/pkg/bin/clang $(CC); \
 	else \
-		echo ">> ./clang sudah ada."; \
+		echo ">> $(CC) sudah ada."; \
+	fi
+	@if [ ! -e $(CXX) ]; then \
+		echo ">> Membuat symlink $(CXX)..."; \
+		$(USE_SUDO) ln -s /usr/pkg/bin/clang++ $(CXX); \
+	else \
+		echo ">> $(CXX) sudah ada."; \
 	fi
 	$(call install_pkg,json-c)
 	$(call install_pkg,pkg-config)
 	$(call install_pkg,python312)
-	@if [ ! -e ./python ]; then \
-		echo ">> Membuat symlink ./python..."; \
-		$(USE_SUDO) ln -s /usr/pkg/bin/python3.12 ./python; \
+	@if [ ! -e $(PY) ]; then \
+		echo ">> Membuat symlink $(PY)..."; \
+		$(USE_SUDO) ln -s /usr/pkg/bin/python3.12 $(PY); \
 	else \
-		echo ">> ./python sudah ada."; \
+		echo ">> $(PY) sudah ada."; \
 	fi
 else ifeq ($(DISTRO_ID),freebsd)
-	@if [ ! -e ./clang ]; then \
+	@if [ ! -e $(CC) ]; then \
 		$(USE_SUDO) $(PKG_MANAGER) install -y llvm; \
-		echo ">> Membuat symlink ./clang..."; \
-		$(USE_SUDO) ln -s /usr/bin/clang ./clang; \
+		echo ">> Membuat symlink $(CC)..."; \
+		$(USE_SUDO) ln -s /usr/bin/clang $(CC); \
 	else \
-		echo ">> ./clang sudah ada."; \
+		echo ">> $(CC) sudah ada."; \
+	fi
+	@if [ ! -e $(CXX) ]; then \
+		echo ">> Membuat symlink $(CXX)..."; \
+		$(USE_SUDO) ln -s /usr/bin/clang++ $(CXX); \
+	else \
+		echo ">> $(CXX) sudah ada."; \
 	fi
 	$(call install_pkg,json-c)
 	$(call install_pkg,pkgconf)
 	$(call install_pkg,python3)
-	@if [ ! -e ./python ]; then \
-		echo ">> Membuat symlink ./python..."; \
-		$(USE_SUDO) ln -s /usr/local/bin/python3 ./python; \
+	@if [ ! -e $(PY) ]; then \
+		echo ">> Membuat symlink $(PY)..."; \
+		$(USE_SUDO) ln -s /usr/local/bin/python3 $(PY); \
 	else \
-		echo ">> ./python sudah ada."; \
+		echo ">> $(PY) sudah ada."; \
 	fi
 else ifeq ($(DISTRO_ID),openbsd)
-	@if [ ! -e ./clang ]; then \
-		CLLVMVER=$$(clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \
+	@if [ ! -e $(CC) ]; then \
+		echo ">> Membuat symlink $(CC)..."; \
+		$(USE_SUDO) ln -s /usr/local/bin/clang-21 $(CC); \
+		CLLVMVER=$$($(CC) --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \
 		echo "================================"; \
 		echo "!!--- PILIH llvm$$CLLVMVER ---!!"; \
 		echo "================================"; \
 		$(USE_SUDO) $(PKG_MANAGER) llvm; \
-		echo ">> Membuat symlink ./clang..."; \
-		$(USE_SUDO) ln -s /usr/bin/clang ./clang; \
 	else \
-		echo ">> ./clang sudah ada."; \
+		echo ">> $(CC) sudah ada."; \
+	fi
+	@if [ ! -e $(CXX) ]; then \
+		echo ">> Membuat symlink $(CXX)..."; \
+		$(USE_SUDO) ln -s /usr/local/bin/clang++-21 $(CXX); \
+	else \
+		echo ">> $(CXX) sudah ada."; \
 	fi
 	$(call install_pkg,json-c)
-	@if [ ! -e ./python ]; then \
+	@if [ ! -e $(PY) ]; then \
 		echo "========================="; \
 		echo "!!--- PILIH python3 ---!!"; \
 		echo "========================="; \
 	fi
 	$(call install_pkg,python)
-	@if [ ! -e ./python ]; then \
-		echo ">> Membuat symlink ./python..."; \
-		$(USE_SUDO) ln -s /usr/local/bin/python3 ./python; \
+	@if [ ! -e $(PY) ]; then \
+		echo ">> Membuat symlink $(PY)..."; \
+		$(USE_SUDO) ln -s /usr/local/bin/python3 $(PY); \
 	else \
-		echo ">> ./python sudah ada."; \
+		echo ">> $(PY) sudah ada."; \
 	fi
 else ifeq ($(DISTRO_ID),rocky)
 	$(call install_pkg,clang)
-	@if [ ! -e ./clang ]; then \
+	@if [ ! -e $(CC) ]; then \
 		$(USE_SUDO) $(PKG_MANAGER) -y install llvm; \
-		echo ">> Membuat symlink ./clang..."; \
-		$(USE_SUDO) ln -s /usr/bin/clang ./clang; \
+		echo ">> Membuat symlink $(CC)..."; \
+		$(USE_SUDO) ln -s /usr/bin/clang $(CC); \
 	else \
-		echo ">> ./clang sudah ada."; \
+		echo ">> $(CC) sudah ada."; \
+	fi
+	@if [ ! -e $(CXX) ]; then \
+		echo ">> Membuat symlink $(CXX)..."; \
+		$(USE_SUDO) ln -s /usr/bin/clang++ $(CXX); \
+	else \
+		echo ">> $(CXX) sudah ada."; \
 	fi
 	$(call install_pkg,json-c)
 	$(call install_pkg,pkg-config)
 	$(call install_pkg,json-c-devel)
 	$(call install_pkg,python3)
-	@if [ ! -e ./python ]; then \
-		echo ">> Membuat symlink ./python..."; \
-		$(USE_SUDO) ln -s /usr/bin/python3 ./python; \
+	@if [ ! -e $(PY) ]; then \
+		echo ">> Membuat symlink $(PY)..."; \
+		$(USE_SUDO) ln -s /usr/bin/python3 $(PY); \
 	else \
-		echo ">> ./python sudah ada."; \
+		echo ">> $(PY) sudah ada."; \
 	fi
 endif	
 
@@ -267,7 +294,7 @@ $(PQCLEAN_SIGN_MLDSA87_LIB_PATH):
 	@echo "Membangun ML-DSA-87..."
 	@echo "Membangun dari sumber..."
 	@if [ ! -f "$(PQCLEAN_SIGN_MLDSA87_LIB_PATH)" ]; then \
-		$(MAKE) CC=../../../../clang -C $(PQCLEAN_SIGN_MLDSA87_DIR); \
+		$(MAKE) CC=$(CC) CXX=$(CXX) -C $(PQCLEAN_SIGN_MLDSA87_DIR); \
 	else \
 		echo "Library sudah ada: $@"; \
 	fi
@@ -276,7 +303,7 @@ $(PQCLEAN_SIGN_FALCONPADDED512_LIB_PATH):
 	@echo "Membangun Falcon-Padded-512..."
 	@echo "Membangun dari sumber..."
 	@if [ ! -f "$(PQCLEAN_SIGN_FALCONPADDED512_LIB_PATH)" ]; then \
-		$(MAKE) CC=../../../../clang -C $(PQCLEAN_SIGN_FALCONPADDED512_DIR); \
+		$(MAKE) CC=$(CC) CXX=$(CXX) -C $(PQCLEAN_SIGN_FALCONPADDED512_DIR); \
 	else \
 		echo "Library sudah ada: $@"; \
 	fi
@@ -285,7 +312,7 @@ $(PQCLEAN_KEM_LIB_PATH):
 	@echo "Membangun ML-KEM-1024..."
 	@echo "Membangun dari sumber..."
 	@if [ ! -f "$(PQCLEAN_KEM_LIB_PATH)" ]; then \
-		$(MAKE) CC=../../../../clang -C $(PQCLEAN_KEM_DIR); \
+		$(MAKE) CC=$(CC) CXX=$(CXX) -C $(PQCLEAN_KEM_DIR); \
 	else \
 		echo "Library sudah ada: $@"; \
 	fi
@@ -300,7 +327,7 @@ $(LMDB_LIB_PATH):
 	@if [ -f "$(LMDB_LIB_PATH)" ]; then \
 		echo "LMDB library sudah ada. Melewati build."; \
 	else \
-		$(MAKE) CC=../../../clang -C $(LMDB_DIR); \
+		$(MAKE) CC=$(CC) CXX=$(CXX) -C $(LMDB_DIR); \
 	fi
 
 # =============================
@@ -316,7 +343,7 @@ check_iwyu_c: $(IWYU_BIN_PATH)
 			echo "IWYU error in $$file" | tee -a iwyu_failed_c.log; \
 			cat /tmp/iwyu.tmp >> iwyu_failed_c.log; \
 			echo "" >> iwyu_failed_c.log; \
-			./python $(IWYU_DIR)/fix_includes.py < /tmp/iwyu.tmp >> iwyu_applied_c.log 2>&1; \
+			$(PY) $(IWYU_DIR)/fix_includes.py < /tmp/iwyu.tmp >> iwyu_applied_c.log 2>&1; \
 			echo "FIX applied to $$file" >> iwyu_applied_c.log; \
 		else \
 			echo "Tidak ada masalah di $$file."; \
@@ -339,7 +366,7 @@ check_iwyu_h: $(IWYU_BIN_PATH)
 			echo "IWYU error in $$file" | tee -a iwyu_failed_h.log; \
 			cat /tmp/iwyu.tmp >> iwyu_failed_h.log; \
 			echo "" >> iwyu_failed_h.log; \
-			./python $(IWYU_DIR)/fix_includes.py < /tmp/iwyu.tmp >> iwyu_applied_h.log 2>&1; \
+			$(PY) $(IWYU_DIR)/fix_includes.py < /tmp/iwyu.tmp >> iwyu_applied_h.log 2>&1; \
 			echo "FIX applied to $$file" >> iwyu_applied_h.log; \
 		else \
 			echo "Tidak ada masalah di $$file."; \
@@ -373,7 +400,7 @@ $(IWYU_BIN_PATH):
 			$(USE_SUDO) $(PKG_MANAGER) update && $(USE_SUDO) $(PKG_MANAGER) -y install wget cmake clang-devel llvm-devel; \
 		fi; \
 		\
-		CLANG_MAJOR_VER=$$(clang --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \
+		CLANG_MAJOR_VER=$$($(CC) --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \
 		IWYU_VER=$$(expr $$CLANG_MAJOR_VER + 4); \
 		echo "Deteksi Clang versi $$CLANG_MAJOR_VER"; \
 		\
@@ -402,8 +429,8 @@ $(IWYU_BIN_PATH):
 		cd $(IWYU_BUILD) && \
 		cmake \
 		-G "Unix Makefiles" \
-		-DCMAKE_C_COMPILER=clang \
-		-DCMAKE_CXX_COMPILER=clang++ \
+		-DCMAKE_C_COMPILER=$(CC) \
+		-DCMAKE_CXX_COMPILER=$(CXX) \
 		-DCMAKE_BUILD_TYPE="Release" \
 		-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
 		-DLLVM_DIR=$$LLVM_CMAKE_DIR \
