@@ -12,5 +12,6 @@ iwyu_failed_h.log
 gcc
 python
 clang
+clang++
 GENESIS_PRIVATEKEY_SAVE_IN_SAFEST_PLACE
 GENESIS_PUBLICKEY
