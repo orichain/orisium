@@ -7,9 +7,13 @@
 #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
     #include <dirent.h>
     
-#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
-    #include <sys/dirent.h>
-#endif
+    #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+        #if defined(__clang__)
+            #if __clang_major__ < 21
+                #include <sys/dirent.h>
+            #endif
+        #endif
+    #endif
 
     #include <errno.h>
     #include <stdint.h>
