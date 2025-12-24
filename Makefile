@@ -52,7 +52,11 @@ PKG_MANAGER := $(shell \
 	elif [ "$(DISTRO_ID)" = "rocky" ]; then echo "dnf"; \
 	else echo "unsupported"; fi)
 
-USE_SUDO := $(shell command -v sudo >/dev/null 2>&1 && echo sudo || echo "")
+ifeq ($(UNAME_S),OpenBSD)
+	USE_SUDO := doas
+else
+	USE_SUDO := $(shell command -v sudo >/dev/null 2>&1 && echo sudo || echo "")
+endif
 
 # =============================
 # Source & Object Files
@@ -197,7 +201,7 @@ else ifeq ($(DISTRO_ID),freebsd)
 else ifeq ($(DISTRO_ID),openbsd)
 	@if [ ! -e $(CC) ]; then \
 		echo ">> Membuat symlink $(CC)..."; \
-		$(USE_SUDO) ln -s /usr/local/bin/clang-21 $(CC); \
+		$(USE_SUDO) ln -s /usr/bin/clang $(CC); \
 		CLLVMVER=$$($(CC) --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \
 		echo "================================"; \
 		echo "!!--- PILIH llvm$$CLLVMVER ---!!"; \
@@ -208,7 +212,7 @@ else ifeq ($(DISTRO_ID),openbsd)
 	fi
 	@if [ ! -e $(CXX) ]; then \
 		echo ">> Membuat symlink $(CXX)..."; \
-		$(USE_SUDO) ln -s /usr/local/bin/clang++-21 $(CXX); \
+		$(USE_SUDO) ln -s /usr/bin/clang++ $(CXX); \
 	else \
 		echo ">> $(CXX) sudah ada."; \
 	fi
