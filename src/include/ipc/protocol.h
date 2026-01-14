@@ -3,13 +3,7 @@
 
 #include <netinet/in.h>
 #include <stdint.h>
-
-#if defined(__clang__)
-    #if __clang_major__ < 21
-        #include <stdlib.h>
-    #endif
-#endif
-
+#include <stdlib.h>
 #include <string.h>
 
 #include "constants.h"
@@ -25,7 +19,8 @@ typedef enum {
     
     IPC_MASTER_COW_CONNECT = (uint8_t)0x10,
     
-    IPC_WORKER_MASTER_TASK_INFO = (uint8_t)0xfb,
+    IPC_WORKER_WORKER_INFO = (uint8_t)0xfa,
+    IPC_WORKER_MASTER_INFO = (uint8_t)0xfb,
     IPC_UDP_DATA = (uint8_t)0xfc,
     IPC_UDP_DATA_ACK = (uint8_t)0xfd,
     IPC_WORKER_MASTER_HEARTBEAT = (uint8_t)0xfe,
@@ -34,8 +29,18 @@ typedef enum {
 
 typedef struct {
     uint8_t session_index;
-    task_info_type_t flag;
-} ipc_worker_master_task_info_t;
+    info_type_t flag;
+} ipc_worker_master_info_t;
+
+typedef struct {
+	worker_type_t src_wot;
+	uint8_t src_index;
+	uint8_t src_session_index;
+    worker_type_t dst_wot;
+	uint8_t dst_index;
+    uint8_t dst_session_index;
+    info_type_t flag;
+} ipc_worker_worker_info_t;
 
 typedef struct {
     uint8_t session_index;
@@ -98,7 +103,8 @@ typedef struct {
     worker_type_t wot;
     uint8_t index;
 	union {
-        ipc_worker_master_task_info_t *ipc_worker_master_task_info;
+		ipc_worker_worker_info_t *ipc_worker_worker_info;
+        ipc_worker_master_info_t *ipc_worker_master_info;
 		ipc_master_worker_info_t *ipc_master_worker_info;
 		ipc_worker_master_heartbeat_t *ipc_worker_master_heartbeat;
         ipc_master_cow_connect_t *ipc_master_cow_connect;
@@ -129,8 +135,10 @@ static inline void CLOSE_IPC_PROTOCOL(oritlsf_pool_t *pool, ipc_protocol_t **pro
 				oritlsf_free(pool, (void **)&x->payload.ipc_worker_master_heartbeat);
 			} else if (x->type == IPC_MASTER_WORKER_INFO) {
 				oritlsf_free(pool, (void **)&x->payload.ipc_master_worker_info);
-			} else if (x->type == IPC_WORKER_MASTER_TASK_INFO) {
-				oritlsf_free(pool, (void **)&x->payload.ipc_worker_master_task_info);
+			} else if (x->type == IPC_WORKER_MASTER_INFO) {
+				oritlsf_free(pool, (void **)&x->payload.ipc_worker_master_info);
+			} else if (x->type == IPC_WORKER_WORKER_INFO) {
+				oritlsf_free(pool, (void **)&x->payload.ipc_worker_worker_info);
 			} else if (x->type == IPC_MASTER_COW_CONNECT) {
 				oritlsf_free(pool, (void **)&x->payload.ipc_master_cow_connect);
 			} else if (x->type == IPC_UDP_DATA) {

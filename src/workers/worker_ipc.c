@@ -20,9 +20,8 @@
 #include "ipc/protocol.h"
 #include "ipc/udp_data.h"
 #include "ipc/worker_master_heartbeat.h"
-#include "ipc/worker_master_hello1.h"
 #include "ipc/worker_master_hello2.h"
-#include "ipc/worker_master_task_info.h"
+#include "ipc/worker_master_info.h"
 #include "log.h"
 #include "orilink.h"
 #include "orilink/heartbeat.h"
@@ -43,6 +42,7 @@
 #include "workers/worker_ipc_heartbeat.h"
 #include "xorshiro128plus.h"
 #include "workers/worker_ipc.h"
+#include "workers/worker_ipc_info.h"
 #include "oritw.h"
 #include "oritlsf.h"
 
@@ -83,40 +83,6 @@ status_t worker_master_heartbeat(worker_context_t *ctx, double new_heartbeat_int
         }
         CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
     }
-    return SUCCESS;
-}
-
-status_t worker_master_hello1(worker_context_t *ctx) {
-	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_master_hello1(
-        ctx->label,
-        &ctx->oritlsf_pool,  
-        *ctx->wot, 
-        *ctx->index, 
-        ctx->kem_publickey
-    );
-    if (cmd_result.status != SUCCESS) {
-        return FAILURE;
-    }
-    ssize_t_status_t send_result = send_ipc_protocol_message(
-        ctx->label, 
-        &ctx->oritlsf_pool, 
-        ctx->aes_key,
-        ctx->mac_key,
-        ctx->local_nonce,
-        &ctx->local_ctr,
-        ctx->master_uds_fd, 
-        ctx->buffer,
-        cmd_result.r_ipc_protocol_t
-    );
-    if (send_result.status != SUCCESS) {
-        LOG_ERROR("%sFailed to sent worker_master_hello1 to Master.", ctx->label);
-        CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
-        return send_result.status;
-    } else {
-        LOG_DEBUG("%sSent worker_master_hello1 to Master.", ctx->label);
-    }
-    ctx->hello1_sent = true;
-    CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
     return SUCCESS;
 }
 
@@ -278,8 +244,8 @@ status_t worker_master_udp_data_send_ipc(
     return SUCCESS;
 }
 
-status_t worker_master_task_info(worker_context_t *ctx, uint8_t session_index, task_info_type_t flag) {
-	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_master_task_info(
+status_t worker_master_info(worker_context_t *ctx, uint8_t session_index, info_type_t flag) {
+	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_master_info(
         ctx->label, 
         &ctx->oritlsf_pool, 
         *ctx->wot, 
@@ -308,122 +274,13 @@ status_t worker_master_task_info(worker_context_t *ctx, uint8_t session_index, t
             cmd_result.r_ipc_protocol_t
         );
         if (send_result.status != SUCCESS) {
-            LOG_ERROR("%sFailed to sent worker_master_task_info to Master.", ctx->label);
+            LOG_ERROR("%sFailed to sent worker_master_info to Master.", ctx->label);
             CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return send_result.status;
         } else {
-            LOG_DEBUG("%sSent worker_master_task_info to Master.", ctx->label);
+            LOG_DEBUG("%sSent worker_master_info to Master.", ctx->label);
         }
         CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
-    }
-    return SUCCESS;
-}
-
-status_t handle_workers_ipc_info(worker_context_t *worker_ctx, double *initial_delay_ms, ipc_raw_protocol_t_status_t *ircvdi) {
-    ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool, 
-        worker_ctx->aes_key, worker_ctx->remote_nonce, &worker_ctx->remote_ctr,
-        (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
-    );
-    if (deserialized_ircvdi.status != SUCCESS) {
-        LOG_ERROR("%sipc_deserialize gagal dengan status %d.", worker_ctx->label, deserialized_ircvdi.status);
-        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
-        return FAILURE;
-    } else {
-        LOG_DEBUG("%sipc_deserialize BERHASIL.", worker_ctx->label);
-        CLOSE_IPC_RAW_PROTOCOL(&worker_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
-    }           
-    ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
-    ipc_master_worker_info_t *iinfoi = received_protocol->payload.ipc_master_worker_info;
-    switch (iinfoi->flag) {
-        case IT_SHUTDOWN: {
-            LOG_INFO("%sSIGINT received. Initiating graceful shutdown...", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
-            worker_ctx->shutdown_requested = 1;
-            break;
-        }
-        case IT_WAKEUP: {
-            LOG_INFO("%sIT_WAKEUP received...", worker_ctx->label);
-            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
-            break;
-        }
-        case IT_READY: {
-            LOG_INFO("%sMaster Ready ...", worker_ctx->label);
-//----------------------------------------------------------------------
-            if (*initial_delay_ms > 0) {
-                LOG_DEBUG("%sApplying initial delay of %ld ms...", worker_ctx->label, *initial_delay_ms);
-                sleep_ms(*initial_delay_ms);
-            }
-//----------------------------------------------------------------------
-            if (KEM_GENERATE_KEYPAIR(worker_ctx->kem_publickey, worker_ctx->kem_privatekey) != 0) {
-                LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", worker_ctx->label);
-                worker_ctx->shutdown_requested = 1;
-                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
-                return FAILURE;
-            }
-            if (worker_master_hello1(worker_ctx) != SUCCESS) {
-                LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
-                worker_ctx->shutdown_requested = 1;
-                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
-                return FAILURE;
-            }
-            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
-            break;
-        }
-        case IT_REKEYING: {
-            worker_ctx->is_rekeying = true;
-            LOG_INFO("%sMaster Rekeying ...", worker_ctx->label);
-//----------------------------------------------------------------------
-            if (*initial_delay_ms > 0) {
-                LOG_DEBUG("%sApplying initial delay of %ld ms...", worker_ctx->label, *initial_delay_ms);
-                sleep_ms(*initial_delay_ms);
-            }
-//----------------------------------------------------------------------
-            if (KEM_GENERATE_KEYPAIR(worker_ctx->kem_publickey, worker_ctx->kem_privatekey) != 0) {
-                LOG_ERROR("%sFailed to KEM_GENERATE_KEYPAIR.", worker_ctx->label);
-                worker_ctx->shutdown_requested = 1;
-                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
-                return FAILURE;
-            }
-            worker_ctx->hello1_sent = false;
-            worker_ctx->hello1_ack_rcvd = false;
-            worker_ctx->hello2_sent = false;
-            worker_ctx->hello2_ack_rcvd = false;
-            if (worker_master_hello1(worker_ctx) != SUCCESS) {
-                LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
-                worker_ctx->shutdown_requested = 1;
-                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
-                return FAILURE;
-            }
-//----------------------------------------------------------------------
-//--- Test Send IPC During Rekeying
-//----------------------------------------------------------------------
-            /*
-            if (worker_master_task_info(worker_ctx, 0xff, TIT_WAKEUP) != SUCCESS) {
-                LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
-                worker_ctx->shutdown_requested = 1;
-                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
-                return FAILURE;
-            }
-            if (worker_master_task_info(worker_ctx, 0xff, TIT_WAKEUP) != SUCCESS) {
-                LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
-                worker_ctx->shutdown_requested = 1;
-                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
-                return FAILURE;
-            }
-            if (worker_master_task_info(worker_ctx, 0xff, TIT_WAKEUP) != SUCCESS) {
-                LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
-                worker_ctx->shutdown_requested = 1;
-                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
-                return FAILURE;
-            }
-            */
-//----------------------------------------------------------------------
-            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
-            break;
-        }
-        default:
-            LOG_ERROR("%sUnknown Info Flag %d from Master. Ignoring.", worker_ctx->label, iinfoi->flag);
-            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
     }
     return SUCCESS;
 }
@@ -3326,7 +3183,13 @@ status_t handle_workers_ipc_event(worker_context_t *worker_ctx, void **worker_se
                     }
                     switch (ircvdi.r_ipc_raw_protocol_t->type) {
                         case IPC_MASTER_WORKER_INFO: {
-                            if (handle_workers_ipc_info(worker_ctx, initial_delay_ms, &ircvdi) != SUCCESS) {
+                            if (handle_master_workers_ipc_info(worker_ctx, initial_delay_ms, &ircvdi) != SUCCESS) {
+                                return FAILURE;
+                            }
+                            break;
+                        }
+                        case IPC_WORKER_WORKER_INFO: {
+                            if (handle_worker_workers_ipc_info(worker_ctx, &ircvdi) != SUCCESS) {
                                 return FAILURE;
                             }
                             break;

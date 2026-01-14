@@ -1,12 +1,7 @@
 #ifndef IPC_H
 #define IPC_H
 
-#if defined(__clang__)
-    #if __clang_major__ < 21
-        #include <stdio.h>
-    #endif
-#endif
-
+#include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,18 +13,10 @@
 
 #if defined(__NetBSD__)
     #include <sys/endian.h>
-    #if defined(__clang__)
-        #if __clang_major__ < 21
-            #include <sys/errno.h>
-        #endif
-    #endif
+    #include <sys/errno.h>
 #elif defined(__OpenBSD__)
     #include <sys/endian.h>
-    #if defined(__clang__)
-        #if __clang_major__ < 21
-            #include <sys/errno.h>
-        #endif
-    #endif
+    #include <sys/errno.h>
 #elif defined(__FreeBSD__)
     #include <x86/endian.h>
 #else
@@ -41,7 +28,8 @@
 #include "types.h"
 #include "log.h"
 #include "ipc/master_worker_info.h"
-#include "ipc/worker_master_task_info.h"
+#include "ipc/worker_master_info.h"
+#include "ipc/worker_worker_info.h"
 #include "ipc/worker_master_heartbeat.h"
 #include "ipc/master_cow_connect.h"
 #include "ipc/udp_data.h"
@@ -62,8 +50,12 @@ static inline size_t calculate_ipc_payload_fixed_size(const char *label, ipc_pro
             payload_fixed_size = sizeof(uint8_t);
             break;
         }
-        case IPC_WORKER_MASTER_TASK_INFO: {
+        case IPC_WORKER_MASTER_INFO: {
             payload_fixed_size = sizeof(uint8_t) + sizeof(uint8_t);
+            break;
+        }
+        case IPC_WORKER_WORKER_INFO: {
+            payload_fixed_size = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t);
             break;
         }
         case IPC_WORKER_MASTER_HEARTBEAT: {
@@ -202,8 +194,11 @@ static inline ssize_t_status_t ipc_serialize(const char *label, oritlsf_pool_t *
         case IPC_MASTER_WORKER_INFO:
             result_pyld = ipc_serialize_master_worker_info(label, p->payload.ipc_master_worker_info, current_buffer, buffer_size, &offset);
             break;
-        case IPC_WORKER_MASTER_TASK_INFO:
-            result_pyld = ipc_serialize_worker_master_task_info(label, p->payload.ipc_worker_master_task_info, current_buffer, buffer_size, &offset);
+        case IPC_WORKER_MASTER_INFO:
+            result_pyld = ipc_serialize_worker_master_info(label, p->payload.ipc_worker_master_info, current_buffer, buffer_size, &offset);
+            break;
+        case IPC_WORKER_WORKER_INFO:
+            result_pyld = ipc_serialize_worker_worker_info(label, p->payload.ipc_worker_worker_info, current_buffer, buffer_size, &offset);
             break;
         case IPC_WORKER_MASTER_HEARTBEAT:
             result_pyld = ipc_serialize_worker_master_heartbeat(label, p->payload.ipc_worker_master_heartbeat, current_buffer, buffer_size, &offset);
@@ -397,22 +392,40 @@ static inline ipc_protocol_t_status_t ipc_deserialize(const char *label, oritlsf
             result_pyld = ipc_deserialize_master_worker_info(label, p, buffer, len, &current_buffer_offset);
             break;
 		}
-        case IPC_WORKER_MASTER_TASK_INFO: {
+        case IPC_WORKER_MASTER_INFO: {
             if (current_buffer_offset + fixed_payload_size > len) {
-                LOG_ERROR("%sBuffer terlalu kecil untuk IPC_WORKER_MASTER_TASK_INFO fixed header.", label);
+                LOG_ERROR("%sBuffer terlalu kecil untuk IPC_WORKER_MASTER_INFO fixed header.", label);
                 CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_OOBUF;
                 return result;
             }
-            ipc_worker_master_task_info_t *payload = (ipc_worker_master_task_info_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_worker_master_task_info_t));
+            ipc_worker_master_info_t *payload = (ipc_worker_master_info_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_worker_master_info_t));
             if (!payload) {
-                LOG_ERROR("%sFailed to allocate ipc_worker_master_task_info_t without FAM. %s", label, strerror(errno));
+                LOG_ERROR("%sFailed to allocate ipc_worker_master_info_t without FAM. %s", label, strerror(errno));
                 CLOSE_IPC_PROTOCOL(pool, &p);
                 result.status = FAILURE_NOMEM;
                 return result;
             }
-            p->payload.ipc_worker_master_task_info = payload;
-            result_pyld = ipc_deserialize_worker_master_task_info(label, p, buffer, len, &current_buffer_offset);
+            p->payload.ipc_worker_master_info = payload;
+            result_pyld = ipc_deserialize_worker_master_info(label, p, buffer, len, &current_buffer_offset);
+            break;
+		}
+		case IPC_WORKER_WORKER_INFO: {
+            if (current_buffer_offset + fixed_payload_size > len) {
+                LOG_ERROR("%sBuffer terlalu kecil untuk IPC_WORKER_WORKER_INFO fixed header.", label);
+                CLOSE_IPC_PROTOCOL(pool, &p);
+                result.status = FAILURE_OOBUF;
+                return result;
+            }
+            ipc_worker_worker_info_t *payload = (ipc_worker_worker_info_t*)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_worker_worker_info_t));
+            if (!payload) {
+                LOG_ERROR("%sFailed to allocate ipc_worker_worker_info_t without FAM. %s", label, strerror(errno));
+                CLOSE_IPC_PROTOCOL(pool, &p);
+                result.status = FAILURE_NOMEM;
+                return result;
+            }
+            p->payload.ipc_worker_worker_info = payload;
+            result_pyld = ipc_deserialize_worker_worker_info(label, p, buffer, len, &current_buffer_offset);
             break;
 		}
         case IPC_WORKER_MASTER_HEARTBEAT: {

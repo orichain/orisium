@@ -41,7 +41,7 @@ static inline status_t retry_transmit(
                 if (setup_cow_session(worker_ctx, session, c_wot, c_index, c_session_index) != SUCCESS) {
                     return FAILURE;
                 }
-                if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
+                if (worker_master_info(worker_ctx, c_session_index, IT_TIMEOUT) != SUCCESS) {
                     return FAILURE;
                 }
                 return FAILURE_MAXTRY;
@@ -77,7 +77,7 @@ static inline status_t retry_transmit(
                 if (setup_sio_session(worker_ctx, session, c_wot, c_index, c_session_index) != SUCCESS) {
                     return FAILURE;
                 }
-                if (worker_master_task_info(worker_ctx, c_session_index, TIT_TIMEOUT) != SUCCESS) {
+                if (worker_master_info(worker_ctx, c_session_index, IT_TIMEOUT) != SUCCESS) {
                     return FAILURE;
                 }
                 return FAILURE_MAXTRY;

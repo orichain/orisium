@@ -97,7 +97,10 @@ typedef struct {
     async_type_t master_async;
 //----------------------------------------------------------------------
     uint8_t last_sio_rr_idx;
+    uint8_t last_logic_rr_idx;
     uint8_t last_cow_rr_idx;
+    uint8_t last_dbr_rr_idx;
+    uint8_t last_dbw_rr_idx;
 //----------------------------------------------------------------------
     uint16_t listen_port;
     bootstrap_nodes_t bootstrap_nodes;

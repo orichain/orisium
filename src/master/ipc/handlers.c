@@ -116,8 +116,14 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
                             }
                             break;
                         }
-                        case IPC_WORKER_MASTER_TASK_INFO: {
-                            if (handle_master_ipc_task_info(label, master_ctx, rcvd_wot, rcvd_index, security, &ircvdi) != SUCCESS) {
+                        case IPC_WORKER_MASTER_INFO: {
+                            if (handle_master_ipc_info(label, master_ctx, rcvd_wot, rcvd_index, security, &ircvdi) != SUCCESS) {
+                                return FAILURE;
+                            }
+                            break;
+                        }
+                        case IPC_WORKER_WORKER_INFO: {
+                            if (handle_worker_ipc_info(label, master_ctx, rcvd_wot, rcvd_index, security, &ircvdi) != SUCCESS) {
                                 return FAILURE;
                             }
                             break;

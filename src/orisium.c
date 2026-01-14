@@ -2,43 +2,26 @@
 	#include <pthread.h>
 #endif
 
-#include <errno.h>
-#include <netdb.h>
-#include <netinet/in.h>
 #include <string.h>
-#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 
 #if defined(__NetBSD__)
-    #if defined(__clang__)
-        #if __clang_major__ < 21
-            #include <sys/signal.h>
-        #endif
-    #endif
+    #include <sys/signal.h>
     #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
         #include <pthread_types.h>
 
         #include "globals.h"
     #endif
 #elif defined(__OpenBSD__)
-    #if defined(__clang__)
-        #if __clang_major__ < 21
-            #include <sys/signal.h>
-        #endif
-    #endif
+    #include <sys/signal.h>
     #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
         #include "globals.h"
     #endif
 #elif defined(__FreeBSD__)
-    #if defined(__clang__)
-        #if __clang_major__ < 21
-            #include <sys/signal.h>
-        #endif
-    #endif
+    #include <sys/signal.h>
     #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
         #include <sys/_pthreadtypes.h>
-
         #include "globals.h"
     #endif
 #else
@@ -48,7 +31,6 @@
 #endif
 
 #include "log.h"
-#include "node.h"
 #include "master/master.h"
 #include "utilities.h"
 #include "types.h"
@@ -78,6 +60,7 @@ int main() {
 // Master
 //======================================================================
 	master_context_t master_ctx;
+	/*
     master_ctx.listen_port = (uint16_t)0;
     memset(&master_ctx.bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
     if (read_listen_port_and_bootstrap_nodes_from_json(
@@ -109,6 +92,7 @@ int main() {
         printf("[Master]:   - Node %d: IP %s, Port %s\n", i + 1, host_str, port_str);
     }
     printf("[Master]: -------------------------\n");
+    */
     if (setup_master("[Master]: ", &master_ctx) != SUCCESS) goto exit1;
     run_master("[Master]: ", &master_ctx);
 //======================================================================

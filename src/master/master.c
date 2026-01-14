@@ -1,9 +1,4 @@
-#if defined(__clang__)
-    #if __clang_major__ < 21
-        #include <stdio.h>
-    #endif
-#endif
-
+#include <stdio.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <stdint.h>
@@ -17,15 +12,14 @@
 #include "async.h"
 #include "utilities.h"
 #include "types.h"
-#include "master/udp/socket_udp.h"
 #include "master/udp/handlers.h"
 #include "master/ipc/handlers.h"
 #include "master/master_workers.h"
+#include "master/master_worker_selector.h"
+#include "master/master_worker_metrics.h"
 #include "master/master.h"
 #include "master/master_timer.h"
 #include "master/ipc/worker_ipc_cmds.h"
-#include "master/master_worker_metrics.h"
-#include "master/master_worker_selector.h"
 #include "node.h"
 #include "oritw.h"
 #include "oritlsf.h"
@@ -367,7 +361,10 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
     master_ctx->is_rekeying = false;
     master_ctx->all_workers_is_ready = false;
     master_ctx->last_sio_rr_idx = 0;
+    master_ctx->last_logic_rr_idx = 0;
     master_ctx->last_cow_rr_idx = 0;
+    master_ctx->last_dbr_rr_idx = 0;
+    master_ctx->last_dbw_rr_idx = 0;
 	master_ctx->master_pid = 0;
     master_ctx->ipv4_udp = -1;
     master_ctx->ipv6_udp = -1;
@@ -471,7 +468,10 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     master_ctx->is_rekeying = false;
     master_ctx->all_workers_is_ready = false;
     master_ctx->last_sio_rr_idx = 0;
+    master_ctx->last_logic_rr_idx = 0;
     master_ctx->last_cow_rr_idx = 0;
+    master_ctx->last_dbr_rr_idx = 0;
+    master_ctx->last_dbw_rr_idx = 0;
     async_delete_event(label, &master_ctx->master_async, &master_ctx->ipv4_udp, EIT_FD);
     CLOSE_FD(&master_ctx->ipv4_udp);
     async_delete_event(label, &master_ctx->master_async, &master_ctx->ipv6_udp, EIT_FD);
@@ -723,6 +723,26 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                         master_workers_info(label, master_ctx, IT_SHUTDOWN);
                                         continue;
                                     }
+                                    uint8_t worker_index = select_best_worker(label, master_ctx, LOGIC);
+									if (worker_index == 0xff) {
+										LOG_ERROR("%sFailed to select an LOGIC worker for new task. Initiating graceful shutdown...", label);
+										master_ctx->shutdown_requested = 1;
+										master_workers_info(label, master_ctx, IT_SHUTDOWN);
+										continue;
+									}
+									if (new_task_metrics(label, master_ctx, LOGIC, worker_index) != SUCCESS) {
+										LOG_ERROR("%sFailed to input new task in LOGIC %d metrics. Initiating graceful shutdown...", label, worker_index);
+										master_ctx->shutdown_requested = 1;
+										master_workers_info(label, master_ctx, IT_SHUTDOWN);
+										continue;
+									}
+									if (master_worker_info(label, master_ctx, LOGIC, worker_index, IT_AWKSRDY) != SUCCESS) {
+										LOG_ERROR("%sFailed to infoing AWKSRDY to LOGIC %d. Initiating graceful shutdown...", label, worker_index);
+										master_ctx->shutdown_requested = 1;
+										master_workers_info(label, master_ctx, IT_SHUTDOWN);
+										continue;
+									}
+                                    /*
                                     for (int ic = 0; ic < master_ctx->bootstrap_nodes.len; ic++) {
                                         uint8_t worker_index = select_best_worker(label, master_ctx, COW);
                                         if (worker_index == 0xff) {
@@ -777,6 +797,7 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                         continue;
                                     }
                                     LOG_INFO("%sPID %d UDP Server listening on port %d.", label, master_ctx->master_pid, master_ctx->listen_port);
+                                    */
                                 } else {
                                     master_ctx->is_rekeying = false;
                                 }

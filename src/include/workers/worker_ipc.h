@@ -11,7 +11,6 @@
 struct sockaddr_in6;
 
 status_t worker_master_heartbeat(worker_context_t *ctx, double new_heartbeat_interval_double);
-status_t worker_master_hello1(worker_context_t *ctx);
 status_t worker_master_hello2(worker_context_t *ctx, uint8_t encrypted_wot_index2[]);
 status_t worker_master_udp_data_ack_send_ipc(
     const char *label, 
@@ -35,8 +34,7 @@ status_t worker_master_udp_data_send_ipc(
     struct sockaddr_in6 *addr,
     packet_t *h
 );
-status_t worker_master_task_info(worker_context_t *ctx, uint8_t session_index, task_info_type_t flag);
-status_t handle_workers_ipc_info(worker_context_t *worker_ctx, double *initial_delay_ms, ipc_raw_protocol_t_status_t *ircvdi);
+status_t worker_master_info(worker_context_t *ctx, uint8_t session_index, info_type_t flag);
 status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void **worker_sessions, ipc_raw_protocol_t_status_t *ircvdi);
 status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_protocol_t_status_t *ircvdi);
 status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_protocol_t_status_t *ircvdi);

@@ -59,16 +59,13 @@ typedef enum {
 	IT_READY = (uint8_t)0x00,
     IT_SHUTDOWN = (uint8_t)0x01,
     IT_REKEYING = (uint8_t)0x02,
+    IT_AWKSRDY = (uint8_t)0x03,
+    IT_SECURE = (uint8_t)0x04,
+    IT_TIMEOUT = (uint8_t)0x05,
+    IT_RNIDTY = (uint8_t)0x06,
     
     IT_WAKEUP = (uint8_t)0xff
 } info_type_t;
-
-typedef enum {
-    TIT_SECURE = (uint8_t)0x00,
-	TIT_TIMEOUT = (uint8_t)0x01,
-    
-    TIT_WAKEUP = (uint8_t)0xff
-} task_info_type_t;
 
 typedef enum {
 	CONNECTED = (uint8_t)0x00,

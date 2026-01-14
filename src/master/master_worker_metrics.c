@@ -39,9 +39,18 @@ status_t new_task_metrics(const char *label, master_context_t *master_ctx, worke
     if (wot == SIO) {
         metrics = master_ctx->sio_session[index].metrics;
         task_count = &master_ctx->sio_session[index].task_count;
+    } else if (wot == LOGIC) {
+        metrics = master_ctx->logic_session[index].metrics;
+        task_count = &master_ctx->logic_session[index].task_count;
     } else if (wot == COW) {
         metrics = master_ctx->cow_session[index].metrics;
         task_count = &master_ctx->cow_session[index].task_count;
+    } else if (wot == DBR) {
+        metrics = master_ctx->dbr_session[index].metrics;
+        task_count = &master_ctx->dbr_session[index].task_count;
+    } else if (wot == DBW) {
+        metrics = master_ctx->dbw_session[index].metrics;
+        task_count = &master_ctx->dbw_session[index].task_count;
     }
     if (!task_count || !metrics) return FAILURE;
     *task_count += 1;
