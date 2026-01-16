@@ -22,6 +22,7 @@
     #include <sys/signal.h>
     #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
         #include <sys/_pthreadtypes.h>
+
         #include "globals.h"
     #endif
 #else
@@ -34,6 +35,7 @@
 #include "master/master.h"
 #include "utilities.h"
 #include "types.h"
+#include "constants.h"
 
 int main() {
 	printf("[Orisium]: ==========================================================\n");
@@ -47,7 +49,7 @@ int main() {
 //======================================================================
 // Configuring node and bootstrap
 //======================================================================
-	if (ensure_directory_exists("[Orisium]: ", "./database") != SUCCESS) goto exit2;
+	if (ensure_directory_exists("[Orisium]: ", DATABASE_PATH) != SUCCESS) goto exit2;
 //======================================================================
 // Install sigint handler
 //======================================================================    
