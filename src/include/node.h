@@ -61,7 +61,9 @@ typedef struct {
 	node_publickeys_t menag;
 	node_publickeys_t wamenag;
 	node_publickeys_t dprkemenag[DPR_COUNT];
-	node_publickeys_t irjen;
+	node_publickeys_t irjen1;
+	node_publickeys_t irjen2;
+	node_publickeys_t irjen3;
 	uint8_t ab[IPV6_ADDRESS_LEN][AB_COUNT];
 	uint8_t prevhash[HASHES_BYTES];
 	uint8_t hash[HASHES_BYTES];
@@ -71,7 +73,7 @@ typedef struct {
 #define TABLE_ERA_SIZE ( \
     sizeof(uint64_t) + \
     (2 * sizeof(uint8_t)) + \
-    (27 * (SIGN_PUBLICKEY_BYTES + KEM_PUBLICKEY_BYTES)) + \
+    (29 * (SIGN_PUBLICKEY_BYTES + KEM_PUBLICKEY_BYTES)) + \
     (12 * DPR_COUNT * (SIGN_PUBLICKEY_BYTES + KEM_PUBLICKEY_BYTES)) + \
     (AB_COUNT * IPV6_ADDRESS_LEN) + \
     (2 * HASHES_BYTES) + \

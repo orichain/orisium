@@ -2,9 +2,7 @@
 #define DATABASE_H
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include <lmdb.h>
 
 #if defined(__NetBSD__)
