@@ -34,6 +34,7 @@ et_buffered_event_id_t *shutdown_event_fd = NULL;
 oritlsf_pool_t *oritlsf_pool = NULL;
 async_type_t *master_async = NULL;
 MDB_env *g_database_env = NULL;
+MDB_dbi g_table_era;
 
 void sigint_handler(int signum) {
     shutdown_requested = 1ULL;
@@ -51,6 +52,8 @@ void sigint_handler(int signum) {
 
 status_t setup_master(const char *label, master_context_t *master_ctx) {
 	database_init_env(label, &g_database_env, DATABASE_PATH, DB_MAPSIZE, MAX_TABLES);
+	unsigned int flags = MDB_INTEGERKEY;
+	database_open(label, g_database_env, &g_table_era, TABLE_ERA_NAME, flags);
     master_ctx->arena_buffer = (uint8_t *)calloc(1, MASTER_ARENA_SIZE);
     int result = oritlsf_setup_pool(&master_ctx->oritlsf_pool, master_ctx->arena_buffer, MASTER_ARENA_SIZE);
     if (result != 0) {
@@ -501,6 +504,7 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
         LOG_ERROR("%sFailed To oritlsf_cleanup_pool.", label);
     }
     free(master_ctx->arena_buffer);
+    database_close(g_database_env, g_table_era);
     database_deinit_env(label, &g_database_env);
 }
 

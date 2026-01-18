@@ -25,6 +25,9 @@
 #define DATABASE_PATH "./database"
 #define DB_MAPSIZE (64ULL * 1024ULL * 1024ULL * 1024ULL)
 #define MAX_TABLES 64
+#define TABLE_ERA_NAME "table_era"
+#define AB_COUNT 10
+#define DPR_COUNT 10
 
 #define PARALLEL_DATA_WINDOW_SIZE 256
 

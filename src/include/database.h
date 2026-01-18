@@ -17,11 +17,6 @@
 #include "log.h"
 
 typedef struct {
-    MDB_env *env;
-    MDB_dbi dbi;
-} database_t;
-
-typedef struct {
     MDB_txn *txn;
     int readonly;
 } database_txn_t;
@@ -67,29 +62,10 @@ static inline void database_deinit_env(
     }
 }
 
-static inline int database_init(
-    const char *label,
-    MDB_env *env,
-    database_t *db
-)
-{
-    int rc;
-    MDB_txn *txn;
-    db->env = env;
-    rc = mdb_txn_begin(db->env, NULL, 0, &txn);
-    if (database_error(label, rc)) return rc;
-    rc = mdb_dbi_open(txn, NULL, MDB_CREATE, &db->dbi);
-    if (rc != MDB_SUCCESS) {
-        mdb_txn_abort(txn);
-        return database_error(label, rc);
-    }
-    return mdb_txn_commit(txn);
-}
-
 static inline int database_open(
     const char *label,
-    database_t *db,
     MDB_env *env,
+    MDB_dbi *dbi,
     const char *name,
     unsigned flags
 ) 
@@ -97,30 +73,32 @@ static inline int database_open(
     MDB_txn *txn;
     int rc;
 
-    db->env = env;
-
     rc = mdb_txn_begin(env, NULL, 0, &txn);
     if (database_error(label, rc)) return rc;
 
-    rc = mdb_dbi_open(txn, name, MDB_CREATE | flags, &db->dbi);
+    rc = mdb_dbi_open(txn, name, MDB_CREATE | flags, dbi);
     if (rc != MDB_SUCCESS) {
         mdb_txn_abort(txn);
         return database_error(label, rc);
     }
 
-    return mdb_txn_commit(txn);
+    rc = mdb_txn_commit(txn);
+    return database_error(label, rc);
 }
 
-static inline void database_close(database_t *db) {
-    if (db && db->env) {
-        mdb_dbi_close(db->env, db->dbi);
-        db->env = NULL;
+static inline void database_close(
+	MDB_env *env,
+    MDB_dbi dbi
+)
+{
+    if (env) {
+        mdb_dbi_close(env, dbi);
     }
 }
 
 static inline int database_txn_begin(
     const char *label,
-    database_t *db,
+    MDB_env *env,
     database_txn_t *t,
     int readonly
 ) 
@@ -129,7 +107,7 @@ static inline int database_txn_begin(
     return database_error(
         label,
         mdb_txn_begin(
-            db->env,
+            env,
             NULL,
             readonly ? MDB_RDONLY : 0,
             &t->txn
@@ -142,20 +120,25 @@ static inline int database_txn_commit(
     database_txn_t *t
 ) 
 {
-    return database_error(label, mdb_txn_commit(t->txn));
+	int rc = mdb_txn_commit(t->txn);
+    t->txn = NULL;
+    return database_error(label, rc);
 }
 
 static inline void database_txn_abort(database_txn_t *t) {
-    mdb_txn_abort(t->txn);
+    if (t && t->txn) {
+        mdb_txn_abort(t->txn);
+        t->txn = NULL;
+    }
 }
 
 static inline int database_batch_begin(
     const char *label,
-    database_t *db,
+    MDB_env *env,
     database_txn_t *t
 ) 
 {
-    return database_txn_begin(label, db, t, 0);
+    return database_txn_begin(label, env, t, 0);
 }
 
 static inline int database_batch_commit(
@@ -210,7 +193,8 @@ static inline int database_txn_del(
 
 static inline int database_put(
     const char *label,
-    database_t *db,
+    MDB_env *env,
+    MDB_dbi dbi,
     const void *key,
     size_t klen,
     const void *val,
@@ -219,10 +203,10 @@ static inline int database_put(
 ) 
 {
     database_txn_t t;
-    int rc = database_txn_begin(label, db, &t, 0);
+    int rc = database_txn_begin(label, env, &t, 0);
     if (rc) return rc;
 
-    rc = database_txn_put(label, &t, db->dbi, key, klen, val, vlen, flags);
+    rc = database_txn_put(label, &t, dbi, key, klen, val, vlen, flags);
     if (rc) {
         database_txn_abort(&t);
         return rc;
@@ -233,7 +217,8 @@ static inline int database_put(
 static inline int database_get(
     const char *label,
     oritlsf_pool_t *pool, 
-    database_t *db,
+    MDB_env *env,
+    MDB_dbi dbi,
     const void *key,
     size_t klen,
     void **out,
@@ -242,10 +227,10 @@ static inline int database_get(
 {
     database_txn_t t;
     MDB_val v;
-    int rc = database_txn_begin(label, db, &t, 1);
+    int rc = database_txn_begin(label, env, &t, 1);
     if (rc) return rc;
 
-    rc = database_txn_get(&t, db->dbi, key, klen, &v);
+    rc = database_txn_get(&t, dbi, key, klen, &v);
     if (rc != MDB_SUCCESS) {
         database_txn_abort(&t);
         return rc;
@@ -266,16 +251,17 @@ static inline int database_get(
 
 static inline int database_del(
     const char *label,
-    database_t *db,
+    MDB_env *env,
+    MDB_dbi dbi,
     const void *key,
     size_t klen
 ) 
 {
     database_txn_t t;
-    int rc = database_txn_begin(label, db, &t, 0);
+    int rc = database_txn_begin(label, env, &t, 0);
     if (rc) return rc;
 
-    rc = database_txn_del(label, &t, db->dbi, key, klen);
+    rc = database_txn_del(label, &t, dbi, key, klen);
     if (rc) {
         database_txn_abort(&t);
         return rc;
@@ -285,7 +271,8 @@ static inline int database_del(
 
 static inline int database_zc_get(
     const char *label,
-    database_t *db,
+    MDB_env *env,
+    MDB_dbi dbi,
     MDB_txn **out_txn,
     const void *key,
     size_t klen,
@@ -298,10 +285,10 @@ static inline int database_zc_get(
     MDB_val v;
     int rc;
 
-    rc = mdb_txn_begin(db->env, NULL, MDB_RDONLY, &txn);
+    rc = mdb_txn_begin(env, NULL, MDB_RDONLY, &txn);
     if (database_error(label, rc)) return rc;
 
-    rc = mdb_get(txn, db->dbi, &k, &v);
+    rc = mdb_get(txn, dbi, &k, &v);
     if (rc != MDB_SUCCESS) {
         mdb_txn_abort(txn);
         return rc;
@@ -314,7 +301,7 @@ static inline int database_zc_get(
 }
 
 static inline void database_zc_abort(MDB_txn *txn) {
-    mdb_txn_abort(txn);
+    if (txn) mdb_txn_abort(txn);
 }
 
 static inline int database_cursor_open(
@@ -328,7 +315,10 @@ static inline int database_cursor_open(
 }
 
 static inline void database_cursor_close(database_cursor_t *c) {
-    mdb_cursor_close(c->cur);
+    if (c && c->cur) {
+        mdb_cursor_close(c->cur);
+        c->cur = NULL;
+    }
 }
 
 static inline int database_cursor_get_first(database_cursor_t *c, MDB_val *k, MDB_val *v) {
@@ -424,13 +414,8 @@ static inline int database_get_prev(
     if (rc != MDB_SUCCESS) return rc;
 
     rc = mdb_cursor_get(cur, &k, outv, MDB_SET_RANGE);
-    if (rc == MDB_SUCCESS) {
-        if (k.mv_size == klen &&
-            memcmp(k.mv_data, key, klen) == 0)
-            rc = mdb_cursor_get(cur, &k, outv, MDB_PREV);
-        else
-            rc = mdb_cursor_get(cur, &k, outv, MDB_PREV);
-    }
+    if (rc == MDB_SUCCESS)
+        rc = mdb_cursor_get(cur, &k, outv, MDB_PREV);
 
     if (rc == MDB_SUCCESS)
         *outk = k;

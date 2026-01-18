@@ -16,6 +16,8 @@
 #include "orilink/protocol.h"
 #include "orilink.h"
 #include "stdbool.h"
+#include "node.h"
+#include "globals.h"
 #include "orilink/heartbeat_ack.h"
 
 static inline status_t handle_master_workers_ipc_info(worker_context_t *worker_ctx, double *initial_delay_ms, ipc_raw_protocol_t_status_t *ircvdi) {
@@ -130,7 +132,13 @@ static inline status_t handle_worker_workers_ipc_info(worker_context_t *worker_c
     ipc_worker_worker_info_t *iinfoi = received_protocol->payload.ipc_worker_worker_info;
     switch (iinfoi->flag) {
         case IT_RNIDTY: {
-            LOG_DEVEL_DEBUG("%sIT_RNIDTY from Logic %d", worker_ctx->label, iinfoi->src_index);
+			era_t *out_era = NULL;
+            int rc = database_get_latest_era(worker_ctx->label, &worker_ctx->oritlsf_pool, g_database_env, g_table_era, &out_era);
+            if (rc != MDB_NOTFOUND) {
+				oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&out_era);	
+			} else {
+				LOG_ERROR("%sTable Era Masih Kosong.", worker_ctx->label);
+			}
             CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             break;
         }
