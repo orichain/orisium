@@ -99,37 +99,49 @@ status_t handle_worker_ipc_info(const char *label, master_context_t *master_ctx,
     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
     ipc_worker_worker_info_t *iinfoi = received_protocol->payload.ipc_worker_worker_info;
     switch (iinfoi->flag) {
-        case IT_RNIDTY: {
+		case IT_READNKEYS:
+        case IT_NKEYSEMPTY:
+        case IT_WNKEYS: 
+        case IT_READERA:
+        case IT_ERAEMPTY:
+        case IT_WGENESISERA: {
             if (calculate_avgtt(label, master_ctx, rcvd_wot, rcvd_index) != SUCCESS) {
                 CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
                 return FAILURE;
             }
-            uint8_t worker_index = select_best_worker(label, master_ctx, DBR);
+            uint8_t worker_index = 0xff;
+            if (iinfoi->dst_index == 0xff) {
+				worker_index = select_best_worker(label, master_ctx, iinfoi->dst_wot);
+			} else {
+				worker_index = iinfoi->dst_index;
+			}
+			const char *worker_name = get_worker_name(iinfoi->dst_wot);
 			if (worker_index == 0xff) {
-				LOG_ERROR("%sFailed to select an DBR worker for new task. Initiating graceful shutdown...", label);
+				LOG_ERROR("%sFailed to select an %s worker for new task. Initiating graceful shutdown...", label, worker_name);
 				master_ctx->shutdown_requested = 1;
 				master_workers_info(label, master_ctx, IT_SHUTDOWN);
 				CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
                 return FAILURE;
 			}
-			if (new_task_metrics(label, master_ctx, DBR, worker_index) != SUCCESS) {
-				LOG_ERROR("%sFailed to input new task in DBR %d metrics. Initiating graceful shutdown...", label, worker_index);
+			if (new_task_metrics(label, master_ctx, iinfoi->dst_wot, worker_index) != SUCCESS) {
+				LOG_ERROR("%sFailed to input new task in %s %d metrics. Initiating graceful shutdown...", label, worker_name, worker_index);
 				master_ctx->shutdown_requested = 1;
 				master_workers_info(label, master_ctx, IT_SHUTDOWN);
 				CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
                 return FAILURE;
 			}
-			if (logic_master_dbr_read_node_identity(
+			if (relay_worker_master_worker_info(
 					label, 
 					master_ctx, 
-					DBR, 
+					iinfoi->dst_wot, 
 					worker_index, 
+					iinfoi->src_wot,
 					iinfoi->src_index,
-					IT_RNIDTY
+					iinfoi->flag
 				) != SUCCESS
 			)
 			{
-				LOG_ERROR("%sFailed to infoing IT_RNIDTY to DBR %d. Initiating graceful shutdown...", label, worker_index);
+				LOG_ERROR("%sFailed to infoing %d to %s %d. Initiating graceful shutdown...", label, iinfoi->flag, worker_name, worker_index);
 				master_ctx->shutdown_requested = 1;
 				master_workers_info(label, master_ctx, IT_SHUTDOWN);
 				return FAILURE;

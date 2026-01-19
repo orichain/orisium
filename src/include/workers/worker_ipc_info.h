@@ -99,7 +99,7 @@ static inline status_t handle_master_workers_ipc_info(worker_context_t *worker_c
             break;
         }
         case IT_AWKSRDY: {
-            if (logic_dbr_read_node_identity(worker_ctx) != SUCCESS) {
+            if (worker_master_worker_info(worker_ctx, DBR, 0xff, IT_READNKEYS) != SUCCESS) {
                 LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
                 worker_ctx->shutdown_requested = 1;
                 CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
@@ -131,13 +131,54 @@ static inline status_t handle_worker_workers_ipc_info(worker_context_t *worker_c
     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
     ipc_worker_worker_info_t *iinfoi = received_protocol->payload.ipc_worker_worker_info;
     switch (iinfoi->flag) {
-        case IT_RNIDTY: {
-			era_t *out_era = NULL;
-            int rc = database_get_latest_era(worker_ctx->label, &worker_ctx->oritlsf_pool, g_database_env, g_table_era, &out_era);
+		case IT_READNKEYS: {
+			nodekeys_t *out_nodekeys_nodekeys = NULL;
+            int rc = nodekeys_nodekeys_get_last(worker_ctx->label, &worker_ctx->oritlsf_pool, g_nodekeys_env, g_nodekeys_nodekeys, &out_nodekeys_nodekeys);
             if (rc != MDB_NOTFOUND) {
-				oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&out_era);	
+				oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&out_nodekeys_nodekeys);	
 			} else {
-				LOG_ERROR("%sTable Era Masih Kosong.", worker_ctx->label);
+				if (worker_master_worker_info(worker_ctx, iinfoi->src_wot, iinfoi->src_index, IT_NKEYSEMPTY) != SUCCESS) {
+					LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
+					worker_ctx->shutdown_requested = 1;
+					CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+					return FAILURE;
+				}
+			}
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+            break;
+        }
+        case IT_NKEYSEMPTY: {
+			if (worker_master_worker_info(worker_ctx, DBW, 0x00, IT_WNKEYS) != SUCCESS) {
+				LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
+				worker_ctx->shutdown_requested = 1;
+				CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+				return FAILURE;
+			}
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+            break;
+        }
+        case IT_READERA: {
+			era_t *out_database_era = NULL;
+            int rc = database_era_get_last(worker_ctx->label, &worker_ctx->oritlsf_pool, g_database_env, g_database_era, &out_database_era);
+            if (rc != MDB_NOTFOUND) {
+				oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&out_database_era);	
+			} else {
+				if (worker_master_worker_info(worker_ctx, iinfoi->src_wot, iinfoi->src_index, IT_ERAEMPTY) != SUCCESS) {
+					LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
+					worker_ctx->shutdown_requested = 1;
+					CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+					return FAILURE;
+				}
+			}
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+            break;
+        }
+        case IT_ERAEMPTY: {
+			if (worker_master_worker_info(worker_ctx, DBW, 0x00, IT_WGENESISERA) != SUCCESS) {
+				LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
+				worker_ctx->shutdown_requested = 1;
+				CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+				return FAILURE;
 			}
             CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             break;

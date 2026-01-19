@@ -15,6 +15,68 @@
 #include "oritlsf.h"
 
 typedef struct {
+	uint64_t no;
+	uint8_t vermaj;	
+	uint8_t vermin;
+	uint8_t sgn_privatekey[SIGN_PRIVATEKEY_BYTES];
+	uint8_t sgn_publickey[SIGN_PUBLICKEY_BYTES];
+	uint8_t kem_privatekey[KEM_PRIVATEKEY_BYTES];
+	uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
+} nodekeys_t;
+
+#define NODEKEYS_NODEKEYS_SIZE ( \
+    sizeof(uint64_t) + \
+    (2 * sizeof(uint8_t)) + \
+    SIGN_PRIVATEKEY_BYTES + \
+    SIGN_PUBLICKEY_BYTES + \
+    KEM_PRIVATEKEY_BYTES + \
+    KEM_PUBLICKEY_BYTES \
+)
+
+static inline int nodekeys_nodekeys_get_last(
+	const char *label,
+    oritlsf_pool_t *pool,
+    MDB_env *env,
+    MDB_dbi dbi,
+    nodekeys_t **out_nodekeys_nodekeys
+)
+{
+    database_txn_t t;
+    database_cursor_t c;
+    MDB_val k, v;
+    int rc;
+    rc = database_txn_begin(label, env, &t, 1);
+    if (rc != MDB_SUCCESS) return rc;
+    rc = database_cursor_open(label, &t, dbi, &c);
+    if (rc != MDB_SUCCESS) {
+        database_txn_abort(&t);
+        return rc;
+    }
+    rc = database_cursor_get_last(&c, &k, &v);
+    if (rc != MDB_SUCCESS) {
+        database_cursor_close(&c);
+        database_txn_abort(&t);
+        return rc;
+    }
+    *out_nodekeys_nodekeys = (nodekeys_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, NODEKEYS_NODEKEYS_SIZE);
+    if (!*out_nodekeys_nodekeys) {
+        database_cursor_close(&c);
+        database_txn_abort(&t);
+        return ENOMEM;
+    }
+    if (v.mv_size != NODEKEYS_NODEKEYS_SIZE) {
+        LOG_ERROR("ERA: Data size mismatch! Expected %zu, got %zu", NODEKEYS_NODEKEYS_SIZE, v.mv_size);
+        database_cursor_close(&c);
+        database_txn_abort(&t);
+        return MDB_CORRUPTED;
+    }
+    memcpy(*out_nodekeys_nodekeys, v.mv_data, v.mv_size);
+    database_cursor_close(&c);
+    database_txn_abort(&t);
+    return MDB_SUCCESS;
+}
+
+typedef struct {
 	uint8_t sgn_publickey[SIGN_PUBLICKEY_BYTES];
 	uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
 } node_publickeys_t;
@@ -70,7 +132,7 @@ typedef struct {
 	uint8_t signature[SIGN_GENERATE_SIGNATURE_BBYTES];
 } era_t;
 
-#define TABLE_ERA_SIZE ( \
+#define DATABASE_ERA_SIZE ( \
     sizeof(uint64_t) + \
     (2 * sizeof(uint8_t)) + \
     (29 * (SIGN_PUBLICKEY_BYTES + KEM_PUBLICKEY_BYTES)) + \
@@ -80,12 +142,12 @@ typedef struct {
     SIGN_GENERATE_SIGNATURE_BBYTES \
 )
 
-static inline int database_get_latest_era(
+static inline int database_era_get_last(
 	const char *label,
     oritlsf_pool_t *pool,
     MDB_env *env,
     MDB_dbi dbi,
-    era_t **out_era
+    era_t **out_database_era
 )
 {
     database_txn_t t;
@@ -105,19 +167,19 @@ static inline int database_get_latest_era(
         database_txn_abort(&t);
         return rc;
     }
-    *out_era = (era_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, TABLE_ERA_SIZE);
-    if (!*out_era) {
+    *out_database_era = (era_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, DATABASE_ERA_SIZE);
+    if (!*out_database_era) {
         database_cursor_close(&c);
         database_txn_abort(&t);
         return ENOMEM;
     }
-    if (v.mv_size != TABLE_ERA_SIZE) {
-        LOG_ERROR("ERA: Data size mismatch! Expected %zu, got %zu", TABLE_ERA_SIZE, v.mv_size);
+    if (v.mv_size != DATABASE_ERA_SIZE) {
+        LOG_ERROR("ERA: Data size mismatch! Expected %zu, got %zu", DATABASE_ERA_SIZE, v.mv_size);
         database_cursor_close(&c);
         database_txn_abort(&t);
         return MDB_CORRUPTED;
     }
-    memcpy(*out_era, v.mv_data, v.mv_size);
+    memcpy(*out_database_era, v.mv_data, v.mv_size);
     database_cursor_close(&c);
     database_txn_abort(&t);
     return MDB_SUCCESS;

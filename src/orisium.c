@@ -50,6 +50,7 @@ int main() {
 // Configuring node and bootstrap
 //======================================================================
 	if (ensure_directory_exists("[Orisium]: ", DATABASE_PATH) != SUCCESS) goto exit2;
+	if (ensure_directory_exists("[Orisium]: ", NODEKEYS_PATH) != SUCCESS) goto exit2;
 //======================================================================
 // Install sigint handler
 //======================================================================    

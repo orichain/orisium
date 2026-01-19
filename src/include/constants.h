@@ -22,10 +22,14 @@
 #define MASTER_ARENA_SIZE (5 * 1024 * 1024)
 #define WORKER_ARENA_SIZE (10 * 1024 * 1024)
 
+#define NODEKEYS_PATH "./nodekeys"
+#define NODEKEYS_MAPSIZE (1024ULL * 1024ULL)
+#define NODEKEYS_TABLES 1
+#define NODEKEYS_NODEKEYS_NAME "table_nodekeys"
 #define DATABASE_PATH "./database"
-#define DB_MAPSIZE (64ULL * 1024ULL * 1024ULL * 1024ULL)
-#define MAX_TABLES 64
-#define TABLE_ERA_NAME "table_era"
+#define DATABASE_MAPSIZE (64ULL * 1024ULL * 1024ULL * 1024ULL)
+#define DATABASE_TABLES 64
+#define DATABASE_ERA_NAME "table_era"
 #define AB_COUNT 10
 #define DPR_COUNT 10
 

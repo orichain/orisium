@@ -11,7 +11,7 @@
 #include "oritlsf.h"
 
 status_t handle_master_ipc_closed_event(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index, int *file_descriptor) {
-	const char *worker_name = get_master_worker_name(wot);
+	const char *worker_name = get_worker_name(wot);
     LOG_DEBUG("%sWorker UDS FD %d (%s Worker %d) terputus.", label, *file_descriptor, worker_name, index);
 	return SUCCESS;
 }
@@ -47,7 +47,7 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
                         CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi.r_ipc_raw_protocol_t);
                         return FAILURE;
                     }
-                    const char *worker_name = get_master_worker_name(rcvd_wot);
+                    const char *worker_name = get_worker_name(rcvd_wot);
                     worker_security_t *security = session->security;
                     worker_rekeying_t *rekeying = session->rekeying;
                     int *worker_uds_fd = &session->upp->uds[0];

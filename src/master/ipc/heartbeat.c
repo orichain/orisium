@@ -19,7 +19,7 @@ status_t handle_master_ipc_heartbeat(const char *label, master_context_t *master
         CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
         return FAILURE;
     }
-    const char *worker_name = get_master_worker_name(rcvd_wot);
+    const char *worker_name = get_worker_name(rcvd_wot);
     if (deserialized_ircvdi.status != SUCCESS) {
         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", label, deserialized_ircvdi.status);
         CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);

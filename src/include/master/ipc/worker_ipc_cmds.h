@@ -222,7 +222,7 @@ static inline status_t master_worker_udp_data(
     et_buffer_t *buffer = session->buffer;
     worker_security_t *security = session->security;
     const char *worker_name = "UNKNOWN";
-    worker_name = get_master_worker_name(wot);
+    worker_name = get_worker_name(wot);
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data(
         label,
         &master_ctx->oritlsf_pool, 
@@ -285,7 +285,7 @@ static inline status_t master_worker_udp_data_ack(
     et_buffer_t *buffer = session->buffer;
     worker_security_t *security = session->security;
     const char *worker_name = "UNKNOWN";
-    worker_name = get_master_worker_name(wot);
+    worker_name = get_worker_name(wot);
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data_ack(
         label,
         &master_ctx->oritlsf_pool, 
@@ -328,11 +328,12 @@ static inline status_t master_worker_udp_data_ack(
     return SUCCESS;
 }
 
-static inline status_t logic_master_dbr_read_node_identity(
+static inline status_t relay_worker_master_worker_info(
 	const char *label, 
     master_context_t *master_ctx, 
     worker_type_t wot, 
     uint8_t index,
+    worker_type_t src_wot, 
 	uint8_t src_index,
 	info_type_t flag
 )
@@ -344,19 +345,19 @@ static inline status_t logic_master_dbr_read_node_identity(
     et_buffer_t *buffer = session->buffer;
     worker_security_t *security = session->security;
     const char *worker_name = "UNKNOWN";
-    worker_name = get_master_worker_name(wot);
+    worker_name = get_worker_name(wot);
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_worker_info(
         label,
         &master_ctx->oritlsf_pool, 
         wot, 
         index, 
-        LOGIC,
+        src_wot,
         src_index, 
         0xff,
         wot,
         index,
         0xff,
-        IT_RNIDTY
+        flag
     );
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
@@ -379,11 +380,11 @@ static inline status_t logic_master_dbr_read_node_identity(
             cmd_result.r_ipc_protocol_t
         );
         if (send_result.status != SUCCESS) {
-            LOG_ERROR("%sFailed to sent udp_data to %s.", label, worker_name);
+            LOG_ERROR("%sFailed to sent relay_worker_master_worker_info to %s.", label, worker_name);
             CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
             return FAILURE;
         } else {
-            LOG_DEBUG("%sSent udp_data to %s.", label, worker_name);
+            LOG_DEBUG("%sSent relay_worker_master_worker_info to %s.", label, worker_name);
         }
         CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
 	}

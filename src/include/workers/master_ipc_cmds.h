@@ -51,19 +51,19 @@ static inline status_t worker_master_hello1(worker_context_t *ctx) {
     return SUCCESS;
 }
 
-static inline status_t logic_dbr_read_node_identity(worker_context_t *ctx) {
+static inline status_t worker_master_worker_info(worker_context_t *ctx, worker_type_t dst_wot, uint8_t dst_index, info_type_t flag) {
 	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_worker_info(
         ctx->label,
         &ctx->oritlsf_pool,  
         *ctx->wot, 
         *ctx->index, 
-        LOGIC,
+        *ctx->wot,
         *ctx->index, 
         0xff,
-        DBR,
+        dst_wot,
+        dst_index,
         0xff,
-        0xff,
-        IT_RNIDTY
+        flag
     );
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
@@ -80,11 +80,11 @@ static inline status_t logic_dbr_read_node_identity(worker_context_t *ctx) {
         cmd_result.r_ipc_protocol_t
     );
     if (send_result.status != SUCCESS) {
-        LOG_ERROR("%sFailed to sent logic_dbr_read_node_identity to Master.", ctx->label);
+        LOG_ERROR("%sFailed to sent worker_master_worker_info to Master.", ctx->label);
         CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
         return send_result.status;
     } else {
-        LOG_DEBUG("%sSent logic_dbr_read_node_identity to Master.", ctx->label);
+        LOG_DEBUG("%sSent worker_master_worker_info to Master.", ctx->label);
     }
     CLOSE_IPC_PROTOCOL(&ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
     return SUCCESS;

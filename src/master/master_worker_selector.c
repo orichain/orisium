@@ -14,7 +14,7 @@
 #include "master/master.h"
 
 uint8_t select_best_worker(const char *label, master_context_t *master_ctx, worker_type_t wot) {
-    const char *worker_name = get_master_worker_name(wot);
+    const char *worker_name = get_worker_name(wot);
     uint8_t selected_worker_idx = 0xff;
     long double min_avg_task_time = LDBL_MAX;
     uint64_t min_longest_task_time = ULLONG_MAX;

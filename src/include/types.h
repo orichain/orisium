@@ -55,6 +55,28 @@ typedef enum {
     DBW = (uint8_t)0x05
 } worker_type_t;
 
+static inline const char *get_worker_name(worker_type_t wot) {
+    switch (wot) {
+        case SIO: {
+            return "SIO";
+        }
+        case LOGIC: {
+            return "LOGIC";
+        }
+        case COW: {
+            return "COW";
+        }
+        case DBR: {
+            return "DBR";
+        }
+        case DBW: {
+            return "DBW";
+        }
+        default:
+            return "UNKNOWN";
+    }
+}
+
 typedef enum {
 	IT_READY = (uint8_t)0x00,
     IT_SHUTDOWN = (uint8_t)0x01,
@@ -62,7 +84,12 @@ typedef enum {
     IT_AWKSRDY = (uint8_t)0x03,
     IT_SECURE = (uint8_t)0x04,
     IT_TIMEOUT = (uint8_t)0x05,
-    IT_RNIDTY = (uint8_t)0x06,
+    IT_READNKEYS = (uint8_t)0x06,
+    IT_NKEYSEMPTY = (uint8_t)0x07,
+    IT_WNKEYS = (uint8_t)0x08,
+    IT_READERA = (uint8_t)0x09,
+    IT_ERAEMPTY = (uint8_t)0x0a,
+    IT_WGENESISERA = (uint8_t)0x0b,
     
     IT_WAKEUP = (uint8_t)0xff
 } info_type_t;

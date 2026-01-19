@@ -147,28 +147,6 @@ static inline master_worker_session_t *get_master_worker_session(master_context_
     }
 }
 
-static inline const char *get_master_worker_name(worker_type_t wot) {
-    switch (wot) {
-        case SIO: {
-            return "SIO";
-        }
-        case LOGIC: {
-            return "LOGIC";
-        }
-        case COW: {
-            return "COW";
-        }
-        case DBR: {
-            return "DBR";
-        }
-        case DBW: {
-            return "DBW";
-        }
-        default:
-            return "UNKNOWN";
-    }
-}
-
 //----------------------------------------------------------------------
 void sigint_handler(int signum);
 //----------------------------------------------------------------------

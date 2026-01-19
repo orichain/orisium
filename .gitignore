@@ -1,3 +1,5 @@
+nodekeys/*
+!nodekeys/.gitkeep
 iwyu/*
 !iwyu/.gitkeep
 obj/

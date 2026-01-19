@@ -70,7 +70,7 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
     if (session == NULL) {
         return FAILURE;
     }
-    const char *worker_name = get_master_worker_name(wot);
+    const char *worker_name = get_worker_name(wot);
     uds_pair_pid_t *upp = session->upp;
     worker_security_t *security = session->security;
     worker_rekeying_t *rekeying = session->rekeying;
@@ -242,7 +242,7 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
     if (session == NULL) {
         return FAILURE;
     }
-    const char *worker_name = get_master_worker_name(wot);
+    const char *worker_name = get_worker_name(wot);
     double initial_delay_ms = (double)0;
     session->upp->pid = fork();
     if (session->upp->pid == -1) {
@@ -367,7 +367,7 @@ status_t calculate_avgtt(const char *label, master_context_t *master_ctx, worker
     if (session == NULL) {
         return FAILURE;
     }
-    const char *worker_name = get_master_worker_name(wot);
+    const char *worker_name = get_worker_name(wot);
     uint64_t_status_t rt = get_monotonic_time_ns(label);
     if (rt.status != SUCCESS) return rt.status;
     worker_metrics_t *metrics = session->metrics;
@@ -426,7 +426,7 @@ status_t calculate_healthy(const char* label, master_context_t *master_ctx, work
     if (session == NULL) {
         return FAILURE;
     }
-    const char *worker_name = get_master_worker_name(wot);
+    const char *worker_name = get_worker_name(wot);
     uint64_t_status_t rt = get_monotonic_time_ns(label);
     if (rt.status != SUCCESS) return rt.status;
     worker_metrics_t *metrics = session->metrics;
