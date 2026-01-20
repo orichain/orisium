@@ -9,6 +9,7 @@ logs/
 test/
 orisium
 orisium.core
+commit.sh
 iwyu_applied_c.log
 iwyu_failed_c.log
 iwyu_applied_h.log
