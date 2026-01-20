@@ -8,6 +8,7 @@ obj/
 logs/
 test/
 orisium
+orisium.core
 iwyu_applied_c.log
 iwyu_failed_c.log
 iwyu_applied_h.log
