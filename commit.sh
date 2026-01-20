@@ -5,13 +5,6 @@ if [ ! -d ".git" ]; then
     exit 1
 fi
 
-FILE_TO_IGNORE="config.json"
-
-if [ -f "$FILE_TO_IGNORE" ]; then
-    git update-index --assume-unchanged "$FILE_TO_IGNORE"
-    echo "Info: '$FILE_TO_IGNORE' ditandai sebagai assume-unchanged."
-fi
-
 git add .
 
 echo ""
