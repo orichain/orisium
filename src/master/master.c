@@ -35,9 +35,9 @@ oritlsf_pool_t *oritlsf_pool = NULL;
 async_type_t *master_async = NULL;
 //======================================================================
 MDB_env *g_nodekeys_env = NULL;
-MDB_dbi g_nodekeys_nodekeys;
+MDB_dbi g_nodekeys_keys = 0;
 MDB_env *g_database_env = NULL;
-MDB_dbi g_database_era;
+MDB_dbi g_database_era = 0;
 //======================================================================
 
 void sigint_handler(int signum) {
@@ -57,7 +57,7 @@ void sigint_handler(int signum) {
 status_t setup_master(const char *label, master_context_t *master_ctx) {
 	unsigned int flags = MDB_INTEGERKEY;
 	database_init_env(label, &g_nodekeys_env, NODEKEYS_PATH, NODEKEYS_MAPSIZE, NODEKEYS_TABLES);
-	database_open(label, g_nodekeys_env, &g_nodekeys_nodekeys, NODEKEYS_NODEKEYS_NAME, flags);
+	database_open(label, g_nodekeys_env, &g_nodekeys_keys, NODEKEYS_NODEKEYS_NAME, flags);
 	database_init_env(label, &g_database_env, DATABASE_PATH, DATABASE_MAPSIZE, DATABASE_TABLES);
 	database_open(label, g_database_env, &g_database_era, DATABASE_ERA_NAME, flags);
     master_ctx->arena_buffer = (uint8_t *)calloc(1, MASTER_ARENA_SIZE);
@@ -512,7 +512,7 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     free(master_ctx->arena_buffer);
     database_close(g_database_env, g_database_era);
     database_deinit_env(label, &g_database_env);
-    database_close(g_nodekeys_env, g_nodekeys_nodekeys);
+    database_close(g_nodekeys_env, g_nodekeys_keys);
     database_deinit_env(label, &g_nodekeys_env);
 }
 

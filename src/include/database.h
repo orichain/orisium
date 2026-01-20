@@ -4,11 +4,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <lmdb.h>
+#include <stdint.h>
 
-#if defined(__NetBSD__)
+#if defined(__OpenBSD__) || defined(__NetBSD__)
     #include <sys/errno.h>
-#elif defined(__OpenBSD__)
-    #include <sys/errno.h>
+	#include <sys/mount.h>
 #endif
 
 #include "oritlsf.h"
@@ -16,7 +16,6 @@
 
 typedef struct {
     MDB_txn *txn;
-    int readonly;
 } database_txn_t;
 
 typedef struct {
@@ -27,6 +26,15 @@ static inline int database_error(const char *label, int rc) {
     if (rc != MDB_SUCCESS)
         LOG_ERROR("%sLMDB error %d: %s", label, rc, mdb_strerror(rc));
     return rc;
+}
+
+static inline size_t detect_disk_80percent(const char *path) {
+    struct statfs sf;
+    if (statfs(path, &sf) != 0) {
+        return (size_t)1 << 40;
+    }
+    uint64_t total_bytes = (uint64_t)sf.f_blocks * sf.f_bsize;
+    return (size_t)(total_bytes * 8 / 10);
 }
 
 static inline int database_init_env(
@@ -40,7 +48,11 @@ static inline int database_init_env(
     int rc;
     rc = mdb_env_create(env);
     if (database_error(label, rc)) return rc;
-    rc = mdb_env_set_mapsize(*env, mapsize);
+    size_t final_mapsize = mapsize;
+    if (final_mapsize == (size_t)-1) {
+        final_mapsize = detect_disk_80percent(path);
+    }
+    rc = mdb_env_set_mapsize(*env, final_mapsize);
     if (database_error(label, rc)) return rc;
     rc = mdb_env_set_maxdbs(*env, maxdbs);
     if (database_error(label, rc)) return rc;
@@ -97,17 +109,15 @@ static inline void database_close(
 static inline int database_txn_begin(
     const char *label,
     MDB_env *env,
-    database_txn_t *t,
-    int readonly
+    database_txn_t *t
 ) 
 {
-    t->readonly = readonly;
     return database_error(
         label,
         mdb_txn_begin(
             env,
             NULL,
-            readonly ? MDB_RDONLY : 0,
+            0,
             &t->txn
         )
     );
@@ -136,7 +146,7 @@ static inline int database_batch_begin(
     database_txn_t *t
 ) 
 {
-    return database_txn_begin(label, env, t, 0);
+    return database_txn_begin(label, env, t);
 }
 
 static inline int database_batch_commit(
@@ -201,7 +211,7 @@ static inline int database_put(
 ) 
 {
     database_txn_t t;
-    int rc = database_txn_begin(label, env, &t, 0);
+    int rc = database_txn_begin(label, env, &t);
     if (rc) return rc;
 
     rc = database_txn_put(label, &t, dbi, key, klen, val, vlen, flags);
@@ -225,7 +235,7 @@ static inline int database_get(
 {
     database_txn_t t;
     MDB_val v;
-    int rc = database_txn_begin(label, env, &t, 1);
+    int rc = database_txn_begin(label, env, &t);
     if (rc) return rc;
 
     rc = database_txn_get(&t, dbi, key, klen, &v);
@@ -256,7 +266,7 @@ static inline int database_del(
 ) 
 {
     database_txn_t t;
-    int rc = database_txn_begin(label, env, &t, 0);
+    int rc = database_txn_begin(label, env, &t);
     if (rc) return rc;
 
     rc = database_txn_del(label, &t, dbi, key, klen);

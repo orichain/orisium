@@ -101,10 +101,14 @@ status_t handle_worker_ipc_info(const char *label, master_context_t *master_ctx,
     switch (iinfoi->flag) {
 		case IT_READNKEYS:
         case IT_NKEYSEMPTY:
-        case IT_WNKEYS: 
+        case IT_APPNDNKEYS: 
+        case IT_APPNDNKEYS_SUCCESS: 
+        case IT_APPNDNKEYS_FAILURE: 
         case IT_READERA:
         case IT_ERAEMPTY:
-        case IT_WGENESISERA: {
+        case IT_APPNDERA:
+		case IT_APPNDERA_SUCCESS:
+		case IT_APPNDERA_FAILURE: {
             if (calculate_avgtt(label, master_ctx, rcvd_wot, rcvd_index) != SUCCESS) {
                 CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &received_protocol);
                 return FAILURE;

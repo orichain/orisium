@@ -5,12 +5,12 @@
 #include <stdint.h>
 #include <string.h>
 #include <sys/errno.h>
+#include <lmdb.h>
 
 #include "types.h"
 #include "constants.h"
 #include "pqc.h"
 #include "database.h"
-#include "lmdb.h"
 #include "log.h"
 #include "oritlsf.h"
 
@@ -24,7 +24,7 @@ typedef struct {
 	uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
 } nodekeys_t;
 
-#define NODEKEYS_NODEKEYS_SIZE ( \
+#define NODEKEYS_KEYS_SIZE ( \
     sizeof(uint64_t) + \
     (2 * sizeof(uint8_t)) + \
     SIGN_PRIVATEKEY_BYTES + \
@@ -33,19 +33,19 @@ typedef struct {
     KEM_PUBLICKEY_BYTES \
 )
 
-static inline int nodekeys_nodekeys_get_last(
+static inline int nodekeys_keys_get_last(
 	const char *label,
     oritlsf_pool_t *pool,
     MDB_env *env,
     MDB_dbi dbi,
-    nodekeys_t **out_nodekeys_nodekeys
+    nodekeys_t **nodekeys_keys
 )
 {
     database_txn_t t;
     database_cursor_t c;
     MDB_val k, v;
     int rc;
-    rc = database_txn_begin(label, env, &t, 1);
+    rc = database_txn_begin(label, env, &t);
     if (rc != MDB_SUCCESS) return rc;
     rc = database_cursor_open(label, &t, dbi, &c);
     if (rc != MDB_SUCCESS) {
@@ -58,22 +58,65 @@ static inline int nodekeys_nodekeys_get_last(
         database_txn_abort(&t);
         return rc;
     }
-    *out_nodekeys_nodekeys = (nodekeys_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, NODEKEYS_NODEKEYS_SIZE);
-    if (!*out_nodekeys_nodekeys) {
+    *nodekeys_keys = (nodekeys_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, NODEKEYS_KEYS_SIZE);
+    if (!*nodekeys_keys) {
         database_cursor_close(&c);
         database_txn_abort(&t);
         return ENOMEM;
     }
-    if (v.mv_size != NODEKEYS_NODEKEYS_SIZE) {
-        LOG_ERROR("ERA: Data size mismatch! Expected %zu, got %zu", NODEKEYS_NODEKEYS_SIZE, v.mv_size);
+    if (v.mv_size != NODEKEYS_KEYS_SIZE) {
+        LOG_ERROR("KEYS: Data size mismatch! Expected %zu, got %zu", NODEKEYS_KEYS_SIZE, v.mv_size);
         database_cursor_close(&c);
         database_txn_abort(&t);
         return MDB_CORRUPTED;
     }
-    memcpy(*out_nodekeys_nodekeys, v.mv_data, v.mv_size);
+    memcpy(*nodekeys_keys, v.mv_data, v.mv_size);
     database_cursor_close(&c);
     database_txn_abort(&t);
     return MDB_SUCCESS;
+}
+
+static inline int nodekeys_keys_append(
+    const char *label,
+    MDB_env *env,
+    MDB_dbi dbi,
+    const nodekeys_t *nodekeys
+)
+{
+    database_txn_t t;
+    database_cursor_t c;
+    MDB_val k, v;
+    nodekeys_t tmp;
+    uint64_t next_no = 0;
+    int rc;
+    rc = database_txn_begin(label, env, &t);
+    if (rc != MDB_SUCCESS) return rc;
+    rc = database_cursor_open(label, &t, dbi, &c);
+    if (rc != MDB_SUCCESS) {
+        database_txn_abort(&t);
+        return rc;
+    }
+    rc = database_cursor_get_last(&c, &k, &v);
+    if (rc == MDB_NOTFOUND) {
+        next_no = 0;
+    } else if (rc == MDB_SUCCESS) {
+        memcpy(&next_no, k.mv_data, sizeof(uint64_t));
+        next_no++;
+    } else {
+        database_cursor_close(&c);
+        database_txn_abort(&t);
+        return rc;
+    }
+    database_cursor_close(&c);
+    tmp = *nodekeys;
+    tmp.no = next_no;
+    rc = database_txn_put(label, &t, dbi, &tmp.no, sizeof(uint64_t), &tmp, NODEKEYS_KEYS_SIZE, 0);
+    if (rc == MDB_SUCCESS) {
+        return database_txn_commit(label, &t);
+    } else {
+        database_txn_abort(&t);
+        return rc;
+    }
 }
 
 typedef struct {
@@ -154,7 +197,7 @@ static inline int database_era_get_last(
     database_cursor_t c;
     MDB_val k, v;
     int rc;
-    rc = database_txn_begin(label, env, &t, 1);
+    rc = database_txn_begin(label, env, &t);
     if (rc != MDB_SUCCESS) return rc;
     rc = database_cursor_open(label, &t, dbi, &c);
     if (rc != MDB_SUCCESS) {

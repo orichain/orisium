@@ -1,12 +1,13 @@
 nodekeys/*
 !nodekeys/.gitkeep
+database/*
+!database/.gitkeep
 iwyu/*
 !iwyu/.gitkeep
 obj/
 logs/
 test/
 orisium
-database/*.key
 iwyu_applied_c.log
 iwyu_failed_c.log
 iwyu_applied_h.log
@@ -15,5 +16,4 @@ gcc
 python
 clang
 clang++
-GENESIS_PRIVATEKEY_SAVE_IN_SAFEST_PLACE
-GENESIS_PUBLICKEY
+

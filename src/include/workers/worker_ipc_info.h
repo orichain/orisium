@@ -132,10 +132,11 @@ static inline status_t handle_worker_workers_ipc_info(worker_context_t *worker_c
     ipc_worker_worker_info_t *iinfoi = received_protocol->payload.ipc_worker_worker_info;
     switch (iinfoi->flag) {
 		case IT_READNKEYS: {
-			nodekeys_t *out_nodekeys_nodekeys = NULL;
-            int rc = nodekeys_nodekeys_get_last(worker_ctx->label, &worker_ctx->oritlsf_pool, g_nodekeys_env, g_nodekeys_nodekeys, &out_nodekeys_nodekeys);
-            if (rc != MDB_NOTFOUND) {
-				oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&out_nodekeys_nodekeys);	
+			nodekeys_t *out_nodekeys_keys = NULL;
+            int rc = nodekeys_keys_get_last(worker_ctx->label, &worker_ctx->oritlsf_pool, g_nodekeys_env, g_nodekeys_keys, &out_nodekeys_keys);
+            if (rc == MDB_SUCCESS) {
+				LOG_ERROR("%sKeys Ada", worker_ctx->label);
+				oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&out_nodekeys_keys);	
 			} else {
 				if (worker_master_worker_info(worker_ctx, iinfoi->src_wot, iinfoi->src_index, IT_NKEYSEMPTY) != SUCCESS) {
 					LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
@@ -148,7 +149,7 @@ static inline status_t handle_worker_workers_ipc_info(worker_context_t *worker_c
             break;
         }
         case IT_NKEYSEMPTY: {
-			if (worker_master_worker_info(worker_ctx, DBW, 0x00, IT_WNKEYS) != SUCCESS) {
+			if (worker_master_worker_info(worker_ctx, DBW, 0x00, IT_APPNDNKEYS) != SUCCESS) {
 				LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
 				worker_ctx->shutdown_requested = 1;
 				CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
@@ -157,10 +158,57 @@ static inline status_t handle_worker_workers_ipc_info(worker_context_t *worker_c
             CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
             break;
         }
+        case IT_APPNDNKEYS: {
+			nodekeys_t *nodekeys = (nodekeys_t *)oritlsf_calloc(__FILE__, __LINE__, &worker_ctx->oritlsf_pool, 1, NODEKEYS_KEYS_SIZE);
+			nodekeys->no = 0;
+			nodekeys->vermaj = NODEKEYS_VERSION_MAJOR;
+			nodekeys->vermin = NODEKEYS_VERSION_MINOR;
+			SIGN_GENERATE_KEYPAIR(nodekeys->sgn_publickey, nodekeys->sgn_privatekey);
+			KEM_GENERATE_KEYPAIR(nodekeys->kem_publickey, nodekeys->kem_privatekey);
+			int rc = nodekeys_keys_append(worker_ctx->label, g_nodekeys_env, g_nodekeys_keys, nodekeys);
+			memset(nodekeys->sgn_privatekey, 0, SIGN_PRIVATEKEY_BYTES);
+			memset(nodekeys->kem_privatekey, 0, KEM_PRIVATEKEY_BYTES);
+			oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&nodekeys);
+			if (rc == MDB_SUCCESS) {
+				if (worker_master_worker_info(worker_ctx, iinfoi->src_wot, iinfoi->src_index, IT_APPNDNKEYS_SUCCESS) != SUCCESS) {
+					LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
+					worker_ctx->shutdown_requested = 1;
+					CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+					return FAILURE;
+				}
+			} else {
+				if (worker_master_worker_info(worker_ctx, iinfoi->src_wot, iinfoi->src_index, IT_APPNDNKEYS_FAILURE) != SUCCESS) {
+					LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
+					worker_ctx->shutdown_requested = 1;
+					CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+					return FAILURE;
+				}
+			}
+			CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+			break;
+		}
+		case IT_APPNDNKEYS_SUCCESS: {
+			if (worker_master_worker_info(worker_ctx, DBR, 0xff, IT_READNKEYS) != SUCCESS) {
+                LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
+                worker_ctx->shutdown_requested = 1;
+                CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+                return FAILURE;
+            }
+            CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+            break;
+        }
+        case IT_APPNDNKEYS_FAILURE: {
+			LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
+			worker_ctx->shutdown_requested = 1;
+			CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);
+			return FAILURE;
+            break;
+        }
         case IT_READERA: {
 			era_t *out_database_era = NULL;
             int rc = database_era_get_last(worker_ctx->label, &worker_ctx->oritlsf_pool, g_database_env, g_database_era, &out_database_era);
-            if (rc != MDB_NOTFOUND) {
+            if (rc == MDB_SUCCESS) {
+				LOG_ERROR("%sEra Ada", worker_ctx->label);
 				oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&out_database_era);	
 			} else {
 				if (worker_master_worker_info(worker_ctx, iinfoi->src_wot, iinfoi->src_index, IT_ERAEMPTY) != SUCCESS) {
@@ -174,7 +222,7 @@ static inline status_t handle_worker_workers_ipc_info(worker_context_t *worker_c
             break;
         }
         case IT_ERAEMPTY: {
-			if (worker_master_worker_info(worker_ctx, DBW, 0x00, IT_WGENESISERA) != SUCCESS) {
+			if (worker_master_worker_info(worker_ctx, DBW, 0x00, IT_APPNDERA) != SUCCESS) {
 				LOG_ERROR("%sWorker error. Initiating graceful shutdown...", worker_ctx->label);
 				worker_ctx->shutdown_requested = 1;
 				CLOSE_IPC_PROTOCOL(&worker_ctx->oritlsf_pool, &received_protocol);

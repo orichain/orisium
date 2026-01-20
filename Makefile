@@ -16,9 +16,9 @@ ifneq ($(shell command -v pkg-config 2>/dev/null),)
 endif
 
 COMMON_CFLAGS = -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration $(JSONC_CFLAGS)
-LDFLAGS = -pthread $(JSONC_LIBS) -lm
+LDFLAGS = -pthread $(JSONC_LIBS) -lm -llmdb
 CLANG_INCLUDE_DIRS := $(shell echo '' | $(CC) -E -x c - -v 2>&1 | awk '/^ \// { print "-I" $$1 }')
-INCLUDE_DIR = $(CLANG_INCLUDE_DIRS) -I./$(SRC_DIR)/include -I./PQClean -I./PQClean/common -I./lmdb/libraries/liblmdb
+INCLUDE_DIR = $(CLANG_INCLUDE_DIRS) -I./$(SRC_DIR)/include -I./PQClean -I./PQClean/common
 COMMON_CFLAGS += $(INCLUDE_DIR)
 
 BUILD_MODE ?= DEVELOPMENT
@@ -84,13 +84,6 @@ PQCLEAN_KEM_LIB_NAME = libml-kem-1024_clean.a
 PQCLEAN_KEM_LIB_PATH = $(PQCLEAN_KEM_DIR)/$(PQCLEAN_KEM_LIB_NAME)
 
 # =============================
-# LMDB Configuration
-# =============================
-LMDB_DIR = lmdb/libraries/liblmdb
-LMDB_LIB_NAME = liblmdb.a
-LMDB_LIB_PATH = $(LMDB_DIR)/$(LMDB_LIB_NAME)
-
-# =============================
 # IWYU Configuration
 # =============================
 IWYU_DIR := iwyu
@@ -98,7 +91,7 @@ IWYU_BUILD := build
 IWYU_BUILD_PATH := $(IWYU_DIR)/$(IWYU_BUILD)
 IWYU_BIN_PATH := $(IWYU_BUILD_PATH)/bin/include-what-you-use
 
-EXCLUDED_DIRS := PQClean iwyu lmdb
+EXCLUDED_DIRS := PQClean iwyu
 EXCLUDE_PATHS := $(foreach dir,$(EXCLUDED_DIRS),-path ./$(dir) -prune -o)
 CFILES := $(shell find . $(EXCLUDE_PATHS) -name '*.c' -print)
 HFILES := $(shell find . $(EXCLUDE_PATHS) -name '*.h' -print)
@@ -166,6 +159,7 @@ ifeq ($(DISTRO_ID),netbsd)
 	else \
 		echo ">> $(CXX) sudah ada."; \
 	fi
+	$(call install_pkg,lmdb)
 	$(call install_pkg,json-c)
 	$(call install_pkg,pkg-config)
 	$(call install_pkg,python312)
@@ -189,6 +183,7 @@ else ifeq ($(DISTRO_ID),freebsd)
 	else \
 		echo ">> $(CXX) sudah ada."; \
 	fi
+	$(call install_pkg,lmdb)
 	$(call install_pkg,json-c)
 	$(call install_pkg,pkgconf)
 	$(call install_pkg,python3)
@@ -216,6 +211,7 @@ else ifeq ($(DISTRO_ID),openbsd)
 	else \
 		echo ">> $(CXX) sudah ada."; \
 	fi
+	$(call install_pkg,lmdb)
 	$(call install_pkg,json-c)
 	@if [ ! -e $(PY) ]; then \
 		echo "========================="; \
@@ -230,6 +226,10 @@ else ifeq ($(DISTRO_ID),openbsd)
 		echo ">> $(PY) sudah ada."; \
 	fi
 else ifeq ($(DISTRO_ID),rocky)
+	$(call install_pkg,dnf-plugins-core)
+	$(USE_SUDO) dnf config-manager --set-enabled crb
+	$(call install_pkg,epel-release)
+	$(USE_SUDO) dnf makecache
 	$(call install_pkg,clang)
 	@if [ ! -e $(CC) ]; then \
 		$(USE_SUDO) $(PKG_MANAGER) -y install llvm; \
@@ -244,6 +244,8 @@ else ifeq ($(DISTRO_ID),rocky)
 	else \
 		echo ">> $(CXX) sudah ada."; \
 	fi
+	$(call install_pkg,lmdb-libs)
+	$(call install_pkg,lmdb-devel)
 	$(call install_pkg,json-c)
 	$(call install_pkg,pkg-config)
 	$(call install_pkg,json-c-devel)
@@ -274,8 +276,7 @@ $(TARGET): $(OBJS) \
 	$(PQCLEAN_COMMON_OBJS) \
 	$(PQCLEAN_SIGN_MLDSA87_LIB_PATH) \
 	$(PQCLEAN_SIGN_FALCONPADDED512_LIB_PATH) \
-	$(PQCLEAN_KEM_LIB_PATH) \
-	$(LMDB_LIB_PATH)
+	$(PQCLEAN_KEM_LIB_PATH)
 	$(CC) $(FINAL_CFLAGS) $^ -o $@ $(LDFLAGS)
 
 # =============================
@@ -319,19 +320,6 @@ $(PQCLEAN_KEM_LIB_PATH):
 		$(MAKE) CC=$(CC) CXX=$(CXX) -C $(PQCLEAN_KEM_DIR); \
 	else \
 		echo "Library sudah ada: $@"; \
-	fi
-	
-# =============================
-# Bangun LMDB (jika belum ada)
-# =============================
-$(LMDB_LIB_PATH):
-	@echo "-------------------------------------"
-	@echo "Membangun pustaka LMDB..."
-	@echo "-------------------------------------"
-	@if [ -f "$(LMDB_LIB_PATH)" ]; then \
-		echo "LMDB library sudah ada. Melewati build."; \
-	else \
-		$(MAKE) CC=$(CC) CXX=$(CXX) -C $(LMDB_DIR); \
 	fi
 
 # =============================

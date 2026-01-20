@@ -86,10 +86,14 @@ typedef enum {
     IT_TIMEOUT = (uint8_t)0x05,
     IT_READNKEYS = (uint8_t)0x06,
     IT_NKEYSEMPTY = (uint8_t)0x07,
-    IT_WNKEYS = (uint8_t)0x08,
-    IT_READERA = (uint8_t)0x09,
-    IT_ERAEMPTY = (uint8_t)0x0a,
-    IT_WGENESISERA = (uint8_t)0x0b,
+    IT_APPNDNKEYS = (uint8_t)0x08,
+    IT_APPNDNKEYS_SUCCESS = (uint8_t)0x09,
+    IT_APPNDNKEYS_FAILURE = (uint8_t)0x0a,
+    IT_READERA = (uint8_t)0x0b,
+    IT_ERAEMPTY = (uint8_t)0x0c,
+    IT_APPNDERA = (uint8_t)0x0d,
+    IT_APPNDERA_SUCCESS = (uint8_t)0x0e,
+    IT_APPNDERA_FAILURE = (uint8_t)0x0f,
     
     IT_WAKEUP = (uint8_t)0xff
 } info_type_t;
