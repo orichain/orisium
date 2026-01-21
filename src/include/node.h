@@ -506,4 +506,53 @@ static inline int database_era_get_last(
     return (st == SUCCESS) ? MDB_SUCCESS : FAILURE;
 }
 
+static inline int database_era_append(
+    const char *label,
+    MDB_env *env,
+    MDB_dbi dbi,
+    const era_t *era
+)
+{
+    MDB_txn *txn = NULL;
+    MDB_cursor *cur = NULL;
+    MDB_val k, v;
+    uint64_t next_no = 0;
+    int rc;
+    rc = database_txn_begin(label, env, &txn);
+    if (rc != MDB_SUCCESS) return rc;
+    rc = database_cursor_open(label, txn, dbi, &cur);
+    if (rc != MDB_SUCCESS) {
+        database_txn_abort(&txn);
+        return rc;
+    }
+    rc = database_cursor_get_last(cur, &k, &v);
+    if (rc == MDB_NOTFOUND) {
+        next_no = 0;
+    } else if (rc == MDB_SUCCESS) {
+        uint64_t last_no_be;
+        memcpy(&last_no_be, k.mv_data, sizeof(uint64_t));
+        next_no = be64toh(last_no_be) + 1;
+    } else {
+        database_cursor_close(&cur);
+        database_txn_abort(&txn);
+        return rc;
+    }
+    database_cursor_close(&cur);
+    uint8_t k_buf[DATABASE_ERA_KEY_SIZE];
+    uint8_t v_buf[DATABASE_ERA_DATA_SIZE];
+    era_t tmp = *era;
+    tmp.no = next_no;
+    if (era_serialize(label, &tmp, k_buf, sizeof(k_buf), v_buf, sizeof(v_buf)) != SUCCESS) {
+        database_txn_abort(&txn);
+        return FAILURE;
+    }
+    rc = database_txn_put(label, txn, dbi, k_buf, sizeof(k_buf), v_buf, sizeof(v_buf), 0);
+    if (rc == MDB_SUCCESS) {
+        return database_txn_commit(label, &txn);
+    } else {
+        database_txn_abort(&txn);
+        return rc;
+    }
+}
+
 #endif
