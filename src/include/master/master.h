@@ -11,7 +11,6 @@
 #include "async.h"
 #include "ipc/protocol.h"
 #include "kalman.h"
-#include "node.h"
 #include "types.h"
 #include "oritw.h"
 #include "oritlsf.h"
@@ -103,7 +102,6 @@ typedef struct {
     uint8_t last_dbw_rr_idx;
 //----------------------------------------------------------------------
     uint16_t listen_port;
-    bootstrap_nodes_t bootstrap_nodes;
     sig_atomic_t shutdown_requested;
     uint16_t hb_check_times;
 //----------------------------------------------------------------------

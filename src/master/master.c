@@ -21,7 +21,6 @@
 #include "master/master.h"
 #include "master/master_timer.h"
 #include "master/ipc/worker_ipc_cmds.h"
-#include "node.h"
 #include "oritw.h"
 #include "oritlsf.h"
 #include "oritw/timer_event.h"
@@ -503,7 +502,6 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
 //----------------------------------------------------------------------
     CLOSE_FD(&master_ctx->master_async.async_fd);
     master_ctx->listen_port = (uint16_t)0;
-    memset(&master_ctx->bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
 //----------------------------------------------------------------------
     void *reclaimed_buffer = oritlsf_cleanup_pool(label, &master_ctx->oritlsf_pool);
     if (reclaimed_buffer != master_ctx->arena_buffer) {

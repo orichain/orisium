@@ -7,16 +7,16 @@ CC = $(ROOT_DIR)/clang
 CXX = $(ROOT_DIR)/clang++
 PY = $(ROOT_DIR)/python
 
-JSONC_CFLAGS :=
-JSONC_LIBS := -ljson-c
+LMDB_CFLAGS :=
+LMDB_LIBS := -llmdb
 
 ifneq ($(shell command -v pkg-config 2>/dev/null),)
-	JSONC_CFLAGS := $(shell pkg-config --cflags json-c 2>/dev/null)
-	JSONC_LIBS := $(shell pkg-config --libs json-c 2>/dev/null)
+	LMDB_CFLAGS := $(shell pkg-config --cflags lmdb 2>/dev/null)
+	LMDB_LIBS := $(shell pkg-config --libs lmdb 2>/dev/null)
 endif
 
-COMMON_CFLAGS = -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration $(JSONC_CFLAGS)
-LDFLAGS = -pthread $(JSONC_LIBS) -lm -llmdb
+COMMON_CFLAGS = -Wall -Wextra -Wno-unused-parameter -Werror=implicit-function-declaration $(LMDB_CFLAGS)
+LDFLAGS = -pthread $(LMDB_LIBS) -lm -llmdb
 CLANG_INCLUDE_DIRS := $(shell echo '' | $(CC) -E -x c - -v 2>&1 | awk '/^ \// { print "-I" $$1 }')
 INCLUDE_DIR = $(CLANG_INCLUDE_DIRS) -I./$(SRC_DIR)/include -I./PQClean -I./PQClean/common
 COMMON_CFLAGS += $(INCLUDE_DIR)
@@ -160,7 +160,6 @@ ifeq ($(DISTRO_ID),netbsd)
 		echo ">> $(CXX) sudah ada."; \
 	fi
 	$(call install_pkg,lmdb)
-	$(call install_pkg,json-c)
 	$(call install_pkg,pkg-config)
 	$(call install_pkg,python312)
 	@if [ ! -e $(PY) ]; then \
@@ -184,7 +183,6 @@ else ifeq ($(DISTRO_ID),freebsd)
 		echo ">> $(CXX) sudah ada."; \
 	fi
 	$(call install_pkg,lmdb)
-	$(call install_pkg,json-c)
 	$(call install_pkg,pkgconf)
 	$(call install_pkg,python3)
 	@if [ ! -e $(PY) ]; then \
@@ -212,7 +210,6 @@ else ifeq ($(DISTRO_ID),openbsd)
 		echo ">> $(CXX) sudah ada."; \
 	fi
 	$(call install_pkg,lmdb)
-	$(call install_pkg,json-c)
 	@if [ ! -e $(PY) ]; then \
 		echo "========================="; \
 		echo "!!--- PILIH python3 ---!!"; \
@@ -246,9 +243,7 @@ else ifeq ($(DISTRO_ID),rocky)
 	fi
 	$(call install_pkg,lmdb-libs)
 	$(call install_pkg,lmdb-devel)
-	$(call install_pkg,json-c)
 	$(call install_pkg,pkg-config)
-	$(call install_pkg,json-c-devel)
 	$(call install_pkg,python3)
 	@if [ ! -e $(PY) ]; then \
 		echo ">> Membuat symlink $(PY)..."; \
