@@ -73,7 +73,6 @@ static inline status_t nodekeys_deserialize(const char *label, const uint8_t *ke
     }
     uint64_t key_be;
     memcpy(&key_be, key + current_offset, sizeof(uint64_t));
-    current_offset += sizeof(uint64_t);
     dst->no = be64toh(key_be);
     current_offset += sizeof(uint64_t);
     current_offset = 0;
