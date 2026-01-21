@@ -153,7 +153,7 @@ static inline status_t handle_worker_workers_ipc_info(worker_context_t *worker_c
             break;
         }
         case IT_APPNDNKEYS: {
-			nodekeys_t *nodekeys = (nodekeys_t *)oritlsf_calloc(__FILE__, __LINE__, &worker_ctx->oritlsf_pool, 1, NODEKEYS_KEYS_SIZE);
+			nodekeys_t *nodekeys = (nodekeys_t *)oritlsf_calloc(__FILE__, __LINE__, &worker_ctx->oritlsf_pool, 1, sizeof(nodekeys_t));
 			nodekeys->no = 0;
 			nodekeys->vermaj = NODEKEYS_VERSION_MAJOR;
 			nodekeys->vermin = NODEKEYS_VERSION_MINOR;

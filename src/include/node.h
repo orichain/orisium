@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/errno.h>
 #include <lmdb.h>
+#include <sys/endian.h>
 
 #include "types.h"
 #include "constants.h"
@@ -13,6 +14,7 @@
 #include "database.h"
 #include "log.h"
 #include "oritlsf.h"
+#include "utilities.h"
 
 typedef struct {
 	uint64_t no;
@@ -24,8 +26,11 @@ typedef struct {
 	uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
 } nodekeys_t;
 
-#define NODEKEYS_KEYS_SIZE ( \
-    sizeof(uint64_t) + \
+#define NODEKEYS_KEYS_KEY_SIZE ( \
+    sizeof(uint64_t) \
+)
+
+#define NODEKEYS_KEYS_DATA_SIZE ( \
     (2 * sizeof(uint8_t)) + \
     SIGN_PRIVATEKEY_BYTES + \
     SIGN_PUBLICKEY_BYTES + \
@@ -33,8 +38,105 @@ typedef struct {
     KEM_PUBLICKEY_BYTES \
 )
 
+static inline status_t nodekeys_serialize(const char *label, const nodekeys_t *src, uint8_t *key, size_t key_len, uint8_t *value, size_t value_len) {
+    if (!src || !key || !value) {
+        LOG_ERROR("%sInvalid src pointers.", label);
+        return FAILURE;
+    }
+    size_t current_offset_local = 0;
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint64_t), key_len) != SUCCESS) return FAILURE_OOBUF;
+    uint64_t key_be = htobe64(src->no);
+    memcpy(key + current_offset_local, &key_be, sizeof(uint64_t));
+    current_offset_local += sizeof(uint64_t);
+    current_offset_local = 0;
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), value_len) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(value + current_offset_local, &src->vermaj, sizeof(uint8_t));
+    current_offset_local += sizeof(uint8_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), value_len) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(value + current_offset_local, &src->vermin, sizeof(uint8_t));
+    current_offset_local += sizeof(uint8_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, SIGN_PRIVATEKEY_BYTES, value_len) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(value + current_offset_local, src->sgn_privatekey, SIGN_PRIVATEKEY_BYTES);
+    current_offset_local += SIGN_PRIVATEKEY_BYTES;
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, SIGN_PUBLICKEY_BYTES, value_len) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(value + current_offset_local, src->sgn_publickey, SIGN_PUBLICKEY_BYTES);
+    current_offset_local += SIGN_PUBLICKEY_BYTES;
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, KEM_PRIVATEKEY_BYTES, value_len) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(value + current_offset_local, src->kem_privatekey, KEM_PRIVATEKEY_BYTES);
+    current_offset_local += KEM_PRIVATEKEY_BYTES;
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, KEM_PUBLICKEY_BYTES, value_len) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(value + current_offset_local, src->kem_publickey, KEM_PUBLICKEY_BYTES);
+    current_offset_local += KEM_PUBLICKEY_BYTES;
+    return SUCCESS;
+}
+
+static inline status_t nodekeys_deserialize(const char *label, const uint8_t *key, size_t key_len, const uint8_t *value, size_t value_len, nodekeys_t *dst) {
+    if (!dst || !key || !value) {
+        LOG_ERROR("%sInvalid input pointers.", label);
+        return FAILURE;
+    }
+    size_t current_offset = 0;
+    size_t total_buffer_len = key_len;
+    const uint8_t *cursor_k = key + current_offset;
+    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading key.", label);
+        return FAILURE_OOBUF;
+    }
+    uint64_t key_be;
+    memcpy(&key_be, cursor_k, sizeof(uint64_t));
+    dst->no = be64toh(key_be);
+    cursor_k += sizeof(uint64_t);
+    current_offset += sizeof(uint64_t);
+    current_offset = 0;
+    total_buffer_len = value_len;
+    const uint8_t *cursor_v = value + current_offset;
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading vermaj.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&dst->vermaj, cursor_v, sizeof(uint8_t));
+    cursor_v += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading vermin.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&dst->vermin, cursor_v, sizeof(uint8_t));
+    cursor_v += sizeof(uint8_t);
+    current_offset += sizeof(uint8_t);
+    if (current_offset + SIGN_PRIVATEKEY_BYTES > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading sgnpvkey.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(dst->sgn_privatekey, cursor_v, SIGN_PRIVATEKEY_BYTES);
+    cursor_v += SIGN_PRIVATEKEY_BYTES;
+    current_offset += SIGN_PRIVATEKEY_BYTES;
+    if (current_offset + SIGN_PUBLICKEY_BYTES > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading sgnpbkey.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(dst->sgn_publickey, cursor_v, SIGN_PUBLICKEY_BYTES);
+    cursor_v += SIGN_PUBLICKEY_BYTES;
+    current_offset += SIGN_PUBLICKEY_BYTES;
+    if (current_offset + KEM_PRIVATEKEY_BYTES > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading kempvkey.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(dst->kem_privatekey, cursor_v, KEM_PRIVATEKEY_BYTES);
+    cursor_v += KEM_PRIVATEKEY_BYTES;
+    current_offset += KEM_PRIVATEKEY_BYTES;
+    if (current_offset + KEM_PUBLICKEY_BYTES > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading kempbkey.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(dst->kem_publickey, cursor_v, KEM_PUBLICKEY_BYTES);
+    cursor_v += KEM_PUBLICKEY_BYTES;
+    current_offset += KEM_PUBLICKEY_BYTES;
+    return SUCCESS;
+}
+
 static inline int nodekeys_keys_get_last(
-	const char *label,
+    const char *label,
     oritlsf_pool_t *pool,
     MDB_env *env,
     MDB_dbi dbi,
@@ -58,22 +160,22 @@ static inline int nodekeys_keys_get_last(
         database_txn_abort(&txn);
         return rc;
     }
-    *nodekeys_keys = (nodekeys_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, NODEKEYS_KEYS_SIZE);
+    *nodekeys_keys = (nodekeys_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(nodekeys_t));
     if (!*nodekeys_keys) {
         database_cursor_close(&cur);
         database_txn_abort(&txn);
         return ENOMEM;
     }
-    if (v.mv_size != NODEKEYS_KEYS_SIZE) {
-        LOG_ERROR("KEYS: Data size mismatch! Expected %zu, got %zu", NODEKEYS_KEYS_SIZE, v.mv_size);
+    if (k.mv_size != NODEKEYS_KEYS_KEY_SIZE || v.mv_size != NODEKEYS_KEYS_DATA_SIZE) {
+        LOG_ERROR("%sKEYS: Size mismatch! K:%zu V:%zu", label, k.mv_size, v.mv_size);
         database_cursor_close(&cur);
         database_txn_abort(&txn);
         return MDB_CORRUPTED;
     }
-    memcpy(*nodekeys_keys, v.mv_data, v.mv_size);
+    status_t st = nodekeys_deserialize(label, k.mv_data, k.mv_size, v.mv_data, v.mv_size, *nodekeys_keys);
     database_cursor_close(&cur);
     database_txn_abort(&txn);
-    return MDB_SUCCESS;
+    return (st == SUCCESS) ? MDB_SUCCESS : FAILURE;
 }
 
 static inline int nodekeys_keys_append(
@@ -86,7 +188,6 @@ static inline int nodekeys_keys_append(
     MDB_txn *txn = NULL;
     MDB_cursor *cur = NULL;
     MDB_val k, v;
-    nodekeys_t tmp;
     uint64_t next_no = 0;
     int rc;
     rc = database_txn_begin(label, env, &txn);
@@ -100,17 +201,24 @@ static inline int nodekeys_keys_append(
     if (rc == MDB_NOTFOUND) {
         next_no = 0;
     } else if (rc == MDB_SUCCESS) {
-        memcpy(&next_no, k.mv_data, sizeof(uint64_t));
-        next_no++;
+        uint64_t last_no_be;
+        memcpy(&last_no_be, k.mv_data, sizeof(uint64_t));
+        next_no = be64toh(last_no_be) + 1;
     } else {
         database_cursor_close(&cur);
         database_txn_abort(&txn);
         return rc;
     }
     database_cursor_close(&cur);
-    tmp = *nodekeys;
+    uint8_t k_buf[NODEKEYS_KEYS_KEY_SIZE];
+    uint8_t v_buf[NODEKEYS_KEYS_DATA_SIZE];
+    nodekeys_t tmp = *nodekeys;
     tmp.no = next_no;
-    rc = database_txn_put(label, txn, dbi, &tmp.no, sizeof(uint64_t), &tmp, NODEKEYS_KEYS_SIZE, 0);
+    if (nodekeys_serialize(label, &tmp, k_buf, sizeof(k_buf), v_buf, sizeof(v_buf)) != SUCCESS) {
+        database_txn_abort(&txn);
+        return FAILURE;
+    }
+    rc = database_txn_put(label, txn, dbi, k_buf, sizeof(k_buf), v_buf, sizeof(v_buf), 0);
     if (rc == MDB_SUCCESS) {
         return database_txn_commit(label, &txn);
     } else {
