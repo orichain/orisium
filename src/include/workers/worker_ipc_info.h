@@ -8,17 +8,11 @@
 #include "ipc/protocol.h"
 #include "log.h"
 #include "types.h"
-#include "workers/workers.h"
-#include "workers/worker_ipc.h"
 #include "workers/master_ipc_cmds.h"
 #include "utilities.h"
-#include "orilink/heartbeat.h"
-#include "orilink/protocol.h"
-#include "orilink.h"
 #include "stdbool.h"
 #include "node.h"
 #include "globals.h"
-#include "orilink/heartbeat_ack.h"
 
 static inline status_t handle_master_workers_ipc_info(worker_context_t *worker_ctx, double *initial_delay_ms, ipc_raw_protocol_t_status_t *ircvdi) {
     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool, 

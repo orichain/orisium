@@ -41,38 +41,38 @@ static inline int nodekeys_keys_get_last(
     nodekeys_t **nodekeys_keys
 )
 {
-    database_txn_t t;
-    database_cursor_t c;
+    MDB_txn *txn = NULL;
+    MDB_cursor *cur = NULL;
     MDB_val k, v;
     int rc;
-    rc = database_txn_begin(label, env, &t);
+    rc = database_txn_begin(label, env, &txn);
     if (rc != MDB_SUCCESS) return rc;
-    rc = database_cursor_open(label, &t, dbi, &c);
+    rc = database_cursor_open(label, txn, dbi, &cur);
     if (rc != MDB_SUCCESS) {
-        database_txn_abort(&t);
+        database_txn_abort(&txn);
         return rc;
     }
-    rc = database_cursor_get_last(&c, &k, &v);
+    rc = database_cursor_get_last(cur, &k, &v);
     if (rc != MDB_SUCCESS) {
-        database_cursor_close(&c);
-        database_txn_abort(&t);
+        database_cursor_close(&cur);
+        database_txn_abort(&txn);
         return rc;
     }
     *nodekeys_keys = (nodekeys_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, NODEKEYS_KEYS_SIZE);
     if (!*nodekeys_keys) {
-        database_cursor_close(&c);
-        database_txn_abort(&t);
+        database_cursor_close(&cur);
+        database_txn_abort(&txn);
         return ENOMEM;
     }
     if (v.mv_size != NODEKEYS_KEYS_SIZE) {
         LOG_ERROR("KEYS: Data size mismatch! Expected %zu, got %zu", NODEKEYS_KEYS_SIZE, v.mv_size);
-        database_cursor_close(&c);
-        database_txn_abort(&t);
+        database_cursor_close(&cur);
+        database_txn_abort(&txn);
         return MDB_CORRUPTED;
     }
     memcpy(*nodekeys_keys, v.mv_data, v.mv_size);
-    database_cursor_close(&c);
-    database_txn_abort(&t);
+    database_cursor_close(&cur);
+    database_txn_abort(&txn);
     return MDB_SUCCESS;
 }
 
@@ -83,38 +83,38 @@ static inline int nodekeys_keys_append(
     const nodekeys_t *nodekeys
 )
 {
-    database_txn_t t;
-    database_cursor_t c;
+    MDB_txn *txn = NULL;
+    MDB_cursor *cur = NULL;
     MDB_val k, v;
     nodekeys_t tmp;
     uint64_t next_no = 0;
     int rc;
-    rc = database_txn_begin(label, env, &t);
+    rc = database_txn_begin(label, env, &txn);
     if (rc != MDB_SUCCESS) return rc;
-    rc = database_cursor_open(label, &t, dbi, &c);
+    rc = database_cursor_open(label, txn, dbi, &cur);
     if (rc != MDB_SUCCESS) {
-        database_txn_abort(&t);
+        database_txn_abort(&txn);
         return rc;
     }
-    rc = database_cursor_get_last(&c, &k, &v);
+    rc = database_cursor_get_last(cur, &k, &v);
     if (rc == MDB_NOTFOUND) {
         next_no = 0;
     } else if (rc == MDB_SUCCESS) {
         memcpy(&next_no, k.mv_data, sizeof(uint64_t));
         next_no++;
     } else {
-        database_cursor_close(&c);
-        database_txn_abort(&t);
+        database_cursor_close(&cur);
+        database_txn_abort(&txn);
         return rc;
     }
-    database_cursor_close(&c);
+    database_cursor_close(&cur);
     tmp = *nodekeys;
     tmp.no = next_no;
-    rc = database_txn_put(label, &t, dbi, &tmp.no, sizeof(uint64_t), &tmp, NODEKEYS_KEYS_SIZE, 0);
+    rc = database_txn_put(label, txn, dbi, &tmp.no, sizeof(uint64_t), &tmp, NODEKEYS_KEYS_SIZE, 0);
     if (rc == MDB_SUCCESS) {
-        return database_txn_commit(label, &t);
+        return database_txn_commit(label, &txn);
     } else {
-        database_txn_abort(&t);
+        database_txn_abort(&txn);
         return rc;
     }
 }
@@ -193,38 +193,38 @@ static inline int database_era_get_last(
     era_t **out_database_era
 )
 {
-    database_txn_t t;
-    database_cursor_t c;
+    MDB_txn *txn = NULL;
+    MDB_cursor *cur = NULL;
     MDB_val k, v;
     int rc;
-    rc = database_txn_begin(label, env, &t);
+    rc = database_txn_begin(label, env, &txn);
     if (rc != MDB_SUCCESS) return rc;
-    rc = database_cursor_open(label, &t, dbi, &c);
+    rc = database_cursor_open(label, txn, dbi, &cur);
     if (rc != MDB_SUCCESS) {
-        database_txn_abort(&t);
+        database_txn_abort(&txn);
         return rc;
     }
-    rc = database_cursor_get_last(&c, &k, &v);
+    rc = database_cursor_get_last(cur, &k, &v);
     if (rc != MDB_SUCCESS) {
-        database_cursor_close(&c);
-        database_txn_abort(&t);
+        database_cursor_close(&cur);
+        database_txn_abort(&txn);
         return rc;
     }
     *out_database_era = (era_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, DATABASE_ERA_SIZE);
     if (!*out_database_era) {
-        database_cursor_close(&c);
-        database_txn_abort(&t);
+        database_cursor_close(&cur);
+        database_txn_abort(&txn);
         return ENOMEM;
     }
     if (v.mv_size != DATABASE_ERA_SIZE) {
         LOG_ERROR("ERA: Data size mismatch! Expected %zu, got %zu", DATABASE_ERA_SIZE, v.mv_size);
-        database_cursor_close(&c);
-        database_txn_abort(&t);
+        database_cursor_close(&cur);
+        database_txn_abort(&txn);
         return MDB_CORRUPTED;
     }
     memcpy(*out_database_era, v.mv_data, v.mv_size);
-    database_cursor_close(&c);
-    database_txn_abort(&t);
+    database_cursor_close(&cur);
+    database_txn_abort(&txn);
     return MDB_SUCCESS;
 }
 

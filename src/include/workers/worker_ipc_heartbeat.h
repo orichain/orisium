@@ -16,6 +16,7 @@
 #include "orilink.h"
 #include "stdbool.h"
 #include "orilink/heartbeat_ack.h"
+#include "workers/master_ipc_cmds.h"
 
 struct sockaddr_in6;
 

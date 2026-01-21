@@ -18,6 +18,7 @@
 #include "oritw/timer_id.h"
 #include "async.h"
 #include "oritlsf.h"
+#include "workers/master_ipc_cmds.h"
 
 static inline status_t retry_transmit(
     worker_context_t *worker_ctx, 
