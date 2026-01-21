@@ -31,32 +31,32 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
     ctx->wot = wot;
     ctx->index = index;
     ctx->master_uds_fd = master_uds_fd;
-//----------------------------------------------------------------------
-// Inisialisasi seed dengan waktu saat ini untuk hasil yang berbeda setiap kali
-// Seed untuk random() jitter
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
+    // Inisialisasi seed dengan waktu saat ini untuk hasil yang berbeda setiap kali
+    // Seed untuk random() jitter
+    //----------------------------------------------------------------------
     srandom(time(NULL) ^ ctx->pid);
-//----------------------------------------------------------------------
-// Setup label
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
+    // Setup label
+    //----------------------------------------------------------------------
 	int needed = snprintf(NULL, 0, "[%s %d]: ", woname, *ctx->index);
-    ctx->label = (char *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        needed + 1,
-        sizeof(char)
-    );
-	snprintf(ctx->label, needed + 1, "[%s %d]: ", woname, *ctx->index);  
-//----------------------------------------------------------------------
+    ctx->label = (char *)oritlsf_calloc(__FILE__, __LINE__,
+                                        &ctx->oritlsf_pool,
+                                        needed + 1,
+                                        sizeof(char)
+                                        );
+	snprintf(ctx->label, needed + 1, "[%s %d]: ", woname, *ctx->index);
+    //----------------------------------------------------------------------
     generate_uint64_t_id(ctx->label, &ctx->heartbeat_timer_id.id);
     ctx->heartbeat_timer_id.event = NULL;
     ctx->heartbeat_timer_id.delay_us = 0.0;
     ctx->heartbeat_timer_id.event_type = TE_HEARTBEAT;
-//----------------------------------------------------------------------
-    ctx->buffer = (et_buffer_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        1,
-        sizeof(et_buffer_t)
-    );
+    //----------------------------------------------------------------------
+    ctx->buffer = (et_buffer_t *)oritlsf_calloc(__FILE__, __LINE__,
+                                                &ctx->oritlsf_pool,
+                                                1,
+                                                sizeof(et_buffer_t)
+                                                );
     et_buffer_t *buffer = ctx->buffer;
     buffer->read_step = 0;
     buffer->buffer_in = NULL;
@@ -65,67 +65,67 @@ status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *
     buffer->buffer_out = NULL;
     buffer->out_size_tb = 0;
     buffer->out_size_c = 0;
-//----------------------------------------------------------------------
-// Setup IPC security
-//----------------------------------------------------------------------
-    ctx->kem_privatekey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        KEM_PRIVATEKEY_BYTES,
-        sizeof(uint8_t)
-    );
-    ctx->kem_publickey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        KEM_PUBLICKEY_BYTES,
-        sizeof(uint8_t)
-    );
-    ctx->kem_ciphertext = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        KEM_CIPHERTEXT_BYTES,
-        sizeof(uint8_t)
-    );
-    ctx->kem_sharedsecret = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        KEM_SHAREDSECRET_BYTES,
-        sizeof(uint8_t)
-    );
-    ctx->aes_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        HASHES_BYTES,
-        sizeof(uint8_t)
-    );
-    ctx->mac_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        HASHES_BYTES,
-        sizeof(uint8_t)
-    );
-    ctx->local_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        AES_NONCE_BYTES,
-        sizeof(uint8_t)
-    );
-    ctx->remote_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        AES_NONCE_BYTES,
-        sizeof(uint8_t)
-    );
+    //----------------------------------------------------------------------
+    // Setup IPC security
+    //----------------------------------------------------------------------
+    ctx->kem_privatekey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+                                                    &ctx->oritlsf_pool,
+                                                    KEM_PRIVATEKEY_BYTES,
+                                                    sizeof(uint8_t)
+                                                    );
+    ctx->kem_publickey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+                                                   &ctx->oritlsf_pool,
+                                                   KEM_PUBLICKEY_BYTES,
+                                                   sizeof(uint8_t)
+                                                   );
+    ctx->kem_ciphertext = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+                                                    &ctx->oritlsf_pool,
+                                                    KEM_CIPHERTEXT_BYTES,
+                                                    sizeof(uint8_t)
+                                                    );
+    ctx->kem_sharedsecret = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+                                                      &ctx->oritlsf_pool,
+                                                      KEM_SHAREDSECRET_BYTES,
+                                                      sizeof(uint8_t)
+                                                      );
+    ctx->aes_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+                                             &ctx->oritlsf_pool,
+                                             HASHES_BYTES,
+                                             sizeof(uint8_t)
+                                             );
+    ctx->mac_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+                                             &ctx->oritlsf_pool,
+                                             HASHES_BYTES,
+                                             sizeof(uint8_t)
+                                             );
+    ctx->local_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+                                                 &ctx->oritlsf_pool,
+                                                 AES_NONCE_BYTES,
+                                                 sizeof(uint8_t)
+                                                 );
+    ctx->remote_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+                                                  &ctx->oritlsf_pool,
+                                                  AES_NONCE_BYTES,
+                                                  sizeof(uint8_t)
+                                                  );
     ctx->local_ctr = (uint32_t)0;
     ctx->remote_ctr = (uint32_t)0;
     ctx->hello1_sent = false;
     ctx->hello1_ack_rcvd = false;
     ctx->hello2_sent = false;
     ctx->hello2_ack_rcvd = false;
-//----------------------------------------------------------------------
-// Setup IPC rekeying
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
+    // Setup IPC rekeying
+    //----------------------------------------------------------------------
     ctx->is_rekeying = false;
     ctx->rekeying_queue_head = NULL;
     ctx->rekeying_queue_tail = NULL;
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
 	if (async_create(ctx->label, &ctx->async) != SUCCESS) return FAILURE;
 	if (async_create_inout_event(ctx->label, &ctx->async, ctx->master_uds_fd, EIT_FD) != SUCCESS) return FAILURE;
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     if (oritw_setup(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer) != SUCCESS) return FAILURE;
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     return SUCCESS;
 }
 
@@ -156,24 +156,24 @@ void cleanup_worker(worker_context_t *ctx) {
     ipc_cleanup_protocol_queue(&ctx->oritlsf_pool, &ctx->rekeying_queue_head, &ctx->rekeying_queue_tail);
     async_delete_event(ctx->label, &ctx->async, ctx->master_uds_fd, EIT_FD);
     CLOSE_UDS(ctx->master_uds_fd);
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     if (ctx->heartbeat_timer_id.event) {
         oritw_remove_event(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer, &ctx->heartbeat_timer_id.event);
         ctx->heartbeat_timer_id.id = 0ULL;
         ctx->heartbeat_timer_id.delay_us = 0.0;
         ctx->heartbeat_timer_id.event_type = TE_UNKNOWN;
     }
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
 	int needed = strlen(ctx->label);
     char llabel[needed + 1];
     strlcpy(llabel, ctx->label, needed + 1);
     oritw_cleanup(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer);
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     CLOSE_FD(&ctx->async.async_fd);
     oritlsf_free(&ctx->oritlsf_pool, (void **)&ctx->label);
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     CLOSE_ET_BUFFER(&ctx->oritlsf_pool, &ctx->buffer);
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
 	void *reclaimed_buffer = oritlsf_cleanup_pool(llabel, &ctx->oritlsf_pool);
     if (reclaimed_buffer != ctx->arena_buffer) {
         LOG_ERROR("%sFailed To oritlsf_cleanup_pool.", llabel);

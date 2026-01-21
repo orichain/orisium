@@ -3,9 +3,9 @@
 #include <stddef.h>
 
 #if defined(__OpenBSD__)
-    #include <sys/limits.h>
+#include <sys/limits.h>
 #else
-    #include <limits.h>
+#include <limits.h>
 #endif
 
 #include "log.h"
@@ -18,7 +18,7 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
     uint8_t selected_worker_idx = 0xff;
     long double min_avg_task_time = LDBL_MAX;
     uint64_t min_longest_task_time = ULLONG_MAX;
-    
+
     uint8_t temp_best_idx_t1 = 0xff;
     if (wot == SIO) {
         for (uint8_t i = 0; i < MAX_SIO_WORKERS; ++i) {
@@ -93,7 +93,7 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
     if (temp_best_idx_t1 != 0xff) {
         if (min_avg_task_time > 0.0L) {
             selected_worker_idx = temp_best_idx_t1;
-            LOG_DEBUG("%sSelecting %s worker %d based on lowest Avg Task Time: %Lf", 
+            LOG_DEBUG("%sSelecting %s worker %d based on lowest Avg Task Time: %Lf",
                       label, worker_name, selected_worker_idx, min_avg_task_time);
             return selected_worker_idx;
         }
@@ -175,9 +175,9 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
     if (temp_best_idx_t2 != 0xff) {
         if (min_longest_task_time > 0ULL) {
             selected_worker_idx = temp_best_idx_t2;
-            LOG_DEBUG("%sSelecting %s worker %d based on lowest Longest Task Time: %llu", 
+            LOG_DEBUG("%sSelecting %s worker %d based on lowest Longest Task Time: %llu",
                       label, worker_name, selected_worker_idx, (unsigned long long)min_longest_task_time);
-            return selected_worker_idx; 
+            return selected_worker_idx;
         }
         LOG_DEBUG("%sAll not-full %s workers have 0 Longest Task Time. Falling back to Round Robin.", label, worker_name);
     } else {
@@ -185,7 +185,7 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
     }
     uint8_t temp_best_idx_t3 = 0xff;
     if (wot == SIO) {
-        uint8_t start_rr_check_idx = master_ctx->last_sio_rr_idx; 
+        uint8_t start_rr_check_idx = master_ctx->last_sio_rr_idx;
         for (uint8_t i = 0; i < MAX_SIO_WORKERS; ++i) {
             master_worker_session_t *session = get_master_worker_session(master_ctx, SIO, i);
             if (session == NULL) {
@@ -201,7 +201,7 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
             }
         }
     } else if (wot == LOGIC) {
-        uint8_t start_rr_check_idx = master_ctx->last_logic_rr_idx; 
+        uint8_t start_rr_check_idx = master_ctx->last_logic_rr_idx;
         for (uint8_t i = 0; i < MAX_LOGIC_WORKERS; ++i) {
             master_worker_session_t *session = get_master_worker_session(master_ctx, LOGIC, i);
             if (session == NULL) {
@@ -215,7 +215,7 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
 			}
         }
     } else if (wot == COW) {
-        uint8_t start_rr_check_idx = master_ctx->last_cow_rr_idx; 
+        uint8_t start_rr_check_idx = master_ctx->last_cow_rr_idx;
         for (uint8_t i = 0; i < MAX_COW_WORKERS; ++i) {
             master_worker_session_t *session = get_master_worker_session(master_ctx, COW, i);
             if (session == NULL) {
@@ -231,7 +231,7 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
             }
         }
     } else if (wot == DBR) {
-        uint8_t start_rr_check_idx = master_ctx->last_dbr_rr_idx; 
+        uint8_t start_rr_check_idx = master_ctx->last_dbr_rr_idx;
         for (uint8_t i = 0; i < MAX_DBR_WORKERS; ++i) {
             master_worker_session_t *session = get_master_worker_session(master_ctx, DBR, i);
             if (session == NULL) {
@@ -245,7 +245,7 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
 			}
         }
     } else if (wot == DBW) {
-        uint8_t start_rr_check_idx = master_ctx->last_dbw_rr_idx; 
+        uint8_t start_rr_check_idx = master_ctx->last_dbw_rr_idx;
         for (uint8_t i = 0; i < MAX_DBW_WORKERS; ++i) {
             master_worker_session_t *session = get_master_worker_session(master_ctx, DBW, i);
             if (session == NULL) {

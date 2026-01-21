@@ -6,7 +6,7 @@
 #include <inttypes.h>
 
 #if defined(__FreeBSD__)
-    #include <arpa/inet.h>
+#include <arpa/inet.h>
 #endif
 
 #include "log.h"
@@ -22,20 +22,20 @@
 #include "orilink/protocol.h"
 
 status_t handle_master_udp_sock_event(
-    const char *label, 
-    master_context_t *master_ctx, 
-    struct sockaddr_in6 *remote_addr, 
+    const char *label,
+    master_context_t *master_ctx,
+    struct sockaddr_in6 *remote_addr,
     orilink_raw_protocol_t_status_t *orcvdo
 )
 {
     char host_str[NI_MAXHOST];
     char port_str[NI_MAXSERV];
-    
+
     int getname_res = getnameinfo((struct sockaddr *)remote_addr, sizeof(struct sockaddr_in6),
-                        host_str, NI_MAXHOST,
-                        port_str, NI_MAXSERV,
-                        NI_NUMERICHOST | NI_NUMERICSERV
-                      );
+                                  host_str, NI_MAXHOST,
+                                  port_str, NI_MAXSERV,
+                                  NI_NUMERICHOST | NI_NUMERICSERV
+                                  );
     if (getname_res != 0) {
         LOG_ERROR("%sgetnameinfo failed. %s", label, strerror(errno));
         CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &orcvdo->r_orilink_raw_protocol_t);
@@ -59,9 +59,9 @@ status_t handle_master_udp_sock_event(
     switch (orilink_protocol) {
         case ORILINK_HELLO1: {
             master_sio_c_session_t *c_session = NULL;
-//======================================================================
-// + Security
-//======================================================================
+            //======================================================================
+            // + Security
+            //======================================================================
             for(uint16_t i = 0; i < MAX_MASTER_SIO_SESSIONS; ++i) {
                 c_session = &master_ctx->sio_c_session[i];
                 if(c_session->in_use && c_session->in_secure) {
@@ -77,7 +77,7 @@ status_t handle_master_udp_sock_event(
                     }
                 }
             }
-//======================================================================
+            //======================================================================
             uint8_t worker_index = 0xff;
             uint8_t session_index = 0xff;
             uint8_t trycount = orcvdo->r_orilink_raw_protocol_t->trycount;
@@ -126,16 +126,16 @@ status_t handle_master_udp_sock_event(
                 }
             }
             if (master_worker_udp_data(
-                    label, 
-                    master_ctx, 
-                    SIO, 
-                    worker_index, 
-                    session_index, 
-                    (uint8_t)orilink_protocol,
-                    trycount,
-                    remote_addr, 
-                    orcvdo->r_orilink_raw_protocol_t
-                ) != SUCCESS
+                label,
+                master_ctx,
+                SIO,
+                worker_index,
+                session_index,
+                (uint8_t)orilink_protocol,
+                trycount,
+                remote_addr,
+                orcvdo->r_orilink_raw_protocol_t
+            ) != SUCCESS
             )
             {
                 CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &orcvdo->r_orilink_raw_protocol_t);
@@ -159,9 +159,9 @@ status_t handle_master_udp_sock_event(
             uint8_t worker_index = orcvdo->r_orilink_raw_protocol_t->remote_index;
             uint8_t session_index = orcvdo->r_orilink_raw_protocol_t->remote_session_index;
             uint8_t trycount = orcvdo->r_orilink_raw_protocol_t->trycount;
-//======================================================================
-// + Security
-//======================================================================
+            //======================================================================
+            // + Security
+            //======================================================================
             switch (wot) {
                 case SIO: {
                     if (worker_index > MAX_SIO_WORKERS) {
@@ -227,18 +227,18 @@ status_t handle_master_udp_sock_event(
                     CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &orcvdo->r_orilink_raw_protocol_t);
                     return FAILURE;
             }
-//======================================================================
+            //======================================================================
             if (master_worker_udp_data(
-                    label, 
-                    master_ctx, 
-                    wot, 
-                    worker_index, 
-                    session_index, 
-                    (uint8_t)orilink_protocol,
-                    trycount,
-                    remote_addr, 
-                    orcvdo->r_orilink_raw_protocol_t
-                ) != SUCCESS
+                label,
+                master_ctx,
+                wot,
+                worker_index,
+                session_index,
+                (uint8_t)orilink_protocol,
+                trycount,
+                remote_addr,
+                orcvdo->r_orilink_raw_protocol_t
+            ) != SUCCESS
             )
             {
                 CLOSE_ORILINK_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &orcvdo->r_orilink_raw_protocol_t);
@@ -257,7 +257,7 @@ status_t handle_master_udp_sock_event(
 status_t handle_master_ipv4_udp_sock_event(const char *label, master_context_t *master_ctx) {
     struct sockaddr_in remote_addr;
     struct sockaddr_in6 ipv6_remote_addr;
-    
+
     orilink_raw_protocol_t_status_t orcvdo;
     orcvdo.status = FAILURE;
     do {
@@ -281,7 +281,7 @@ status_t handle_master_ipv4_udp_sock_event(const char *label, master_context_t *
 
 status_t handle_master_ipv6_udp_sock_event(const char *label, master_context_t *master_ctx) {
     struct sockaddr_in6 remote_addr;
-    
+
     orilink_raw_protocol_t_status_t orcvdo;
     orcvdo.status = FAILURE;
     do {

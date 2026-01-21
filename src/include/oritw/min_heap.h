@@ -5,9 +5,9 @@
 #include <stdint.h>
 
 #if defined(__OpenBSD__)
-    #include <sys/limits.h>
+#include <sys/limits.h>
 #else
-    #include <limits.h>
+#include <limits.h>
 #endif
 
 #include "constants.h"

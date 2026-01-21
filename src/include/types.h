@@ -7,16 +7,16 @@
 #include <stdbool.h>
 
 typedef enum {
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     SUCCESS = (uint8_t)0x00,
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     SUCCESS_WRKSRDY = (uint8_t)0x01,
     SUCCESS_EAGNEWBLK = (uint8_t)0x02,
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     FAILURE_NOTFOUND = (uint8_t)0xe5,
     FAILURE_IVLDTRY = (uint8_t)0xe6,
     FAILURE_MAXTRY = (uint8_t)0xe7,
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     FAILURE_EBADF = (uint8_t)0xe8,
     FAILURE_CTRMSMTCH = (uint8_t)0xe9,
     FAILURE_MACMSMTCH = (uint8_t)0xea,
@@ -41,9 +41,9 @@ typedef enum {
     FAILURE_IPYLD = (uint8_t)0xfc,
     FAILURE_OOBUF = (uint8_t)0xfd,
     FAILURE_OOIDX = (uint8_t)0xfe,
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     FAILURE = (uint8_t)0xff
-//----------------------------------------------------------------------
+        //----------------------------------------------------------------------
 } status_t;
 
 typedef enum {
@@ -58,22 +58,22 @@ typedef enum {
 static inline const char *get_worker_name(worker_type_t wot) {
     switch (wot) {
         case SIO: {
-            return "SIO";
-        }
+                      return "SIO";
+                  }
         case LOGIC: {
-            return "LOGIC";
-        }
+                        return "LOGIC";
+                    }
         case COW: {
-            return "COW";
-        }
+                      return "COW";
+                  }
         case DBR: {
-            return "DBR";
-        }
+                      return "DBR";
+                  }
         case DBW: {
-            return "DBW";
-        }
+                      return "DBW";
+                  }
         default:
-            return "UNKNOWN";
+                  return "UNKNOWN";
     }
 }
 
@@ -94,7 +94,7 @@ typedef enum {
     IT_APPNDERA = (uint8_t)0x0d,
     IT_APPNDERA_SUCCESS = (uint8_t)0x0e,
     IT_APPNDERA_FAILURE = (uint8_t)0x0f,
-    
+
     IT_WAKEUP = (uint8_t)0xff
 } info_type_t;
 

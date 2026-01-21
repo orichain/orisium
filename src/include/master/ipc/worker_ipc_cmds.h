@@ -21,7 +21,7 @@
 #include "ipc/worker_worker_info.h"
 
 struct sockaddr_in6;
-                        
+
 static inline status_t master_worker_info(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index, info_type_t flag) {
     master_worker_session_t *session = get_master_worker_session(master_ctx, wot, index);
     if (session == NULL) return FAILURE;
@@ -40,16 +40,16 @@ static inline status_t master_worker_info(const char *label, master_context_t *m
         }
     } else {
         ssize_t_status_t send_result = send_ipc_protocol_message(
-            label, 
-            &master_ctx->oritlsf_pool, 
-            security->aes_key,
-            security->mac_key,
-            security->local_nonce,
-            &security->local_ctr,
-            &upp->uds[0], 
-            buffer,
-            cmd_result.r_ipc_protocol_t
-        );
+                label,
+                &master_ctx->oritlsf_pool,
+                security->aes_key,
+                security->mac_key,
+                security->local_nonce,
+                &security->local_ctr,
+                &upp->uds[0],
+                buffer,
+                cmd_result.r_ipc_protocol_t
+                );
         if (send_result.status != SUCCESS) {
             LOG_ERROR("%sFailed to sent master_worker_info to worker.", label);
             CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
@@ -70,19 +70,19 @@ static inline status_t master_worker_info(const char *label, master_context_t *m
 }
 
 static inline status_t master_workers_info(const char *label, master_context_t *master_ctx, info_type_t flag) {
-	for (uint8_t i = 0; i < MAX_SIO_WORKERS; ++i) { 
+	for (uint8_t i = 0; i < MAX_SIO_WORKERS; ++i) {
 		if (master_worker_info(label, master_ctx, SIO, i, flag) != SUCCESS) return FAILURE;
 	}
 	for (uint8_t i = 0; i < MAX_LOGIC_WORKERS; ++i) {
 		if (master_worker_info(label, master_ctx, LOGIC, i, flag) != SUCCESS) return FAILURE;
 	}
-	for (uint8_t i = 0; i < MAX_COW_WORKERS; ++i) { 
+	for (uint8_t i = 0; i < MAX_COW_WORKERS; ++i) {
 		if (master_worker_info(label, master_ctx, COW, i, flag) != SUCCESS) return FAILURE;
 	}
-    for (uint8_t i = 0; i < MAX_DBR_WORKERS; ++i) { 
+    for (uint8_t i = 0; i < MAX_DBR_WORKERS; ++i) {
 		if (master_worker_info(label, master_ctx, DBR, i, flag) != SUCCESS) return FAILURE;
 	}
-    for (uint8_t i = 0; i < MAX_DBW_WORKERS; ++i) { 
+    for (uint8_t i = 0; i < MAX_DBW_WORKERS; ++i) {
 		if (master_worker_info(label, master_ctx, DBW, i, flag) != SUCCESS) return FAILURE;
 	}
 	return SUCCESS;
@@ -103,16 +103,16 @@ static inline status_t master_cow_connect(const char *label, master_context_t *m
         }
     } else {
         ssize_t_status_t send_result = send_ipc_protocol_message(
-            label, 
-            &master_ctx->oritlsf_pool, 
-            master_ctx->cow_session[index].security->aes_key,
-            master_ctx->cow_session[index].security->mac_key,
-            master_ctx->cow_session[index].security->local_nonce,
-            &master_ctx->cow_session[index].security->local_ctr,
-            &master_ctx->cow_session[index].upp->uds[0], 
-            master_ctx->cow_session[index].buffer,
-            cmd_result.r_ipc_protocol_t
-        );
+                label,
+                &master_ctx->oritlsf_pool,
+                master_ctx->cow_session[index].security->aes_key,
+                master_ctx->cow_session[index].security->mac_key,
+                master_ctx->cow_session[index].security->local_nonce,
+                &master_ctx->cow_session[index].security->local_ctr,
+                &master_ctx->cow_session[index].upp->uds[0],
+                master_ctx->cow_session[index].buffer,
+                cmd_result.r_ipc_protocol_t
+                );
         if (send_result.status != SUCCESS) {
             LOG_ERROR("%sFailed to sent master_cow_connect to COW %ld.", label, index);
             CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
@@ -120,7 +120,7 @@ static inline status_t master_cow_connect(const char *label, master_context_t *m
         } else {
             LOG_DEBUG("%sSent master_cow_connect to COW %ld.", label, index);
         }
-        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t); 
+        CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
     }
 	return SUCCESS;
 }
@@ -132,27 +132,27 @@ static inline status_t master_worker_hello1_ack(const char *label, master_contex
     et_buffer_t *buffer = session->buffer;
     uint8_t *kem_ciphertext = security->kem_ciphertext;
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_hello1_ack(
-        label, 
-        &master_ctx->oritlsf_pool, 
-        wot, 
-        index, 
-        local_nonce,
-        kem_ciphertext
-    );
+            label,
+            &master_ctx->oritlsf_pool,
+            wot,
+            index,
+            local_nonce,
+            kem_ciphertext
+            );
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
     ssize_t_status_t send_result = send_ipc_protocol_message(
-        label, 
-        &master_ctx->oritlsf_pool, 
-        security->aes_key,
-        security->mac_key,
-        security->local_nonce,
-        &security->local_ctr,
-        worker_uds_fd, 
-        buffer,
-        cmd_result.r_ipc_protocol_t
-    );
+            label,
+            &master_ctx->oritlsf_pool,
+            security->aes_key,
+            security->mac_key,
+            security->local_nonce,
+            &security->local_ctr,
+            worker_uds_fd,
+            buffer,
+            cmd_result.r_ipc_protocol_t
+            );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent master_worker_hello1_ack to %s %ld.", label, worker_name, index);
         CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
@@ -161,7 +161,7 @@ static inline status_t master_worker_hello1_ack(const char *label, master_contex
         LOG_DEBUG("%sSent master_worker_hello1_ack to %s %ld.", label, worker_name, index);
     }
     security->hello1_ack_sent = true;
-    CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t); 
+    CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
 	return SUCCESS;
 }
 
@@ -171,26 +171,26 @@ static inline status_t master_worker_hello2_ack(const char *label, master_contex
     if (session == NULL) return FAILURE;
     et_buffer_t *buffer = session->buffer;
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_master_worker_hello2_ack(
-        label, 
-        &master_ctx->oritlsf_pool, 
-        wot,
-        index,
-        encrypted_wot_index1
-    );
+            label,
+            &master_ctx->oritlsf_pool,
+            wot,
+            index,
+            encrypted_wot_index1
+            );
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
     ssize_t_status_t send_result = send_ipc_protocol_message(
-        label, 
-        &master_ctx->oritlsf_pool, 
-        security->aes_key,
-        security->mac_key,
-        security->local_nonce,
-        &security->local_ctr,
-        worker_uds_fd, 
-        buffer,
-        cmd_result.r_ipc_protocol_t
-    );
+            label,
+            &master_ctx->oritlsf_pool,
+            security->aes_key,
+            security->mac_key,
+            security->local_nonce,
+            &security->local_ctr,
+            worker_uds_fd,
+            buffer,
+            cmd_result.r_ipc_protocol_t
+            );
     if (send_result.status != SUCCESS) {
         LOG_ERROR("%sFailed to sent master_worker_hello2_ack to %s %ld.", label, worker_name, index);
         CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
@@ -199,21 +199,21 @@ static inline status_t master_worker_hello2_ack(const char *label, master_contex
         LOG_DEBUG("%sSent master_worker_hello2_ack to %s %ld.", label, worker_name, index);
     }
     security->hello2_ack_sent = true;
-    CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t); 
+    CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
 	return SUCCESS;
 }
 
 static inline status_t master_worker_udp_data(
-    const char *label, 
-    master_context_t *master_ctx, 
-    worker_type_t wot, 
-    uint8_t index,
-    uint8_t session_index,
-    uint8_t orilink_protocol, 
-    uint8_t trycount,
-    struct sockaddr_in6 *addr,
-    orilink_raw_protocol_t *r
-) 
+        const char *label,
+        master_context_t *master_ctx,
+        worker_type_t wot,
+        uint8_t index,
+        uint8_t session_index,
+        uint8_t orilink_protocol,
+        uint8_t trycount,
+        struct sockaddr_in6 *addr,
+        orilink_raw_protocol_t *r
+        )
 {
     master_worker_session_t *session = get_master_worker_session(master_ctx, wot, index);
     if (session == NULL) return FAILURE;
@@ -224,17 +224,17 @@ static inline status_t master_worker_udp_data(
     const char *worker_name = "UNKNOWN";
     worker_name = get_worker_name(wot);
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data(
-        label,
-        &master_ctx->oritlsf_pool, 
-        r->local_wot,
-        r->local_index,
-        session_index,
-        orilink_protocol,
-        trycount,
-        addr,
-        r->n,
-        r->recv_buffer
-    );
+            label,
+            &master_ctx->oritlsf_pool,
+            r->local_wot,
+            r->local_index,
+            session_index,
+            orilink_protocol,
+            trycount,
+            addr,
+            r->n,
+            r->recv_buffer
+            );
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
@@ -245,16 +245,16 @@ static inline status_t master_worker_udp_data(
         }
     } else {
         ssize_t_status_t send_result = send_ipc_protocol_message(
-            label, 
-            &master_ctx->oritlsf_pool, 
-            security->aes_key,
-            security->mac_key,
-            security->local_nonce,
-            &security->local_ctr,
-            &upp->uds[0], 
-            buffer,
-            cmd_result.r_ipc_protocol_t
-        );
+                label,
+                &master_ctx->oritlsf_pool,
+                security->aes_key,
+                security->mac_key,
+                security->local_nonce,
+                &security->local_ctr,
+                &upp->uds[0],
+                buffer,
+                cmd_result.r_ipc_protocol_t
+                );
         if (send_result.status != SUCCESS) {
             LOG_ERROR("%sFailed to sent udp_data to %s.", label, worker_name);
             CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
@@ -268,15 +268,15 @@ static inline status_t master_worker_udp_data(
 }
 
 static inline status_t master_worker_udp_data_ack(
-    const char *label, 
-    master_context_t *master_ctx, 
-    worker_type_t wot, 
-    uint8_t index,
-    uint8_t session_index,
-    uint8_t orilink_protocol,
-    uint8_t trycount,
-    status_t status
-) 
+        const char *label,
+        master_context_t *master_ctx,
+        worker_type_t wot,
+        uint8_t index,
+        uint8_t session_index,
+        uint8_t orilink_protocol,
+        uint8_t trycount,
+        status_t status
+        )
 {
     master_worker_session_t *session = get_master_worker_session(master_ctx, wot, index);
     if (session == NULL) return FAILURE;
@@ -287,15 +287,15 @@ static inline status_t master_worker_udp_data_ack(
     const char *worker_name = "UNKNOWN";
     worker_name = get_worker_name(wot);
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_udp_data_ack(
-        label,
-        &master_ctx->oritlsf_pool, 
-        wot,
-        index,
-        session_index,
-        orilink_protocol,
-        trycount,
-        status
-    );
+            label,
+            &master_ctx->oritlsf_pool,
+            wot,
+            index,
+            session_index,
+            orilink_protocol,
+            trycount,
+            status
+            );
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
@@ -306,16 +306,16 @@ static inline status_t master_worker_udp_data_ack(
         }
     } else {
         ssize_t_status_t send_result = send_ipc_protocol_message(
-            label, 
-            &master_ctx->oritlsf_pool, 
-            security->aes_key,
-            security->mac_key,
-            security->local_nonce,
-            &security->local_ctr,
-            &upp->uds[0], 
-            buffer,
-            cmd_result.r_ipc_protocol_t
-        );
+                label,
+                &master_ctx->oritlsf_pool,
+                security->aes_key,
+                security->mac_key,
+                security->local_nonce,
+                &security->local_ctr,
+                &upp->uds[0],
+                buffer,
+                cmd_result.r_ipc_protocol_t
+                );
         if (send_result.status != SUCCESS) {
             LOG_ERROR("%sFailed to sent udp_data to %s.", label, worker_name);
             CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);
@@ -329,14 +329,14 @@ static inline status_t master_worker_udp_data_ack(
 }
 
 static inline status_t relay_worker_master_worker_info(
-	const char *label, 
-    master_context_t *master_ctx, 
-    worker_type_t wot, 
-    uint8_t index,
-    worker_type_t src_wot, 
-	uint8_t src_index,
-	info_type_t flag
-)
+	    const char *label,
+        master_context_t *master_ctx,
+        worker_type_t wot,
+        uint8_t index,
+        worker_type_t src_wot,
+	    uint8_t src_index,
+	    info_type_t flag
+        )
 {
 	master_worker_session_t *session = get_master_worker_session(master_ctx, wot, index);
     if (session == NULL) return FAILURE;
@@ -347,18 +347,18 @@ static inline status_t relay_worker_master_worker_info(
     const char *worker_name = "UNKNOWN";
     worker_name = get_worker_name(wot);
     ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_worker_info(
-        label,
-        &master_ctx->oritlsf_pool, 
-        wot, 
-        index, 
-        src_wot,
-        src_index, 
-        0xff,
-        wot,
-        index,
-        0xff,
-        flag
-    );
+            label,
+            &master_ctx->oritlsf_pool,
+            wot,
+            index,
+            src_wot,
+            src_index,
+            0xff,
+            wot,
+            index,
+            0xff,
+            flag
+            );
     if (cmd_result.status != SUCCESS) {
         return FAILURE;
     }
@@ -369,16 +369,16 @@ static inline status_t relay_worker_master_worker_info(
         }
 	} else {
 		ssize_t_status_t send_result = send_ipc_protocol_message(
-            label, 
-            &master_ctx->oritlsf_pool, 
-            security->aes_key,
-            security->mac_key,
-            security->local_nonce,
-            &security->local_ctr,
-            &upp->uds[0], 
-            buffer,
-            cmd_result.r_ipc_protocol_t
-        );
+                label,
+                &master_ctx->oritlsf_pool,
+                security->aes_key,
+                security->mac_key,
+                security->local_nonce,
+                &security->local_ctr,
+                &upp->uds[0],
+                buffer,
+                cmd_result.r_ipc_protocol_t
+                );
         if (send_result.status != SUCCESS) {
             LOG_ERROR("%sFailed to sent relay_worker_master_worker_info to %s.", label, worker_name);
             CLOSE_IPC_PROTOCOL(&master_ctx->oritlsf_pool, &cmd_result.r_ipc_protocol_t);

@@ -1,5 +1,5 @@
 #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
-	#include <pthread.h>
+#include <pthread.h>
 #endif
 
 #include <string.h>
@@ -7,28 +7,28 @@
 #include <stdio.h>
 
 #if defined(__NetBSD__)
-    #include <sys/signal.h>
-    #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
-        #include <pthread_types.h>
+#include <sys/signal.h>
+#if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
+#include <pthread_types.h>
 
-        #include "globals.h"
-    #endif
+#include "globals.h"
+#endif
 #elif defined(__OpenBSD__)
-    #include <sys/signal.h>
-    #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
-        #include "globals.h"
-    #endif
+#include <sys/signal.h>
+#if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
+#include "globals.h"
+#endif
 #elif defined(__FreeBSD__)
-    #include <sys/signal.h>
-    #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
-        #include <sys/_pthreadtypes.h>
+#include <sys/signal.h>
+#if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
+#include <sys/_pthreadtypes.h>
 
-        #include "globals.h"
-    #endif
+#include "globals.h"
+#endif
 #else
-    #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
-        #include "globals.h"
-    #endif
+#if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
+#include "globals.h"
+#endif
 #endif
 
 #include "log.h"
@@ -46,30 +46,30 @@ int main() {
     pthread_t cleaner_thread;
     pthread_create(&cleaner_thread, NULL, log_cleaner_thread, NULL);
 #endif
-//======================================================================
-// Configuring node and bootstrap
-//======================================================================
+    //======================================================================
+    // Configuring node and bootstrap
+    //======================================================================
 	if (ensure_directory_exists("[Orisium]: ", DATABASE_PATH) != SUCCESS) goto exit2;
 	if (ensure_directory_exists("[Orisium]: ", NODEKEYS_PATH) != SUCCESS) goto exit2;
-//======================================================================
-// Install sigint handler
-//======================================================================    
+    //======================================================================
+    // Install sigint handler
+    //======================================================================
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = sigint_handler;
     sigaction(SIGINT, &sa, NULL);
     LOG_INFO("[Orisium]: SIGINT handler installed.");
-//======================================================================
-// Master
-//======================================================================
+    //======================================================================
+    // Master
+    //======================================================================
 	master_context_t master_ctx;
 	/*
     master_ctx.listen_port = (uint16_t)0;
     memset(&master_ctx.bootstrap_nodes, 0, sizeof(bootstrap_nodes_t));
     if (read_listen_port_and_bootstrap_nodes_from_json(
-        "[Orisium]: ", 
-        "config.json", 
-        &master_ctx.listen_port, 
+        "[Orisium]: ",
+        "config.json",
+        &master_ctx.listen_port,
         &master_ctx.bootstrap_nodes
         ) != SUCCESS
     )
@@ -98,9 +98,9 @@ int main() {
     */
     if (setup_master("[Master]: ", &master_ctx) != SUCCESS) goto exit1;
     run_master("[Master]: ", &master_ctx);
-//======================================================================
-// Cleanup
-//======================================================================
+    //======================================================================
+    // Cleanup
+    //======================================================================
 exit1:
     cleanup_master("[Master]: ", &master_ctx);
 exit2:

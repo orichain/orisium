@@ -14,7 +14,7 @@ status_t setup_master_socket_udp(const char *label, master_context_t *master_ctx
     struct sockaddr_in6 ipv6_addr;
     struct sockaddr_in ipv4_addr;
     int v6only = 1;
-    
+
     master_ctx->ipv4_udp = socket(AF_INET, SOCK_DGRAM, 0);
     if (master_ctx->ipv4_udp == -1) {
         LOG_ERROR("%ssocket failed. %s", label, strerror(errno));

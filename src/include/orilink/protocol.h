@@ -2,9 +2,9 @@
 #define ORILINK_PROTOCOL_H
 
 #if defined(__clang__)
-    #if __clang_major__ < 21
-        #include <stdio.h>
-    #endif
+#if __clang_major__ < 21
+#include <stdio.h>
+#endif
 #endif
 
 #include <netinet/in.h>
@@ -25,7 +25,7 @@ typedef enum {
     ORILINK_HELLO3_ACK = (uint8_t)0x05,
     ORILINK_HELLO4 = (uint8_t)0x06,
     ORILINK_HELLO4_ACK = (uint8_t)0x07,
-    
+
     ORILINK_INFO = (uint8_t)0xfc,
     ORILINK_INFO_ACK = (uint8_t)0xfd,
     ORILINK_HEARTBEAT = (uint8_t)0xfe,
@@ -115,28 +115,28 @@ typedef struct {
 typedef struct {
     uint8_t encrypted_local_identity[
         AES_NONCE_BYTES +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint64_t) +
-        AES_TAG_BYTES
+            sizeof(uint8_t) +
+            sizeof(uint8_t) +
+            sizeof(uint8_t) +
+            sizeof(uint64_t) +
+            AES_TAG_BYTES
     ];
 } orilink_hello4_t;
 
 typedef struct {
     uint8_t encrypted_remote_identity[
         sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint64_t) +
-        AES_TAG_BYTES
+            sizeof(uint8_t) +
+            sizeof(uint8_t) +
+            sizeof(uint64_t) +
+            AES_TAG_BYTES
     ];
     uint8_t encrypted_local_identity[
         sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint64_t) +
-        AES_TAG_BYTES
+            sizeof(uint8_t) +
+            sizeof(uint8_t) +
+            sizeof(uint64_t) +
+            AES_TAG_BYTES
     ];
 } orilink_hello4_ack_t;
 
@@ -148,15 +148,15 @@ typedef struct {
     uint8_t local_index;
     uint8_t local_session_index;
     worker_type_t local_wot;
-    
+
     uint64_t id_connection;
-    
+
     worker_type_t remote_wot;
     uint8_t remote_index;
     uint8_t remote_session_index;
     orilink_protocol_type_t type;
     uint8_t trycount;
-    
+
 	union {
         orilink_hello1_t *orilink_hello1;
         orilink_hello1_ack_t *orilink_hello1_ack;
@@ -195,30 +195,30 @@ static inline void CLOSE_ORILINK_PROTOCOL(oritlsf_pool_t *pool, orilink_protocol
 				memset(x->payload.orilink_hello3_ack->ciphertext2, 0, KEM_CIPHERTEXT_BYTES / 2);
 				oritlsf_free(pool, (void **)&x->payload.orilink_hello3_ack);
 			} else if (x->type == ORILINK_HELLO4) {
-				memset(x->payload.orilink_hello4->encrypted_local_identity, 0, 
-					AES_NONCE_BYTES +
-					sizeof(uint8_t) +
-					sizeof(uint8_t) +
-					sizeof(uint8_t) +
-					sizeof(uint64_t) +
-					AES_TAG_BYTES
-				);
+				memset(x->payload.orilink_hello4->encrypted_local_identity, 0,
+					    AES_NONCE_BYTES +
+					    sizeof(uint8_t) +
+					    sizeof(uint8_t) +
+					    sizeof(uint8_t) +
+					    sizeof(uint64_t) +
+					    AES_TAG_BYTES
+				      );
 				oritlsf_free(pool, (void **)&x->payload.orilink_hello4);
 			}  else if (x->type == ORILINK_HELLO4_ACK) {
-				memset(x->payload.orilink_hello4_ack->encrypted_remote_identity, 0, 
-					sizeof(uint8_t) +
-					sizeof(uint8_t) +
-					sizeof(uint8_t) +
-					sizeof(uint64_t) +
-					AES_TAG_BYTES
-				);
-				memset(x->payload.orilink_hello4_ack->encrypted_local_identity, 0, 
-					sizeof(uint8_t) +
-					sizeof(uint8_t) +
-					sizeof(uint8_t) +
-					sizeof(uint64_t) +
-					AES_TAG_BYTES
-				);
+				memset(x->payload.orilink_hello4_ack->encrypted_remote_identity, 0,
+					    sizeof(uint8_t) +
+					    sizeof(uint8_t) +
+					    sizeof(uint8_t) +
+					    sizeof(uint64_t) +
+					    AES_TAG_BYTES
+				      );
+				memset(x->payload.orilink_hello4_ack->encrypted_local_identity, 0,
+					    sizeof(uint8_t) +
+					    sizeof(uint8_t) +
+					    sizeof(uint8_t) +
+					    sizeof(uint64_t) +
+					    AES_TAG_BYTES
+				      );
 				oritlsf_free(pool, (void **)&x->payload.orilink_hello4_ack);
 			} else if (x->type == ORILINK_HEARTBEAT) {
 				oritlsf_free(pool, (void **)&x->payload.orilink_heartbeat);
@@ -244,9 +244,9 @@ typedef struct orilink_raw_protocol_t {
     uint8_t local_index;
     uint8_t local_session_index;
     worker_type_t local_wot;
-    
+
     uint64_t id_connection;
-    
+
     worker_type_t remote_wot;
     uint8_t remote_index;
     uint8_t remote_session_index;

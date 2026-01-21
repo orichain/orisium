@@ -2,9 +2,9 @@
 #define IPC_UDP_DATA_H
 
 #if defined(__clang__)
-    #if __clang_major__ < 21
-        #include <stdio.h>
-    #endif
+#if __clang_major__ < 21
+#include <stdio.h>
+#endif
 #endif
 
 #include <string.h>
@@ -12,9 +12,9 @@
 #include <errno.h>
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-    #include <sys/endian.h>
+#include <sys/endian.h>
 #else
-    #include <endian.h>
+#include <endian.h>
 #endif
 
 #include "utilities.h"
@@ -44,7 +44,7 @@ static inline status_t ipc_serialize_udp_data(const char *label, const ipc_udp_d
     current_offset_local += sizeof(uint8_t);
     if (CHECK_BUFFER_BOUNDS(current_offset_local, SOCKADDR_IN6_SIZE, buffer_size) != SUCCESS) return FAILURE_OOBUF;
     uint8_t remote_addr_be[SOCKADDR_IN6_SIZE];
-    serialize_sockaddr_in6(&payload->remote_addr, remote_addr_be);    
+    serialize_sockaddr_in6(&payload->remote_addr, remote_addr_be);
     memcpy(current_buffer + current_offset_local, remote_addr_be, SOCKADDR_IN6_SIZE);
     current_offset_local += SOCKADDR_IN6_SIZE;
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint16_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
@@ -117,17 +117,17 @@ static inline status_t ipc_deserialize_udp_data(const char *label, ipc_protocol_
 }
 
 static inline ipc_protocol_t_status_t ipc_prepare_cmd_udp_data(
-    const char *label, 
-    oritlsf_pool_t *pool, 
-    worker_type_t wot, 
-    uint8_t index, 
-    uint8_t session_index, 
-    uint8_t orilink_protocol, 
-    uint8_t trycount,
-    struct sockaddr_in6 *remote_addr, 
-    uint16_t len, 
-    uint8_t *data
-)
+        const char *label,
+        oritlsf_pool_t *pool,
+        worker_type_t wot,
+        uint8_t index,
+        uint8_t session_index,
+        uint8_t orilink_protocol,
+        uint8_t trycount,
+        struct sockaddr_in6 *remote_addr,
+        uint16_t len,
+        uint8_t *data
+        )
 {
 	ipc_protocol_t_status_t result;
 	result.r_ipc_protocol_t = (ipc_protocol_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_protocol_t));

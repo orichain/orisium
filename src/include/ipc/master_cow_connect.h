@@ -2,9 +2,9 @@
 #define IPC_MASTER_COW_CONNECT_H
 
 #if defined(__clang__)
-    #if __clang_major__ < 21
-        #include <stdio.h>
-    #endif
+#if __clang_major__ < 21
+#include <stdio.h>
+#endif
 #endif
 
 #include <string.h>
@@ -12,9 +12,9 @@
 #include <errno.h>
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-    #include <sys/endian.h>
+#include <sys/endian.h>
 #else
-    #include <endian.h>
+#include <endian.h>
 #endif
 
 #include "utilities.h"
@@ -42,7 +42,7 @@ static inline status_t ipc_serialize_master_cow_connect(const char *label, const
     current_offset_local += sizeof(uint64_t);
     if (CHECK_BUFFER_BOUNDS(current_offset_local, SOCKADDR_IN6_SIZE, buffer_size) != SUCCESS) return FAILURE_OOBUF;
     uint8_t remote_addr_be[SOCKADDR_IN6_SIZE];
-    serialize_sockaddr_in6(&payload->remote_addr, remote_addr_be);    
+    serialize_sockaddr_in6(&payload->remote_addr, remote_addr_be);
     memcpy(current_buffer + current_offset_local, remote_addr_be, SOCKADDR_IN6_SIZE);
     current_offset_local += SOCKADDR_IN6_SIZE;
     *offset = current_offset_local;

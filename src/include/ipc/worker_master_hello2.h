@@ -2,9 +2,9 @@
 #define IPC_WORKER_MASTER_HELLO2_H
 
 #if defined(__clang__)
-    #if __clang_major__ < 21
-        #include <stdio.h>
-    #endif
+#if __clang_major__ < 21
+#include <stdio.h>
+#endif
 #endif
 
 #include <string.h>

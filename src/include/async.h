@@ -9,19 +9,19 @@
 #include <unistd.h>
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-    #include <sys/event.h>
-    #if defined(__clang__)
-        #if __clang_major__ < 21
-            #include <sys/errno.h>
-        #endif
-    #endif
+#include <sys/event.h>
+#if defined(__clang__)
+#if __clang_major__ < 21
+#include <sys/errno.h>
+#endif
+#endif
 #elif defined(__FreeBSD__)
-    #include <sys/event.h>
+#include <sys/event.h>
 #else
-    #include <time.h>
-    #include <sys/epoll.h>
-    #include <sys/eventfd.h>
-    #include <sys/timerfd.h>
+#include <time.h>
+#include <sys/epoll.h>
+#include <sys/eventfd.h>
+#include <sys/timerfd.h>
 #endif
 
 #include "constants.h"
@@ -31,57 +31,57 @@
 #include "utilities.h"
 
 #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
-    typedef struct {
-        int async_fd;
-        struct kevent event_change[2];
-        struct kevent events[MAX_EVENTS];
-    } async_type_t;
-    
-    #define ASYNC_IN_FLAG  (1 << 0)
-    #define ASYNC_OUT_FLAG (1 << 1)
-    #define ASYNC_HUP_FLAG (1 << 2)
-    #define ASYNC_ERR_FLAG (1 << 3)
-    #define ASYNC_RDHUP_FLAG (1 << 4)
+typedef struct {
+    int async_fd;
+    struct kevent event_change[2];
+    struct kevent events[MAX_EVENTS];
+} async_type_t;
+
+#define ASYNC_IN_FLAG  (1 << 0)
+#define ASYNC_OUT_FLAG (1 << 1)
+#define ASYNC_HUP_FLAG (1 << 2)
+#define ASYNC_ERR_FLAG (1 << 3)
+#define ASYNC_RDHUP_FLAG (1 << 4)
 #else
-    typedef struct {
-        int async_fd;
-        struct epoll_event event;
-        struct epoll_event events[MAX_EVENTS];
-    } async_type_t;
+typedef struct {
+    int async_fd;
+    struct epoll_event event;
+    struct epoll_event events[MAX_EVENTS];
+} async_type_t;
 #endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
-    static inline bool async_event_is_HUP(uint32_t events_flags) {
-        return events_flags & ASYNC_HUP_FLAG;
-    }
-    static inline bool async_event_is_ERR(uint32_t events_flags) {
-        return events_flags & ASYNC_ERR_FLAG;
-    }
-    static inline bool async_event_is_RDHUP(uint32_t events_flags) {
-        return events_flags & ASYNC_RDHUP_FLAG;
-    }
-    static inline bool async_event_is_IN(uint32_t events_flags) {
-        return events_flags & ASYNC_IN_FLAG;
-    }
-    static inline bool async_event_is_OUT(uint32_t events_flags) {
-        return events_flags & ASYNC_OUT_FLAG;
-    }
+static inline bool async_event_is_HUP(uint32_t events_flags) {
+    return events_flags & ASYNC_HUP_FLAG;
+}
+static inline bool async_event_is_ERR(uint32_t events_flags) {
+    return events_flags & ASYNC_ERR_FLAG;
+}
+static inline bool async_event_is_RDHUP(uint32_t events_flags) {
+    return events_flags & ASYNC_RDHUP_FLAG;
+}
+static inline bool async_event_is_IN(uint32_t events_flags) {
+    return events_flags & ASYNC_IN_FLAG;
+}
+static inline bool async_event_is_OUT(uint32_t events_flags) {
+    return events_flags & ASYNC_OUT_FLAG;
+}
 #else
-    static inline bool async_event_is_HUP(uint32_t events) {
-        return events & EPOLLHUP;
-    }
-    static inline bool async_event_is_ERR(uint32_t events) {
-        return events & EPOLLERR;
-    }
-    static inline bool async_event_is_RDHUP(uint32_t events) {
-        return events & EPOLLRDHUP;
-    }
-    static inline bool async_event_is_IN(uint32_t events) {
-        return events & EPOLLIN;
-    }
-    static inline bool async_event_is_OUT(uint32_t events) {
-        return events & EPOLLOUT;
-    }
+static inline bool async_event_is_HUP(uint32_t events) {
+    return events & EPOLLHUP;
+}
+static inline bool async_event_is_ERR(uint32_t events) {
+    return events & EPOLLERR;
+}
+static inline bool async_event_is_RDHUP(uint32_t events) {
+    return events & EPOLLRDHUP;
+}
+static inline bool async_event_is_IN(uint32_t events) {
+    return events & EPOLLIN;
+}
+static inline bool async_event_is_OUT(uint32_t events) {
+    return events & EPOLLOUT;
+}
 #endif
 
 static inline int_status_t async_getfd(const char* label, async_type_t *async, int n) {
@@ -116,10 +116,10 @@ static inline uint32_t_status_t async_getevents(const char* label, async_type_t 
     }
 #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
     if (
-        async->events[n].filter == EVFILT_READ ||
-        async->events[n].filter == EVFILT_USER ||
-        async->events[n].filter == EVFILT_TIMER
-    )
+            async->events[n].filter == EVFILT_READ ||
+            async->events[n].filter == EVFILT_USER ||
+            async->events[n].filter == EVFILT_TIMER
+       )
     {
         result.r_uint32_t |= ASYNC_IN_FLAG;
     }
@@ -185,16 +185,16 @@ static inline status_t async_create(const char* label, async_type_t *async) {
 
 static inline status_t async_create_event(const char* label, int *event_fd, event_type_t event_type) {
     if (event_type == EIT_FD) {
-    #if !defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__FreeBSD__)
+#if !defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__FreeBSD__)
         *event_fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
         if (*event_fd == -1) {
             LOG_ERROR("%sGagal membuat eventfd: %s", label, strerror(errno));
             return FAILURE;
         }
         LOG_DEBUG("%sBerhasil membuat eventfd %d", label, *event_fd);
-    #else
+#else
         return FAILURE;
-    #endif
+#endif
     } else {
         *event_fd = GENERATE_EVENT_ID();
         if (*event_fd == -1) {
@@ -208,15 +208,15 @@ static inline status_t async_create_event(const char* label, int *event_fd, even
 
 static inline status_t async_create_timerfd(const char* label, int *timer_fd, event_type_t event_type) {
     if (event_type == EIT_FD) {
-    #if !defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__FreeBSD__)
+#if !defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__FreeBSD__)
         *timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
         if (*timer_fd == -1) {
             LOG_ERROR("%sGagal membuat timerfd: %s", label, strerror(errno));
             return FAILURE;
         }
-    #else
+#else
         return FAILURE;
-    #endif
+#endif
     } else {
         *timer_fd = GENERATE_EVENT_ID();
         if (*timer_fd == -1) {
@@ -228,9 +228,9 @@ static inline status_t async_create_timerfd(const char* label, int *timer_fd, ev
 }
 
 static inline status_t async_set_timerfd_time(const char* label, int *timer_fd,
-    time_t initial_sec, long initial_nsec,
-    time_t interval_sec, long interval_nsec
-)
+        time_t initial_sec, long initial_nsec,
+        time_t interval_sec, long interval_nsec
+        )
 {
 #if !defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__FreeBSD__)
     struct itimerspec new_value;
@@ -249,21 +249,21 @@ static inline status_t async_set_timerfd_time(const char* label, int *timer_fd,
 }
 
 static inline status_t async_create_in_event(
-    const char* label,
-    async_type_t *async,
-    int *fd
-)
+        const char* label,
+        async_type_t *async,
+        int *fd
+        )
 {
 #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
     EV_SET(&async->event_change[0], *fd,
-           EVFILT_READ,
-           EV_ADD | EV_ENABLE | EV_CLEAR,
-           0, 0, NULL);
+            EVFILT_READ,
+            EV_ADD | EV_ENABLE | EV_CLEAR,
+            0, 0, NULL);
     if (kevent(async->async_fd,
-               &async->event_change[0], 1,
-               NULL, 0, NULL) == -1) {
+                &async->event_change[0], 1,
+                NULL, 0, NULL) == -1) {
         LOG_ERROR("%skqueue READ add failed: %s",
-                  label, strerror(errno));
+                label, strerror(errno));
         return FAILURE;
     }
 #else
@@ -271,11 +271,11 @@ static inline status_t async_create_in_event(
     async->event.data.fd = *fd;
 
     if (epoll_ctl(async->async_fd,
-                   EPOLL_CTL_ADD,
-                   *fd,
-                   &async->event) == -1) {
+                EPOLL_CTL_ADD,
+                *fd,
+                &async->event) == -1) {
         LOG_ERROR("%sepoll add failed: %s",
-                  label, strerror(errno));
+                label, strerror(errno));
         return FAILURE;
     }
 #endif
@@ -283,14 +283,14 @@ static inline status_t async_create_in_event(
 }
 
 static inline status_t async_create_inout_event(
-    const char* label,
-    async_type_t *async,
-    int *fd,
-    event_type_t event_type
-)
+        const char* label,
+        async_type_t *async,
+        int *fd,
+        event_type_t event_type
+        )
 {
     if (event_type == EIT_FD) {
-    #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
         EV_SET(&async->event_change[0], *fd,
                 EVFILT_READ,
                 EV_ADD | EV_ENABLE | EV_CLEAR,
@@ -305,23 +305,23 @@ static inline status_t async_create_inout_event(
             LOG_ERROR("%skqueue READ/WRITE add failed: %s", label, strerror(errno));
             return FAILURE;
         }
-    #else
+#else
         async->event.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLET;
         async->event.data.fd = *fd;
         if (epoll_ctl(async->async_fd,
-                        EPOLL_CTL_ADD,
-                        *fd,
-                        &async->event) == -1) {
+                    EPOLL_CTL_ADD,
+                    *fd,
+                    &async->event) == -1) {
             LOG_ERROR("%sepoll add failed: %s",
-                        label, strerror(errno));
+                    label, strerror(errno));
             return FAILURE;
         }
-    #endif
+#endif
     } else {
-    #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
         EV_SET(&async->event_change[0], *fd,
-                EVFILT_USER, 
-                EV_ADD | EV_ENABLE | EV_CLEAR, 
+                EVFILT_USER,
+                EV_ADD | EV_ENABLE | EV_CLEAR,
                 0, 0, NULL);
         if (kevent(async->async_fd,
                     async->event_change, 1,
@@ -329,9 +329,9 @@ static inline status_t async_create_inout_event(
             LOG_ERROR("%skqueue USER add failed: %s", label, strerror(errno));
             return FAILURE;
         }
-    #else
+#else
         return FAILURE;
-    #endif
+#endif
     }
     return SUCCESS;
 }
@@ -343,23 +343,23 @@ static inline status_t async_delete_event(const char* label, async_type_t *async
         int chc = 1;
         switch (event_type) {
             case EIT_USER: {
-                EV_SET(&ch[0], *fd_to_delete, EVFILT_USER, EV_DELETE, 0, 0, NULL);
-                chc = 1;
-                break;
-            }
+                               EV_SET(&ch[0], *fd_to_delete, EVFILT_USER, EV_DELETE, 0, 0, NULL);
+                               chc = 1;
+                               break;
+                           }
             case EIT_TIMER: {
-                EV_SET(&ch[0], *fd_to_delete, EVFILT_TIMER, EV_DELETE, 0, 0, NULL);
-                chc = 1;
-                break;
-            }
+                                EV_SET(&ch[0], *fd_to_delete, EVFILT_TIMER, EV_DELETE, 0, 0, NULL);
+                                chc = 1;
+                                break;
+                            }
             default:
-                EV_SET(&ch[0], *fd_to_delete, EVFILT_READ,  EV_DELETE, 0, 0, NULL);
-                EV_SET(&ch[1], *fd_to_delete, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
-                chc = 2;
+                            EV_SET(&ch[0], *fd_to_delete, EVFILT_READ,  EV_DELETE, 0, 0, NULL);
+                            EV_SET(&ch[1], *fd_to_delete, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+                            chc = 2;
         }
         if (kevent(async->async_fd, ch, chc, NULL, 0, NULL) == -1) {
             LOG_DEBUG("%sGagal menghapus event (mungkin sudah ditutup): %s",
-                      label, strerror(errno));
+                    label, strerror(errno));
         }
 #else
         if (epoll_ctl(async->async_fd, EPOLL_CTL_DEL, *fd_to_delete, NULL) == -1) {
@@ -380,10 +380,10 @@ static inline status_t async_create_timer_oneshot(const char* label, async_type_
     }
     if (event_type == EIT_FD) {
         if (async_set_timerfd_time(label, file_descriptor,
-            (time_t)timer_interval,
-            (long)((timer_interval - (time_t)timer_interval) * 1e9),
-            (time_t)0,
-            (long)0) != SUCCESS)
+                    (time_t)timer_interval,
+                    (long)((timer_interval - (time_t)timer_interval) * 1e9),
+                    (time_t)0,
+                    (long)0) != SUCCESS)
         {
             return FAILURE;
         }
@@ -393,26 +393,26 @@ static inline status_t async_create_timer_oneshot(const char* label, async_type_
             }
         }
     } else {
-    #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
         if (timer_interval <= (double)0.00000001) {
             async_delete_event(label, async, file_descriptor, event_type);
             return SUCCESS;
         }
         uint64_t timeout_ns = (int64_t)(timer_interval * 1000000000.0);
         EV_SET(&async->event_change[0], *file_descriptor,
-               EVFILT_TIMER,
-               EV_ADD | EV_ENABLE | EV_ONESHOT,
-               NOTE_NSECONDS, timeout_ns, NULL);
+                EVFILT_TIMER,
+                EV_ADD | EV_ENABLE | EV_ONESHOT,
+                NOTE_NSECONDS, timeout_ns, NULL);
         if (kevent(async->async_fd,
-                   &async->event_change[0], 1,
-                   NULL, 0, NULL) == -1) {
+                    &async->event_change[0], 1,
+                    NULL, 0, NULL) == -1) {
             LOG_ERROR("%skqueue TIMER add failed: %s",
-                      label, strerror(errno));
+                    label, strerror(errno));
             return FAILURE;
         }
-    #else
+#else
         return FAILURE;
-    #endif
+#endif
     }
     return SUCCESS;
 }
@@ -420,34 +420,34 @@ static inline status_t async_create_timer_oneshot(const char* label, async_type_
 static inline status_t async_update_timer_oneshot(const char* label, async_type_t *async, int *file_descriptor, double timer_interval, event_type_t event_type) {
     if (event_type == EIT_FD) {
         if (async_set_timerfd_time(label, file_descriptor,
-            (time_t)timer_interval,
-            (long)((timer_interval - (time_t)timer_interval) * 1e9),
-            (time_t)0,
-            (long)0) != SUCCESS)
+                    (time_t)timer_interval,
+                    (long)((timer_interval - (time_t)timer_interval) * 1e9),
+                    (time_t)0,
+                    (long)0) != SUCCESS)
         {
             return FAILURE;
         }
     } else {
-    #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
         if (timer_interval <= (double)0.00000001) {
             async_delete_event(label, async, file_descriptor, event_type);
             return SUCCESS;
         }
         uint64_t timeout_ns = (int64_t)(timer_interval * 1000000000.0);
         EV_SET(&async->event_change[0], *file_descriptor,
-               EVFILT_TIMER,
-               EV_ADD | EV_ENABLE | EV_ONESHOT,
-               NOTE_NSECONDS, timeout_ns, NULL);
+                EVFILT_TIMER,
+                EV_ADD | EV_ENABLE | EV_ONESHOT,
+                NOTE_NSECONDS, timeout_ns, NULL);
         if (kevent(async->async_fd,
-                   &async->event_change[0], 1,
-                   NULL, 0, NULL) == -1) {
+                    &async->event_change[0], 1,
+                    NULL, 0, NULL) == -1) {
             LOG_ERROR("%skqueue TIMER add failed: %s",
-                      label, strerror(errno));
+                    label, strerror(errno));
             return FAILURE;
         }
-    #else
+#else
         return FAILURE;
-    #endif
+#endif
     }
     return SUCCESS;
 }
@@ -458,9 +458,9 @@ static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, async_
     wetr.partial = true;
     wetr.event_type = et_buffered_event_id->event_type;
     wetr.status = FAILURE;
-    
+
     if (wetr.event_type == EIT_USER) {
-    #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
         EV_SET(&async->event_change[0], et_buffered_event_id->event_id, EVFILT_USER, 0, NOTE_TRIGGER, 0, NULL);
         if (kevent(async->async_fd, &async->event_change[0], 1, NULL, 0, NULL) == -1) {
             wetr.failure = true;
@@ -471,12 +471,12 @@ static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, async_
         wetr.failure = false;
         wetr.partial = false;
         wetr.status = SUCCESS;
-    #else
+#else
         wetr.failure = true;
         wetr.partial = true;
         wetr.status = FAILURE;
         return wetr;
-    #endif
+#endif
     } else {
         if (on_out_ready && et_buffered_event_id->buffer->out_size_tb == 0) {
             wetr.failure = false;
@@ -488,11 +488,11 @@ static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, async_
             uint64_t u = 1ULL;
             if (et_buffered_event_id->buffer->out_size_tb == 0) {
                 et_buffered_event_id->buffer->out_size_tb = sizeof(uint64_t);
-                et_buffered_event_id->buffer->buffer_out = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-                    oritlsf_pool,
-                    et_buffered_event_id->buffer->out_size_tb,
-                    sizeof(uint8_t)
-                );
+                et_buffered_event_id->buffer->buffer_out = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+                        oritlsf_pool,
+                        et_buffered_event_id->buffer->out_size_tb,
+                        sizeof(uint8_t)
+                        );
                 if (!et_buffered_event_id->buffer->buffer_out) {
                     et_buffered_event_id->buffer->out_size_tb = 0;
                     et_buffered_event_id->buffer->out_size_c = 0;
@@ -505,11 +505,11 @@ static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, async_
             } else {
                 ssize_t old_out_size_tb = et_buffered_event_id->buffer->out_size_tb;
                 et_buffered_event_id->buffer->out_size_tb += sizeof(uint64_t);
-                et_buffered_event_id->buffer->buffer_out = (uint8_t *)oritlsf_realloc(__FILE__, __LINE__, 
-                    oritlsf_pool,
-                    et_buffered_event_id->buffer->buffer_out,
-                    et_buffered_event_id->buffer->out_size_tb * sizeof(uint8_t)
-                );
+                et_buffered_event_id->buffer->buffer_out = (uint8_t *)oritlsf_realloc(__FILE__, __LINE__,
+                        oritlsf_pool,
+                        et_buffered_event_id->buffer->buffer_out,
+                        et_buffered_event_id->buffer->out_size_tb * sizeof(uint8_t)
+                        );
                 if (!et_buffered_event_id->buffer->buffer_out) {
                     et_buffered_event_id->buffer->out_size_tb = 0;
                     et_buffered_event_id->buffer->out_size_c = 0;
@@ -544,7 +544,7 @@ static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, async_
                     wetr.status = FAILURE;
                     break;
                 }
-            } 
+            }
             if (wsize > 0) {
                 et_buffered_event_id->buffer->out_size_c += wsize;
             }
@@ -574,37 +574,37 @@ static inline et_result_t async_read_event(oritlsf_pool_t *oritlsf_pool, et_buff
     retr.partial = true;
     retr.event_type = et_buffered_event_id->event_type;
     retr.status = FAILURE;
-    
+
     if (retr.event_type == EIT_USER) {
-    #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
         retr.failure = false;
         retr.partial = false;
         retr.status = SUCCESS;
-    #else
+#else
         retr.failure = true;
         retr.partial = true;
         retr.status = FAILURE;
         return retr;
-    #endif
+#endif
     } else if (retr.event_type == EIT_TIMER) {
-    #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
         retr.failure = false;
         retr.partial = false;
         retr.status = SUCCESS;
-    #else
+#else
         retr.failure = true;
         retr.partial = true;
         retr.status = FAILURE;
         return retr;
-    #endif
+#endif
     } else {
         if (et_buffered_event_id->buffer->in_size_tb == 0) {
             et_buffered_event_id->buffer->in_size_tb = sizeof(uint64_t);
-            et_buffered_event_id->buffer->buffer_in = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-                oritlsf_pool,
-                et_buffered_event_id->buffer->in_size_tb,
-                sizeof(uint8_t)
-            );
+            et_buffered_event_id->buffer->buffer_in = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+                    oritlsf_pool,
+                    et_buffered_event_id->buffer->in_size_tb,
+                    sizeof(uint8_t)
+                    );
             if (!et_buffered_event_id->buffer->buffer_in) {
                 et_buffered_event_id->buffer->read_step = 0;
                 et_buffered_event_id->buffer->out_size_tb = 0;
@@ -639,7 +639,7 @@ static inline et_result_t async_read_event(oritlsf_pool_t *oritlsf_pool, et_buff
                     retr.status = FAILURE;
                     break;
                 }
-            } 
+            }
             if (rsize > 0) {
                 et_buffered_event_id->buffer->in_size_c += rsize;
             }

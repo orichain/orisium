@@ -15,9 +15,9 @@
 
 status_t handle_master_ipc_info(const char *label, master_context_t *master_ctx, worker_type_t rcvd_wot, uint8_t rcvd_index, worker_security_t *security, ipc_raw_protocol_t_status_t *ircvdi) {
     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label, &master_ctx->oritlsf_pool,
-        security->aes_key, security->remote_nonce, &security->remote_ctr,
-        (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
-    );
+                                                                  security->aes_key, security->remote_nonce, &security->remote_ctr,
+                                                                  (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
+                                                                  );
     if (deserialized_ircvdi.status != SUCCESS) {
         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", label, deserialized_ircvdi.status);
         CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
@@ -25,7 +25,7 @@ status_t handle_master_ipc_info(const char *label, master_context_t *master_ctx,
     } else {
         LOG_DEBUG("%sipc_deserialize BERHASIL.", label);
         CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
-    }           
+    }
     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
     ipc_worker_master_info_t *iinfoi = received_protocol->payload.ipc_worker_master_info;
     switch (iinfoi->flag) {
@@ -85,9 +85,9 @@ status_t handle_master_ipc_info(const char *label, master_context_t *master_ctx,
 
 status_t handle_worker_ipc_info(const char *label, master_context_t *master_ctx, worker_type_t rcvd_wot, uint8_t rcvd_index, worker_security_t *security, ipc_raw_protocol_t_status_t *ircvdi) {
     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label, &master_ctx->oritlsf_pool,
-        security->aes_key, security->remote_nonce, &security->remote_ctr,
-        (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
-    );
+                                                                  security->aes_key, security->remote_nonce, &security->remote_ctr,
+                                                                  (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
+                                                                  );
     if (deserialized_ircvdi.status != SUCCESS) {
         LOG_ERROR("%sipc_deserialize gagal dengan status %d.", label, deserialized_ircvdi.status);
         CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
@@ -95,15 +95,15 @@ status_t handle_worker_ipc_info(const char *label, master_context_t *master_ctx,
     } else {
         LOG_DEBUG("%sipc_deserialize BERHASIL.", label);
         CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
-    }           
+    }
     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
     ipc_worker_worker_info_t *iinfoi = received_protocol->payload.ipc_worker_worker_info;
     switch (iinfoi->flag) {
 		case IT_READNKEYS:
         case IT_NKEYSEMPTY:
-        case IT_APPNDNKEYS: 
-        case IT_APPNDNKEYS_SUCCESS: 
-        case IT_APPNDNKEYS_FAILURE: 
+        case IT_APPNDNKEYS:
+        case IT_APPNDNKEYS_SUCCESS:
+        case IT_APPNDNKEYS_FAILURE:
         case IT_READERA:
         case IT_ERAEMPTY:
         case IT_APPNDERA:
@@ -135,14 +135,14 @@ status_t handle_worker_ipc_info(const char *label, master_context_t *master_ctx,
                 return FAILURE;
 			}
 			if (relay_worker_master_worker_info(
-					label, 
-					master_ctx, 
-					iinfoi->dst_wot, 
-					worker_index, 
-					iinfoi->src_wot,
-					iinfoi->src_index,
-					iinfoi->flag
-				) != SUCCESS
+				label,
+				master_ctx,
+				iinfoi->dst_wot,
+				worker_index,
+				iinfoi->src_wot,
+				iinfoi->src_index,
+				iinfoi->flag
+			) != SUCCESS
 			)
 			{
 				LOG_ERROR("%sFailed to infoing %d to %s %d. Initiating graceful shutdown...", label, iinfoi->flag, worker_name, worker_index);

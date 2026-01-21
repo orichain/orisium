@@ -106,18 +106,18 @@ static inline status_t ipc_deserialize_worker_worker_info(const char *label, ipc
 }
 
 static inline ipc_protocol_t_status_t ipc_prepare_cmd_worker_worker_info(
-	const char *label, 
-	oritlsf_pool_t *pool, 
-	worker_type_t wot, 
-	uint8_t index, 
-	worker_type_t src_wot, 
-	uint8_t src_index, 
-	uint8_t src_session_index, 
-	worker_type_t dst_wot, 
-	uint8_t dst_index, 
-	uint8_t dst_session_index, 
-	info_type_t flag
-)
+	    const char *label,
+	    oritlsf_pool_t *pool,
+	    worker_type_t wot,
+	    uint8_t index,
+	    worker_type_t src_wot,
+	    uint8_t src_index,
+	    uint8_t src_session_index,
+	    worker_type_t dst_wot,
+	    uint8_t dst_index,
+	    uint8_t dst_session_index,
+	    info_type_t flag
+        )
 {
 	ipc_protocol_t_status_t result;
 	result.r_ipc_protocol_t = (ipc_protocol_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(ipc_protocol_t));

@@ -2,9 +2,9 @@
 #define ORILINK_HEARTBEAT_H
 
 #if defined(__clang__)
-    #if __clang_major__ < 21
-        #include <stdio.h>
-    #endif
+#if __clang_major__ < 21
+#include <stdio.h>
+#endif
 #endif
 
 #include <string.h>
@@ -12,9 +12,9 @@
 #include <errno.h>
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-    #include <sys/endian.h>
+#include <sys/endian.h>
 #else
-    #include <endian.h>
+#include <endian.h>
 #endif
 
 #include "utilities.h"
@@ -42,7 +42,7 @@ static inline status_t orilink_serialize_heartbeat(const char *label, const oril
     uint8_t hb_interval_be[8];
     double_to_uint8_be(payload->hb_interval, hb_interval_be);
     memcpy(current_buffer + current_offset_local, hb_interval_be, DOUBLE_ARRAY_SIZE);
-    current_offset_local += DOUBLE_ARRAY_SIZE; 
+    current_offset_local += DOUBLE_ARRAY_SIZE;
     *offset = current_offset_local;
     return SUCCESS;
 }
@@ -87,21 +87,21 @@ static inline status_t orilink_deserialize_heartbeat(const char *label, orilink_
 }
 
 static inline orilink_protocol_t_status_t orilink_prepare_cmd_heartbeat(
-    const char *label, 
-    oritlsf_pool_t *pool, 
-    uint8_t inc_ctr, 
-    worker_type_t remote_wot, 
-    uint8_t remote_index, 
-    uint8_t remote_session_index, 
-    worker_type_t local_wot, 
-    uint8_t local_index, 
-    uint8_t local_session_index, 
-    uint64_t id_connection,
-    uint64_t local_id,
-    uint64_t remote_id,
-    double hb_interval,
-    uint8_t trycount
-)
+        const char *label,
+        oritlsf_pool_t *pool,
+        uint8_t inc_ctr,
+        worker_type_t remote_wot,
+        uint8_t remote_index,
+        uint8_t remote_session_index,
+        worker_type_t local_wot,
+        uint8_t local_index,
+        uint8_t local_session_index,
+        uint64_t id_connection,
+        uint64_t local_id,
+        uint64_t remote_id,
+        double hb_interval,
+        uint8_t trycount
+        )
 {
 	orilink_protocol_t_status_t result;
 	result.r_orilink_protocol_t = (orilink_protocol_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(orilink_protocol_t));

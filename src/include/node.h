@@ -7,7 +7,7 @@
 #include <lmdb.h>
 
 #if defined(__OpenBSD__) || defined(__NetBSD__)
-	#include <sys/endian.h>
+#include <sys/endian.h>
 #endif
 
 #include "types.h"
@@ -20,7 +20,7 @@
 
 typedef struct {
 	uint64_t no;
-	uint8_t vermaj;	
+	uint8_t vermaj;
 	uint8_t vermin;
 	uint8_t sgn_privatekey[SIGN_PRIVATEKEY_BYTES];
 	uint8_t sgn_publickey[SIGN_PUBLICKEY_BYTES];
@@ -117,24 +117,24 @@ static inline status_t nodekeys_deserialize(const char *label, const uint8_t *ke
 }
 
 #define NODEKEYS_KEYS_KEY_SIZE ( \
-    sizeof(uint64_t) \
-)
+        sizeof(uint64_t) \
+        )
 
 #define NODEKEYS_KEYS_DATA_SIZE ( \
-    (2 * sizeof(uint8_t)) + \
-    SIGN_PRIVATEKEY_BYTES + \
-    SIGN_PUBLICKEY_BYTES + \
-    KEM_PRIVATEKEY_BYTES + \
-    KEM_PUBLICKEY_BYTES \
-)
+        (2 * sizeof(uint8_t)) + \
+        SIGN_PRIVATEKEY_BYTES + \
+        SIGN_PUBLICKEY_BYTES + \
+        KEM_PRIVATEKEY_BYTES + \
+        KEM_PUBLICKEY_BYTES \
+        )
 
 static inline int nodekeys_keys_get_last(
-    const char *label,
-    oritlsf_pool_t *pool,
-    MDB_env *env,
-    MDB_dbi dbi,
-    nodekeys_t **nodekeys_keys
-)
+        const char *label,
+        oritlsf_pool_t *pool,
+        MDB_env *env,
+        MDB_dbi dbi,
+        nodekeys_t **nodekeys_keys
+        )
 {
     MDB_txn *txn = NULL;
     MDB_cursor *cur = NULL;
@@ -172,11 +172,11 @@ static inline int nodekeys_keys_get_last(
 }
 
 static inline int nodekeys_keys_append(
-    const char *label,
-    MDB_env *env,
-    MDB_dbi dbi,
-    const nodekeys_t *nodekeys
-)
+        const char *label,
+        MDB_env *env,
+        MDB_dbi dbi,
+        const nodekeys_t *nodekeys
+        )
 {
     MDB_txn *txn = NULL;
     MDB_cursor *cur = NULL;
@@ -298,7 +298,7 @@ static inline status_t deserialize_node_men(const char *label, node_men_t *dst, 
 
 typedef struct {
 	uint64_t no;
-	uint8_t vermaj;	
+	uint8_t vermaj;
 	uint8_t vermin;
 	node_publickeys_t presiden;
 	node_publickeys_t wapres;
@@ -450,25 +450,25 @@ static inline status_t era_deserialize(const char *label, const uint8_t *key, si
 }
 
 #define DATABASE_ERA_KEY_SIZE ( \
-    sizeof(uint64_t) \
-)
+        sizeof(uint64_t) \
+        )
 
 #define DATABASE_ERA_DATA_SIZE ( \
-    (2 * sizeof(uint8_t)) + \
-    (29 * (SIGN_PUBLICKEY_BYTES + KEM_PUBLICKEY_BYTES)) + \
-    (12 * DPR_COUNT * (SIGN_PUBLICKEY_BYTES + KEM_PUBLICKEY_BYTES)) + \
-    (AB_COUNT * IPV6_ADDRESS_LEN) + \
-    (2 * HASHES_BYTES) + \
-    SIGN_GENERATE_SIGNATURE_BBYTES \
-)
+        (2 * sizeof(uint8_t)) + \
+        (29 * (SIGN_PUBLICKEY_BYTES + KEM_PUBLICKEY_BYTES)) + \
+        (12 * DPR_COUNT * (SIGN_PUBLICKEY_BYTES + KEM_PUBLICKEY_BYTES)) + \
+        (AB_COUNT * IPV6_ADDRESS_LEN) + \
+        (2 * HASHES_BYTES) + \
+        SIGN_GENERATE_SIGNATURE_BBYTES \
+        )
 
 static inline int database_era_get_last(
-    const char *label,
-    oritlsf_pool_t *pool,
-    MDB_env *env,
-    MDB_dbi dbi,
-    era_t **database_era
-)
+        const char *label,
+        oritlsf_pool_t *pool,
+        MDB_env *env,
+        MDB_dbi dbi,
+        era_t **database_era
+        )
 {
     MDB_txn *txn = NULL;
     MDB_cursor *cur = NULL;
@@ -506,11 +506,11 @@ static inline int database_era_get_last(
 }
 
 static inline int database_era_append(
-    const char *label,
-    MDB_env *env,
-    MDB_dbi dbi,
-    const era_t *era
-)
+        const char *label,
+        MDB_env *env,
+        MDB_dbi dbi,
+        const era_t *era
+        )
 {
     MDB_txn *txn = NULL;
     MDB_cursor *cur = NULL;

@@ -16,9 +16,9 @@ typedef enum {
     IPC_MASTER_WORKER_HELLO1_ACK = (uint8_t)0x01,
     IPC_WORKER_MASTER_HELLO2 = (uint8_t)0x02,
     IPC_MASTER_WORKER_HELLO2_ACK = (uint8_t)0x03,
-    
+
     IPC_MASTER_COW_CONNECT = (uint8_t)0x10,
-    
+
     IPC_WORKER_WORKER_INFO = (uint8_t)0xfa,
     IPC_WORKER_MASTER_INFO = (uint8_t)0xfb,
     IPC_UDP_DATA = (uint8_t)0xfc,
@@ -49,11 +49,11 @@ typedef struct {
     uint8_t inc_ctr;
     struct sockaddr_in6 remote_addr;
     uint16_t len;
-//----------------------------------------------------------------------
-//FAM (Flexible Array Member)    
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
+    //FAM (Flexible Array Member)
+    //----------------------------------------------------------------------
     uint8_t data[];
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
 } ipc_udp_data_t;
 
 typedef struct {

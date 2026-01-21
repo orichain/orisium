@@ -2,9 +2,9 @@
 #define ORILINK_HELLO4_ACK_H
 
 #if defined(__clang__)
-    #if __clang_major__ < 21
-        #include <stdio.h>
-    #endif
+#if __clang_major__ < 21
+#include <stdio.h>
+#endif
 #endif
 
 #include <string.h>
@@ -25,22 +25,22 @@ static inline status_t orilink_serialize_hello4_ack(const char *label, const ori
     }
     size_t current_offset_local = *offset;
     if (CHECK_BUFFER_BOUNDS(
-            current_offset_local, 
+                current_offset_local,
+                sizeof(uint8_t) +
+                sizeof(uint8_t) +
+                sizeof(uint8_t) +
+                sizeof(uint64_t) +
+                AES_TAG_BYTES,
+                buffer_size
+                ) != SUCCESS
+       ) return FAILURE_OOBUF;
+    memcpy(current_buffer + current_offset_local, payload->encrypted_remote_identity,
             sizeof(uint8_t) +
             sizeof(uint8_t) +
             sizeof(uint8_t) +
             sizeof(uint64_t) +
-            AES_TAG_BYTES, 
-            buffer_size
-        ) != SUCCESS
-    ) return FAILURE_OOBUF;
-    memcpy(current_buffer + current_offset_local, payload->encrypted_remote_identity,
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint64_t) +
-        AES_TAG_BYTES
-    );
+            AES_TAG_BYTES
+          );
     current_offset_local +=
         sizeof(uint8_t) +
         sizeof(uint8_t) +
@@ -48,22 +48,22 @@ static inline status_t orilink_serialize_hello4_ack(const char *label, const ori
         sizeof(uint64_t) +
         AES_TAG_BYTES;
     if (CHECK_BUFFER_BOUNDS(
-            current_offset_local, 
+                current_offset_local,
+                sizeof(uint8_t) +
+                sizeof(uint8_t) +
+                sizeof(uint8_t) +
+                sizeof(uint64_t) +
+                AES_TAG_BYTES,
+                buffer_size
+                ) != SUCCESS
+       ) return FAILURE_OOBUF;
+    memcpy(current_buffer + current_offset_local, payload->encrypted_local_identity,
             sizeof(uint8_t) +
             sizeof(uint8_t) +
             sizeof(uint8_t) +
             sizeof(uint64_t) +
-            AES_TAG_BYTES, 
-            buffer_size
-        ) != SUCCESS
-    ) return FAILURE_OOBUF;
-    memcpy(current_buffer + current_offset_local, payload->encrypted_local_identity,
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint64_t) +
-        AES_TAG_BYTES
-    );
+            AES_TAG_BYTES
+          );
     current_offset_local +=
         sizeof(uint8_t) +
         sizeof(uint8_t) +
@@ -82,65 +82,65 @@ static inline status_t orilink_deserialize_hello4_ack(const char *label, orilink
     size_t current_offset = *offset_ptr;
     const uint8_t *cursor = buffer + current_offset;
     orilink_hello4_ack_t *payload = p->payload.orilink_hello4_ack;
-    if (current_offset + 
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint64_t) +
-        AES_TAG_BYTES
-        >
-        total_buffer_len
-    )
+    if (current_offset +
+            sizeof(uint8_t) +
+            sizeof(uint8_t) +
+            sizeof(uint8_t) +
+            sizeof(uint64_t) +
+            AES_TAG_BYTES
+            >
+            total_buffer_len
+       )
     {
         LOG_ERROR("%sOut of bounds reading encrypted_remote_identity.", label);
         return FAILURE_OOBUF;
     }
     memcpy(payload->encrypted_remote_identity, cursor,
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint64_t) +
-        AES_TAG_BYTES
-    );
+            sizeof(uint8_t) +
+            sizeof(uint8_t) +
+            sizeof(uint8_t) +
+            sizeof(uint64_t) +
+            AES_TAG_BYTES
+          );
     cursor +=
         sizeof(uint8_t) +
         sizeof(uint8_t) +
         sizeof(uint8_t) +
         sizeof(uint64_t) +
         AES_TAG_BYTES;
-    current_offset += 
+    current_offset +=
         sizeof(uint8_t) +
         sizeof(uint8_t) +
         sizeof(uint8_t) +
         sizeof(uint64_t) +
         AES_TAG_BYTES;
-    if (current_offset + 
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint64_t) +
-        AES_TAG_BYTES
-        >
-        total_buffer_len
-    )
+    if (current_offset +
+            sizeof(uint8_t) +
+            sizeof(uint8_t) +
+            sizeof(uint8_t) +
+            sizeof(uint64_t) +
+            AES_TAG_BYTES
+            >
+            total_buffer_len
+       )
     {
         LOG_ERROR("%sOut of bounds reading encrypted_local_identity.", label);
         return FAILURE_OOBUF;
     }
     memcpy(payload->encrypted_local_identity, cursor,
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint64_t) +
-        AES_TAG_BYTES
-    );
+            sizeof(uint8_t) +
+            sizeof(uint8_t) +
+            sizeof(uint8_t) +
+            sizeof(uint64_t) +
+            AES_TAG_BYTES
+          );
     cursor +=
         sizeof(uint8_t) +
         sizeof(uint8_t) +
         sizeof(uint8_t) +
         sizeof(uint64_t) +
         AES_TAG_BYTES;
-    current_offset += 
+    current_offset +=
         sizeof(uint8_t) +
         sizeof(uint8_t) +
         sizeof(uint8_t) +
@@ -151,20 +151,20 @@ static inline status_t orilink_deserialize_hello4_ack(const char *label, orilink
 }
 
 static inline orilink_protocol_t_status_t orilink_prepare_cmd_hello4_ack(
-    const char *label, 
-    oritlsf_pool_t *pool, 
-    uint8_t inc_ctr, 
-    worker_type_t remote_wot, 
-    uint8_t remote_index, 
-    uint8_t remote_session_index, 
-    worker_type_t local_wot, 
-    uint8_t local_index, 
-    uint8_t local_session_index,
-    uint64_t id_connection,
-    uint8_t *encrypted_remote_identity,
-    uint8_t *encrypted_local_identity,
-    uint8_t trycount
-)
+        const char *label,
+        oritlsf_pool_t *pool,
+        uint8_t inc_ctr,
+        worker_type_t remote_wot,
+        uint8_t remote_index,
+        uint8_t remote_session_index,
+        worker_type_t local_wot,
+        uint8_t local_index,
+        uint8_t local_session_index,
+        uint64_t id_connection,
+        uint8_t *encrypted_remote_identity,
+        uint8_t *encrypted_local_identity,
+        uint8_t trycount
+        )
 {
 	orilink_protocol_t_status_t result;
 	result.r_orilink_protocol_t = (orilink_protocol_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, sizeof(orilink_protocol_t));
@@ -191,20 +191,20 @@ static inline orilink_protocol_t_status_t orilink_prepare_cmd_hello4_ack(
 		CLOSE_ORILINK_PROTOCOL(pool, &result.r_orilink_protocol_t);
 		return result;
 	}
-    memcpy(payload->encrypted_remote_identity, encrypted_remote_identity, 
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint64_t) +
-        AES_TAG_BYTES
-    );
-    memcpy(payload->encrypted_local_identity, encrypted_local_identity, 
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint8_t) +
-        sizeof(uint64_t) +
-        AES_TAG_BYTES
-    );
+    memcpy(payload->encrypted_remote_identity, encrypted_remote_identity,
+            sizeof(uint8_t) +
+            sizeof(uint8_t) +
+            sizeof(uint8_t) +
+            sizeof(uint64_t) +
+            AES_TAG_BYTES
+          );
+    memcpy(payload->encrypted_local_identity, encrypted_local_identity,
+            sizeof(uint8_t) +
+            sizeof(uint8_t) +
+            sizeof(uint8_t) +
+            sizeof(uint64_t) +
+            AES_TAG_BYTES
+          );
 	result.r_orilink_protocol_t->payload.orilink_hello4_ack = payload;
 	result.status = SUCCESS;
 	return result;

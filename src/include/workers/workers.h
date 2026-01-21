@@ -60,9 +60,9 @@ typedef struct {
     double last_send_heartbeat_interval;
     uint8_t heartbeat_cnt;
     timer_id_t heartbeat_sender_timer_id;
-    #if defined(ACCRCY_TEST)
+#if defined(ACCRCY_TEST)
     timer_id_t heartbeat_openner_timer_id;
-    #endif
+#endif
 } packet_heartbeat_t;
 
 typedef struct {
@@ -71,7 +71,7 @@ typedef struct {
     double interval;
     double last_send_interval;
     timer_id_t data_sender_timer_id;
-    
+
 } packet_data_sender_t;
 
 typedef struct {
@@ -90,31 +90,31 @@ typedef struct {
 typedef packet_data_t packet_datas_t[PARALLEL_DATA_WINDOW_SIZE];
 
 typedef struct {
-//======================================================================
-// IDENTITY & SECURITY
-//======================================================================    
+    //======================================================================
+    // IDENTITY & SECURITY
+    //======================================================================
 	orilink_identity_t *identity;
 	orilink_security_t *security;
-//======================================================================
-// HELLO
-//======================================================================
+    //======================================================================
+    // HELLO
+    //======================================================================
     packet_ack_t hello1_ack;
     packet_ack_t hello2_ack;
     packet_ack_t hello3_ack;
     packet_ack_t hello4_ack;
-//======================================================================
-// HEARTBEAT
-//======================================================================
+    //======================================================================
+    // HEARTBEAT
+    //======================================================================
     packet_heartbeat_t heartbeat;
-//======================================================================
-// DATA
-//======================================================================
+    //======================================================================
+    // DATA
+    //======================================================================
     packet_datas_t data;
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     node_metrics_t *metrics;
-//======================================================================
-// ORICLE
-//======================================================================
+    //======================================================================
+    // ORICLE
+    //======================================================================
 	oricle_double_t *rtt;
     oricle_double_t *retry;
     oricle_double_t *healthy;
@@ -122,32 +122,32 @@ typedef struct {
 } sio_c_session_t;
 
 typedef struct {
-//======================================================================
-// IDENTITY & SECURITY
-//======================================================================    
+    //======================================================================
+    // IDENTITY & SECURITY
+    //======================================================================
 	orilink_identity_t *identity;
 	uint8_t *kem_privatekey;
 	orilink_security_t *security;
-//======================================================================
-// HELLO
-//======================================================================
+    //======================================================================
+    // HELLO
+    //======================================================================
     packet_t hello1;
     packet_t hello2;
     packet_t hello3;
     packet_t hello4;
-//======================================================================
-// HEARTBEAT
-//======================================================================
+    //======================================================================
+    // HEARTBEAT
+    //======================================================================
     packet_heartbeat_t heartbeat;
-//======================================================================
-// DATA
-//======================================================================
+    //======================================================================
+    // DATA
+    //======================================================================
     packet_datas_t data;
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     node_metrics_t *metrics;
-//======================================================================
-// ORICLE
-//======================================================================
+    //======================================================================
+    // ORICLE
+    //======================================================================
 	oricle_double_t *rtt;
     oricle_double_t *retry;
     oricle_double_t *healthy;
@@ -212,50 +212,50 @@ static inline void initialize_node_metrics(const char *label, node_metrics_t* me
 static inline void calculate_retry(worker_context_t *ctx, void *void_session, worker_type_t wot, double try_count) {
     switch (wot) {
         case COW: {
-            cow_c_session_t *session = (cow_c_session_t *)void_session;
-            int needed = snprintf(NULL, 0, "[RETRY %d]: ", session->identity->local_session_index);
-            char desc[needed+1];
-            snprintf(desc, needed + 1, "[RETRY %d]: ", session->identity->local_session_index);
-            calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, session->retry, try_count, ((double)MAX_RETRY_CNT * (double)2));
-            //printf("%s%s Value Prediction: %f\n", ctx->label, desc, session->retry.value_prediction);
-            break;
-        }
+                      cow_c_session_t *session = (cow_c_session_t *)void_session;
+                      int needed = snprintf(NULL, 0, "[RETRY %d]: ", session->identity->local_session_index);
+                      char desc[needed+1];
+                      snprintf(desc, needed + 1, "[RETRY %d]: ", session->identity->local_session_index);
+                      calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, session->retry, try_count, ((double)MAX_RETRY_CNT * (double)2));
+                      //printf("%s%s Value Prediction: %f\n", ctx->label, desc, session->retry.value_prediction);
+                      break;
+                  }
         case SIO: {
-            sio_c_session_t *session = (sio_c_session_t *)void_session;
-            int needed = snprintf(NULL, 0, "[RETRY %d]: ", session->identity->local_session_index);
-            char desc[needed+1];
-            snprintf(desc, needed + 1, "[RETRY %d]: ", session->identity->local_session_index);
-            calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, session->retry, try_count, ((double)MAX_RETRY_CNT * (double)2));
-            //printf("%s%s Value Prediction: %f\n", ctx->label, desc, session->retry.value_prediction);
-            break;
-        }
+                      sio_c_session_t *session = (sio_c_session_t *)void_session;
+                      int needed = snprintf(NULL, 0, "[RETRY %d]: ", session->identity->local_session_index);
+                      char desc[needed+1];
+                      snprintf(desc, needed + 1, "[RETRY %d]: ", session->identity->local_session_index);
+                      calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, session->retry, try_count, ((double)MAX_RETRY_CNT * (double)2));
+                      //printf("%s%s Value Prediction: %f\n", ctx->label, desc, session->retry.value_prediction);
+                      break;
+                  }
         default:
-            return;
+                  return;
     }
 }
 
 static inline void calculate_rtt(worker_context_t *ctx, void *void_session, worker_type_t wot, double rtt_value) {
     switch (wot) {
         case COW: {
-            cow_c_session_t *session = (cow_c_session_t *)void_session;
-            int needed = snprintf(NULL, 0, "[RTT %d]: ", session->identity->local_session_index);
-            char desc[needed + 1];
-            snprintf(desc, needed + 1, "[RTT %d]: ", session->identity->local_session_index);
-            calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, session->rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
-            //printf("%s%s Value Prediction: %f\n", ctx->label, desc, session->rtt.value_prediction);
-            break;
-        }
+                      cow_c_session_t *session = (cow_c_session_t *)void_session;
+                      int needed = snprintf(NULL, 0, "[RTT %d]: ", session->identity->local_session_index);
+                      char desc[needed + 1];
+                      snprintf(desc, needed + 1, "[RTT %d]: ", session->identity->local_session_index);
+                      calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, session->rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
+                      //printf("%s%s Value Prediction: %f\n", ctx->label, desc, session->rtt.value_prediction);
+                      break;
+                  }
         case SIO: {
-            sio_c_session_t *session = (sio_c_session_t *)void_session;
-            int needed = snprintf(NULL, 0, "[RTT %d]: ", session->identity->local_session_index);
-            char desc[needed + 1];
-            snprintf(desc, needed + 1, "[RTT %d]: ", session->identity->local_session_index);
-            calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, session->rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
-            //printf("%s%s Value Prediction: %f\n", ctx->label, desc, session->rtt.value_prediction);
-            break;
-        }
+                      sio_c_session_t *session = (sio_c_session_t *)void_session;
+                      int needed = snprintf(NULL, 0, "[RTT %d]: ", session->identity->local_session_index);
+                      char desc[needed + 1];
+                      snprintf(desc, needed + 1, "[RTT %d]: ", session->identity->local_session_index);
+                      calculate_oricle_double(ctx->label, &ctx->oritlsf_pool, desc, session->rtt, rtt_value, ((double)MAX_RTT_SEC * (double)1e9 * (double)2));
+                      //printf("%s%s Value Prediction: %f\n", ctx->label, desc, session->rtt.value_prediction);
+                      break;
+                  }
         default:
-            return;
+                  return;
     }
 }
 
@@ -274,12 +274,12 @@ static inline void cleanup_control_packet(worker_context_t *ctx, packet_t *h, bo
     if (h->retry_timer_id.event) {
         oritw_remove_event(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer, &h->retry_timer_id.event);
         h->retry_timer_id.delay_us = 0.0;
-//----------------------------------------------------------------------
-// Reuse Old Id And Old Type
-//----------------------------------------------------------------------
+        //----------------------------------------------------------------------
+        // Reuse Old Id And Old Type
+        //----------------------------------------------------------------------
         //h->retry_timer_id.event_type = TE_UNKNOWN;
         //h->retry_timer_id.id = 0ULL;
-//----------------------------------------------------------------------
+        //----------------------------------------------------------------------
     }
 }
 
@@ -323,49 +323,49 @@ static inline void setup_control_packet_ack(packet_ack_t *h) {
 }
 
 static inline status_t setup_cow_session(worker_context_t *ctx, cow_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
-    single_session->identity = (orilink_identity_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        1,
-        sizeof(orilink_identity_t)
-    );
-    single_session->security = (orilink_security_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        1,
-        sizeof(orilink_security_t)
-    );
-    single_session->metrics = (node_metrics_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        1,
-        sizeof(node_metrics_t)
-    );
-    single_session->rtt = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        1,
-        sizeof(oricle_double_t)
-    );
-    single_session->retry = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        1,
-        sizeof(oricle_double_t)
-    );
-    single_session->healthy = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        1,
-        sizeof(oricle_double_t)
-    );
-    single_session->avgtt = (oricle_long_double_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        1,
-        sizeof(oricle_long_double_t)
-    );
-//----------------------------------------------------------------------
+    single_session->identity = (orilink_identity_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            1,
+            sizeof(orilink_identity_t)
+            );
+    single_session->security = (orilink_security_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            1,
+            sizeof(orilink_security_t)
+            );
+    single_session->metrics = (node_metrics_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            1,
+            sizeof(node_metrics_t)
+            );
+    single_session->rtt = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            1,
+            sizeof(oricle_double_t)
+            );
+    single_session->retry = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            1,
+            sizeof(oricle_double_t)
+            );
+    single_session->healthy = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            1,
+            sizeof(oricle_double_t)
+            );
+    single_session->avgtt = (oricle_long_double_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            1,
+            sizeof(oricle_long_double_t)
+            );
+    //----------------------------------------------------------------------
     initialize_node_metrics(ctx->label, single_session->metrics);
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     setup_control_packet(ctx->label, session_index, &single_session->hello1);
     setup_control_packet(ctx->label, session_index, &single_session->hello2);
     setup_control_packet(ctx->label, session_index, &single_session->hello3);
     setup_control_packet(ctx->label, session_index, &single_session->hello4);
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     setup_control_packet(ctx->label, session_index, &single_session->heartbeat.heartbeat);
     setup_control_packet_ack(&single_session->heartbeat.heartbeat_ack);
     single_session->heartbeat.heartbeat_interval = (double)0;
@@ -375,13 +375,13 @@ static inline status_t setup_cow_session(worker_context_t *ctx, cow_c_session_t 
     single_session->heartbeat.heartbeat_sender_timer_id.event = NULL;
     single_session->heartbeat.heartbeat_sender_timer_id.delay_us = 0.0;
     single_session->heartbeat.heartbeat_sender_timer_id.event_type = TE_GENERAL;
-    #if defined(ACCRCY_TEST)
+#if defined(ACCRCY_TEST)
     generate_si_id(ctx->label, session_index, &single_session->heartbeat.heartbeat_openner_timer_id.id);
     single_session->heartbeat.heartbeat_openner_timer_id.event = NULL;
     single_session->heartbeat.heartbeat_openner_timer_id.delay_us = 0.0;
     single_session->heartbeat.heartbeat_openner_timer_id.event_type = TE_GENERAL;
-    #endif
-//----------------------------------------------------------------------
+#endif
+    //----------------------------------------------------------------------
     setup_oricle_double(single_session->retry, (double)0);
     setup_oricle_double(single_session->rtt, (double)0);
     setup_oricle_long_double(single_session->avgtt, (long double)0);
@@ -398,59 +398,59 @@ static inline status_t setup_cow_session(worker_context_t *ctx, cow_c_session_t 
     identity->local_index = index;
     identity->local_session_index = session_index;
     if (generate_uint64_t_id(ctx->label, &identity->local_id) != SUCCESS) return FAILURE;
-    single_session->kem_privatekey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        KEM_PRIVATEKEY_BYTES,
-        sizeof(uint8_t)
-    );
-    security->kem_publickey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        KEM_PUBLICKEY_BYTES,
-        sizeof(uint8_t)
-    );
-    security->kem_ciphertext = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        KEM_CIPHERTEXT_BYTES,
-        sizeof(uint8_t)
-    );
-    security->kem_sharedsecret = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        KEM_SHAREDSECRET_BYTES,
-        sizeof(uint8_t)
-    );
-    security->aes_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        HASHES_BYTES,
-        sizeof(uint8_t)
-    );
-    security->mac_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        HASHES_BYTES,
-        sizeof(uint8_t)
-    );
-    security->local_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        AES_NONCE_BYTES,
-        sizeof(uint8_t)
-    );
-    security->remote_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        AES_NONCE_BYTES,
-        sizeof(uint8_t)
-    );
+    single_session->kem_privatekey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            KEM_PRIVATEKEY_BYTES,
+            sizeof(uint8_t)
+            );
+    security->kem_publickey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            KEM_PUBLICKEY_BYTES,
+            sizeof(uint8_t)
+            );
+    security->kem_ciphertext = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            KEM_CIPHERTEXT_BYTES,
+            sizeof(uint8_t)
+            );
+    security->kem_sharedsecret = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            KEM_SHAREDSECRET_BYTES,
+            sizeof(uint8_t)
+            );
+    security->aes_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            HASHES_BYTES,
+            sizeof(uint8_t)
+            );
+    security->mac_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            HASHES_BYTES,
+            sizeof(uint8_t)
+            );
+    security->local_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            AES_NONCE_BYTES,
+            sizeof(uint8_t)
+            );
+    security->remote_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            AES_NONCE_BYTES,
+            sizeof(uint8_t)
+            );
     security->local_ctr = (uint32_t)0;
     security->remote_ctr = (uint32_t)0;
     for (uint16_t illp=0;illp<PARALLEL_DATA_WINDOW_SIZE;++illp) {
-		security->local_data_nonce[illp] = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-			&ctx->oritlsf_pool,
-			AES_NONCE_BYTES,
-			sizeof(uint8_t)
-		);
-		security->remote_data_nonce[illp] = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-			&ctx->oritlsf_pool,
-			AES_NONCE_BYTES,
-			sizeof(uint8_t)
-		);
+		security->local_data_nonce[illp] = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+			    &ctx->oritlsf_pool,
+			    AES_NONCE_BYTES,
+			    sizeof(uint8_t)
+		        );
+		security->remote_data_nonce[illp] = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+			    &ctx->oritlsf_pool,
+			    AES_NONCE_BYTES,
+			    sizeof(uint8_t)
+		        );
 		security->local_data_ctr[illp] = (uint32_t)0;
 		security->remote_data_ctr[illp] = (uint32_t)0;
 	}
@@ -462,12 +462,12 @@ static inline status_t setup_cow_session(worker_context_t *ctx, cow_c_session_t 
 }
 
 static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *single_session) {
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     cleanup_control_packet(ctx, &single_session->hello1, true, true);
     cleanup_control_packet(ctx, &single_session->hello2, true, true);
     cleanup_control_packet(ctx, &single_session->hello3, true, true);
     cleanup_control_packet(ctx, &single_session->hello4, true, true);
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     cleanup_control_packet(ctx, &single_session->heartbeat.heartbeat, true, true);
     cleanup_control_packet_ack(&ctx->oritlsf_pool, &single_session->heartbeat.heartbeat_ack, true, true);
     single_session->heartbeat.heartbeat_interval = (double)0;
@@ -479,15 +479,15 @@ static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *s
         single_session->heartbeat.heartbeat_sender_timer_id.delay_us = 0.0;
         single_session->heartbeat.heartbeat_sender_timer_id.event_type = TE_UNKNOWN;
     }
-    #if defined(ACCRCY_TEST)
+#if defined(ACCRCY_TEST)
     if (single_session->heartbeat.heartbeat_openner_timer_id.event) {
         oritw_remove_event(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer, &single_session->heartbeat.heartbeat_openner_timer_id.event);
         single_session->heartbeat.heartbeat_openner_timer_id.id = 0ULL;
         single_session->heartbeat.heartbeat_openner_timer_id.delay_us = 0.0;
         single_session->heartbeat.heartbeat_openner_timer_id.event_type = TE_UNKNOWN;
     }
-    #endif
-//----------------------------------------------------------------------
+#endif
+    //----------------------------------------------------------------------
     cleanup_oricle_double(&ctx->oritlsf_pool, single_session->retry);
     cleanup_oricle_double(&ctx->oritlsf_pool, single_session->rtt);
     cleanup_oricle_long_double(&ctx->oritlsf_pool, single_session->avgtt);
@@ -542,49 +542,49 @@ static inline void cleanup_cow_session(worker_context_t *ctx, cow_c_session_t *s
 }
 
 static inline status_t setup_sio_session(worker_context_t *ctx, sio_c_session_t *single_session, worker_type_t wot, uint8_t index, uint8_t session_index) {
-    single_session->identity = (orilink_identity_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        1,
-        sizeof(orilink_identity_t)
-    );
-    single_session->security = (orilink_security_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        1,
-        sizeof(orilink_security_t)
-    );
-    single_session->metrics = (node_metrics_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        1,
-        sizeof(node_metrics_t)
-    );
-    single_session->rtt = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        1,
-        sizeof(oricle_double_t)
-    );
-    single_session->retry = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        1,
-        sizeof(oricle_double_t)
-    );
-    single_session->healthy = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        1,
-        sizeof(oricle_double_t)
-    );
-    single_session->avgtt = (oricle_long_double_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        1,
-        sizeof(oricle_long_double_t)
-    );
-//----------------------------------------------------------------------
+    single_session->identity = (orilink_identity_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            1,
+            sizeof(orilink_identity_t)
+            );
+    single_session->security = (orilink_security_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            1,
+            sizeof(orilink_security_t)
+            );
+    single_session->metrics = (node_metrics_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            1,
+            sizeof(node_metrics_t)
+            );
+    single_session->rtt = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            1,
+            sizeof(oricle_double_t)
+            );
+    single_session->retry = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            1,
+            sizeof(oricle_double_t)
+            );
+    single_session->healthy = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            1,
+            sizeof(oricle_double_t)
+            );
+    single_session->avgtt = (oricle_long_double_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            1,
+            sizeof(oricle_long_double_t)
+            );
+    //----------------------------------------------------------------------
     initialize_node_metrics(ctx->label, single_session->metrics);
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     setup_control_packet_ack(&single_session->hello1_ack);
     setup_control_packet_ack(&single_session->hello2_ack);
     setup_control_packet_ack(&single_session->hello3_ack);
     setup_control_packet_ack(&single_session->hello4_ack);
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     setup_control_packet(ctx->label, session_index, &single_session->heartbeat.heartbeat);
     setup_control_packet_ack(&single_session->heartbeat.heartbeat_ack);
     single_session->heartbeat.heartbeat_interval = (double)0;
@@ -594,13 +594,13 @@ static inline status_t setup_sio_session(worker_context_t *ctx, sio_c_session_t 
     single_session->heartbeat.heartbeat_sender_timer_id.event = NULL;
     single_session->heartbeat.heartbeat_sender_timer_id.delay_us = 0.0;
     single_session->heartbeat.heartbeat_sender_timer_id.event_type = TE_GENERAL;
-    #if defined(ACCRCY_TEST)
+#if defined(ACCRCY_TEST)
     generate_si_id(ctx->label, session_index, &single_session->heartbeat.heartbeat_openner_timer_id.id);
     single_session->heartbeat.heartbeat_openner_timer_id.event = NULL;
     single_session->heartbeat.heartbeat_openner_timer_id.delay_us = 0.0;
     single_session->heartbeat.heartbeat_openner_timer_id.event_type = TE_GENERAL;
-    #endif
-//----------------------------------------------------------------------
+#endif
+    //----------------------------------------------------------------------
     setup_oricle_double(single_session->retry, (double)0);
     setup_oricle_double(single_session->rtt, (double)0);
     setup_oricle_double(single_session->healthy, (double)100);
@@ -616,54 +616,54 @@ static inline status_t setup_sio_session(worker_context_t *ctx, sio_c_session_t 
     identity->local_index = index;
     identity->local_session_index = session_index;
     if (generate_uint64_t_id(ctx->label, &identity->local_id) != SUCCESS) return FAILURE;
-    security->kem_publickey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        KEM_PUBLICKEY_BYTES,
-        sizeof(uint8_t)
-    );
-    security->kem_ciphertext = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        KEM_CIPHERTEXT_BYTES,
-        sizeof(uint8_t)
-    );
-    security->kem_sharedsecret = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        KEM_SHAREDSECRET_BYTES,
-        sizeof(uint8_t)
-    );
-    security->aes_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        HASHES_BYTES,
-        sizeof(uint8_t)
-    );
-    security->mac_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        HASHES_BYTES,
-        sizeof(uint8_t)
-    );
-    security->local_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        AES_NONCE_BYTES,
-        sizeof(uint8_t)
-    );
-    security->remote_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &ctx->oritlsf_pool,
-        AES_NONCE_BYTES,
-        sizeof(uint8_t)
-    );
+    security->kem_publickey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            KEM_PUBLICKEY_BYTES,
+            sizeof(uint8_t)
+            );
+    security->kem_ciphertext = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            KEM_CIPHERTEXT_BYTES,
+            sizeof(uint8_t)
+            );
+    security->kem_sharedsecret = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            KEM_SHAREDSECRET_BYTES,
+            sizeof(uint8_t)
+            );
+    security->aes_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            HASHES_BYTES,
+            sizeof(uint8_t)
+            );
+    security->mac_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            HASHES_BYTES,
+            sizeof(uint8_t)
+            );
+    security->local_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            AES_NONCE_BYTES,
+            sizeof(uint8_t)
+            );
+    security->remote_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+            &ctx->oritlsf_pool,
+            AES_NONCE_BYTES,
+            sizeof(uint8_t)
+            );
     security->local_ctr = (uint32_t)0;
     security->remote_ctr = (uint32_t)0;
     for (uint16_t illp=0;illp<PARALLEL_DATA_WINDOW_SIZE;++illp) {
-		security->local_data_nonce[illp] = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-			&ctx->oritlsf_pool,
-			AES_NONCE_BYTES,
-			sizeof(uint8_t)
-		);
-		security->remote_data_nonce[illp] = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-			&ctx->oritlsf_pool,
-			AES_NONCE_BYTES,
-			sizeof(uint8_t)
-		);
+		security->local_data_nonce[illp] = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+			    &ctx->oritlsf_pool,
+			    AES_NONCE_BYTES,
+			    sizeof(uint8_t)
+		        );
+		security->remote_data_nonce[illp] = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+			    &ctx->oritlsf_pool,
+			    AES_NONCE_BYTES,
+			    sizeof(uint8_t)
+		        );
 		security->local_data_ctr[illp] = (uint32_t)0;
 		security->remote_data_ctr[illp] = (uint32_t)0;
 	}
@@ -671,12 +671,12 @@ static inline status_t setup_sio_session(worker_context_t *ctx, sio_c_session_t 
 }
 
 static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *single_session) {
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     cleanup_control_packet_ack(&ctx->oritlsf_pool, &single_session->hello1_ack, true, true);
     cleanup_control_packet_ack(&ctx->oritlsf_pool, &single_session->hello2_ack, true, true);
     cleanup_control_packet_ack(&ctx->oritlsf_pool, &single_session->hello3_ack, true, true);
     cleanup_control_packet_ack(&ctx->oritlsf_pool, &single_session->hello4_ack, true, true);
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     cleanup_control_packet(ctx, &single_session->heartbeat.heartbeat, true, true);
     cleanup_control_packet_ack(&ctx->oritlsf_pool, &single_session->heartbeat.heartbeat_ack, true, true);
     single_session->heartbeat.heartbeat_interval = (double)0;
@@ -688,15 +688,15 @@ static inline void cleanup_sio_session(worker_context_t *ctx, sio_c_session_t *s
         single_session->heartbeat.heartbeat_sender_timer_id.delay_us = 0.0;
         single_session->heartbeat.heartbeat_sender_timer_id.event_type = TE_UNKNOWN;
     }
-    #if defined(ACCRCY_TEST)
+#if defined(ACCRCY_TEST)
     if (single_session->heartbeat.heartbeat_openner_timer_id.event) {
         oritw_remove_event(ctx->label, &ctx->oritlsf_pool, &ctx->async, &ctx->timer, &single_session->heartbeat.heartbeat_openner_timer_id.event);
         single_session->heartbeat.heartbeat_openner_timer_id.id = 0ULL;
         single_session->heartbeat.heartbeat_openner_timer_id.delay_us = 0.0;
         single_session->heartbeat.heartbeat_openner_timer_id.event_type = TE_UNKNOWN;
     }
-    #endif
-//----------------------------------------------------------------------
+#endif
+    //----------------------------------------------------------------------
     cleanup_oricle_double(&ctx->oritlsf_pool, single_session->retry);
     cleanup_oricle_double(&ctx->oritlsf_pool, single_session->rtt);
     cleanup_oricle_double(&ctx->oritlsf_pool, single_session->healthy);

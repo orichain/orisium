@@ -74,48 +74,48 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
     uds_pair_pid_t *upp = session->upp;
     worker_security_t *security = session->security;
     worker_rekeying_t *rekeying = session->rekeying;
-    upp->uds[0] = 0; 
-    upp->uds[1] = 0; 
+    upp->uds[0] = 0;
+    upp->uds[1] = 0;
     setup_oricle_long_double(session->avgtt, (long double)0);
     setup_oricle_double(session->healthy, (double)100);
     session->isactive = true;
-    session->ishealthy = true;        
-    session->isready = false;  
-    security->kem_publickey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &master_ctx->oritlsf_pool,
-        KEM_PUBLICKEY_BYTES,
-        sizeof(uint8_t)
-    );
-    security->kem_ciphertext = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &master_ctx->oritlsf_pool,
-        KEM_CIPHERTEXT_BYTES,
-        sizeof(uint8_t)
-    );
-    security->kem_sharedsecret = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &master_ctx->oritlsf_pool,
-        KEM_SHAREDSECRET_BYTES,
-        sizeof(uint8_t)
-    );
-    security->aes_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &master_ctx->oritlsf_pool,
-        HASHES_BYTES,
-        sizeof(uint8_t)
-    );
-    security->mac_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &master_ctx->oritlsf_pool,
-        HASHES_BYTES,
-        sizeof(uint8_t)
-    );
-    security->local_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &master_ctx->oritlsf_pool,
-        AES_NONCE_BYTES,
-        sizeof(uint8_t)
-    );
-    security->remote_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, 
-        &master_ctx->oritlsf_pool,
-        AES_NONCE_BYTES,
-        sizeof(uint8_t)
-    );
+    session->ishealthy = true;
+    session->isready = false;
+    security->kem_publickey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+                                                        &master_ctx->oritlsf_pool,
+                                                        KEM_PUBLICKEY_BYTES,
+                                                        sizeof(uint8_t)
+                                                        );
+    security->kem_ciphertext = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+                                                         &master_ctx->oritlsf_pool,
+                                                         KEM_CIPHERTEXT_BYTES,
+                                                         sizeof(uint8_t)
+                                                         );
+    security->kem_sharedsecret = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+                                                           &master_ctx->oritlsf_pool,
+                                                           KEM_SHAREDSECRET_BYTES,
+                                                           sizeof(uint8_t)
+                                                           );
+    security->aes_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+                                                  &master_ctx->oritlsf_pool,
+                                                  HASHES_BYTES,
+                                                  sizeof(uint8_t)
+                                                  );
+    security->mac_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+                                                  &master_ctx->oritlsf_pool,
+                                                  HASHES_BYTES,
+                                                  sizeof(uint8_t)
+                                                  );
+    security->local_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+                                                      &master_ctx->oritlsf_pool,
+                                                      AES_NONCE_BYTES,
+                                                      sizeof(uint8_t)
+                                                      );
+    security->remote_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
+                                                       &master_ctx->oritlsf_pool,
+                                                       AES_NONCE_BYTES,
+                                                       sizeof(uint8_t)
+                                                       );
     security->local_ctr = (uint32_t)0;
     security->remote_ctr = (uint32_t)0;
     security->hello1_rcvd = false;
@@ -281,12 +281,12 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
         }
     } else {
         CLOSE_UDS(&session->upp->uds[1]);
-//======================================================================
-// Hitung delay start dan inisialisasi metrics
-//======================================================================
+        //======================================================================
+        // Hitung delay start dan inisialisasi metrics
+        //======================================================================
         session->task_count = (uint16_t)0;
         initial_delay_ms = initialize_metrics(label, session->metrics, wot, index);
-//======================================================================
+        //======================================================================
         async_create_inout_event(
             label,
             &master_ctx->master_async,
@@ -333,7 +333,7 @@ status_t setup_workers(const char *label, master_context_t *master_ctx) {
     }
     for (int index = 0; index < MAX_DBW_WORKERS; ++index) {
 		if (create_socket_pair(label, master_ctx, DBW, index) != SUCCESS) return FAILURE;
-    }    
+    }
 	for (uint8_t index = 0; index < MAX_SIO_WORKERS; ++index) {
 		if (setup_fork_worker(label, master_ctx, SIO, index) != SUCCESS) {
 			return FAILURE;
@@ -358,7 +358,7 @@ status_t setup_workers(const char *label, master_context_t *master_ctx) {
 		if (setup_fork_worker(label, master_ctx, DBW, index) != SUCCESS) {
 			return FAILURE;
 		}
-    }    
+    }
     return SUCCESS;
 }
 
@@ -446,15 +446,15 @@ status_t calculate_healthy(const char* label, master_context_t *master_ctx, work
     } else {
         current_health_measurement = metrics->count_ack / expected_count_ack;
     }
-    current_health_measurement *= (double)100;    
+    current_health_measurement *= (double)100;
 	int needed = snprintf(NULL, 0, "ORICLE => HEALTHY %s-%d", worker_name, index);
 	char desc[needed + 1];
 	snprintf(desc, needed + 1, "ORICLE => HEALTHY %s-%d", worker_name, index);
-    #if defined(LONGINTV_TEST)
+#if defined(LONGINTV_TEST)
     calculate_oricle_doubleX(label, &master_ctx->oritlsf_pool, desc, oricle, current_health_measurement, (double)200);
-    #else
+#else
     calculate_oricle_double(label, &master_ctx->oritlsf_pool, desc, oricle, current_health_measurement, (double)200);
-    #endif
+#endif
     *ishealthy = (oricle->value_prediction >= HEALTHY_THRESHOLD);
     metrics->last_checkhealthy = now_ns;
     metrics->count_ack = (double)0;
@@ -479,7 +479,7 @@ status_t recreate_worker(const char *label, master_context_t *master_ctx, worker
 }
 
 status_t check_workers_healthy(const char *label, master_context_t *master_ctx) {
-	for (uint8_t i = 0; i < MAX_SIO_WORKERS; ++i) { 
+	for (uint8_t i = 0; i < MAX_SIO_WORKERS; ++i) {
 		if (calculate_healthy(label, master_ctx, SIO, i) != SUCCESS) {
             return FAILURE;
         }
@@ -509,7 +509,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
             }
         }
 	}
-	for (uint8_t i = 0; i < MAX_COW_WORKERS; ++i) { 
+	for (uint8_t i = 0; i < MAX_COW_WORKERS; ++i) {
 		if (calculate_healthy(label, master_ctx, COW, i) != SUCCESS) {
             return FAILURE;
         }
@@ -524,7 +524,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
             }
         }
 	}
-    for (uint8_t i = 0; i < MAX_DBR_WORKERS; ++i) { 
+    for (uint8_t i = 0; i < MAX_DBR_WORKERS; ++i) {
 		if (calculate_healthy(label, master_ctx, DBR, i) != SUCCESS) {
             return FAILURE;
         }
@@ -539,7 +539,7 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
             }
         }
 	}
-    for (uint8_t i = 0; i < MAX_DBW_WORKERS; ++i) { 
+    for (uint8_t i = 0; i < MAX_DBW_WORKERS; ++i) {
 		if (calculate_healthy(label, master_ctx, DBW, i) != SUCCESS) {
             return FAILURE;
         }

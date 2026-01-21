@@ -7,17 +7,17 @@
 #include <string.h>
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-    #include <sys/endian.h>
+#include <sys/endian.h>
 #elif defined(__FreeBSD__)
-    #include <x86/endian.h>
+#include <x86/endian.h>
 #else
-    #include <endian.h>
+#include <endian.h>
 #endif
 
 static uint64_t s[2];
 static bool is_seeded = false;
 static uint64_t current_rand_64bit = 0;
-static uint8_t byte_counter = 8; 
+static uint8_t byte_counter = 8;
 
 static inline uint64_t rotl(const uint64_t x, int k) {
     return (x << k) | (x >> (64 - k));
@@ -41,7 +41,7 @@ static inline uint64_t _next_xoroshiro128plus(void) {
     }
     const uint64_t s0 = s[0];
     uint64_t s1 = s[1];
-    const uint64_t result = s0 + s1;    
+    const uint64_t result = s0 + s1;
     s1 ^= s0;
     s[0] = rotl(s0, 24) ^ s1 ^ (s1 << 16);
     s[1] = rotl(s1, 37);
@@ -50,7 +50,7 @@ static inline uint64_t _next_xoroshiro128plus(void) {
 
 static inline uint8_t _next_xoroshiro128plus_uint8(void) {
     if (byte_counter >= 8) {
-        current_rand_64bit = _next_xoroshiro128plus(); 
+        current_rand_64bit = _next_xoroshiro128plus();
         byte_counter = 0;
     }
     uint8_t result_byte = (uint8_t)(current_rand_64bit >> (byte_counter * 8)) & 0xFF;

@@ -1,7 +1,7 @@
 #if defined(__SIZEOF_INT128__)
-    typedef unsigned __int128 uint128_t;
+typedef unsigned __int128 uint128_t;
 #else
-    typedef unsigned uint128_t __attribute__((mode(TI)));
+typedef unsigned uint128_t __attribute__((mode(TI)));
 #endif
 
 #define MUL(out, x, y) out = ((uint128_t)x * y)
@@ -114,7 +114,7 @@ poly1305_blocks(poly1305_state_internal_t *st, const unsigned char *m, size_t by
 		MUL(d2, h0, r2); MUL(d, h1, r1); ADD(d2, d); MUL(d, h2, r0); ADD(d2, d);
 
 		/* (partial) h %= p */
-		              c = SHR(d0, 44); h0 = LO(d0) & 0xfffffffffff;
+		c = SHR(d0, 44); h0 = LO(d0) & 0xfffffffffff;
 		ADDLO(d1, c); c = SHR(d1, 44); h1 = LO(d1) & 0xfffffffffff;
 		ADDLO(d2, c); c = SHR(d2, 42); h2 = LO(d2) & 0x3ffffffffff;
 		h0  += c * 5; c = (h0 >> 44);  h0 =    h0  & 0xfffffffffff;
@@ -152,7 +152,7 @@ poly1305_finish(poly1305_context *ctx, unsigned char mac[16]) {
 	h1 = st->h[1];
 	h2 = st->h[2];
 
-	             c = (h1 >> 44); h1 &= 0xfffffffffff;
+	c = (h1 >> 44); h1 &= 0xfffffffffff;
 	h2 += c;     c = (h2 >> 42); h2 &= 0x3ffffffffff;
 	h0 += c * 5; c = (h0 >> 44); h0 &= 0xfffffffffff;
 	h1 += c;     c = (h1 >> 44); h1 &= 0xfffffffffff;

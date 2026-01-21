@@ -10,43 +10,43 @@
 #include <netdb.h>
 
 #if defined(__NetBSD__)
-    #ifndef AI_V4MAPPED
-        #define AI_V4MAPPED 0
-    #endif
-    #if defined(__clang__)
-        #if __clang_major__ < 21
-            #include <sys/signal.h>
-            #include <sys/errno.h>
-        #endif
-    #endif
-    #include <sys/time.h>
-    #include <sys/endian.h>
-    #include <sys/common_int_limits.h>
+#ifndef AI_V4MAPPED
+#define AI_V4MAPPED 0
+#endif
+#if defined(__clang__)
+#if __clang_major__ < 21
+#include <sys/signal.h>
+#include <sys/errno.h>
+#endif
+#endif
+#include <sys/time.h>
+#include <sys/endian.h>
+#include <sys/common_int_limits.h>
 #elif defined(__OpenBSD__)
-    #ifndef AI_V4MAPPED
-        #define AI_V4MAPPED 0
-    #endif
-    #if defined(__clang__)
-        #if __clang_major__ < 21
-            #include <sys/signal.h>
-            #include <sys/errno.h>
-        #endif
-    #endif
-    #include <sys/_time.h>
-    #include <sys/endian.h>
+#ifndef AI_V4MAPPED
+#define AI_V4MAPPED 0
+#endif
+#if defined(__clang__)
+#if __clang_major__ < 21
+#include <sys/signal.h>
+#include <sys/errno.h>
+#endif
+#endif
+#include <sys/_time.h>
+#include <sys/endian.h>
 #elif defined(__FreeBSD__)
-    #if defined(__clang__)
-        #if __clang_major__ < 21
-            #include <sys/signal.h>
-        #endif
-    #endif
-    #include <sys/_clock_id.h>
-    #include <x86/endian.h>
-    #include <strings.h>
-    #include <x86/_stdint.h>
+#if defined(__clang__)
+#if __clang_major__ < 21
+#include <sys/signal.h>
+#endif
+#endif
+#include <sys/_clock_id.h>
+#include <x86/endian.h>
+#include <strings.h>
+#include <x86/_stdint.h>
 #else
-    #include <endian.h>
-    #include <stddef.h>
+#include <endian.h>
+#include <stddef.h>
 #endif
 
 #include <netinet/in.h>
@@ -104,7 +104,7 @@ static inline void shell_sort_uint64(uint64_t *arr, size_t n) {
 static inline size_t quick_sort_partition(uint64_t *arr, size_t low, size_t high) {
     uint64_t pivot = arr[high];
     size_t i = low;
-    uint64_t tmp;    
+    uint64_t tmp;
     for (size_t j = low; j < high; ++j) {
         if (arr[j] < pivot) {
             tmp = arr[i];
@@ -135,13 +135,13 @@ static inline void oritw_sort_uint64(uint64_t *arr, size_t n) {
     if (n <= 1) {
         return;
     }
-    #if ORITW_MAX_CANDIDATES <= ORISORT_THRESHOLD_INSERTION
+#if ORITW_MAX_CANDIDATES <= ORISORT_THRESHOLD_INSERTION
     insertion_sort_uint64(arr, n);
-    #elif ORITW_MAX_CANDIDATES <= ORISORT_THRESHOLD_SHELL
+#elif ORITW_MAX_CANDIDATES <= ORISORT_THRESHOLD_SHELL
     shell_sort_uint64(arr, n);
-    #else
+#else
     quick_sort_uint64_recursive(arr, 0, n - 1);
-    #endif
+#endif
 }
 
 static inline int hexchr2bin(char c, uint8_t *out) {
@@ -154,8 +154,8 @@ static inline int hexchr2bin(char c, uint8_t *out) {
     uint8_t is_u = (uint8_t)(u <= 5);
     uint8_t is_l = (uint8_t)(l <= 5);
     *out = (uint8_t)((is_d * d) |
-                     (is_u * (u + 10)) |
-                     (is_l * (l + 10)));
+            (is_u * (u + 10)) |
+            (is_l * (l + 10)));
     return (is_d | is_u | is_l);
 }
 
@@ -165,7 +165,7 @@ static inline int hexs2bin(const char *hex, size_t hexlen, uint8_t *out, size_t 
     for (size_t i = 0; i < outlen; i++) {
         uint8_t hi, lo;
         if (!hexchr2bin(hex[2*i], &hi) ||
-            !hexchr2bin(hex[2*i + 1], &lo)) return -1;
+                !hexchr2bin(hex[2*i + 1], &lo)) return -1;
         out[i] = (uint8_t)((hi << 4) | lo);
     }
     return 0;
@@ -175,15 +175,15 @@ static inline void bin2hexs(const uint8_t *bin, size_t binlen, char *out) {
     if (__builtin_expect(!bin || !out, 0)) return;
     for (size_t i = 0; i < binlen; i++) {
         uint8_t nibbles[2];
-        nibbles[0] = bin[i] >> 4; 
+        nibbles[0] = bin[i] >> 4;
         nibbles[1] = bin[i] & 0x0F;
 
         for (int j = 0; j < 2; j++) {
             uint8_t v = nibbles[j];
             uint8_t is_digit = (uint8_t)(v <= 9);
             uint8_t is_letter = (uint8_t)(v >= 10);
-            out[i * 2 + j] = (char)((is_digit * ('0' + v)) | 
-                                    (is_letter * ('a' + (v - 10))));
+            out[i * 2 + j] = (char)((is_digit * ('0' + v)) |
+                    (is_letter * ('a' + (v - 10))));
         }
     }
     out[binlen * 2] = '\0';
@@ -229,11 +229,11 @@ static void increment_ctr(uint32_t *ctr, uint8_t *nonce) {
 }
 
 static inline void calculate_mac(
-    uint8_t* key_mac, 
-    uint8_t *data_4mac, 
-    uint8_t *mac, 
-    const size_t data_4mac_len
-)
+        uint8_t* key_mac,
+        uint8_t *data_4mac,
+        uint8_t *mac,
+        const size_t data_4mac_len
+        )
 {
     poly1305_context ctx;
     poly1305_init(&ctx, key_mac);
@@ -242,15 +242,15 @@ static inline void calculate_mac(
 }
 
 static inline status_t encrypt_decrypt_256(
-    const char* label, 
-    oritlsf_pool_t *pool, 
-    uint8_t* key_aes, 
-    uint8_t* nonce, 
-    uint32_t *ctr, 
-    uint8_t *data, 
-    uint8_t *encrypted_decrypted_data, 
-    const size_t data_len
-)
+        const char* label,
+        oritlsf_pool_t *pool,
+        uint8_t* key_aes,
+        uint8_t* nonce,
+        uint32_t *ctr,
+        uint8_t *data,
+        uint8_t *encrypted_decrypted_data,
+        const size_t data_len
+        )
 {
     uint8_t *keystream_buffer = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, data_len);
     if (!keystream_buffer) {
@@ -261,16 +261,16 @@ static inline status_t encrypt_decrypt_256(
     aes256_ctr_keyexp(&aes_ctx, key_aes);
     uint8_t iv[AES_IV_BYTES];
     memcpy(iv, nonce, AES_NONCE_BYTES);
-/*
- * CRITICAL: Convert the 4-byte Counter to Little-Endian (LE).
- * The underlying PQClean/BearSSL implementation relies on the LE convention
- * (using internal functions like 'br_dec32le') to correctly interpret the
- * 4-byte counter field within the 12-byte IV prefix.
- *  
- * This use of htole32 ensures cryptographic portability and guarantees that 
- * the counter is processed logically (1, 2, 3, etc.), preventing byte-ordering 
- * confusion regardless of the Host system's native endianness (e.g., big-endian systems).
-*/
+    /*
+     * CRITICAL: Convert the 4-byte Counter to Little-Endian (LE).
+     * The underlying PQClean/BearSSL implementation relies on the LE convention
+     * (using internal functions like 'br_dec32le') to correctly interpret the
+     * 4-byte counter field within the 12-byte IV prefix.
+     *
+     * This use of htole32 ensures cryptographic portability and guarantees that
+     * the counter is processed logically (1, 2, 3, etc.), preventing byte-ordering
+     * confusion regardless of the Host system's native endianness (e.g., big-endian systems).
+     */
     uint32_t ctr_le = htole32(*ctr);
     memcpy(iv + AES_NONCE_BYTES, &ctr_le, sizeof(uint32_t));
     aes256_ctr(keystream_buffer, data_len, iv, &aes_ctx);
@@ -283,15 +283,15 @@ static inline status_t encrypt_decrypt_256(
 }
 
 static status_t encrypt_decrypt_128(
-    const char* label, 
-    oritlsf_pool_t *pool, 
-    uint8_t* key_aes, 
-    uint8_t* nonce, 
-    uint32_t *ctr, 
-    uint8_t *data, 
-    uint8_t *encrypted_decrypted_data, 
-    const size_t data_len
-)
+        const char* label,
+        oritlsf_pool_t *pool,
+        uint8_t* key_aes,
+        uint8_t* nonce,
+        uint32_t *ctr,
+        uint8_t *data,
+        uint8_t *encrypted_decrypted_data,
+        const size_t data_len
+        )
 {
     uint8_t *keystream_buffer = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, data_len);
     if (!keystream_buffer) {
@@ -302,16 +302,16 @@ static status_t encrypt_decrypt_128(
     aes128_ctr_keyexp(&aes_ctx, key_aes);
     uint8_t iv[AES_IV_BYTES];
     memcpy(iv, nonce, AES_NONCE_BYTES);
-/*
- * CRITICAL: Convert the 4-byte Counter to Little-Endian (LE).
- * The underlying PQClean/BearSSL implementation relies on the LE convention
- * (using internal functions like 'br_dec32le') to correctly interpret the
- * 4-byte counter field within the 12-byte IV prefix.
- *  
- * This use of htole32 ensures cryptographic portability and guarantees that 
- * the counter is processed logically (1, 2, 3, etc.), preventing byte-ordering 
- * confusion regardless of the Host system's native endianness (e.g., big-endian systems).
-*/
+    /*
+     * CRITICAL: Convert the 4-byte Counter to Little-Endian (LE).
+     * The underlying PQClean/BearSSL implementation relies on the LE convention
+     * (using internal functions like 'br_dec32le') to correctly interpret the
+     * 4-byte counter field within the 12-byte IV prefix.
+     *
+     * This use of htole32 ensures cryptographic portability and guarantees that
+     * the counter is processed logically (1, 2, 3, etc.), preventing byte-ordering
+     * confusion regardless of the Host system's native endianness (e.g., big-endian systems).
+     */
     uint32_t ctr_le = htole32(*ctr);
     memcpy(iv + AES_NONCE_BYTES, &ctr_le, sizeof(uint32_t));
     aes128_ctr(keystream_buffer, data_len, iv, &aes_ctx);
@@ -324,18 +324,18 @@ static status_t encrypt_decrypt_128(
 }
 
 static inline status_t compare_mac(
-    uint8_t *key_mac, 
-    uint8_t *data, 
-    const size_t data_len,
-    uint8_t *data_4mac
-)
+        uint8_t *key_mac,
+        uint8_t *data,
+        const size_t data_len,
+        uint8_t *data_4mac
+        )
 {
     uint8_t mac[AES_TAG_BYTES];
     poly1305_context ctx;
     poly1305_init(&ctx, key_mac);
     poly1305_update(&ctx, data, data_len);
     poly1305_finish(&ctx, mac);
-    if (!poly1305_verify(mac, data_4mac)) {       
+    if (!poly1305_verify(mac, data_4mac)) {
         return FAILURE_MACMSMTCH;
     }
     return SUCCESS;
@@ -349,7 +349,7 @@ static inline void decrement_ctr(uint32_t *ctr, uint8_t *nonce) {
             int16_t temp_diff = nonce[i] - borrow;
             if (temp_diff < 0) {
                 nonce[i] = 255;
-                borrow = 1; 
+                borrow = 1;
             } else {
                 nonce[i] = (uint8_t)temp_diff;
                 borrow = 0;
@@ -365,18 +365,18 @@ static inline bool is_1greater_ctr(const char* label, oritlsf_pool_t *pool, uint
     uint8_t tmp_nonce[AES_NONCE_BYTES];
     memcpy(tmp_nonce, nonce, AES_NONCE_BYTES);
     uint32_t tmp_ctr = *ctr;
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     increment_ctr(&tmp_ctr, tmp_nonce);
     const size_t header_offset = AES_TAG_BYTES;
     const size_t header_len = sizeof(uint32_t) +
-                              ORILINK_VERSION_BYTES +
-                              sizeof(uint8_t) +
-                              sizeof(uint8_t) +
-                              sizeof(uint8_t);
+        ORILINK_VERSION_BYTES +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t);
     uint8_t *header = data + header_offset;
     uint8_t decripted_header[header_len];
-    #if defined(ORILINK_DECRYPT_HEADER)
-        if (encrypt_decrypt_128(
+#if defined(ORILINK_DECRYPT_HEADER)
+    if (encrypt_decrypt_128(
                 label,
                 pool,
                 key_mac,
@@ -385,20 +385,20 @@ static inline bool is_1greater_ctr(const char* label, oritlsf_pool_t *pool, uint
                 header,
                 decripted_header,
                 header_len
-            ) != SUCCESS
-        )
-        {
-            memset(tmp_nonce, 0, AES_NONCE_BYTES);
-            return false;
-        }
-    #else
-        memcpy(decripted_header, header, header_len);
-    #endif
+                ) != SUCCESS
+       )
+    {
+        memset(tmp_nonce, 0, AES_NONCE_BYTES);
+        return false;
+    }
+#else
+    memcpy(decripted_header, header, header_len);
+#endif
     uint32_t data_ctr_be;
     memcpy(&data_ctr_be, decripted_header, sizeof(uint32_t));
     uint32_t data_ctr = be32toh(data_ctr_be);
     bool islwr = (data_ctr == tmp_ctr);
-//----------------------------------------------------------------------    
+    //----------------------------------------------------------------------
     memset(tmp_nonce, 0, AES_NONCE_BYTES);
     return islwr;
 }
@@ -407,17 +407,17 @@ static inline bool is_1lower_equal_ctr(const char* label, oritlsf_pool_t *pool, 
     uint8_t tmp_nonce[AES_NONCE_BYTES];
     memcpy(tmp_nonce, nonce, AES_NONCE_BYTES);
     uint32_t tmp_ctr = *ctr;
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     const size_t header_offset = AES_TAG_BYTES;
     const size_t header_len = sizeof(uint32_t) +
-                              ORILINK_VERSION_BYTES +
-                              sizeof(uint8_t) +
-                              sizeof(uint8_t) +
-                              sizeof(uint8_t);
+        ORILINK_VERSION_BYTES +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t);
     uint8_t *header = data + header_offset;
     uint8_t decripted_header[header_len];
-    #if defined(ORILINK_DECRYPT_HEADER)
-        if (encrypt_decrypt_128(
+#if defined(ORILINK_DECRYPT_HEADER)
+    if (encrypt_decrypt_128(
                 label,
                 pool,
                 key_mac,
@@ -426,15 +426,15 @@ static inline bool is_1lower_equal_ctr(const char* label, oritlsf_pool_t *pool, 
                 header,
                 decripted_header,
                 header_len
-            ) != SUCCESS
-        )
-        {
-            memset(tmp_nonce, 0, AES_NONCE_BYTES);
-            return false;
-        }
-    #else
-        memcpy(decripted_header, header, header_len);
-    #endif
+                ) != SUCCESS
+       )
+    {
+        memset(tmp_nonce, 0, AES_NONCE_BYTES);
+        return false;
+    }
+#else
+    memcpy(decripted_header, header, header_len);
+#endif
     uint32_t data_ctr_be;
     memcpy(&data_ctr_be, decripted_header, sizeof(uint32_t));
     uint32_t data_ctr = be32toh(data_ctr_be);
@@ -444,8 +444,8 @@ static inline bool is_1lower_equal_ctr(const char* label, oritlsf_pool_t *pool, 
         return issme;
     }
     decrement_ctr(&tmp_ctr, tmp_nonce);
-    #if defined(ORILINK_DECRYPT_HEADER)
-        if (encrypt_decrypt_128(
+#if defined(ORILINK_DECRYPT_HEADER)
+    if (encrypt_decrypt_128(
                 label,
                 pool,
                 key_mac,
@@ -454,19 +454,19 @@ static inline bool is_1lower_equal_ctr(const char* label, oritlsf_pool_t *pool, 
                 header,
                 decripted_header,
                 header_len
-            ) != SUCCESS
-        )
-        {
-            memset(tmp_nonce, 0, AES_NONCE_BYTES);
-            return false;
-        }
-    #else
-        memcpy(decripted_header, header, header_len);
-    #endif
+                ) != SUCCESS
+       )
+    {
+        memset(tmp_nonce, 0, AES_NONCE_BYTES);
+        return false;
+    }
+#else
+    memcpy(decripted_header, header, header_len);
+#endif
     memcpy(&data_ctr_be, decripted_header, sizeof(uint32_t));
     data_ctr = be32toh(data_ctr_be);
     bool islwr = (data_ctr == tmp_ctr);
-//----------------------------------------------------------------------    
+    //----------------------------------------------------------------------
     memset(tmp_nonce, 0, AES_NONCE_BYTES);
     return islwr;
 }
@@ -475,17 +475,17 @@ static inline bool is_equal_ctr(const char* label, oritlsf_pool_t *pool, uint8_t
     uint8_t tmp_nonce[AES_NONCE_BYTES];
     memcpy(tmp_nonce, nonce, AES_NONCE_BYTES);
     uint32_t tmp_ctr = *ctr;
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     const size_t header_offset = AES_TAG_BYTES;
     const size_t header_len = sizeof(uint32_t) +
-                              ORILINK_VERSION_BYTES +
-                              sizeof(uint8_t) +
-                              sizeof(uint8_t) +
-                              sizeof(uint8_t);
+        ORILINK_VERSION_BYTES +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t);
     uint8_t *header = data + header_offset;
     uint8_t decripted_header[header_len];
-    #if defined(ORILINK_DECRYPT_HEADER)
-        if (encrypt_decrypt_128(
+#if defined(ORILINK_DECRYPT_HEADER)
+    if (encrypt_decrypt_128(
                 label,
                 pool,
                 key_mac,
@@ -494,20 +494,20 @@ static inline bool is_equal_ctr(const char* label, oritlsf_pool_t *pool, uint8_t
                 header,
                 decripted_header,
                 header_len
-            ) != SUCCESS
-        )
-        {
-            memset(tmp_nonce, 0, AES_NONCE_BYTES);
-            return false;
-        }
-    #else
-        memcpy(decripted_header, header, header_len);
-    #endif
+                ) != SUCCESS
+       )
+    {
+        memset(tmp_nonce, 0, AES_NONCE_BYTES);
+        return false;
+    }
+#else
+    memcpy(decripted_header, header, header_len);
+#endif
     uint32_t data_ctr_be;
     memcpy(&data_ctr_be, decripted_header, sizeof(uint32_t));
     uint32_t data_ctr = be32toh(data_ctr_be);
     bool issme = (data_ctr == tmp_ctr);
-//----------------------------------------------------------------------    
+    //----------------------------------------------------------------------
     memset(tmp_nonce, 0, AES_NONCE_BYTES);
     return issme;
 }
@@ -516,17 +516,17 @@ static inline bool is_gc_ctr(const char* label, oritlsf_pool_t *pool, uint8_t *d
     uint8_t tmp_nonce[AES_NONCE_BYTES];
     memcpy(tmp_nonce, nonce, AES_NONCE_BYTES);
     uint32_t tmp_ctr = 0xffffffff;
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     const size_t header_offset = AES_TAG_BYTES;
     const size_t header_len = sizeof(uint32_t) +
-                              ORILINK_VERSION_BYTES +
-                              sizeof(uint8_t) +
-                              sizeof(uint8_t) +
-                              sizeof(uint8_t);
+        ORILINK_VERSION_BYTES +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t);
     uint8_t *header = data + header_offset;
     uint8_t decripted_header[header_len];
-    #if defined(ORILINK_DECRYPT_HEADER)
-        if (encrypt_decrypt_128(
+#if defined(ORILINK_DECRYPT_HEADER)
+    if (encrypt_decrypt_128(
                 label,
                 pool,
                 key_mac,
@@ -535,20 +535,20 @@ static inline bool is_gc_ctr(const char* label, oritlsf_pool_t *pool, uint8_t *d
                 header,
                 decripted_header,
                 header_len
-            ) != SUCCESS
-        )
-        {
-            memset(tmp_nonce, 0, AES_NONCE_BYTES);
-            return false;
-        }
-    #else
-        memcpy(decripted_header, header, header_len);
-    #endif
+                ) != SUCCESS
+       )
+    {
+        memset(tmp_nonce, 0, AES_NONCE_BYTES);
+        return false;
+    }
+#else
+    memcpy(decripted_header, header, header_len);
+#endif
     uint32_t data_ctr_be;
     memcpy(&data_ctr_be, decripted_header, sizeof(uint32_t));
     uint32_t data_ctr = be32toh(data_ctr_be);
     bool issme = (data_ctr == tmp_ctr);
-//----------------------------------------------------------------------    
+    //----------------------------------------------------------------------
     memset(tmp_nonce, 0, AES_NONCE_BYTES);
     return issme;
 }
@@ -627,18 +627,18 @@ static inline bool is_1lower_ctr(const char* label, oritlsf_pool_t *pool, uint8_
     uint8_t tmp_nonce[AES_NONCE_BYTES];
     memcpy(tmp_nonce, nonce, AES_NONCE_BYTES);
     uint32_t tmp_ctr = *ctr;
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     decrement_ctr(&tmp_ctr, tmp_nonce);
     const size_t header_offset = AES_TAG_BYTES;
     const size_t header_len = sizeof(uint32_t) +
-                              ORILINK_VERSION_BYTES +
-                              sizeof(uint8_t) +
-                              sizeof(uint8_t) +
-                              sizeof(uint8_t);
+        ORILINK_VERSION_BYTES +
+        sizeof(uint8_t) +
+        sizeof(uint8_t) +
+        sizeof(uint8_t);
     uint8_t *header = data + header_offset;
     uint8_t decripted_header[header_len];
-    #if defined(ORILINK_DECRYPT_HEADER)
-        if (encrypt_decrypt_128(
+#if defined(ORILINK_DECRYPT_HEADER)
+    if (encrypt_decrypt_128(
                 label,
                 pool,
                 key_mac,
@@ -647,30 +647,30 @@ static inline bool is_1lower_ctr(const char* label, oritlsf_pool_t *pool, uint8_
                 header,
                 decripted_header,
                 header_len
-            ) != SUCCESS
-        )
-        {
-            memset(tmp_nonce, 0, AES_NONCE_BYTES);
-            return false;
-        }
-    #else
-        memcpy(decripted_header, header, header_len);
-    #endif
+                ) != SUCCESS
+       )
+    {
+        memset(tmp_nonce, 0, AES_NONCE_BYTES);
+        return false;
+    }
+#else
+    memcpy(decripted_header, header, header_len);
+#endif
     uint32_t data_ctr_be;
     memcpy(&data_ctr_be, decripted_header, sizeof(uint32_t));
     uint32_t data_ctr = be32toh(data_ctr_be);
     bool islwr = (data_ctr == tmp_ctr);
-//----------------------------------------------------------------------    
+    //----------------------------------------------------------------------
     memset(tmp_nonce, 0, AES_NONCE_BYTES);
     return islwr;
 }
 
 static inline int kdf(uint8_t *out, size_t outlen,
-    const uint8_t *key, size_t key_len,
-    const uint8_t *info, size_t info_len)
+        const uint8_t *key, size_t key_len,
+        const uint8_t *info, size_t info_len)
 {
     if ((key_len > UINT32_MAX) ||
-        (info_len > UINT32_MAX))
+            (info_len > UINT32_MAX))
         return -1;
     if (!out && outlen)
         return -1;
@@ -784,7 +784,7 @@ static inline status_t convert_str_to_sockaddr_in6(const char *ip_str, uint16_t 
     struct in_addr ipv4;
     struct in6_addr ipv6;
     uint8_t out_ipv6[IPV6_ADDRESS_LEN];
-    
+
     memset(addr, 0, sizeof(struct sockaddr_in6));
     addr->sin6_family = AF_INET6;
     addr->sin6_port = htobe16(port);
@@ -834,8 +834,8 @@ static inline bool is_ipv4_mapped_in6(const struct sockaddr_in6 *addr) {
 }
 
 static inline bool extract_ipv4_from_in6(
-    const struct sockaddr_in6 *addr,
-    struct in_addr *out)
+        const struct sockaddr_in6 *addr,
+        struct in_addr *out)
 {
     if (!addr || !out) return false;
     if (!IN6_IS_ADDR_V4MAPPED(&addr->sin6_addr)) return false;
@@ -845,8 +845,8 @@ static inline bool extract_ipv4_from_in6(
 }
 
 static inline bool convert_ipv4_to_v4mapped_v6(
-    const struct sockaddr_in *src,
-    struct sockaddr_in6 *dst)
+        const struct sockaddr_in *src,
+        struct sockaddr_in6 *dst)
 {
     if (!src || !dst) return false;
     memset(dst, 0, sizeof(*dst));
@@ -1114,7 +1114,7 @@ static inline int GENERATE_EVENT_ID() {
     int new_id;
     do {
         generate_fast_salt((uint8_t *)&new_id, 4);
-    } while (new_id == -1); 
+    } while (new_id == -1);
     return new_id;
 }
 //Huruf_besar biar selalu ingat karena akan sering digunakan

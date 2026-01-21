@@ -87,38 +87,38 @@ typedef struct {
 } master_cow_c_session_t;
 
 typedef struct {
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
 	int master_pid;
     int ipv6_udp;
     int ipv4_udp;
     timer_id_t check_healthy_timer_id;
     et_buffered_event_id_t *shutdown_event_fd;
     async_type_t master_async;
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     uint8_t last_sio_rr_idx;
     uint8_t last_logic_rr_idx;
     uint8_t last_cow_rr_idx;
     uint8_t last_dbr_rr_idx;
     uint8_t last_dbw_rr_idx;
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     uint16_t listen_port;
     sig_atomic_t shutdown_requested;
     uint16_t hb_check_times;
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     bool all_workers_is_ready;
     bool is_rekeying;
-//----------------------------------------------------------------------    
+    //----------------------------------------------------------------------
     master_worker_session_t *sio_session;
     master_worker_session_t *logic_session;
     master_worker_session_t *cow_session;
     master_worker_session_t *dbr_session;
-    master_worker_session_t *dbw_session;    
-//----------------------------------------------------------------------
+    master_worker_session_t *dbw_session;
+    //----------------------------------------------------------------------
     master_sio_c_session_t *sio_c_session;
     master_cow_c_session_t *cow_c_session;
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     ori_timer_wheels_t timer;
-//----------------------------------------------------------------------
+    //----------------------------------------------------------------------
     uint8_t *arena_buffer;
     oritlsf_pool_t oritlsf_pool;
 } master_context_t;
@@ -126,22 +126,22 @@ typedef struct {
 static inline master_worker_session_t *get_master_worker_session(master_context_t *master_context, worker_type_t wot, uint8_t index) {
     switch (wot) {
         case SIO: {
-            return &master_context->sio_session[index];
-        }
+                      return &master_context->sio_session[index];
+                  }
         case LOGIC: {
-            return &master_context->logic_session[index];
-        }
+                        return &master_context->logic_session[index];
+                    }
         case COW: {
-            return &master_context->cow_session[index];
-        }
+                      return &master_context->cow_session[index];
+                  }
         case DBR: {
-            return &master_context->dbr_session[index];
-        }
+                      return &master_context->dbr_session[index];
+                  }
         case DBW: {
-            return &master_context->dbw_session[index];
-        }
+                      return &master_context->dbw_session[index];
+                  }
         default:
-            return NULL;
+                  return NULL;
     }
 }
 

@@ -19,11 +19,11 @@ static inline status_t ipc_serialize_worker_master_info(const char *label, const
         return FAILURE;
     }
     size_t current_offset_local = *offset;
-    
+
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
     memcpy(current_buffer + current_offset_local, &payload->session_index, sizeof(uint8_t));
     current_offset_local += sizeof(uint8_t);
-    
+
     if (CHECK_BUFFER_BOUNDS(current_offset_local, sizeof(uint8_t), buffer_size) != SUCCESS) return FAILURE_OOBUF;
     memcpy(current_buffer + current_offset_local, (uint8_t *)&payload->flag, sizeof(uint8_t));
     current_offset_local += sizeof(uint8_t);

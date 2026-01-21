@@ -11,9 +11,9 @@
 
 status_t handle_master_ipc_heartbeat(const char *label, master_context_t *master_ctx, worker_type_t rcvd_wot, uint8_t rcvd_index, worker_security_t *security, ipc_raw_protocol_t_status_t *ircvdi) {
     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label, &master_ctx->oritlsf_pool,
-        security->aes_key, security->remote_nonce, &security->remote_ctr,
-        (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
-    );
+                                                                  security->aes_key, security->remote_nonce, &security->remote_ctr,
+                                                                  (uint8_t*)ircvdi->r_ipc_raw_protocol_t->recv_buffer, ircvdi->r_ipc_raw_protocol_t->n
+                                                                  );
     master_worker_session_t *session = get_master_worker_session(master_ctx, rcvd_wot, rcvd_index);
     if (session == NULL) {
         CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
@@ -27,7 +27,7 @@ status_t handle_master_ipc_heartbeat(const char *label, master_context_t *master
     } else {
         LOG_DEBUG("%sipc_deserialize BERHASIL.", label);
         CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi->r_ipc_raw_protocol_t);
-    }           
+    }
     ipc_protocol_t* received_protocol = deserialized_ircvdi.r_ipc_protocol_t;
     ipc_worker_master_heartbeat_t *iheartbeati = received_protocol->payload.ipc_worker_master_heartbeat;
     uint64_t_status_t rt = get_monotonic_time_ns(label);

@@ -56,32 +56,32 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
                         return FAILURE;
                     }
                     if (ipc_check_mac(
-                            label, 
-                            security->mac_key, 
-                            ircvdi.r_ipc_raw_protocol_t
-                        ) != SUCCESS
+                        label,
+                        security->mac_key,
+                        ircvdi.r_ipc_raw_protocol_t
+                    ) != SUCCESS
                     )
                     {
                         CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi.r_ipc_raw_protocol_t);
                         return FAILURE;
                     }
                     if (ipc_read_header(
-                            label,  
-                            security->mac_key, 
-                            security->remote_nonce, 
-                            ircvdi.r_ipc_raw_protocol_t
-                        ) != SUCCESS
+                        label,
+                        security->mac_key,
+                        security->remote_nonce,
+                        ircvdi.r_ipc_raw_protocol_t
+                    ) != SUCCESS
                     )
                     {
                         CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi.r_ipc_raw_protocol_t);
                         return FAILURE;
                     }
                     if (ipc_check_ctr(
-                            label, 
-                            security->aes_key, 
-                            &security->remote_ctr, 
-                            ircvdi.r_ipc_raw_protocol_t
-                        ) != SUCCESS
+                        label,
+                        security->aes_key,
+                        &security->remote_ctr,
+                        ircvdi.r_ipc_raw_protocol_t
+                    ) != SUCCESS
                     )
                     {
                         CLOSE_IPC_RAW_PROTOCOL(&master_ctx->oritlsf_pool, &ircvdi.r_ipc_raw_protocol_t);
@@ -135,9 +135,9 @@ status_t handle_master_ipc_event(const char *label, master_context_t *master_ctx
                 }
             }
         }
-//======================================================================
-// !!!!!!Drain Sampe Kering!!!!!!
-//======================================================================
+        //======================================================================
+        // !!!!!!Drain Sampe Kering!!!!!!
+        //======================================================================
     } while (retr.status == SUCCESS && retr.event_type == EIT_FD);
 	return SUCCESS;
 }

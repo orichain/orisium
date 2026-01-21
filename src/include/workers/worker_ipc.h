@@ -13,19 +13,19 @@ status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_pro
 status_t handle_workers_ipc_hello2_ack(worker_context_t *worker_ctx, ipc_raw_protocol_t_status_t *ircvdi);
 void handle_workers_ipc_closed_event(worker_context_t *worker_ctx);
 status_t retry_control_packet_ack(
-    worker_context_t *worker_ctx, 
-    orilink_identity_t *identity, 
-    orilink_security_t *security, 
-    packet_ack_t *control_packet_ack,
-    orilink_protocol_type_t orilink_protocol
-);
+        worker_context_t *worker_ctx,
+        orilink_identity_t *identity,
+        orilink_security_t *security,
+        packet_ack_t *control_packet_ack,
+        orilink_protocol_type_t orilink_protocol
+        );
 status_t retry_control_packet(
-    worker_context_t *worker_ctx, 
-    orilink_identity_t *identity, 
-    orilink_security_t *security, 
-    packet_t *control_packet,
-    orilink_protocol_type_t orilink_protocol
-);
+        worker_context_t *worker_ctx,
+        orilink_identity_t *identity,
+        orilink_security_t *security,
+        packet_t *control_packet,
+        orilink_protocol_type_t orilink_protocol
+        );
 status_t handle_workers_ipc_udp_data_cow_hello4(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao);
 status_t handle_workers_ipc_udp_data_cow_hello3(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao);
 status_t handle_workers_ipc_udp_data_cow_hello2(worker_context_t *worker_ctx, ipc_protocol_t* received_protocol, sio_c_session_t *session, orilink_identity_t *identity, orilink_security_t *security, struct sockaddr_in6 *remote_addr, orilink_raw_protocol_t *oudp_datao);

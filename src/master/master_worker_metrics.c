@@ -22,7 +22,7 @@ double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_t
     metrics->last_task_started = rt.r_uint64_t;
     metrics->last_task_finished = rt.r_uint64_t;
     metrics->longest_task_time = 0ULL;
-//======================================================================            
+    //======================================================================
     if (initial_delay_ms > 0) {
         metrics->hb_interval = (double)WORKER_HEARTBEAT_INTERVAL + ((double)initial_delay_ms/1000.0);
         metrics->sum_hb_interval = metrics->hb_interval;

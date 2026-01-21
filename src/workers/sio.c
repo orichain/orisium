@@ -17,11 +17,11 @@ void run_sio_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
     sio_c_session_t *sessions[MAX_CONNECTION_PER_SIO_WORKER];
     if (setup_worker(worker_ctx, "SIO", wot, index, master_uds_fd) != SUCCESS) goto exit2;
     for (uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
-        sessions[i] = (sio_c_session_t *)oritlsf_calloc(__FILE__, __LINE__, 
-            &worker_ctx->oritlsf_pool,
-            1,
-            sizeof(sio_c_session_t)
-        );
+        sessions[i] = (sio_c_session_t *)oritlsf_calloc(__FILE__, __LINE__,
+                                                        &worker_ctx->oritlsf_pool,
+                                                        1,
+                                                        sizeof(sio_c_session_t)
+                                                        );
         if (setup_sio_session(worker_ctx, sessions[i], *wot, *index, i) != SUCCESS) {
             goto exit1;
         }
@@ -57,9 +57,9 @@ void run_sio_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
                     }
                     if (async_event_is_OUT(current_events)) {
                         et_result_t wetr = write_ipc_protocol_message(
-                            &worker_ctx->oritlsf_pool, 
+                            &worker_ctx->oritlsf_pool,
                             &current_fd,
-                            worker_ctx->buffer, 
+                            worker_ctx->buffer,
                             0,
                             NULL,
                             true
@@ -81,7 +81,7 @@ void run_sio_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_ms
         }
     }
 
-exit1:   
+exit1:
     for (uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
         cleanup_sio_session(worker_ctx, sessions[i]);
         oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&(sessions[i]));

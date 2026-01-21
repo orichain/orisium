@@ -7,7 +7,7 @@
 #include <stdint.h>
 
 #if defined(__OpenBSD__) || defined(__NetBSD__)
-	#include <sys/mount.h>
+#include <sys/mount.h>
 #endif
 
 #include "log.h"
@@ -28,12 +28,12 @@ static inline size_t detect_disk_80percent(const char *path) {
 }
 
 static inline int database_init_env(
-    const char *label,
-    MDB_env **env,
-    const char *path,
-    size_t mapsize,
-    unsigned maxdbs
-)
+        const char *label,
+        MDB_env **env,
+        const char *path,
+        size_t mapsize,
+        unsigned maxdbs
+        )
 {
     int rc;
     rc = mdb_env_create(env);
@@ -51,9 +51,9 @@ static inline int database_init_env(
 }
 
 static inline void database_deinit_env(
-    const char *label,
-    MDB_env **env
-)
+        const char *label,
+        MDB_env **env
+        )
 {
     if (env && *env) {
         mdb_env_close(*env);
@@ -63,12 +63,12 @@ static inline void database_deinit_env(
 }
 
 static inline int database_open(
-    const char *label,
-    MDB_env *env,
-    MDB_dbi *dbi,
-    const char *name,
-    unsigned flags
-) 
+        const char *label,
+        MDB_env *env,
+        MDB_dbi *dbi,
+        const char *name,
+        unsigned flags
+        )
 {
     MDB_txn *txn = NULL;
     int rc;
@@ -87,9 +87,9 @@ static inline int database_open(
 }
 
 static inline void database_close(
-	MDB_env *env,
-    MDB_dbi dbi
-)
+	    MDB_env *env,
+        MDB_dbi dbi
+        )
 {
     if (env) {
         mdb_dbi_close(env, dbi);
@@ -97,26 +97,26 @@ static inline void database_close(
 }
 
 static inline int database_txn_begin(
-    const char *label,
-    MDB_env *env,
-    MDB_txn **t
-) 
+        const char *label,
+        MDB_env *env,
+        MDB_txn **t
+        )
 {
     return database_error(
-        label,
-        mdb_txn_begin(
-            env,
-            NULL,
-            0,
-            t
-        )
-    );
+            label,
+            mdb_txn_begin(
+                env,
+                NULL,
+                0,
+                t
+                )
+            );
 }
 
 static inline int database_txn_commit(
-    const char *label,
-    MDB_txn **t
-) 
+        const char *label,
+        MDB_txn **t
+        )
 {
     MDB_txn *txn = *t;
     *t = NULL;
@@ -135,13 +135,13 @@ static inline void database_txn_abort(MDB_txn **t) {
 }
 
 static inline int database_txn_put(
-    const char *label,
-    MDB_txn *txn,
-    MDB_dbi dbi,
-    const void *key, size_t klen,
-    const void *val, size_t vlen,
-    unsigned flags
-)
+        const char *label,
+        MDB_txn *txn,
+        MDB_dbi dbi,
+        const void *key, size_t klen,
+        const void *val, size_t vlen,
+        unsigned flags
+        )
 {
     MDB_val k = { klen, (void *)key };
     MDB_val v = { vlen, (void *)val };
@@ -149,35 +149,35 @@ static inline int database_txn_put(
 }
 
 static inline int database_txn_get(
-    MDB_txn *txn,
-    MDB_dbi dbi,
-    const void *key,
-    size_t klen,
-    MDB_val *out
-) 
+        MDB_txn *txn,
+        MDB_dbi dbi,
+        const void *key,
+        size_t klen,
+        MDB_val *out
+        )
 {
     MDB_val k = { klen, (void *)key };
     return mdb_get(txn, dbi, &k, out);
 }
 
 static inline int database_txn_del(
-    const char *label,
-    MDB_txn *txn,
-    MDB_dbi dbi,
-    const void *key,
-    size_t klen
-) 
+        const char *label,
+        MDB_txn *txn,
+        MDB_dbi dbi,
+        const void *key,
+        size_t klen
+        )
 {
     MDB_val k = { klen, (void *)key };
     return database_error(label, mdb_del(txn, dbi, &k, NULL));
 }
 
 static inline int database_cursor_open(
-    const char *label,
-    MDB_txn *txn,
-    MDB_dbi dbi,
-    MDB_cursor **c
-) 
+        const char *label,
+        MDB_txn *txn,
+        MDB_dbi dbi,
+        MDB_cursor **c
+        )
 {
     return database_error(label, mdb_cursor_open(txn, dbi, c));
 }
@@ -208,12 +208,12 @@ static inline int database_cursor_get_prev(MDB_cursor *cur, MDB_val *k, MDB_val 
 }
 
 static inline int database_cursor_seek(
-    MDB_cursor *cur,
-    const void *key,
-    size_t klen,
-    MDB_val *outk,
-    MDB_val *outv
-) 
+        MDB_cursor *cur,
+        const void *key,
+        size_t klen,
+        MDB_val *outk,
+        MDB_val *outv
+        )
 {
     MDB_val k = { klen, (void *)key };
     int rc = mdb_cursor_get(cur, &k, outv, MDB_SET_RANGE);
@@ -223,12 +223,12 @@ static inline int database_cursor_seek(
 }
 
 static inline int database_cursor_prefix_seek(
-    MDB_cursor *cur,
-    const void *prefix,
-    size_t plen,
-    MDB_val *outk,
-    MDB_val *outv
-) 
+        MDB_cursor *cur,
+        const void *prefix,
+        size_t plen,
+        MDB_val *outk,
+        MDB_val *outv
+        )
 {
     MDB_val k = { plen, (void *)prefix };
     int rc = mdb_cursor_get(cur, &k, outv, MDB_SET_RANGE);
@@ -238,7 +238,7 @@ static inline int database_cursor_prefix_seek(
     *outk = k;
 
     if (outk->mv_size < plen ||
-        memcmp(outk->mv_data, prefix, plen) != 0)
+            memcmp(outk->mv_data, prefix, plen) != 0)
         return MDB_NOTFOUND;
 
     return MDB_SUCCESS;

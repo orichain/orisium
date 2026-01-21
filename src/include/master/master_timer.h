@@ -150,26 +150,26 @@ static inline status_t handle_master_timer_event(const char *label, master_conte
                             if (handler_result != SUCCESS) {
                                 break;
                             }
-//----------------------------------------------------------------------
-//--- Test Send IPC During Rekeying
-//----------------------------------------------------------------------
+                            //----------------------------------------------------------------------
+                            //--- Test Send IPC During Rekeying
+                            //----------------------------------------------------------------------
                             /*
-                            handler_result = master_workers_info(label, master_ctx, IT_WAKEUP);
-                            if (handler_result != SUCCESS) {
-                                break;
-                            }
-                            
-                            handler_result = master_workers_info(label, master_ctx, IT_WAKEUP);
-                            if (handler_result != SUCCESS) {
-                                break;
-                            }
-                            
-                            handler_result = master_workers_info(label, master_ctx, IT_WAKEUP);
-                            if (handler_result != SUCCESS) {
-                                break;
-                            }
-                            */
-//----------------------------------------------------------------------
+                               handler_result = master_workers_info(label, master_ctx, IT_WAKEUP);
+                               if (handler_result != SUCCESS) {
+                               break;
+                               }
+
+                               handler_result = master_workers_info(label, master_ctx, IT_WAKEUP);
+                               if (handler_result != SUCCESS) {
+                               break;
+                               }
+
+                               handler_result = master_workers_info(label, master_ctx, IT_WAKEUP);
+                               if (handler_result != SUCCESS) {
+                               break;
+                               }
+                               */
+                            //----------------------------------------------------------------------
                         } else {
                             handler_result = check_workers_healthy(label, master_ctx);
                             if (handler_result != SUCCESS) {
