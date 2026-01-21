@@ -2,7 +2,6 @@
 #define ORITLSF_H
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -610,112 +609,5 @@ static inline void *oritlsf_cleanup_pool(const char *label, oritlsf_pool_t *pool
     memset(pool, 0, sizeof(*pool));
     return start;
 }
-
-#if defined(TLSF_DEBUG)
-static inline void tlsf_dump_free_lists(const oritlsf_pool_t *pool) {
-    if (!pool) return;
-    fprintf(stderr, "=== TLSF FREE LISTS DUMP ===\n");
-    fprintf(stderr, "pool_start=%p pool_end=%p fl_bitmap=0x%zx\n", (void*)pool->pool_start, (void*)pool->pool_end, pool->fl_bitmap);
-    for (int f = 0; f < FL_INDEX_COUNT; ++f) {
-        if ((pool->fl_bitmap & ((size_t)1 << f)) == 0) continue;
-        fprintf(stderr, " FL %d: sl_bitmap=0x%zx\n", f, pool->sl_bitmap[f]);
-        for (int s = 0; s < SL_INDEX_COUNT; ++s) {
-            block_header_t *cur = pool->free_lists[f][s];
-            if (!cur) continue;
-            fprintf(stderr, " SL %d: ", s);
-            while (cur) {
-                fprintf(stderr, "[%p sz=%zu st=%u] -> ", (void*)cur, cur->size, (unsigned)cur->status);
-                cur = cur->next_free;
-                if (!cur) break;
-            }
-            fprintf(stderr, "NULL\n");
-        }
-    }
-    fprintf(stderr, "=== END DUMP ===\n");
-}
-
-static inline void tlsf_validate_all(const oritlsf_pool_t *pool) {
-    if (!pool || !pool->pool_start || !pool->pool_end) return;
-    size_t pool_sz = (size_t)(pool->pool_end - pool->pool_start);
-    size_t max_blocks = pool_sz / MIN_BLOCK_TOTAL + 16;
-    block_header_t **phy = malloc(sizeof(block_header_t*) * max_blocks);
-    if (!phy) { fprintf(stderr, "tlsf_validate_all: malloc failed\n"); abort(); }
-    size_t phy_count = 0;
-
-    uint8_t *cur = pool->pool_start;
-    while (cur < pool->pool_end) {
-        if (!header_aligned(cur)) { fprintf(stderr, "tlsf_validate_all: header not aligned at %p\n", (void*)cur); abort(); }
-        block_header_t *bh = (block_header_t*)cur;
-        if (!in_pool(pool, bh)) { fprintf(stderr, "tlsf_validate_all: header out of pool at %p\n", (void*)bh); abort(); }
-        if (bh->size == 0 || (uint8_t*)bh + bh->size > pool->pool_end) { fprintf(stderr, "tlsf_validate_all: invalid size at %p\n", (void*)bh); abort(); }
-        
-        bool is_sentinel = (cur == pool->pool_end - OVERHEAD) && (bh->size == OVERHEAD) && (bh->status == 1);
-        if (!is_sentinel && bh->size < MIN_BLOCK_TOTAL) { fprintf(stderr, "tlsf_validate_all: size too small at %p\n", (void*)bh); abort(); }
-
-		#if defined(TLSF_DEBUG)
-        if (!is_sentinel && bh->size >= OVERHEAD + FOOTER_SIZE) {
-            uint8_t *footer = (uint8_t*)bh + bh->size - FOOTER_SIZE;
-            if (!in_pool(pool, footer) || footer + FOOTER_SIZE > pool->pool_end) { fprintf(stderr, "tlsf_validate_all: footer OOB for %p\n", (void*)bh); abort(); }
-            uint64_t f = *(const uint64_t*)footer;
-            if (f != GUARD_MAGIC) { fprintf(stderr, "tlsf_validate_all: footer mismatch at %p\n", (void*)bh); abort(); }
-        }
-        #endif
-
-        phy[phy_count++] = bh;
-        cur += bh->size;
-        if (phy_count >= max_blocks) { fprintf(stderr, "tlsf_validate_all: too many blocks\n"); abort(); }
-    }
-
-    for (size_t i = 1; i < phy_count; ++i) {
-        if (phy[i]->prev_phys_block != phy[i-1]) { fprintf(stderr, "tlsf_validate_all: prev_phys mismatch\n"); abort(); }
-    }
-
-    size_t computed_fl = 0;
-    size_t computed_sl[FL_INDEX_COUNT];
-    memset(computed_sl, 0, sizeof(computed_sl));
-    char *phy_is_free = calloc(phy_count, 1);
-    if (!phy_is_free) { fprintf(stderr, "tlsf_validate_all: calloc failed\n"); abort(); }
-
-    for (int f = 0; f < FL_INDEX_COUNT; ++f) {
-        for (int s = 0; s < SL_INDEX_COUNT; ++s) {
-            block_header_t *node = pool->free_lists[f][s];
-            while (node) {
-                if (!in_pool(pool, node) || !header_aligned(node)) { fprintf(stderr, "tlsf_validate_all: invalid free-list node\n"); abort(); }
-                if (node->status != 0) { fprintf(stderr, "tlsf_validate_all: free-list node marked used\n"); abort(); }
-                
-                size_t found = (size_t)-1;
-                for (size_t i = 0; i < phy_count; ++i) { if (phy[i] == node) { found = i; break; } }
-                if (found == (size_t)-1) { fprintf(stderr, "tlsf_validate_all: free-list node not found in physical\n"); abort(); }
-                if (phy_is_free[found]) { fprintf(stderr, "tlsf_validate_all: duplicate free-list entry\n"); abort(); }
-                phy_is_free[found] = 1;
-                int cf, cs;
-                get_indices(node->size, &cf, &cs);
-                if (cf != f || cs != s) { fprintf(stderr, "tlsf_validate_all: wrong bucket for node (found %d:%d, expected %d:%d)\n", cf, cs, f, s); abort(); }
-                computed_fl |= ((size_t)1 << f);
-                computed_sl[f] |= ((size_t)1 << s);
-                if (node->next_free && node->next_free->prev_free != node) { fprintf(stderr, "tlsf_validate_all: next->prev mismatch\n"); abort(); }
-                node = node->next_free;
-            }
-        }
-    }
-
-    if (computed_fl != pool->fl_bitmap) { fprintf(stderr, "tlsf_validate_all: fl_bitmap mismatch (computed 0x%zx, pool 0x%zx)\n", computed_fl, pool->fl_bitmap); abort(); }
-    for (int f = 0; f < FL_INDEX_COUNT; ++f) {
-        if (computed_sl[f] != pool->sl_bitmap[f]) { fprintf(stderr, "tlsf_validate_all: sl_bitmap[%d] mismatch (computed 0x%zx, pool 0x%zx)\n", f, computed_sl[f], pool->sl_bitmap[f]); abort(); }
-    }
-
-    for (size_t i = 0; i < phy_count; ++i) {
-        if (phy[i]->status == 0 && !phy_is_free[i]) { fprintf(stderr, "tlsf_validate_all: physical free block not in lists at %p\n", (void*)phy[i]); abort(); }
-        if (phy[i]->status == 1 && phy_is_free[i]) { fprintf(stderr, "tlsf_validate_all: physical used block is in lists at %p\n", (void*)phy[i]); abort(); }
-    }
-
-    free(phy);
-    free(phy_is_free);
-    fprintf(stderr, "TLSF VALIDATION SUCCESSFUL\n");
-}
-#else
-static inline void tlsf_dump_free_lists(const oritlsf_pool_t *pool) { (void)pool; }
-static inline void tlsf_validate_all(const oritlsf_pool_t *pool) { (void)pool; }
-#endif
 
 #endif
