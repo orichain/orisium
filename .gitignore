@@ -22,4 +22,5 @@ clang++
 .lua.
 compile_commands.json
 clangd.core
+fc-cache.core
 
