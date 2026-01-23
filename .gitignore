@@ -18,4 +18,7 @@ gcc
 python
 clang
 clang++
+.cache/
+.lua.
+compile_commands.json
 

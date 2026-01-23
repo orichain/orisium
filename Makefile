@@ -99,10 +99,8 @@ HFILES := $(shell find . $(EXCLUDE_PATHS) -name '*.h' -print)
 # =============================
 # Build Targets
 # =============================
-.PHONY: all dev prod clean run debug check_iwyu_h check_iwyu_c
+.PHONY: clean all debug check_iwyu_h check_iwyu_c
 
-all: prod
-	
 define install_pkg
 	@echo ">> Memeriksa: $(1)"
 	@if command -v $(1) >/dev/null 2>&1; then \
@@ -210,7 +208,9 @@ else ifeq ($(DISTRO_ID),openbsd)
 		echo ">> $(CXX) sudah ada."; \
 	fi
 	$(call install_pkg,lmdb)
-	@if [ ! -e $(PY) ]; then \
+	$(call install_pkg,bear)
+	$(call install_pkg,spdlog)
+	if [ ! -e $(PY) ]; then \
 		echo "========================="; \
 		echo "!!--- PILIH python3 ---!!"; \
 		echo "========================="; \
@@ -251,22 +251,22 @@ else ifeq ($(DISTRO_ID),rocky)
 	else \
 		echo ">> $(PY) sudah ada."; \
 	fi
-endif	
+endif
 
 dev:
-	$(MAKE) libraries check_iwyu_h check_iwyu_c $(TARGET)
+	$(MAKE) check_iwyu_h check_iwyu_c $(TARGET)
 	@echo "-------------------------------------"
 	@echo "orisium dikompilasi dalam mode DEVELOPMENT!"
 	@echo "Executable: $(TARGET)"
 	@echo "-------------------------------------"
 
 prod:
-	$(MAKE) libraries check_iwyu_h check_iwyu_c $(TARGET) BUILD_MODE=PRODUCTION
+	$(MAKE) check_iwyu_h check_iwyu_c $(TARGET) BUILD_MODE=PRODUCTION
 	@echo "-------------------------------------"
 	@echo "orisium dikompilasi dalam mode PRODUCTION!"
 	@echo "Executable: $(TARGET)"
 	@echo "-------------------------------------"
-	
+
 $(TARGET): $(OBJS) \
 	$(PQCLEAN_COMMON_OBJS) \
 	$(PQCLEAN_SIGN_MLDSA87_LIB_PATH) \
@@ -342,7 +342,7 @@ check_iwyu_c: $(IWYU_BIN_PATH)
 	else \
 		echo "Semua file bersih dari masalah IWYU."; \
 	fi
-	
+
 check_iwyu_h: $(IWYU_BIN_PATH)
 	@echo "Menjalankan IWYU untuk *.h (kecuali: $(EXCLUDED_DIRS))..."
 	@rm -f iwyu_failed_h.log iwyu_applied_h.log
@@ -435,10 +435,15 @@ clean:
 	@echo "Membersihkan file objek dan executable..."
 	rm -rf $(OBJ_DIR) $(TARGET)
 
-run: $(TARGET)
-	@echo "Menjalankan Orisium..."
-	./$(TARGET)
-	
-debug: dev
-	@echo "Menjalankan Orisium dalam mode debug..."
-	./$(TARGET)
+nobearall: prod
+
+nobeardebug: dev
+
+all: libraries
+	bear -- $(MAKE) nobearall || true
+	@echo "Jalankan ./orisium dalam mode production..."
+
+debug: libraries
+	bear -- $(MAKE) nobeardebug || true
+	@echo "Jalankan ./orisium dalam mode debug..."
+
