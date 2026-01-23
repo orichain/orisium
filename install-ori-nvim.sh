@@ -28,4 +28,4 @@ mkdir -p ~/.local/share/nvim/lazy
 git clone https://github.com/nvim-treesitter/nvim-treesitter.git ~/.local/share/nvim/lazy/nvim-treesitter
 
 echo "==> Done. Launching nvim..."
-exec nvim
+exec nvim src/orisium.c
