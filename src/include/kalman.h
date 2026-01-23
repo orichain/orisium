@@ -3,8 +3,8 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <math.h>
+#include <stddef.h>
 
 #include "utilities.h"
 #include "constants.h"

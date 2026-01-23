@@ -15,7 +15,6 @@
 #include "ipc/protocol.h"
 #include "types.h"
 #include "log.h"
-#include "ipc/worker_master_heartbeat.h"
 #include "constants.h"
 #include "oritlsf.h"
 

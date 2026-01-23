@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include <stdlib.h>
+#include <stddef.h>
 
 #include "async.h"
 #include "types.h"
@@ -45,9 +45,9 @@ void run_logic_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_
                     }
                     if (async_event_is_OUT(current_events)) {
                         et_result_t wetr = write_ipc_protocol_message(
-                            &worker_ctx->oritlsf_pool, 
+                            &worker_ctx->oritlsf_pool,
                             &current_fd,
-                            worker_ctx->buffer, 
+                            worker_ctx->buffer,
                             0,
                             NULL,
                             true
@@ -69,6 +69,6 @@ void run_logic_worker(worker_type_t *wot, uint8_t *index, double *initial_delay_
         }
     }
 
-exit:    
+exit:
     cleanup_worker(worker_ctx);
 }

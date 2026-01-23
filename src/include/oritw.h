@@ -19,7 +19,7 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdio.h>
+#include <stddef.h>
 
 #if defined(__OpenBSD__)
 #include <sys/limits.h>

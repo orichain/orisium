@@ -1,11 +1,11 @@
 #include <string.h>
-#include <errno.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <errno.h>
 
 #include "log.h"
 #include "utilities.h"

@@ -1,8 +1,8 @@
 #ifndef MASTER_MASTER_TIMER_H
 #define MASTER_MASTER_TIMER_H
 
-#include <inttypes.h>
-#include <stdio.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #include "log.h"
 #include "oritw.h"
@@ -10,6 +10,7 @@
 #include "utilities.h"
 #include "master/master.h"
 #include "master/ipc/worker_ipc_cmds.h"
+#include "master/master_workers.h"
 #include "constants.h"
 #include "stdbool.h"
 #include "oritw/timer_event.h"

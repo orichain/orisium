@@ -21,4 +21,5 @@ clang++
 .cache/
 .lua.
 compile_commands.json
+clangd.core
 

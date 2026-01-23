@@ -1,7 +1,8 @@
 #ifndef WORKERS_MASTER_IPC_CMDS_H
 #define WORKERS_MASTER_IPC_CMDS_H
 
-#include <inttypes.h>
+
+#include <stdint.h>
 
 #include "ipc.h"
 #include "ipc/protocol.h"
@@ -13,9 +14,9 @@
 #include "ipc/worker_worker_info.h"
 #include "log.h"
 #include "types.h"
-#include "utilities.h"
 #include "stdbool.h"
 #include "oritlsf.h"
+#include "workers/workers.h"
 
 struct sockaddr_in6;
 

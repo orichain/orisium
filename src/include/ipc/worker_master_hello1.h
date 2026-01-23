@@ -15,7 +15,6 @@
 #include "ipc/protocol.h"
 #include "types.h"
 #include "log.h"
-#include "ipc/worker_master_hello1.h"
 #include "constants.h"
 #include "pqc.h"
 #include "oritlsf.h"

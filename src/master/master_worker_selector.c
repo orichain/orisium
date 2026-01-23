@@ -1,6 +1,6 @@
-#include <inttypes.h>
 #include <float.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #if defined(__OpenBSD__)
 #include <sys/limits.h>

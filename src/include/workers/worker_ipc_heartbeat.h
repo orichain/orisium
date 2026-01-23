@@ -1,8 +1,8 @@
 #ifndef WORKERS_WORKER_IPC_HEARTBEAT_H
 #define WORKERS_WORKER_IPC_HEARTBEAT_H
 
-#include <inttypes.h>
 #include <stdio.h>
+#include <stdint.h>
 
 #include "constants.h"
 #include "ipc/protocol.h"

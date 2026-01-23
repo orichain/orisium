@@ -1,8 +1,8 @@
 #ifndef WORKERS_WORKER_TIMER_H
 #define WORKERS_WORKER_TIMER_H
 
-#include <inttypes.h>
-#include <stdio.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #include "log.h"
 #include "oritw.h"

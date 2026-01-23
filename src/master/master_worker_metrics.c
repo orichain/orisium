@@ -1,5 +1,5 @@
-#include <stdlib.h>
-#include <inttypes.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #include "constants.h"
 #include "utilities.h"
