@@ -1,24 +1,10 @@
 #ifndef WORKERS_MASTER_IPC_CMDS_H
 #define WORKERS_MASTER_IPC_CMDS_H
 
-
-#include <stdint.h>
-
 #include "ipc.h"
-#include "ipc/protocol.h"
-#include "ipc/udp_data.h"
-#include "ipc/worker_master_heartbeat.h"
-#include "ipc/worker_master_hello2.h"
-#include "ipc/worker_master_info.h"
 #include "ipc/worker_master_hello1.h"
-#include "ipc/worker_worker_info.h"
-#include "log.h"
 #include "types.h"
-#include "stdbool.h"
-#include "oritlsf.h"
 #include "workers/workers.h"
-
-struct sockaddr_in6;
 
 static inline status_t worker_master_hello1(worker_context_t *ctx) {
 	ipc_protocol_t_status_t cmd_result = ipc_prepare_cmd_worker_master_hello1(

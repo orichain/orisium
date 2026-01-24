@@ -1,14 +1,12 @@
 #ifndef IPC_PROTOCOL_H
 #define IPC_PROTOCOL_H
 
-#include <netinet/in.h>
-#include <stdint.h>
-#include <string.h>
-
 #include "constants.h"
+#include "oritlsf.h"
 #include "pqc.h"
 #include "types.h"
-#include "oritlsf.h"
+#include <netinet/in.h>
+#include <stdint.h>
 
 typedef enum {
     IPC_WORKER_MASTER_HELLO1 = (uint8_t)0x00,

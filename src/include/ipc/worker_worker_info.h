@@ -1,16 +1,10 @@
 #ifndef IPC_WORKER_WORKER_INFO_H
 #define IPC_WORKER_WORKER_INFO_H
 
-#include <stdio.h>
-#include <string.h>
-#include <stdint.h>
-
-#include "utilities.h"
 #include "ipc/protocol.h"
-#include "types.h"
 #include "log.h"
-#include "constants.h"
-#include "oritlsf.h"
+#include "types.h"
+#include "utilities.h"
 
 static inline status_t ipc_serialize_worker_worker_info(const char *label, const ipc_worker_worker_info_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
     if (!payload || !current_buffer || !offset) {

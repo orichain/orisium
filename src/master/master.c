@@ -1,31 +1,12 @@
-#include <stdbool.h>
-#include <unistd.h>
-#include <stdint.h>
-#include <netinet/in.h>
-#include <string.h>
-#include <signal.h>
-#include <stdlib.h>
-#include <lmdb.h>
-
-#include "log.h"
-#include "constants.h"
-#include "async.h"
-#include "utilities.h"
-#include "types.h"
-#include "master/udp/handlers.h"
-#include "master/ipc/handlers.h"
-#include "master/master_workers.h"
-#include "master/master_worker_selector.h"
-#include "master/master_worker_metrics.h"
 #include "master/master.h"
-#include "master/master_timer.h"
-#include "master/ipc/worker_ipc_cmds.h"
-#include "oritw.h"
-#include "oritlsf.h"
-#include "oritw/timer_event.h"
-#include "kalman.h"
-#include "ipc.h"
+#include "async.h"
 #include "database.h"
+#include "lmdb.h"
+#include "master/master_timer.h"
+#include "master/worker_ipc_cmds.h"
+#include "oritlsf.h"
+#include "types.h"
+#include <signal.h>
 
 volatile sig_atomic_t shutdown_requested = 0;
 et_buffered_event_id_t *shutdown_event_fd = NULL;

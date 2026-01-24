@@ -1,29 +1,16 @@
 #include <stdarg.h>
 #include <stdio.h>
-#include <time.h>
-
-#include "log.h"
-
-#if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
-#include <dirent.h>
-
-#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
-#if defined(__clang__)
-#if __clang_major__ < 21
-#include <sys/dirent.h>
-#endif
-#endif
-#endif
-
-#include <errno.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
+#include <time.h>
 
+#if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
 #include "globals.h"
-#include "utilities.h"
 #include "types.h"
+#include "utilities.h"
+#include <dirent.h>
+#include <errno.h>
+#include <sys/stat.h>
 
 static FILE *log_fp = NULL;
 static char current_filename[64] = "";

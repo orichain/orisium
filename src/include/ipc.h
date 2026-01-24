@@ -1,47 +1,22 @@
 #ifndef IPC_H
 #define IPC_H
 
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <sys/uio.h>
-
-#if defined(__NetBSD__)
-#include <sys/endian.h>
-#include <sys/errno.h>
-#elif defined(__OpenBSD__)
-#include <sys/endian.h>
-#include <sys/errno.h>
-#elif defined(__FreeBSD__)
-#include <x86/endian.h>
-#else
-#include <endian.h>
-#endif
-
-#include "utilities.h"
-#include "ipc/protocol.h"
-#include "types.h"
-#include "log.h"
-#include "ipc/master_worker_info.h"
-#include "ipc/worker_master_info.h"
-#include "ipc/worker_worker_info.h"
-#include "ipc/worker_master_heartbeat.h"
 #include "ipc/master_cow_connect.h"
-#include "ipc/udp_data.h"
-#include "ipc/udp_data_ack.h"
-#include "ipc/worker_master_hello1.h"
-#include "ipc/worker_master_hello2.h"
 #include "ipc/master_worker_hello1_ack.h"
 #include "ipc/master_worker_hello2_ack.h"
-#include "constants.h"
-#include "pqc.h"
-#include "xorshiro128plus.h"
-#include "oritlsf.h"
+#include "ipc/master_worker_info.h"
+#include "ipc/protocol.h"
+#include "ipc/udp_data.h"
+#include "ipc/udp_data_ack.h"
+#include "ipc/worker_master_heartbeat.h"
+#include "ipc/worker_master_hello1.h"
+#include "ipc/worker_master_hello2.h"
+#include "ipc/worker_master_info.h"
+#include "ipc/worker_worker_info.h"
+#include "log.h"
+#include "utilities.h"
+#include <stdbool.h>
+#include <stddef.h>
 
 static inline size_t calculate_ipc_payload_fixed_size(const char *label, ipc_protocol_type_t type, bool plus_header) {
 	size_t payload_fixed_size = 0;

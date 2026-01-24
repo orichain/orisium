@@ -1,28 +1,10 @@
 #ifndef ORILINK_HELLO1_H
 #define ORILINK_HELLO1_H
 
-#if defined(__clang__)
-#if __clang_major__ < 21
-#include <stdio.h>
-#endif
-#endif
-
-#include <string.h>
-#include <stdint.h>
-
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-#include <sys/endian.h>
-#else
-#include <endian.h>
-#endif
-
-#include "utilities.h"
+#include "log.h"
 #include "orilink/protocol.h"
 #include "types.h"
-#include "log.h"
-#include "constants.h"
-#include "pqc.h"
-#include "oritlsf.h"
+#include "utilities.h"
 
 static inline status_t orilink_serialize_hello1(const char *label, const orilink_hello1_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
     if (!payload || !current_buffer || !offset) {

@@ -1,29 +1,9 @@
 #ifndef IPC_MASTER_COW_CONNECT_H
 #define IPC_MASTER_COW_CONNECT_H
 
-#if defined(__clang__)
-#if __clang_major__ < 21
-#include <stdio.h>
-#endif
-#endif
-
-#include <string.h>
-#include <stdint.h>
-
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-#include <sys/endian.h>
-#else
-#include <endian.h>
-#endif
-
-#include "utilities.h"
 #include "ipc/protocol.h"
 #include "types.h"
-#include "log.h"
-#include "constants.h"
-#include "oritlsf.h"
-
-struct sockaddr_in6;
+#include "utilities.h"
 
 static inline status_t ipc_serialize_master_cow_connect(const char *label, const ipc_master_cow_connect_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
     if (!payload || !current_buffer || !offset) {

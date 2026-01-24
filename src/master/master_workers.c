@@ -1,26 +1,8 @@
-#include <string.h>
-#include <stdlib.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdbool.h>
-
-#include "log.h"
-#include "utilities.h"
-#include "constants.h"
+#include "ipc.h"
+#include "master/master.h"
+#include "master/worker_ipc_cmds.h"
 #include "types.h"
 #include "workers/workers.h"
-#include "master/master_workers.h"
-#include "master/master_worker_metrics.h"
-#include "master/ipc/worker_ipc_cmds.h"
-#include "async.h"
-#include "master/master.h"
-#include "kalman.h"
-#include "pqc.h"
-#include "ipc.h"
-#include "oritlsf.h"
-#include "oritw.h"
 
 status_t close_worker(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
     master_worker_session_t *session = get_master_worker_session(master_ctx, wot, index);

@@ -1,22 +1,10 @@
 #ifndef IPC_WORKER_MASTER_HELLO1_H
 #define IPC_WORKER_MASTER_HELLO1_H
 
-#if defined(__clang__)
-#if __clang_major__ < 21
-#include <stdio.h>
-#endif
-#endif
-
-#include <string.h>
-#include <stdint.h>
-
-#include "utilities.h"
 #include "ipc/protocol.h"
-#include "types.h"
 #include "log.h"
-#include "constants.h"
-#include "pqc.h"
-#include "oritlsf.h"
+#include "types.h"
+#include "utilities.h"
 
 static inline status_t ipc_serialize_worker_master_hello1(const char *label, const ipc_worker_master_hello1_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
     if (!payload || !current_buffer || !offset) {

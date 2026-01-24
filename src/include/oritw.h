@@ -16,30 +16,11 @@
    └── initial_system_tick   ← anchor ke monotonic clock
    */
 
-#include <math.h>
-#include <stdbool.h>
-#include <stdint.h>
-
-#if defined(__OpenBSD__)
-#include <sys/limits.h>
-#else
-#include <limits.h>
-#if defined(__NetBSD__)
-#include <sys/common_int_limits.h>
-#elif defined(__FreeBSD__)
-#include <x86/_stdint.h>
-#endif
-#endif
-
 #include "async.h"
-#include "constants.h"
-#include "log.h"
-#include "types.h"
-#include "utilities.h"
-#include "oritw/timer_event.h"
 #include "oritw/min_heap.h"
+#include "oritw/timer_event.h"
 #include "oritw/timer_id.h"
-#include "oritlsf.h"
+#include "types.h"
 
 #if (WHEEL_SIZE & (WHEEL_SIZE - 1)) != 0
 #error "WHEEL_SIZE must be a power of 2 for optimal performance."

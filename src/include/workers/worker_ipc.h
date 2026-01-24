@@ -1,12 +1,8 @@
 #ifndef WORKERS_WORKER_IPC_H
 #define WORKERS_WORKER_IPC_H
 
-#include "ipc/protocol.h"
-#include "orilink/protocol.h"
 #include "types.h"
 #include "workers/workers.h"
-
-struct sockaddr_in6;
 
 status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void **worker_sessions, ipc_raw_protocol_t_status_t *ircvdi);
 status_t handle_workers_ipc_hello1_ack(worker_context_t *worker_ctx, ipc_raw_protocol_t_status_t *ircvdi);

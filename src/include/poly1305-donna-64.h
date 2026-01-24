@@ -1,6 +1,5 @@
-#include <stddef.h>
-
 #include "poly1305-donna.h"
+#include <stddef.h>
 
 #if defined(__SIZEOF_INT128__)
 typedef unsigned __int128 uint128_t;

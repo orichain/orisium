@@ -1,18 +1,7 @@
-#include <stdbool.h>
-#include <string.h>
-#include <stdint.h>
-#include <stdlib.h>
-
-#include "log.h"
-#include "constants.h"
 #include "ipc.h"
-#include "types.h"
-#include "utilities.h"
 #include "master/master.h"
-#include "master/ipc/handlers.h"
-#include "master/ipc/worker_ipc_cmds.h"
-#include "ipc/protocol.h"
-#include "pqc.h"
+#include "master/worker_ipc_cmds.h"
+#include "types.h"
 
 status_t handle_master_ipc_hello2(const char *label, master_context_t *master_ctx, worker_type_t rcvd_wot, uint8_t rcvd_index, worker_security_t *security, worker_rekeying_t *rekeying, const char *worker_name, int *worker_uds_fd, ipc_raw_protocol_t_status_t *ircvdi) {
     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(label, &master_ctx->oritlsf_pool,

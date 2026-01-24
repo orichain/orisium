@@ -1,9 +1,0 @@
-#ifndef MASTER_UDP_SOCKET_UDP_H
-#define MASTER_UDP_SOCKET_UDP_H
-
-#include "master/master.h"
-#include "types.h"
-
-status_t setup_master_socket_udp(const char *label, master_context_t *master_ctx);
-
-#endif

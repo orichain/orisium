@@ -1,22 +1,5 @@
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <unistd.h>
-
-#include "async.h"
-#include "utilities.h"
-#include "types.h"
-#include "constants.h"
-#include "pqc.h"
-#include "stdbool.h"
-#include "ipc.h"
 #include "workers/workers.h"
-#include "oritw.h"
-#include "oritw/timer_event.h"
-#include "log.h"
-#include "oritlsf.h"
+#include "types.h"
 
 status_t setup_worker(worker_context_t *ctx, const char *woname, worker_type_t *wot, uint8_t *index, int *master_uds_fd) {
     ctx->arena_buffer = (uint8_t *)calloc(1, WORKER_ARENA_SIZE);
@@ -153,8 +136,6 @@ void cleanup_worker(worker_context_t *ctx) {
     ctx->hello2_sent = false;
     ctx->hello2_ack_rcvd = false;
     ctx->is_rekeying = false;
-    ipc_cleanup_protocol_queue(&ctx->oritlsf_pool, &ctx->rekeying_queue_head, &ctx->rekeying_queue_tail);
-    async_delete_event(ctx->label, &ctx->async, ctx->master_uds_fd, EIT_FD);
     CLOSE_UDS(ctx->master_uds_fd);
     //----------------------------------------------------------------------
     if (ctx->heartbeat_timer_id.event) {

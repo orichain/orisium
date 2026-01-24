@@ -1,16 +1,10 @@
 #ifndef DATABASE_H
 #define DATABASE_H
 
-#include <stdio.h>
-#include <string.h>
-#include <lmdb.h>
-#include <stdint.h>
-
-#if defined(__OpenBSD__) || defined(__NetBSD__)
-#include <sys/mount.h>
-#endif
-
+#include "lmdb.h"
 #include "log.h"
+#include <string.h>
+#include <sys/mount.h>
 
 static inline int database_error(const char *label, int rc) {
     if (rc != MDB_SUCCESS)

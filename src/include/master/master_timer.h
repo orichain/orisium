@@ -1,21 +1,9 @@
 #ifndef MASTER_MASTER_TIMER_H
 #define MASTER_MASTER_TIMER_H
 
-#include <stdint.h>
-
-#include "log.h"
-#include "oritw.h"
-#include "types.h"
-#include "utilities.h"
+#include "master/worker_ipc_cmds.h"
 #include "master/master.h"
-#include "master/ipc/worker_ipc_cmds.h"
-#include "master/master_workers.h"
-#include "constants.h"
-#include "stdbool.h"
-#include "oritw/timer_event.h"
-#include "oritw/timer_id.h"
-#include "async.h"
-#include "oritlsf.h"
+#include "types.h"
 
 static inline status_t handle_master_timer_event(const char *label, master_context_t *master_ctx, int *current_fd, uint32_t *current_events) {
     if (*current_fd == master_ctx->timer.add_event_fd->event_id) {

@@ -1,35 +1,10 @@
 #ifndef ORILINK_ORILINK_H
 #define ORILINK_ORILINK_H
 
-#include <errno.h>
-
-#if defined(__clang__)
-#if __clang_major__ < 21
-#include <stdio.h>
-#endif
-#endif
-
-#include <string.h>
-#include <sys/types.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <sys/socket.h>
-
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-#include <sys/endian.h>
-#if defined(__clang__)
-#if __clang_major__ < 21
-#include <sys/errno.h>
-#endif
-#endif
-#elif defined(__FreeBSD__)
-#include <x86/endian.h>
-#else
-#include <endian.h>
-#endif
-
-#include "utilities.h"
-#include "orilink/protocol.h"
+#include "ipc/protocol.h"
+#include "log.h"
+#include "orilink/heartbeat.h"
+#include "orilink/heartbeat_ack.h"
 #include "orilink/hello1.h"
 #include "orilink/hello1_ack.h"
 #include "orilink/hello2.h"
@@ -38,17 +13,11 @@
 #include "orilink/hello3_ack.h"
 #include "orilink/hello4.h"
 #include "orilink/hello4_ack.h"
-#include "orilink/heartbeat.h"
-#include "orilink/heartbeat_ack.h"
 #include "orilink/info.h"
 #include "orilink/info_ack.h"
-#include "ipc/protocol.h"
-#include "types.h"
-#include "log.h"
-#include "constants.h"
-#include "pqc.h"
-#include "xorshiro128plus.h"
-#include "oritlsf.h"
+#include "orilink/protocol.h"
+#include "utilities.h"
+#include <stddef.h>
 
 static inline size_t calculate_orilink_payload_fixed_size(const char *label, orilink_protocol_type_t type, bool plus_header) {
 	size_t payload_fixed_size = 0;

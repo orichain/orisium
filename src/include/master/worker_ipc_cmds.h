@@ -1,25 +1,11 @@
 #ifndef MASTER_IPC_WORKER_IPC_CMDS_H
 #define MASTER_IPC_WORKER_IPC_CMDS_H
 
-#include <stdint.h>
-
-#include "orilink/protocol.h"
-#include "log.h"
-#include "constants.h"
-#include "types.h"
-#include "master/master.h"
 #include "ipc.h"
 #include "ipc/master_worker_info.h"
-#include "ipc/master_worker_hello1_ack.h"
-#include "ipc/master_worker_hello2_ack.h"
-#include "ipc/master_cow_connect.h"
-#include "stdbool.h"
-#include "ipc/udp_data.h"
-#include "ipc/udp_data_ack.h"
-#include "ipc/protocol.h"
-#include "ipc/worker_worker_info.h"
-
-struct sockaddr_in6;
+#include "master/master.h"
+#include "orilink/protocol.h"
+#include "types.h"
 
 static inline status_t master_worker_info(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index, info_type_t flag) {
     master_worker_session_t *session = get_master_worker_session(master_ctx, wot, index);

@@ -1,17 +1,11 @@
 #ifndef ORITLSF_H
 #define ORITLSF_H
 
-#include <stdio.h>
-#include <stdint.h>
-#include <stddef.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <string.h>
-
-#if defined(__NetBSD__)
-#include <sys/common_int_limits.h>
-#elif defined(__FreeBSD__)
-#include <x86/_stdint.h>
-#endif
 
 #define TLSF_DEBUG
 

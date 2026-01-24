@@ -1,24 +1,12 @@
 #ifndef WORKERS_WORKER_IPC_HEARTBEAT_H
 #define WORKERS_WORKER_IPC_HEARTBEAT_H
 
-#include <stdio.h>
-#include <stdint.h>
-
-#include "constants.h"
-#include "ipc/protocol.h"
-#include "log.h"
-#include "types.h"
-#include "workers/workers.h"
-#include "workers/worker_ipc.h"
-#include "utilities.h"
-#include "orilink/heartbeat.h"
-#include "orilink/protocol.h"
 #include "orilink.h"
-#include "stdbool.h"
-#include "orilink/heartbeat_ack.h"
+#include "orilink/heartbeat.h"
+#include "types.h"
 #include "workers/master_ipc_cmds.h"
-
-struct sockaddr_in6;
+#include "workers/worker_ipc.h"
+#include "workers/workers.h"
 
 static inline status_t send_heartbeat(worker_context_t *worker_ctx, void *xsession, orilink_protocol_type_t orilink_protocol) {
     worker_type_t wot = *worker_ctx->wot;

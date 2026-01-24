@@ -1,10 +1,9 @@
 #ifndef ORITW_TIMER_EVENT_H
 #define ORITW_TIMER_EVENT_H
 
-#include <stdint.h>
-
 #include "constants.h"
 #include "oritlsf.h"
+#include <stdint.h>
 
 typedef enum {
     TE_UNKNOWN = (uint8_t)0x00,

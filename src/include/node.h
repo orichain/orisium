@@ -1,22 +1,13 @@
 #ifndef NODE_H
 #define NODE_H
 
-#include <stdint.h>
-#include <string.h>
-#include <sys/errno.h>
-#include <lmdb.h>
-
-#if defined(__OpenBSD__) || defined(__NetBSD__)
-#include <sys/endian.h>
-#endif
-
-#include "types.h"
-#include "constants.h"
-#include "pqc.h"
 #include "database.h"
+#include "lmdb.h"
 #include "log.h"
-#include "oritlsf.h"
+#include "pqc.h"
+#include "types.h"
 #include "utilities.h"
+#include <stdint.h>
 
 typedef struct {
 	uint64_t no;

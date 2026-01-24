@@ -1,23 +1,11 @@
 #ifndef WORKERS_WORKER_TIMER_H
 #define WORKERS_WORKER_TIMER_H
 
-#include <stdint.h>
-
-#include "log.h"
-#include "oritw.h"
 #include "types.h"
-#include "utilities.h"
-#include "workers/workers.h"
+#include "workers/master_ipc_cmds.h"
 #include "workers/worker_ipc.h"
 #include "workers/worker_ipc_heartbeat.h"
-#include "constants.h"
-#include "orilink/protocol.h"
-#include "stdbool.h"
-#include "oritw/timer_event.h"
-#include "oritw/timer_id.h"
-#include "async.h"
-#include "oritlsf.h"
-#include "workers/master_ipc_cmds.h"
+#include "workers/workers.h"
 
 static inline status_t retry_transmit(
         worker_context_t *worker_ctx,

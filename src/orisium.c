@@ -1,41 +1,10 @@
+#include "master/master.h"
+#include "utilities.h"
+#include <stdio.h>
+
 #if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
 #include <pthread.h>
 #endif
-
-#include <string.h>
-#include <signal.h>
-#include <stdio.h>
-
-#if defined(__NetBSD__)
-#include <sys/signal.h>
-#if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
-#include <pthread_types.h>
-
-#include "globals.h"
-#endif
-#elif defined(__OpenBSD__)
-#include <sys/signal.h>
-#if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
-#include "globals.h"
-#endif
-#elif defined(__FreeBSD__)
-#include <sys/signal.h>
-#if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
-#include <sys/_pthreadtypes.h>
-
-#include "globals.h"
-#endif
-#else
-#if defined(PRODUCTION) || (defined(DEVELOPMENT) && defined(TOFILE))
-#include "globals.h"
-#endif
-#endif
-
-#include "log.h"
-#include "master/master.h"
-#include "utilities.h"
-#include "types.h"
-#include "constants.h"
 
 int main() {
 	printf("[Orisium]: ==========================================================\n");

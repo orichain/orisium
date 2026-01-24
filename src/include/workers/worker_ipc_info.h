@@ -1,23 +1,12 @@
 #ifndef WORKERS_WORKER_IPC_INFO_H
 #define WORKERS_WORKER_IPC_INFO_H
 
-#include <stdint.h>
-#include <string.h>
-
-#include "constants.h"
-#include "ipc/protocol.h"
-#include "log.h"
+#include "ipc.h"
+#include "node.h"
 #include "types.h"
 #include "workers/master_ipc_cmds.h"
-#include "utilities.h"
-#include "stdbool.h"
-#include "node.h"
-#include "globals.h"
-#include "ipc.h"
-#include "lmdb.h"
-#include "oritlsf.h"
-#include "pqc.h"
 #include "workers/workers.h"
+#include "globals.h"
 
 static inline status_t handle_master_workers_ipc_info(worker_context_t *worker_ctx, double *initial_delay_ms, ipc_raw_protocol_t_status_t *ircvdi) {
     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool,

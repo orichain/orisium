@@ -1,26 +1,15 @@
 #ifndef WORKERS_WORKERS_H
 #define WORKERS_WORKERS_H
 
-#include <netinet/in.h>
-#include <signal.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
-
 #include "async.h"
-#include "constants.h"
 #include "ipc/protocol.h"
 #include "kalman.h"
-#include "log.h"
 #include "orilink/protocol.h"
-#include "pqc.h"
-#include "stdbool.h"
-#include "utilities.h"
-#include "types.h"
 #include "oritw.h"
-#include "oritlsf.h"
 #include "oritw/timer_id.h"
-#include "oritw/timer_event.h"
+#include "types.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 typedef struct {
     double hb_interval;

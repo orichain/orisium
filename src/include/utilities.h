@@ -1,75 +1,32 @@
 #ifndef UTILITIES_H
 #define UTILITIES_H
 
-#include <aes.h>
+#include "aes.h"
+#include "constants.h"
+#include "fips202.h"
+#include "log.h"
+#include "oritlsf.h"
+#include "poly1305-donna.h"
+#include "randombytes.h"
+#include "types.h"
+#include "xorshiro128plus.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <fips202.h>
 #include <math.h>
 #include <netdb.h>
-
-#if defined(__NetBSD__)
-#ifndef AI_V4MAPPED
-#define AI_V4MAPPED 0
-#endif
-#if defined(__clang__)
-#if __clang_major__ < 21
-#include <sys/signal.h>
-#include <sys/errno.h>
-#endif
-#endif
-#include <sys/time.h>
-#include <sys/endian.h>
-#include <sys/common_int_limits.h>
-#elif defined(__OpenBSD__)
-#ifndef AI_V4MAPPED
-#define AI_V4MAPPED 0
-#endif
-#if defined(__clang__)
-#if __clang_major__ < 21
-#include <sys/signal.h>
-#include <sys/errno.h>
-#endif
-#endif
-#include <sys/_time.h>
-#include <sys/endian.h>
-#elif defined(__FreeBSD__)
-#if defined(__clang__)
-#if __clang_major__ < 21
-#include <sys/signal.h>
-#endif
-#endif
-#include <sys/_clock_id.h>
-#include <x86/endian.h>
-#include <strings.h>
-#include <x86/_stdint.h>
-#else
-#include <endian.h>
-#include <stddef.h>
-#endif
-
 #include <netinet/in.h>
-#include <randombytes.h>
 #include <signal.h>
-#include <stdbool.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <sys/wait.h>
 #include <time.h>
-#include <unistd.h>
+#include <sys/stat.h>
 
-#include "constants.h"
-#include "log.h"
-#include "poly1305-donna.h"
-#include "types.h"
-#include "oritlsf.h"
-#include "xorshiro128plus.h"
+#ifndef AI_V4MAPPED
+#define AI_V4MAPPED 0
+#endif
 
 static inline void insertion_sort_uint64(uint64_t *arr, size_t n) {
     for (size_t i = 1; i < n; ++i) {

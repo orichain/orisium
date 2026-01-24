@@ -1,23 +1,8 @@
-#include <netdb.h>
-#include <netinet/in.h>
-#include <stdlib.h>
-#include <string.h>
-
-#if defined(__FreeBSD__)
-#include <arpa/inet.h>
-#endif
-
-#include "log.h"
-#include "orilink.h"
-#include "types.h"
 #include "master/master.h"
-#include "master/master_worker_metrics.h"
-#include "master/master_worker_selector.h"
-#include "constants.h"
-#include "stdbool.h"
-#include "master/ipc/worker_ipc_cmds.h"
-#include "utilities.h"
+#include "master/worker_ipc_cmds.h"
+#include "orilink.h"
 #include "orilink/protocol.h"
+#include "types.h"
 
 status_t handle_master_udp_sock_event(
     const char *label,

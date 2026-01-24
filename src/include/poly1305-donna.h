@@ -2,7 +2,6 @@
 #define POLY1305_DONNA_H
 
 #include <stddef.h>
-
 typedef struct poly1305_context {
 	size_t aligner;
 	unsigned char opaque[136];

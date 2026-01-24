@@ -1,20 +1,12 @@
 #ifndef ORILINK_PROTOCOL_H
 #define ORILINK_PROTOCOL_H
 
-#if defined(__clang__)
-#if __clang_major__ < 21
-#include <stdio.h>
-#endif
-#endif
-
-#include <netinet/in.h>
-#include <stdint.h>
-#include <string.h>
-
 #include "constants.h"
+#include "oritlsf.h"
 #include "pqc.h"
 #include "types.h"
-#include "oritlsf.h"
+#include <netinet/in.h>
+#include <stdint.h>
 
 typedef enum {
     ORILINK_HELLO1 = (uint8_t)0x00,

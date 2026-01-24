@@ -1,21 +1,10 @@
 #ifndef ORILINK_HELLO4_H
 #define ORILINK_HELLO4_H
 
-#if defined(__clang__)
-#if __clang_major__ < 21
-#include <stdio.h>
-#endif
-#endif
-
-#include <string.h>
-#include <stdint.h>
-
-#include "utilities.h"
+#include "log.h"
 #include "orilink/protocol.h"
 #include "types.h"
-#include "log.h"
-#include "constants.h"
-#include "oritlsf.h"
+#include "utilities.h"
 
 static inline status_t orilink_serialize_hello4(const char *label, const orilink_hello4_t* payload, uint8_t* current_buffer, size_t buffer_size, size_t* offset) {
     if (!payload || !current_buffer || !offset) {

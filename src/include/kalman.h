@@ -1,15 +1,12 @@
 #ifndef KALMAN_H
 #define KALMAN_H
 
+#include "oritlsf.h"
+#include "types.h"
+#include "utilities.h"
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <math.h>
-
-#include "utilities.h"
-#include "constants.h"
-#include "log.h"
-#include "types.h"
-#include "oritlsf.h"
 
 typedef struct {
     float state_estimate;

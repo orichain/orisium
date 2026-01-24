@@ -1,13 +1,5 @@
-#include <netinet/in.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-
-#include "log.h"
-#include "utilities.h"
-#include "types.h"
-#include "master/udp/socket_udp.h"
 #include "master/master.h"
+#include "types.h"
 
 status_t setup_master_socket_udp(const char *label, master_context_t *master_ctx) {
     struct sockaddr_in6 ipv6_addr;

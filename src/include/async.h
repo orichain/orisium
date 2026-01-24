@@ -1,34 +1,16 @@
 #ifndef ASYNC_H
 #define ASYNC_H
 
-#include <errno.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <string.h>
-#include <sys/types.h>
-#include <unistd.h>
-
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-#include <sys/event.h>
-#if defined(__clang__)
-#if __clang_major__ < 21
-#include <sys/errno.h>
-#endif
-#endif
-#elif defined(__FreeBSD__)
-#include <sys/event.h>
-#else
-#include <time.h>
-#include <sys/epoll.h>
-#include <sys/eventfd.h>
-#include <sys/timerfd.h>
-#endif
-
 #include "constants.h"
 #include "log.h"
-#include "types.h"
 #include "oritlsf.h"
+#include "types.h"
 #include "utilities.h"
+#include <errno.h>
+#include <stdbool.h>
+#include <sys/types.h>
+#include <sys/event.h>
+#include <unistd.h>
 
 #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
 typedef struct {

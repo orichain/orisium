@@ -1,16 +1,10 @@
 #ifndef ORITW_MIN_HEAP_H
 #define ORITW_MIN_HEAP_H
 
+#include "constants.h"
+#include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
-
-#if defined(__OpenBSD__)
-#include <sys/limits.h>
-#else
-#include <limits.h>
-#endif
-
-#include "constants.h"
 
 typedef struct {
     uint64_t expiration_tick;

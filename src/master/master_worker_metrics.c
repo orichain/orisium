@@ -1,11 +1,7 @@
+#include "master/master.h"
 #include <stdint.h>
 
-#include "constants.h"
-#include "utilities.h"
-#include "types.h"
-#include "master/master.h"
-
-double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_type_t wot, int index) {
+double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_type_t wot, uint8_t index) {
     int worker_type_id = (int)wot;
     const double MAX_INITIAL_DELAY_MS = (double)WORKER_HEARTBEAT_INTERVAL * 1000.0;
     double initial_delay_ms = (double)worker_type_id * index * INITIAL_MILISECONDS_PER_UNIT;
@@ -30,7 +26,7 @@ double initialize_metrics(const char *label, worker_metrics_t* metrics, worker_t
     return initial_delay_ms;
 }
 
-status_t new_task_metrics(const char *label, master_context_t *master_ctx, worker_type_t wot, int index) {
+status_t new_task_metrics(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
     uint64_t_status_t rt = get_monotonic_time_ns(label);
     if (rt.status != SUCCESS) return rt.status;
     worker_metrics_t *metrics = NULL;

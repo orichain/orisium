@@ -1,46 +1,11 @@
-#include <netinet/in.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
-
-#if defined(__NetBSD__)
-#include <sys/endian.h>
-#elif defined(__OpenBSD__)
-#include <sys/endian.h>
-#elif defined(__FreeBSD__)
-#include <x86/endian.h>
-#else
-#include <endian.h>
-#endif
-
-#include "constants.h"
 #include "ipc.h"
-#include "ipc/protocol.h"
-#include "log.h"
 #include "orilink.h"
-#include "orilink/heartbeat.h"
 #include "orilink/hello1.h"
-#include "orilink/hello1_ack.h"
-#include "orilink/hello2.h"
-#include "orilink/hello2_ack.h"
-#include "orilink/hello3.h"
-#include "orilink/hello3_ack.h"
-#include "orilink/hello4.h"
-#include "orilink/hello4_ack.h"
-#include "orilink/protocol.h"
-#include "pqc.h"
-#include "stdbool.h"
 #include "types.h"
-#include "utilities.h"
-#include "workers/workers.h"
-#include "workers/worker_ipc_heartbeat.h"
-#include "xorshiro128plus.h"
-#include "workers/worker_ipc.h"
-#include "workers/worker_ipc_info.h"
 #include "workers/master_ipc_cmds.h"
-#include "oritw.h"
-#include "oritlsf.h"
+#include "workers/worker_ipc_heartbeat.h"
+#include "workers/worker_ipc_info.h"
+#include "workers/workers.h"
 
 status_t handle_workers_ipc_cow_connect(worker_context_t *worker_ctx, void **worker_sessions, ipc_raw_protocol_t_status_t *ircvdi) {
     ipc_protocol_t_status_t deserialized_ircvdi = ipc_deserialize(worker_ctx->label, &worker_ctx->oritlsf_pool,
