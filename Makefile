@@ -5,7 +5,6 @@ OBJ_DIR = obj
 ROOT_DIR := $(shell pwd)
 CC = $(ROOT_DIR)/clang
 CXX = $(ROOT_DIR)/clang++
-PY = $(ROOT_DIR)/python
 
 LMDB_CFLAGS :=
 LMDB_LIBS := -llmdb
@@ -84,22 +83,9 @@ PQCLEAN_KEM_LIB_NAME = libml-kem-1024_clean.a
 PQCLEAN_KEM_LIB_PATH = $(PQCLEAN_KEM_DIR)/$(PQCLEAN_KEM_LIB_NAME)
 
 # =============================
-# IWYU Configuration
-# =============================
-IWYU_DIR := iwyu
-IWYU_BUILD := build
-IWYU_BUILD_PATH := $(IWYU_DIR)/$(IWYU_BUILD)
-IWYU_BIN_PATH := $(IWYU_BUILD_PATH)/bin/include-what-you-use
-
-EXCLUDED_DIRS := PQClean iwyu
-EXCLUDE_PATHS := $(foreach dir,$(EXCLUDED_DIRS),-path ./$(dir) -prune -o)
-CFILES := $(shell find . $(EXCLUDE_PATHS) -name '*.c' -print)
-HFILES := $(shell find . $(EXCLUDE_PATHS) -name '*.h' -print)
-
-# =============================
 # Build Targets
 # =============================
-.PHONY: clean all debug check_iwyu_h check_iwyu_c
+.PHONY: clean all debug
 
 define install_pkg
 	@echo ">> Memeriksa: $(1)"
@@ -159,13 +145,6 @@ ifeq ($(DISTRO_ID),netbsd)
 	fi
 	$(call install_pkg,lmdb)
 	$(call install_pkg,pkg-config)
-	$(call install_pkg,python312)
-	@if [ ! -e $(PY) ]; then \
-		echo ">> Membuat symlink $(PY)..."; \
-		$(USE_SUDO) ln -s /usr/pkg/bin/python3.12 $(PY); \
-	else \
-		echo ">> $(PY) sudah ada."; \
-	fi
 else ifeq ($(DISTRO_ID),freebsd)
 	@if [ ! -e $(CC) ]; then \
 		$(USE_SUDO) $(PKG_MANAGER) install -y llvm; \
@@ -182,14 +161,8 @@ else ifeq ($(DISTRO_ID),freebsd)
 	fi
 	$(call install_pkg,lmdb)
 	$(call install_pkg,pkgconf)
-	$(call install_pkg,python3)
-	@if [ ! -e $(PY) ]; then \
-		echo ">> Membuat symlink $(PY)..."; \
-		$(USE_SUDO) ln -s /usr/local/bin/python3 $(PY); \
-	else \
-		echo ">> $(PY) sudah ada."; \
-	fi
 else ifeq ($(DISTRO_ID),openbsd)
+	$(call install_pkg,clang-tools-extra-21.1.2)
 	@if [ ! -e $(CC) ]; then \
 		echo ">> Membuat symlink $(CC)..."; \
 		$(USE_SUDO) ln -s /usr/local/bin/clang-21 $(CC); \
@@ -210,18 +183,6 @@ else ifeq ($(DISTRO_ID),openbsd)
 	$(call install_pkg,lmdb)
 	$(call install_pkg,bear)
 	$(call install_pkg,spdlog)
-	if [ ! -e $(PY) ]; then \
-		echo "========================="; \
-		echo "!!--- PILIH python3 ---!!"; \
-		echo "========================="; \
-	fi
-	$(call install_pkg,python)
-	@if [ ! -e $(PY) ]; then \
-		echo ">> Membuat symlink $(PY)..."; \
-		$(USE_SUDO) ln -s /usr/local/bin/python3 $(PY); \
-	else \
-		echo ">> $(PY) sudah ada."; \
-	fi
 else ifeq ($(DISTRO_ID),rocky)
 	$(call install_pkg,dnf-plugins-core)
 	$(USE_SUDO) dnf config-manager --set-enabled crb
@@ -244,24 +205,17 @@ else ifeq ($(DISTRO_ID),rocky)
 	$(call install_pkg,lmdb-libs)
 	$(call install_pkg,lmdb-devel)
 	$(call install_pkg,pkg-config)
-	$(call install_pkg,python3)
-	@if [ ! -e $(PY) ]; then \
-		echo ">> Membuat symlink $(PY)..."; \
-		$(USE_SUDO) ln -s /usr/bin/python3 $(PY); \
-	else \
-		echo ">> $(PY) sudah ada."; \
-	fi
 endif
 
 dev:
-	$(MAKE) check_iwyu_h check_iwyu_c $(TARGET)
+	$(MAKE) $(TARGET)
 	@echo "-------------------------------------"
 	@echo "orisium dikompilasi dalam mode DEVELOPMENT!"
 	@echo "Executable: $(TARGET)"
 	@echo "-------------------------------------"
 
 prod:
-	$(MAKE) check_iwyu_h check_iwyu_c $(TARGET) BUILD_MODE=PRODUCTION
+	$(MAKE) $(TARGET) BUILD_MODE=PRODUCTION
 	@echo "-------------------------------------"
 	@echo "orisium dikompilasi dalam mode PRODUCTION!"
 	@echo "Executable: $(TARGET)"
@@ -315,117 +269,6 @@ $(PQCLEAN_KEM_LIB_PATH):
 		$(MAKE) CC=$(CC) CXX=$(CXX) -C $(PQCLEAN_KEM_DIR); \
 	else \
 		echo "Library sudah ada: $@"; \
-	fi
-
-# =============================
-# IWYU Check
-# =============================
-check_iwyu_c: $(IWYU_BIN_PATH)
-	@echo "Menjalankan IWYU untuk *.c (kecuali: $(EXCLUDED_DIRS))..."
-	@rm -f iwyu_failed_c.log iwyu_applied_c.log
-	@for file in $(CFILES); do \
-		echo "file: $$file"; \
-		$(IWYU_BIN_PATH) $(FINAL_CFLAGS) "$$file" > /tmp/iwyu.tmp 2>&1; \
-		if grep -q "should" /tmp/iwyu.tmp; then \
-			echo "IWYU error in $$file" | tee -a iwyu_failed_c.log; \
-			cat /tmp/iwyu.tmp >> iwyu_failed_c.log; \
-			echo "" >> iwyu_failed_c.log; \
-			$(PY) $(IWYU_DIR)/fix_includes.py < /tmp/iwyu.tmp >> iwyu_applied_c.log 2>&1; \
-			echo "FIX applied to $$file" >> iwyu_applied_c.log; \
-		else \
-			echo "Tidak ada masalah di $$file."; \
-		fi; \
-		rm -f /tmp/iwyu.tmp; \
-	done; \
-	if [ -f iwyu_failed_c.log ]; then \
-		echo "IWYU sudah diperbaiki secara otomatis, log: iwyu_applied_c.log"; \
-	else \
-		echo "Semua file bersih dari masalah IWYU."; \
-	fi
-
-check_iwyu_h: $(IWYU_BIN_PATH)
-	@echo "Menjalankan IWYU untuk *.h (kecuali: $(EXCLUDED_DIRS))..."
-	@rm -f iwyu_failed_h.log iwyu_applied_h.log
-	@for file in $(HFILES); do \
-		echo "file: $$file"; \
-		$(IWYU_BIN_PATH) $(FINAL_CFLAGS) "$$file" > /tmp/iwyu.tmp 2>&1; \
-		if grep -q "should" /tmp/iwyu.tmp; then \
-			echo "IWYU error in $$file" | tee -a iwyu_failed_h.log; \
-			cat /tmp/iwyu.tmp >> iwyu_failed_h.log; \
-			echo "" >> iwyu_failed_h.log; \
-			$(PY) $(IWYU_DIR)/fix_includes.py < /tmp/iwyu.tmp >> iwyu_applied_h.log 2>&1; \
-			echo "FIX applied to $$file" >> iwyu_applied_h.log; \
-		else \
-			echo "Tidak ada masalah di $$file."; \
-		fi; \
-		rm -f /tmp/iwyu.tmp; \
-	done; \
-	if [ -f iwyu_failed_h.log ]; then \
-		echo "IWYU sudah diperbaiki secara otomatis, log: iwyu_applied_h.log"; \
-	else \
-		echo "Semua file bersih dari masalah IWYU."; \
-	fi
-
-# =============================
-# Bangun IWYU (jika belum ada)
-# =============================
-$(IWYU_BIN_PATH):
-	@echo "Membangun IWYU..."
-	@if [ ! -f "$(IWYU_BIN_PATH)" ]; then \
-		echo "Membangun dari sumber..."; \
-		echo "Memeriksa dan menginstall dependensi IWYU untuk distro $(DISTRO_ID) menggunakan $(PKG_MANAGER)..."; \
-		if [ "$(PKG_MANAGER)" = "unsupported" ]; then \
-			echo "Tidak bisa install dependensi. Distribusi tidak didukung."; \
-			exit 1; \
-		elif [ "$(PKG_MANAGER)" = "pkgin" ]; then \
-			$(USE_SUDO) $(PKG_MANAGER) update && $(USE_SUDO) $(PKG_MANAGER) -y install wget cmake; \
-		elif [ "$(PKG_MANAGER)" = "pkg" ]; then \
-			$(USE_SUDO) $(PKG_MANAGER) update && $(USE_SUDO) $(PKG_MANAGER) install -y wget cmake; \
-		elif [ "$(PKG_MANAGER)" = "pkg_add" ]; then \
-			$(USE_SUDO) $(PKG_MANAGER) -u && $(USE_SUDO) $(PKG_MANAGER) wget gtar cmake; \
-		elif [ "$(PKG_MANAGER)" = "dnf" ]; then \
-			$(USE_SUDO) $(PKG_MANAGER) update && $(USE_SUDO) $(PKG_MANAGER) -y install wget cmake clang-devel llvm-devel; \
-		fi; \
-		\
-		CLANG_MAJOR_VER=$$($(CC) --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \
-		IWYU_VER=$$(expr $$CLANG_MAJOR_VER + 4); \
-		echo "Deteksi Clang versi $$CLANG_MAJOR_VER"; \
-		\
-		LLVM_ROOT=$$(if [ "$(DISTRO_ID)" = "freebsd" ] || [ "$(DISTRO_ID)" = "openbsd" ]; \
-			then echo "/usr/local/llvm$$CLANG_MAJOR_VER"; \
-			else echo "/usr"; \
-			fi); \
-		LLVM_CMAKE_DIR=$$(if [ "$(DISTRO_ID)" = "freebsd" ] || [ "$(DISTRO_ID)" = "openbsd" ]; \
-			then echo "$$LLVM_ROOT/lib/cmake/llvm"; \
-			else echo "/usr/lib64/cmake/llvm"; \
-			fi); \
-		CLANG_CMAKE_DIR=$$(if [ "$(DISTRO_ID)" = "freebsd" ] || [ "$(DISTRO_ID)" = "openbsd" ]; \
-			then echo "$$LLVM_ROOT/lib/cmake/clang"; \
-			else echo ""; \
-			fi); \
-		\
-		wget -q -O iwyu.tar.gz https://github.com/include-what-you-use/include-what-you-use/archive/refs/tags/0.$$IWYU_VER.tar.gz; \
-		if [ "$(DISTRO_ID)" = "openbsd" ]; then \
-			gtar -xzf iwyu.tar.gz -C iwyu --strip-components=1; \
-		else \
-			tar -xzf iwyu.tar.gz -C iwyu --strip-components=1; \
-		fi; \
-		rm -f iwyu.tar.gz && \
-		cd $(IWYU_DIR) && \
-		mkdir -p $(IWYU_BUILD) && \
-		cd $(IWYU_BUILD) && \
-		cmake \
-		-G "Unix Makefiles" \
-		-DCMAKE_C_COMPILER=$(CC) \
-		-DCMAKE_CXX_COMPILER=$(CXX) \
-		-DCMAKE_BUILD_TYPE="Release" \
-		-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-		-DLLVM_DIR=$$LLVM_CMAKE_DIR \
-		$$( [ -n "$$CLANG_CMAKE_DIR" ] && echo "-DClang_DIR=$$CLANG_CMAKE_DIR" ) \
-		.. && \
-		$(MAKE) -j2; \
-	else \
-		echo "IWYU sudah tersedia."; \
 	fi
 
 # =============================
