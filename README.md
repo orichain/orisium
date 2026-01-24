@@ -13,6 +13,11 @@ git submodule update --init --recursive
 gmake clean debug
 ```
 
+Installing neovim
+
+```bash
+./install-ori-nvim.sh
+```
 -----
 
 ## License
