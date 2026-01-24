@@ -192,7 +192,7 @@ else ifeq ($(DISTRO_ID),freebsd)
 else ifeq ($(DISTRO_ID),openbsd)
 	@if [ ! -e $(CC) ]; then \
 		echo ">> Membuat symlink $(CC)..."; \
-		$(USE_SUDO) ln -s /usr/bin/clang $(CC); \
+		$(USE_SUDO) ln -s /usr/local/bin/clang-21 $(CC); \
 		CLLVMVER=$$($(CC) --version | head -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)\..*/\1/'); \
 		echo "================================"; \
 		echo "!!--- PILIH llvm$$CLLVMVER ---!!"; \
@@ -203,7 +203,7 @@ else ifeq ($(DISTRO_ID),openbsd)
 	fi
 	@if [ ! -e $(CXX) ]; then \
 		echo ">> Membuat symlink $(CXX)..."; \
-		$(USE_SUDO) ln -s /usr/bin/clang++ $(CXX); \
+		$(USE_SUDO) ln -s /usr/local/bin/clang++-21 $(CXX); \
 	else \
 		echo ">> $(CXX) sudah ada."; \
 	fi
