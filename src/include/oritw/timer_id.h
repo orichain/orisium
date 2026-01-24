@@ -2,7 +2,6 @@
 #define ORITW_TIMER_ID_H
 
 #include <stdint.h>
-#include <stddef.h>
 
 #include "oritw/timer_event.h"
 #include "oritlsf.h"

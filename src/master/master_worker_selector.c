@@ -1,5 +1,4 @@
 #include <float.h>
-#include <stddef.h>
 #include <stdint.h>
 
 #if defined(__OpenBSD__)

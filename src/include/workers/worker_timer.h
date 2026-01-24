@@ -1,7 +1,6 @@
 #ifndef WORKERS_WORKER_TIMER_H
 #define WORKERS_WORKER_TIMER_H
 
-#include <stddef.h>
 #include <stdint.h>
 
 #include "log.h"

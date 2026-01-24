@@ -1,7 +1,6 @@
 #ifndef MASTER_MASTER_TIMER_H
 #define MASTER_MASTER_TIMER_H
 
-#include <stddef.h>
 #include <stdint.h>
 
 #include "log.h"

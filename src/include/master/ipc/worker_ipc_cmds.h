@@ -2,7 +2,6 @@
 #define MASTER_IPC_WORKER_IPC_CMDS_H
 
 #include <stdint.h>
-#include <stddef.h>
 
 #include "orilink/protocol.h"
 #include "log.h"

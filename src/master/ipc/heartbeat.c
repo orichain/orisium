@@ -1,5 +1,4 @@
 #include <stdint.h>
-#include <stddef.h>
 
 #include "log.h"
 #include "ipc.h"

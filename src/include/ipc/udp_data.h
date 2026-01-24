@@ -9,7 +9,6 @@
 
 #include <string.h>
 #include <stdint.h>
-#include <errno.h>
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <sys/endian.h>

@@ -6,7 +6,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <sys/types.h>
-#include <stddef.h>
 
 #include "async.h"
 #include "ipc/protocol.h"

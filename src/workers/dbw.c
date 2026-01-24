@@ -1,5 +1,4 @@
 #include <stdint.h>
-#include <stddef.h>
 
 #include "async.h"
 #include "types.h"

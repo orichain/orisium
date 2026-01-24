@@ -1,9 +1,7 @@
-#include <errno.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdlib.h>
 #include <string.h>
-#include <inttypes.h>
 
 #if defined(__FreeBSD__)
 #include <arpa/inet.h>
