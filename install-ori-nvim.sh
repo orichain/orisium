@@ -7,7 +7,7 @@ rm -rf ~/.config/nvim \
   ~/.cache/nvim
 
 echo "==> Installing packages..."
-doas pkg_add neovim unzip luarocks-lua51 git bear spdlog clang-tools-extra
+doas pkg_add neovim unzip luarocks-lua51 git bear spdlog clang-tools-extra xclip
 
 echo "==> Installing Nerd Font (0xProto)..."
 mkdir -p ~/.local/share/fonts
