@@ -51,7 +51,7 @@ elif [ "$DISTRO_ID" = "rocky" ]; then
     sudo dnf install -y https://dl.rockylinux.org/pub/rocky/9/devel/x86_64/os/Packages/p/protobuf-3.14.0-16.el9.x86_64.rpm
     sudo dnf install -y https://dl.rockylinux.org/pub/rocky/9/devel/x86_64/os/Packages/p/protobuf-compiler-3.14.0-16.el9.x86_64.rpm
     curl -L https://github.com/fcying/compiledb-go/releases/download/v1.5.2/compiledb-linux-amd64.txz -o compiledb.txz
-    sudo dnf -y bear
+    sudo dnf -y install bear
 else
     echo "Not Automaticly Support For Distro [$DISTRO_ID]."
     exit 1
