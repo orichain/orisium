@@ -455,7 +455,7 @@ static inline et_result_t async_write_event(oritlsf_pool_t *oritlsf_pool, async_
 #else
         EV_SET(&async->event_change[0], et_buffered_event_id->event_id, EVFILT_USER, 0, NOTE_TRIGGER, 0, NULL);
         if (kevent(async->async_fd, &async->event_change[0], 1, NULL, 0, NULL) == -1) {
-            wetr.failure = true
+            wetr.failure = true;
             wetr.partial = true;
             wetr.status = FAILURE;
             return wetr;
