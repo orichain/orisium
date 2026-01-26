@@ -6,6 +6,11 @@
 #include <string.h>
 #include <sys/mount.h>
 
+#if defined (__linux__)
+#include <sys/statfs.h>
+#include <stdint.h>
+#endif
+
 static inline int database_error(const char *label, int rc) {
     if (rc != MDB_SUCCESS)
         LOG_ERROR("%sLMDB error %d: %s", label, rc, mdb_strerror(rc));

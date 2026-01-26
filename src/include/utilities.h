@@ -1,6 +1,12 @@
 #ifndef UTILITIES_H
 #define UTILITIES_H
 
+#if defined(__linux__)
+#include <sys/random.h>
+#else
+#define AI_V4MAPPED 0
+#endif
+
 #include "aes.h"
 #include "constants.h"
 #include "fips202.h"
@@ -23,10 +29,6 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <sys/stat.h>
-
-#ifndef AI_V4MAPPED
-#define AI_V4MAPPED 0
-#endif
 
 static inline void insertion_sort_uint64(uint64_t *arr, size_t n) {
     for (size_t i = 1; i < n; ++i) {
@@ -512,7 +514,11 @@ static inline bool is_gc_ctr(const char* label, oritlsf_pool_t *pool, uint8_t *d
 
 static inline double add_jitter(double value) {
     uint64_t r;
+#if defined(__linux__)
+    getrandom(&r, sizeof(r), 0);
+#else
     arc4random_buf(&r, sizeof(r));
+#endif
     double jitter_amount = (((double)r * 0x1p-64) / RAND_MAX_DOUBLE * JITTER_PERCENTAGE * 2) - JITTER_PERCENTAGE;
     value *= (1.0 + jitter_amount);
     return value;
@@ -812,7 +818,7 @@ static inline bool convert_ipv4_to_v4mapped_v6(
     dst->sin6_addr.s6_addr[10] = 0xff;
     dst->sin6_addr.s6_addr[11] = 0xff;
     memcpy(&dst->sin6_addr.s6_addr[12], &src->sin_addr.s_addr, 4);
-#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+#if !defined(__linux__)
     dst->sin6_len = sizeof(*dst);
 #endif
     return true;

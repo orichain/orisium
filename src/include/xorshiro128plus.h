@@ -1,6 +1,10 @@
 #ifndef XOROSHIRO128PLUS_H
 #define XOROSHIRO128PLUS_H
 
+#if defined (__linux__)
+#include <endian.h>
+#endif
+
 #include "randombytes.h"
 #include <stdbool.h>
 #include <stdint.h>
