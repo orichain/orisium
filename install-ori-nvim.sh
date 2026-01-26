@@ -71,5 +71,5 @@ git clone https://github.com/nvim-treesitter/nvim-treesitter.git ~/.local/share/
 echo "==> Syncing plugins (please wait)..."
 nvim --headless "+Lazy! sync" +qa
 echo "==> Done. Launching nvim..."
-exec nvim src/orisium.c
+exec nvim
 
