@@ -16,6 +16,7 @@ async_type_t *master_async = NULL;
 MDB_env *g_nodekeys_env = NULL;
 MDB_dbi g_nodekeys_keys = 0;
 MDB_env *g_database_env = NULL;
+MDB_dbi g_database_pkhash = 0;
 MDB_dbi g_database_era = 0;
 //======================================================================
 
@@ -38,6 +39,7 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
 	database_init_env(label, &g_nodekeys_env, NODEKEYS_PATH, NODEKEYS_MAPSIZE, NODEKEYS_TABLES);
 	database_open(label, g_nodekeys_env, &g_nodekeys_keys, NODEKEYS_NODEKEYS_NAME, flags);
 	database_init_env(label, &g_database_env, DATABASE_PATH, DATABASE_MAPSIZE, DATABASE_TABLES);
+    database_open(label, g_database_env, &g_database_pkhash, DATABASE_ERA_NAME, 0);
 	database_open(label, g_database_env, &g_database_era, DATABASE_ERA_NAME, flags);
     master_ctx->arena_buffer = (uint8_t *)calloc(1, MASTER_ARENA_SIZE);
     int result = oritlsf_setup_pool(&master_ctx->oritlsf_pool, master_ctx->arena_buffer, MASTER_ARENA_SIZE);
@@ -488,6 +490,7 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
         LOG_ERROR("%sFailed To oritlsf_cleanup_pool.", label);
     }
     free(master_ctx->arena_buffer);
+    database_close(g_database_env, g_database_pkhash);
     database_close(g_database_env, g_database_era);
     database_deinit_env(label, &g_database_env);
     database_close(g_nodekeys_env, g_nodekeys_keys);

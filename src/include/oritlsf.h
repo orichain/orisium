@@ -7,9 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define TLSF_DEBUG
-
-#if defined(TLSF_DEBUG)
+#if defined(DEVELOPMENT)
 static const size_t FOOTER_SIZE = sizeof(uint64_t);
 #define GUARD_MAGIC 0xDEADBEEFABADBABEULL
 #else
@@ -58,7 +56,7 @@ typedef struct block_header_t {
     struct block_header_t *prev_free;
     size_t size;
     uint8_t status;
-#if defined(TLSF_DEBUG)
+#if defined(DEVELOPMENT)
     uint8_t debugging[TLSF_BLOCKHEADER_DEBUGGING_LEN];
 #endif
     uint8_t padding[TLSF_BLOCKHEADER_PADDING_LEN];
@@ -123,7 +121,7 @@ static inline void get_indices(size_t size, int *out_fl, int *out_sl) {
     }
 }
 
-#if defined(TLSF_DEBUG)
+#if defined(DEVELOPMENT)
 static inline void write_footer_guard(const oritlsf_pool_t *pool, block_header_t *block) {
     if (!pool || !block) return;
     if (block->size < OVERHEAD + FOOTER_SIZE) return;
@@ -174,7 +172,7 @@ static inline void tlsf_insert_block(oritlsf_pool_t *pool, block_header_t *block
     pool->fl_bitmap |= ((size_t)1 << fli);
     pool->sl_bitmap[fli] |= ((size_t)1 << sli);
 
-#if defined(TLSF_DEBUG)
+#if defined(DEVELOPMENT)
     write_footer_guard(pool, block);
 #endif
     link_next_phys(pool, block);
@@ -248,7 +246,7 @@ static inline int tlsf_add_pool(oritlsf_pool_t *pool, uint8_t *buffer, size_t si
     initial->next_free = initial->prev_free = NULL;
 
     sentinel->prev_phys_block = initial;
-#if defined(TLSF_DEBUG)
+#if defined(DEVELOPMENT)
     write_footer_guard(pool, initial);
 #endif
 
@@ -333,7 +331,7 @@ static inline void *oritlsf_malloc(const char *label, oritlsf_pool_t *pool, size
                 }
 
                 block->size = required;
-#if defined(TLSF_DEBUG)
+#if defined(DEVELOPMENT)
                 write_footer_guard(pool, block);
                 write_footer_guard(pool, new_free);
 #endif
@@ -344,7 +342,7 @@ static inline void *oritlsf_malloc(const char *label, oritlsf_pool_t *pool, size
     }
 
     block->status = 1;
-#if defined(TLSF_DEBUG)
+#if defined(DEVELOPMENT)
     snprintf((char *)block->debugging, TLSF_BLOCKHEADER_DEBUGGING_LEN, "%s", label);
     write_footer_guard(pool, block);
 #endif
@@ -370,7 +368,7 @@ static inline void oritlsf_free(oritlsf_pool_t *pool, void **pptr) {
             tlsf_remove_block(pool, prev);
             prev->size = prev->size + coalesce->size;
             coalesce = prev;
-#if defined(TLSF_DEBUG)
+#if defined(DEVELOPMENT)
             write_footer_guard(pool, coalesce);
 #endif
         }
@@ -383,7 +381,7 @@ static inline void oritlsf_free(oritlsf_pool_t *pool, void **pptr) {
             if (coalesce->size < SIZE_MAX - next->size) {
                 tlsf_remove_block(pool, next);
                 coalesce->size = coalesce->size + next->size;
-#if defined(TLSF_DEBUG)
+#if defined(DEVELOPMENT)
                 write_footer_guard(pool, coalesce);
 #endif
             }
@@ -422,7 +420,7 @@ static inline void *oritlsf_realloc(const char *file_name, int line_num, oritlsf
         return NULL;
     }
 
-#if defined(TLSF_DEBUG)
+#if defined(DEVELOPMENT)
     uint8_t *footer_ptr = (uint8_t*)block + block->size - FOOTER_SIZE;
     if (!in_pool(pool, footer_ptr) || footer_ptr + FOOTER_SIZE > pool->pool_end) return NULL;
     if (*(const uint64_t*)footer_ptr != GUARD_MAGIC) return NULL;
@@ -461,7 +459,7 @@ static inline void *oritlsf_realloc(const char *file_name, int line_num, oritlsf
                     }
 
                     block->size = required;
-#if defined(TLSF_DEBUG)
+#if defined(DEVELOPMENT)
                     write_footer_guard(pool, block);
                     write_footer_guard(pool, new_free);
 #endif
@@ -470,7 +468,7 @@ static inline void *oritlsf_realloc(const char *file_name, int line_num, oritlsf
                 }
             }
         }
-#if defined(TLSF_DEBUG)
+#if defined(DEVELOPMENT)
         write_footer_guard(pool, block);
 #endif
         return ptr;
@@ -501,7 +499,7 @@ static inline void *oritlsf_realloc(const char *file_name, int line_num, oritlsf
                             }
 
                             block->size = required;
-#if defined(TLSF_DEBUG)
+#if defined(DEVELOPMENT)
                             write_footer_guard(pool, block);
                             write_footer_guard(pool, new_free);
 #endif
@@ -510,7 +508,7 @@ static inline void *oritlsf_realloc(const char *file_name, int line_num, oritlsf
                         }
                     } else {
                         link_next_phys(pool, block);
-#if defined(TLSF_DEBUG)
+#if defined(DEVELOPMENT)
                         write_footer_guard(pool, block);
 #endif
                     }
@@ -529,7 +527,7 @@ static inline void *oritlsf_realloc(const char *file_name, int line_num, oritlsf
     return newptr;
 }
 
-#if defined(TLSF_DEBUG)
+#if defined(DEVELOPMENT)
 static inline size_t tlsf_check_leaks_and_report(const char *label, const oritlsf_pool_t *pool) {
     if (!pool || !pool->pool_start || pool->pool_start >= pool->pool_end) return 0;
 
@@ -596,7 +594,7 @@ static inline size_t tlsf_check_leaks_and_report(const char *label, const oritls
 
 static inline void *oritlsf_cleanup_pool(const char *label, oritlsf_pool_t *pool) {
     if (!pool) return NULL;
-#if defined(TLSF_DEBUG)
+#if defined(DEVELOPMENT)
     if (pool->pool_start) tlsf_check_leaks_and_report(label, pool);
 #endif
     void *start = pool->pool_start;

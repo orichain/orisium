@@ -206,7 +206,7 @@ static inline int database_cursor_get_prev(MDB_cursor *cur, MDB_val *k, MDB_val 
     return mdb_cursor_get(cur, k, v, MDB_PREV);
 }
 
-static inline int database_cursor_seek(
+static inline int database_cursor_find(
         MDB_cursor *cur,
         const void *key,
         size_t klen,
@@ -221,7 +221,7 @@ static inline int database_cursor_seek(
     return rc;
 }
 
-static inline int database_cursor_prefix_seek(
+static inline int database_cursor_find_prefix(
         MDB_cursor *cur,
         const void *prefix,
         size_t plen,
