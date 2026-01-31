@@ -20,9 +20,9 @@ static void get_log_filename(char *buf, size_t len) {
     struct tm tm_info;
     localtime_r(&t, &tm_info);
     snprintf(buf, len, "logs/%04d-%02d-%02d.log",
-             tm_info.tm_year + 1900,
-             tm_info.tm_mon + 1,
-             tm_info.tm_mday);
+            tm_info.tm_year + 1900,
+            tm_info.tm_mon + 1,
+            tm_info.tm_mday);
 }
 
 void log_init() {
@@ -97,31 +97,31 @@ void cleanup_old_logs(int max_age_days) {
 }
 
 void *log_cleaner_thread(void *arg) {
-	uint64_t_status_t grtns_result = get_monotonic_time_ns("[LOG]: ");
-	if (grtns_result.status == SUCCESS) {
-		uint64_t current_time = grtns_result.r_uint64_t;
-		uint64_t start_time = current_time;
-		uint64_t clean_every = (uint64_t)86400 * 1000000000ULL; // 24 hours
+    uint64_t_status_t grtns_result = get_monotonic_time_ns("[LOG]: ");
+    if (grtns_result.status == SUCCESS) {
+        uint64_t current_time = grtns_result.r_uint64_t;
+        uint64_t start_time = current_time;
+        uint64_t clean_every = (uint64_t)86400 * 1000000000ULL; // 24 hours
 
-		cleanup_old_logs(7);
-		while (!shutdown_requested) {
-			grtns_result = get_monotonic_time_ns("[LOG]: ");
-			if (grtns_result.status == SUCCESS) {
-				current_time = grtns_result.r_uint64_t;
-				if ((current_time - start_time) > clean_every) {
-					if (!shutdown_requested) cleanup_old_logs(7);
-					start_time = current_time;
-				}
-				if (sleep_s(1) != SUCCESS) {
-					continue;
-				}
-			} else {
-				fprintf(stderr, "[LOG]: Log cleaner failed to get current_time.\n");
-			}
-		}
-	} else {
-		fprintf(stderr, "[LOG]: Log cleaner failed to start %s\n", strerror(errno));
-	}
+        cleanup_old_logs(7);
+        while (!shutdown_requested) {
+            grtns_result = get_monotonic_time_ns("[LOG]: ");
+            if (grtns_result.status == SUCCESS) {
+                current_time = grtns_result.r_uint64_t;
+                if ((current_time - start_time) > clean_every) {
+                    if (!shutdown_requested) cleanup_old_logs(7);
+                    start_time = current_time;
+                }
+                if (sleep_s(1) != SUCCESS) {
+                    continue;
+                }
+            } else {
+                fprintf(stderr, "[LOG]: Log cleaner failed to get current_time.\n");
+            }
+        }
+    } else {
+        fprintf(stderr, "[LOG]: Log cleaner failed to start %s\n", strerror(errno));
+    }
     return NULL;
 }
 #endif

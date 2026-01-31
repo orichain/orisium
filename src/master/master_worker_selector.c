@@ -31,11 +31,11 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
                 return 0xff;
             }
             if (session->isactive && session->ishealthy) {
-				if (session->avgtt->value_prediction < min_avg_task_time) {
-					min_avg_task_time = session->avgtt->value_prediction;
-					temp_best_idx_t1 = i;
-				}
-			}
+                if (session->avgtt->value_prediction < min_avg_task_time) {
+                    min_avg_task_time = session->avgtt->value_prediction;
+                    temp_best_idx_t1 = i;
+                }
+            }
         }
     } else if (wot == COW) {
         for (uint8_t i = 0; i < MAX_COW_WORKERS; ++i) {
@@ -59,11 +59,11 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
                 return 0xff;
             }
             if (session->isactive && session->ishealthy) {
-				if (session->avgtt->value_prediction < min_avg_task_time) {
-					min_avg_task_time = session->avgtt->value_prediction;
-					temp_best_idx_t1 = i;
-				}
-			}
+                if (session->avgtt->value_prediction < min_avg_task_time) {
+                    min_avg_task_time = session->avgtt->value_prediction;
+                    temp_best_idx_t1 = i;
+                }
+            }
         }
     } else if (wot == DBW) {
         for (uint8_t i = 0; i < MAX_DBW_WORKERS; ++i) {
@@ -72,18 +72,18 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
                 return 0xff;
             }
             if (session->isactive && session->ishealthy) {
-				if (session->avgtt->value_prediction < min_avg_task_time) {
-					min_avg_task_time = session->avgtt->value_prediction;
-					temp_best_idx_t1 = i;
-				}
-			}
+                if (session->avgtt->value_prediction < min_avg_task_time) {
+                    min_avg_task_time = session->avgtt->value_prediction;
+                    temp_best_idx_t1 = i;
+                }
+            }
         }
     }
     if (temp_best_idx_t1 != 0xff) {
         if (min_avg_task_time > 0.0L) {
             selected_worker_idx = temp_best_idx_t1;
             LOG_DEBUG("%sSelecting %s worker %d based on lowest Avg Task Time: %Lf",
-                      label, worker_name, selected_worker_idx, min_avg_task_time);
+                    label, worker_name, selected_worker_idx, min_avg_task_time);
             return selected_worker_idx;
         }
         LOG_DEBUG("%sAll not-full %s workers have 0 Avg Task Time. Falling back to Longest Task Time / Round Robin.", label, worker_name);
@@ -113,11 +113,11 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
                 return 0xff;
             }
             if (session->isactive && session->ishealthy) {
-				if (session->metrics-> longest_task_time < min_longest_task_time) {
-					min_longest_task_time = session->metrics-> longest_task_time;
-					temp_best_idx_t2 = i;
-				}
-			}
+                if (session->metrics-> longest_task_time < min_longest_task_time) {
+                    min_longest_task_time = session->metrics-> longest_task_time;
+                    temp_best_idx_t2 = i;
+                }
+            }
         }
     } else if (wot == COW) {
         for (uint8_t i = 0; i < MAX_COW_WORKERS; ++i) {
@@ -141,11 +141,11 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
                 return 0xff;
             }
             if (session->isactive && session->ishealthy) {
-				if (session->metrics-> longest_task_time < min_longest_task_time) {
-					min_longest_task_time = session->metrics-> longest_task_time;
-					temp_best_idx_t2 = i;
-				}
-			}
+                if (session->metrics-> longest_task_time < min_longest_task_time) {
+                    min_longest_task_time = session->metrics-> longest_task_time;
+                    temp_best_idx_t2 = i;
+                }
+            }
         }
     } else if (wot == DBW) {
         for (uint8_t i = 0; i < MAX_DBW_WORKERS; ++i) {
@@ -154,18 +154,18 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
                 return 0xff;
             }
             if (session->isactive && session->ishealthy) {
-				if (session->metrics-> longest_task_time < min_longest_task_time) {
-					min_longest_task_time = session->metrics-> longest_task_time;
-					temp_best_idx_t2 = i;
-				}
-			}
+                if (session->metrics-> longest_task_time < min_longest_task_time) {
+                    min_longest_task_time = session->metrics-> longest_task_time;
+                    temp_best_idx_t2 = i;
+                }
+            }
         }
     }
     if (temp_best_idx_t2 != 0xff) {
         if (min_longest_task_time > 0ULL) {
             selected_worker_idx = temp_best_idx_t2;
             LOG_DEBUG("%sSelecting %s worker %d based on lowest Longest Task Time: %llu",
-                      label, worker_name, selected_worker_idx, (unsigned long long)min_longest_task_time);
+                    label, worker_name, selected_worker_idx, (unsigned long long)min_longest_task_time);
             return selected_worker_idx;
         }
         LOG_DEBUG("%sAll not-full %s workers have 0 Longest Task Time. Falling back to Round Robin.", label, worker_name);
@@ -198,10 +198,10 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
             }
             uint8_t current_rr_idx = (start_rr_check_idx + i) % MAX_LOGIC_WORKERS;
             if (master_ctx->logic_session[current_rr_idx].isactive && master_ctx->logic_session[current_rr_idx].ishealthy) {
-				temp_best_idx_t3 = current_rr_idx;
-				master_ctx->last_logic_rr_idx = (current_rr_idx + 1) % MAX_LOGIC_WORKERS;
-				break;
-			}
+                temp_best_idx_t3 = current_rr_idx;
+                master_ctx->last_logic_rr_idx = (current_rr_idx + 1) % MAX_LOGIC_WORKERS;
+                break;
+            }
         }
     } else if (wot == COW) {
         uint8_t start_rr_check_idx = master_ctx->last_cow_rr_idx;
@@ -228,10 +228,10 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
             }
             uint8_t current_rr_idx = (start_rr_check_idx + i) % MAX_DBR_WORKERS;
             if (master_ctx->dbr_session[current_rr_idx].isactive && master_ctx->dbr_session[current_rr_idx].ishealthy) {
-				temp_best_idx_t3 = current_rr_idx;
-				master_ctx->last_dbr_rr_idx = (current_rr_idx + 1) % MAX_DBR_WORKERS;
-				break;
-			}
+                temp_best_idx_t3 = current_rr_idx;
+                master_ctx->last_dbr_rr_idx = (current_rr_idx + 1) % MAX_DBR_WORKERS;
+                break;
+            }
         }
     } else if (wot == DBW) {
         uint8_t start_rr_check_idx = master_ctx->last_dbw_rr_idx;
@@ -242,10 +242,10 @@ uint8_t select_best_worker(const char *label, master_context_t *master_ctx, work
             }
             uint8_t current_rr_idx = (start_rr_check_idx + i) % MAX_DBW_WORKERS;
             if (master_ctx->dbw_session[current_rr_idx].isactive && master_ctx->dbw_session[current_rr_idx].ishealthy) {
-				temp_best_idx_t3 = current_rr_idx;
-				master_ctx->last_dbw_rr_idx = (current_rr_idx + 1) % MAX_DBW_WORKERS;
-				break;
-			}
+                temp_best_idx_t3 = current_rr_idx;
+                master_ctx->last_dbw_rr_idx = (current_rr_idx + 1) % MAX_DBW_WORKERS;
+                break;
+            }
         }
     }
     if (temp_best_idx_t3 != 0xff) {

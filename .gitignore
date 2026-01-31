@@ -2,6 +2,8 @@ nodekeys/*
 !nodekeys/.gitkeep
 database/*
 !database/.gitkeep
+dataab/*
+!dataab/.gitkeep
 obj/
 logs/
 test/

@@ -21,7 +21,7 @@ static inline status_t orilink_serialize_heartbeat(const char *label, const oril
     memcpy(current_buffer + current_offset_local, &remote_id_be, sizeof(uint64_t));
     current_offset_local += sizeof(uint64_t);
     if (CHECK_BUFFER_BOUNDS(current_offset_local, DOUBLE_ARRAY_SIZE, buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    uint8_t hb_interval_be[8];
+    uint8_t hb_interval_be[DOUBLE_ARRAY_SIZE];
     double_to_uint8_be(payload->hb_interval, hb_interval_be);
     memcpy(current_buffer + current_offset_local, hb_interval_be, DOUBLE_ARRAY_SIZE);
     current_offset_local += DOUBLE_ARRAY_SIZE;
@@ -59,7 +59,7 @@ static inline status_t orilink_deserialize_heartbeat(const char *label, orilink_
         LOG_ERROR("%sOut of bounds reading hb_interval.", label);
         return FAILURE_OOBUF;
     }
-    uint8_t hb_interval_be[8];
+    uint8_t hb_interval_be[DOUBLE_ARRAY_SIZE];
     memcpy(hb_interval_be, cursor, DOUBLE_ARRAY_SIZE);
     payload->hb_interval = uint8_be_to_double(hb_interval_be);
     cursor += DOUBLE_ARRAY_SIZE;

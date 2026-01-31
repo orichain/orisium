@@ -976,22 +976,82 @@ static inline status_t ensure_directory_exists(const char *label, const char *pa
     }
 }
 
-static inline void double_to_uint8_be(double value, uint8_t out[8]) {
+static inline void double_to_uint8_be(double value, uint8_t out[DOUBLE_ARRAY_SIZE]) {
     uint64_t temp_u64;
-
     memcpy(&temp_u64, &value, sizeof(double));
     uint64_t big_endian_u64 = htobe64(temp_u64);
     memcpy(out, &big_endian_u64, sizeof(uint64_t));
 }
 
-static inline double uint8_be_to_double(const uint8_t in[8]) {
+static inline double uint8_be_to_double(const uint8_t in[DOUBLE_ARRAY_SIZE]) {
     uint64_t big_endian_u64;
     double value;
-
     memcpy(&big_endian_u64, in, sizeof(uint64_t));
     uint64_t host_u64 = be64toh(big_endian_u64);
     memcpy(&value, &host_u64, sizeof(double));
     return value;
+}
+
+static inline void long_double_to_uint8_be(long double value, uint8_t out[LONG_DOUBLE_ARRAY_SIZE]) {
+    memset(out, 0, LONG_DOUBLE_ARRAY_SIZE);
+    if (value == 0.0L) return;
+    if (isnan(value)) { out[16] = 1; return; }
+    if (isinf(value)) { out[16] = 2 | ((value < 0) ? 0x80 : 0); return; }
+    int exp;
+    long double m = frexpl(value, &exp);
+    bool neg = m < 0;
+    if (neg) m = -m;
+    double a = (double)m;
+    long double r = m - (long double)a;
+    double b = (double)(r * 0x1p53L);
+    r -= (long double)b * 0x1p-53L;
+    uint16_t c_fixed = (uint16_t)(r * 0x1p122L + 0.5L);
+    uint64_t ua, ub;
+    memcpy(&ua, &a, 8);
+    memcpy(&ub, &b, 8);
+    ua = htobe64(ua);
+    ub = htobe64(ub);
+    memcpy(out, &ua, 8);
+    memcpy(out + 8, &ub, 6);
+    uint8_t bit_113 = (((uint8_t*)&ub)[6] >> 7) & 0x1;
+    uint16_t u_exp = (uint16_t)exp & 0x7FFF;
+    out[14] = (bit_113 << 7) | ((u_exp >> 8) & 0x7F);
+    out[15] = u_exp & 0xFF;
+    out[16] = neg ? 0x80 : 0x00;
+    out[17] = (c_fixed >> 8) & 0xFF;
+    out[18] = c_fixed & 0xFF;
+}
+
+static inline long double uint8_be_to_long_double(const uint8_t in[LONG_DOUBLE_ARRAY_SIZE]) {
+    bool has_data = false;
+    for (int i = 0; i < 19; i++) {
+        if (in[i] != 0) {
+            has_data = true;
+            break;
+        }
+    }
+    if (!has_data) return 0.0L;
+    if (in[16] & 0x01) return NAN;
+    if (in[16] & 0x02) return (in[16] & 0x80) ? -INFINITY : INFINITY;
+    uint64_t ua, ub;
+    memcpy(&ua, in, 8);
+    uint8_t ub_bytes[8] = {0};
+    memcpy(ub_bytes, in + 8, 6);
+    ub_bytes[6] = (in[14] & 0x80);
+    memcpy(&ub, ub_bytes, 8);
+    ua = be64toh(ua);
+    ub = be64toh(ub);
+    double a_val, b_val;
+    memcpy(&a_val, &ua, 8);
+    memcpy(&b_val, &ub, 8);
+    uint16_t c_fixed = ((uint16_t)in[17] << 8) | in[18];
+    long double c_val = (long double)c_fixed * 0x1p-122L;
+    uint16_t u_exp = ((uint16_t)(in[14] & 0x7F) << 8) | in[15];
+    int exp = (int)u_exp;
+    if (exp & 0x4000) exp |= ~0x7FFF;
+    long double m = (long double)a_val + (long double)b_val * 0x1p-53L + c_val;
+    if (in[16] & 0x80) m = -m;
+    return ldexpl(m, exp);
 }
 
 static inline bool sockaddr_equal(const struct sockaddr *a, const struct sockaddr *b) {

@@ -149,11 +149,11 @@ static inline status_t handle_worker_workers_ipc_info(worker_context_t *worker_c
         case IT_APPNDNKEYS: {
 			                    nodekeys_t *nodekeys = (nodekeys_t *)oritlsf_calloc(__FILE__, __LINE__, &worker_ctx->oritlsf_pool, 1, sizeof(nodekeys_t));
 			                    nodekeys->no = 0;
-			                    nodekeys->vermaj = NODEKEYS_VERSION_MAJOR;
-			                    nodekeys->vermin = NODEKEYS_VERSION_MINOR;
+			                    nodekeys->vermaj = KEYS_VERSION_MAJOR;
+			                    nodekeys->vermin = KEYS_VERSION_MINOR;
 			                    SIGN_GENERATE_KEYPAIR(nodekeys->sgn_publickey, nodekeys->sgn_privatekey);
 			                    KEM_GENERATE_KEYPAIR(nodekeys->kem_publickey, nodekeys->kem_privatekey);
-			                    int rc = nodekeys_keys_append(worker_ctx->label, g_nodekeys_env, g_nodekeys_keys, nodekeys);
+			                    int rc = nodekeys_keys_append(worker_ctx->label, &worker_ctx->oritlsf_pool, g_nodekeys_env, g_nodekeys_keys, nodekeys);
 			                    memset(nodekeys->sgn_privatekey, 0, SIGN_PRIVATEKEY_BYTES);
 			                    memset(nodekeys->kem_privatekey, 0, KEM_PRIVATEKEY_BYTES);
 			                    oritlsf_free(&worker_ctx->oritlsf_pool, (void **)&nodekeys);

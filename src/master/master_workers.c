@@ -43,7 +43,7 @@ status_t close_worker(const char *label, master_context_t *master_ctx, worker_ty
     CLOSE_UDS(&upp->uds[0]);
     CLOSE_UDS(&upp->uds[1]);
     CLOSE_PID(&upp->pid);
-	return SUCCESS;
+    return SUCCESS;
 }
 
 status_t create_socket_pair(const char *label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
@@ -63,40 +63,40 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
     session->ishealthy = true;
     session->isready = false;
     security->kem_publickey = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
-                                                        &master_ctx->oritlsf_pool,
-                                                        KEM_PUBLICKEY_BYTES,
-                                                        sizeof(uint8_t)
-                                                        );
+            &master_ctx->oritlsf_pool,
+            KEM_PUBLICKEY_BYTES,
+            sizeof(uint8_t)
+            );
     security->kem_ciphertext = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
-                                                         &master_ctx->oritlsf_pool,
-                                                         KEM_CIPHERTEXT_BYTES,
-                                                         sizeof(uint8_t)
-                                                         );
+            &master_ctx->oritlsf_pool,
+            KEM_CIPHERTEXT_BYTES,
+            sizeof(uint8_t)
+            );
     security->kem_sharedsecret = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
-                                                           &master_ctx->oritlsf_pool,
-                                                           KEM_SHAREDSECRET_BYTES,
-                                                           sizeof(uint8_t)
-                                                           );
+            &master_ctx->oritlsf_pool,
+            KEM_SHAREDSECRET_BYTES,
+            sizeof(uint8_t)
+            );
     security->aes_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
-                                                  &master_ctx->oritlsf_pool,
-                                                  HASHES_BYTES,
-                                                  sizeof(uint8_t)
-                                                  );
+            &master_ctx->oritlsf_pool,
+            HASHES_BYTES,
+            sizeof(uint8_t)
+            );
     security->mac_key = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
-                                                  &master_ctx->oritlsf_pool,
-                                                  HASHES_BYTES,
-                                                  sizeof(uint8_t)
-                                                  );
+            &master_ctx->oritlsf_pool,
+            HASHES_BYTES,
+            sizeof(uint8_t)
+            );
     security->local_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
-                                                      &master_ctx->oritlsf_pool,
-                                                      AES_NONCE_BYTES,
-                                                      sizeof(uint8_t)
-                                                      );
+            &master_ctx->oritlsf_pool,
+            AES_NONCE_BYTES,
+            sizeof(uint8_t)
+            );
     security->remote_nonce = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__,
-                                                       &master_ctx->oritlsf_pool,
-                                                       AES_NONCE_BYTES,
-                                                       sizeof(uint8_t)
-                                                       );
+            &master_ctx->oritlsf_pool,
+            AES_NONCE_BYTES,
+            sizeof(uint8_t)
+            );
     security->local_ctr = (uint32_t)0;
     security->remote_ctr = (uint32_t)0;
     security->hello1_rcvd = false;
@@ -117,7 +117,7 @@ status_t create_socket_pair(const char *label, master_context_t *master_ctx, wor
         return FAILURE;
     }
     LOG_DEBUG("%sCreated UDS pair for %s Worker %d (Master side: %d, Worker side: %d).", label, worker_name, index, upp->uds[0], upp->uds[1]);
-	return SUCCESS;
+    return SUCCESS;
 }
 
 void close_master_resource(const char* label, master_context_t *master_ctx, worker_type_t wot, uint8_t index) {
@@ -126,7 +126,7 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
         if (session == NULL) {
             continue;
         }
-		if (wot != SIO || index != ixxxx) {
+        if (wot != SIO || index != ixxxx) {
             CLOSE_UDS(&session->upp->uds[0]);
             CLOSE_UDS(&session->upp->uds[1]);
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
@@ -137,13 +137,13 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->metrics);
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->avgtt);
         CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &session->buffer);
-	}
-	for (uint8_t ixxxx=0;ixxxx<MAX_LOGIC_WORKERS;++ixxxx) {
-		master_worker_session_t *session = get_master_worker_session(master_ctx, LOGIC, ixxxx);
+    }
+    for (uint8_t ixxxx=0;ixxxx<MAX_LOGIC_WORKERS;++ixxxx) {
+        master_worker_session_t *session = get_master_worker_session(master_ctx, LOGIC, ixxxx);
         if (session == NULL) {
             continue;
         }
-		if (wot != LOGIC || index != ixxxx) {
+        if (wot != LOGIC || index != ixxxx) {
             CLOSE_UDS(&session->upp->uds[0]);
             CLOSE_UDS(&session->upp->uds[1]);
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
@@ -154,13 +154,13 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->metrics);
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->avgtt);
         CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &session->buffer);
-	}
-	for (uint8_t ixxxx=0;ixxxx<MAX_COW_WORKERS;++ixxxx) {
-		master_worker_session_t *session = get_master_worker_session(master_ctx, COW, ixxxx);
+    }
+    for (uint8_t ixxxx=0;ixxxx<MAX_COW_WORKERS;++ixxxx) {
+        master_worker_session_t *session = get_master_worker_session(master_ctx, COW, ixxxx);
         if (session == NULL) {
             continue;
         }
-		if (wot != COW || index != ixxxx) {
+        if (wot != COW || index != ixxxx) {
             CLOSE_UDS(&session->upp->uds[0]);
             CLOSE_UDS(&session->upp->uds[1]);
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
@@ -171,13 +171,13 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->metrics);
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->avgtt);
         CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &session->buffer);
-	}
-	for (uint8_t ixxxx=0;ixxxx<MAX_DBR_WORKERS;++ixxxx) {
-		master_worker_session_t *session = get_master_worker_session(master_ctx, DBR, ixxxx);
+    }
+    for (uint8_t ixxxx=0;ixxxx<MAX_DBR_WORKERS;++ixxxx) {
+        master_worker_session_t *session = get_master_worker_session(master_ctx, DBR, ixxxx);
         if (session == NULL) {
             continue;
         }
-		if (wot != DBR || index != ixxxx) {
+        if (wot != DBR || index != ixxxx) {
             CLOSE_UDS(&session->upp->uds[0]);
             CLOSE_UDS(&session->upp->uds[1]);
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
@@ -188,13 +188,13 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->metrics);
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->avgtt);
         CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &session->buffer);
-	}
-	for (uint8_t ixxxx=0;ixxxx<MAX_DBW_WORKERS;++ixxxx) {
-		master_worker_session_t *session = get_master_worker_session(master_ctx, DBW, ixxxx);
+    }
+    for (uint8_t ixxxx=0;ixxxx<MAX_DBW_WORKERS;++ixxxx) {
+        master_worker_session_t *session = get_master_worker_session(master_ctx, DBW, ixxxx);
         if (session == NULL) {
             continue;
         }
-		if (wot != DBW || index != ixxxx) {
+        if (wot != DBW || index != ixxxx) {
             CLOSE_UDS(&session->upp->uds[0]);
             CLOSE_UDS(&session->upp->uds[1]);
             oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->upp);
@@ -205,7 +205,7 @@ void close_master_resource(const char* label, master_context_t *master_ctx, work
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->metrics);
         oritlsf_free(&master_ctx->oritlsf_pool, (void **)&session->avgtt);
         CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &session->buffer);
-	}
+    }
     oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_c_session);
     oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_c_session);
     CLOSE_FD(&master_ctx->ipv4_udp);
@@ -238,27 +238,27 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
         int *master_uds_fd = &session->upp->uds[1];
         switch (wot) {
             case SIO: {
-                run_sio_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
-                exit(EXIT_SUCCESS);
-            }
+                          run_sio_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
+                          exit(EXIT_SUCCESS);
+                      }
             case LOGIC: {
-                run_logic_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
-                exit(EXIT_SUCCESS);
-            }
+                            run_logic_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
+                            exit(EXIT_SUCCESS);
+                        }
             case COW: {
-                run_cow_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
-                exit(EXIT_SUCCESS);
-            }
+                          run_cow_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
+                          exit(EXIT_SUCCESS);
+                      }
             case DBR: {
-                run_dbr_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
-                exit(EXIT_SUCCESS);
-            }
+                          run_dbr_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
+                          exit(EXIT_SUCCESS);
+                      }
             case DBW: {
-                run_dbw_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
-                exit(EXIT_SUCCESS);
-            }
+                          run_dbw_worker(&x_wot, &x_index, &x_initial_delay_ms, master_uds_fd);
+                          exit(EXIT_SUCCESS);
+                      }
             default:
-                return FAILURE;
+                      return FAILURE;
         }
     } else {
         CLOSE_UDS(&session->upp->uds[1]);
@@ -269,11 +269,11 @@ status_t setup_fork_worker(const char* label, master_context_t *master_ctx, work
         initial_delay_ms = initialize_metrics(label, session->metrics, wot, index);
         //======================================================================
         async_create_inout_event(
-            label,
-            &master_ctx->master_async,
-            &session->upp->uds[0],
-            EIT_FD
-        );
+                label,
+                &master_ctx->master_async,
+                &session->upp->uds[0],
+                EIT_FD
+                );
         LOG_DEBUG("%sForked %s Worker %d (PID %d).", label, worker_name, index, session->upp->pid);
     }
     return SUCCESS;
@@ -301,44 +301,44 @@ void cleanup_workers(const char *label, master_context_t *master_ctx) {
 
 status_t setup_workers(const char *label, master_context_t *master_ctx) {
     for (int index = 0; index < MAX_SIO_WORKERS; ++index) {
-		if (create_socket_pair(label, master_ctx, SIO, index) != SUCCESS) return FAILURE;
+        if (create_socket_pair(label, master_ctx, SIO, index) != SUCCESS) return FAILURE;
     }
     for (int index = 0; index < MAX_LOGIC_WORKERS; ++index) {
-		if (create_socket_pair(label, master_ctx, LOGIC, index) != SUCCESS) return FAILURE;
+        if (create_socket_pair(label, master_ctx, LOGIC, index) != SUCCESS) return FAILURE;
     }
     for (int index = 0; index < MAX_COW_WORKERS; ++index) {
-		if (create_socket_pair(label, master_ctx, COW, index) != SUCCESS) return FAILURE;
+        if (create_socket_pair(label, master_ctx, COW, index) != SUCCESS) return FAILURE;
     }
     for (int index = 0; index < MAX_DBR_WORKERS; ++index) {
-		if (create_socket_pair(label, master_ctx, DBR, index) != SUCCESS) return FAILURE;
+        if (create_socket_pair(label, master_ctx, DBR, index) != SUCCESS) return FAILURE;
     }
     for (int index = 0; index < MAX_DBW_WORKERS; ++index) {
-		if (create_socket_pair(label, master_ctx, DBW, index) != SUCCESS) return FAILURE;
+        if (create_socket_pair(label, master_ctx, DBW, index) != SUCCESS) return FAILURE;
     }
-	for (uint8_t index = 0; index < MAX_SIO_WORKERS; ++index) {
-		if (setup_fork_worker(label, master_ctx, SIO, index) != SUCCESS) {
-			return FAILURE;
-		}
+    for (uint8_t index = 0; index < MAX_SIO_WORKERS; ++index) {
+        if (setup_fork_worker(label, master_ctx, SIO, index) != SUCCESS) {
+            return FAILURE;
+        }
     }
     for (uint8_t index = 0; index < MAX_LOGIC_WORKERS; ++index) {
-		if (setup_fork_worker(label, master_ctx, LOGIC, index) != SUCCESS) {
-			return FAILURE;
-		}
+        if (setup_fork_worker(label, master_ctx, LOGIC, index) != SUCCESS) {
+            return FAILURE;
+        }
     }
     for (uint8_t index = 0; index < MAX_COW_WORKERS; ++index) {
-		if (setup_fork_worker(label, master_ctx, COW, index) != SUCCESS) {
-			return FAILURE;
-		}
+        if (setup_fork_worker(label, master_ctx, COW, index) != SUCCESS) {
+            return FAILURE;
+        }
     }
     for (uint8_t index = 0; index < MAX_DBR_WORKERS; ++index) {
-		if (setup_fork_worker(label, master_ctx, DBR, index) != SUCCESS) {
-			return FAILURE;
-		}
+        if (setup_fork_worker(label, master_ctx, DBR, index) != SUCCESS) {
+            return FAILURE;
+        }
     }
     for (uint8_t index = 0; index < MAX_DBW_WORKERS; ++index) {
-		if (setup_fork_worker(label, master_ctx, DBW, index) != SUCCESS) {
-			return FAILURE;
-		}
+        if (setup_fork_worker(label, master_ctx, DBW, index) != SUCCESS) {
+            return FAILURE;
+        }
     }
     return SUCCESS;
 }
@@ -367,7 +367,7 @@ status_t calculate_avgtt(const char *label, master_context_t *master_ctx, worker
     metrics->last_task_finished = rt.r_uint64_t;
     uint64_t task_time;
     if (metrics->last_task_started == 0 ||
-        rt.r_uint64_t < metrics->last_task_started) {
+            rt.r_uint64_t < metrics->last_task_started) {
         task_time = 0;
         LOG_WARN("%s%s Worker %d: Invalid last_task_started detected. Resetting task_time to 0.", label, worker_name, index);
     } else {
@@ -381,7 +381,7 @@ status_t calculate_avgtt(const char *label, master_context_t *master_ctx, worker
         *task_count -= 1;
     } else {
         LOG_WARN("%sTask count for %s worker %d is already zero. Possible logic error.",
-                 label, worker_name, index);
+                label, worker_name, index);
         *task_count = 0;
     }
     uint64_t current_task_count = *task_count;
@@ -395,9 +395,9 @@ status_t calculate_avgtt(const char *label, master_context_t *master_ctx, worker
     } else {
         current_avgtt_measurement = (long double)0;
     }
-	int needed = snprintf(NULL, 0, "ORICLE => AVGTT %s-%d", worker_name, index);
+    int needed = snprintf(NULL, 0, "ORICLE => AVGTT %s-%d", worker_name, index);
     char desc[needed + 1];
-	snprintf(desc, needed + 1, "ORICLE => AVGTT %s-%d", worker_name, index);
+    snprintf(desc, needed + 1, "ORICLE => AVGTT %s-%d", worker_name, index);
     calculate_oricle_long_double(label, &master_ctx->oritlsf_pool, desc, oricle, current_avgtt_measurement, (long double)0);
     return SUCCESS;
 }
@@ -428,9 +428,9 @@ status_t calculate_healthy(const char* label, master_context_t *master_ctx, work
         current_health_measurement = metrics->count_ack / expected_count_ack;
     }
     current_health_measurement *= (double)100;
-	int needed = snprintf(NULL, 0, "ORICLE => HEALTHY %s-%d", worker_name, index);
-	char desc[needed + 1];
-	snprintf(desc, needed + 1, "ORICLE => HEALTHY %s-%d", worker_name, index);
+    int needed = snprintf(NULL, 0, "ORICLE => HEALTHY %s-%d", worker_name, index);
+    char desc[needed + 1];
+    snprintf(desc, needed + 1, "ORICLE => HEALTHY %s-%d", worker_name, index);
 #if defined(LONGINTV_TEST)
     calculate_oricle_doubleX(label, &master_ctx->oritlsf_pool, desc, oricle, current_health_measurement, (double)200);
 #else
@@ -460,8 +460,8 @@ status_t recreate_worker(const char *label, master_context_t *master_ctx, worker
 }
 
 status_t check_workers_healthy(const char *label, master_context_t *master_ctx) {
-	for (uint8_t i = 0; i < MAX_SIO_WORKERS; ++i) {
-		if (calculate_healthy(label, master_ctx, SIO, i) != SUCCESS) {
+    for (uint8_t i = 0; i < MAX_SIO_WORKERS; ++i) {
+        if (calculate_healthy(label, master_ctx, SIO, i) != SUCCESS) {
             return FAILURE;
         }
         master_worker_session_t *session = get_master_worker_session(master_ctx, SIO, i);
@@ -474,9 +474,9 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
                 return FAILURE;
             }
         }
-	}
-	for (uint8_t i = 0; i < MAX_LOGIC_WORKERS; ++i) {
-		if (calculate_healthy(label, master_ctx, LOGIC, i) != SUCCESS) {
+    }
+    for (uint8_t i = 0; i < MAX_LOGIC_WORKERS; ++i) {
+        if (calculate_healthy(label, master_ctx, LOGIC, i) != SUCCESS) {
             return FAILURE;
         }
         master_worker_session_t *session = get_master_worker_session(master_ctx, LOGIC, i);
@@ -489,9 +489,9 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
                 return FAILURE;
             }
         }
-	}
-	for (uint8_t i = 0; i < MAX_COW_WORKERS; ++i) {
-		if (calculate_healthy(label, master_ctx, COW, i) != SUCCESS) {
+    }
+    for (uint8_t i = 0; i < MAX_COW_WORKERS; ++i) {
+        if (calculate_healthy(label, master_ctx, COW, i) != SUCCESS) {
             return FAILURE;
         }
         master_worker_session_t *session = get_master_worker_session(master_ctx, COW, i);
@@ -504,9 +504,9 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
                 return FAILURE;
             }
         }
-	}
+    }
     for (uint8_t i = 0; i < MAX_DBR_WORKERS; ++i) {
-		if (calculate_healthy(label, master_ctx, DBR, i) != SUCCESS) {
+        if (calculate_healthy(label, master_ctx, DBR, i) != SUCCESS) {
             return FAILURE;
         }
         master_worker_session_t *session = get_master_worker_session(master_ctx, DBR, i);
@@ -519,9 +519,9 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
                 return FAILURE;
             }
         }
-	}
+    }
     for (uint8_t i = 0; i < MAX_DBW_WORKERS; ++i) {
-		if (calculate_healthy(label, master_ctx, DBW, i) != SUCCESS) {
+        if (calculate_healthy(label, master_ctx, DBW, i) != SUCCESS) {
             return FAILURE;
         }
         master_worker_session_t *session = get_master_worker_session(master_ctx, DBW, i);
@@ -534,6 +534,6 @@ status_t check_workers_healthy(const char *label, master_context_t *master_ctx) 
                 return FAILURE;
             }
         }
-	}
+    }
     return SUCCESS;
 }

@@ -15,6 +15,8 @@ async_type_t *master_async = NULL;
 //======================================================================
 MDB_env *g_nodekeys_env = NULL;
 MDB_dbi g_nodekeys_keys = 0;
+MDB_env *g_dataab_env = NULL;
+MDB_dbi g_dataab_metrics = 0;
 MDB_env *g_database_env = NULL;
 MDB_dbi g_database_pkhash = 0;
 MDB_dbi g_database_era = 0;
@@ -35,12 +37,13 @@ void sigint_handler(int signum) {
 }
 
 status_t setup_master(const char *label, master_context_t *master_ctx) {
-	unsigned int flags = MDB_INTEGERKEY;
-	database_init_env(label, &g_nodekeys_env, NODEKEYS_PATH, NODEKEYS_MAPSIZE, NODEKEYS_TABLES);
-	database_open(label, g_nodekeys_env, &g_nodekeys_keys, NODEKEYS_NODEKEYS_NAME, flags);
-	database_init_env(label, &g_database_env, DATABASE_PATH, DATABASE_MAPSIZE, DATABASE_TABLES);
-    database_open(label, g_database_env, &g_database_pkhash, DATABASE_ERA_NAME, 0);
-	database_open(label, g_database_env, &g_database_era, DATABASE_ERA_NAME, flags);
+    database_init_env(label, &g_nodekeys_env, NODEKEYS_PATH, NODEKEYS_MAPSIZE, NODEKEYS_TABLES);
+    database_open(label, g_nodekeys_env, &g_nodekeys_keys, NODEKEYS_KEYS_NAME, 0);
+    database_init_env(label, &g_dataab_env, DATAAB_PATH, DATAAB_MAPSIZE, DATAAB_TABLES);
+    database_open(label, g_dataab_env, &g_dataab_metrics, DATAAB_METRICS_NAME, 0);
+    database_init_env(label, &g_database_env, DATABASE_PATH, DATABASE_MAPSIZE, DATABASE_TABLES);
+    database_open(label, g_database_env, &g_database_pkhash, DATABASE_PKHASH_NAME, 0);
+    database_open(label, g_database_env, &g_database_era, DATABASE_ERA_NAME, 0);
     master_ctx->arena_buffer = (uint8_t *)calloc(1, MASTER_ARENA_SIZE);
     int result = oritlsf_setup_pool(&master_ctx->oritlsf_pool, master_ctx->arena_buffer, MASTER_ARENA_SIZE);
     if (result != 0) {
@@ -49,10 +52,10 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
     }
     oritlsf_pool = &master_ctx->oritlsf_pool;
     master_ctx->shutdown_event_fd = (et_buffered_event_id_t *)oritlsf_calloc(__FILE__, __LINE__,
-                                                                             &master_ctx->oritlsf_pool,
-                                                                             1,
-                                                                             sizeof(et_buffered_event_id_t)
-                                                                             );
+            &master_ctx->oritlsf_pool,
+            1,
+            sizeof(et_buffered_event_id_t)
+            );
     master_ctx->shutdown_event_fd->event_id = -1;
 #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
     master_ctx->shutdown_event_fd->event_type = EIT_USER;
@@ -60,10 +63,10 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
     master_ctx->shutdown_event_fd->event_type = EIT_FD;
 #endif
     master_ctx->shutdown_event_fd->buffer = (et_buffer_t *)oritlsf_calloc(__FILE__, __LINE__,
-                                                                          &master_ctx->oritlsf_pool,
-                                                                          1,
-                                                                          sizeof(et_buffer_t)
-                                                                          );
+            &master_ctx->oritlsf_pool,
+            1,
+            sizeof(et_buffer_t)
+            );
     master_ctx->shutdown_event_fd->buffer->read_step = 0;
     master_ctx->shutdown_event_fd->buffer->buffer_in = NULL;
     master_ctx->shutdown_event_fd->buffer->in_size_tb = 0;
@@ -72,76 +75,76 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
     master_ctx->shutdown_event_fd->buffer->out_size_tb = 0;
     master_ctx->shutdown_event_fd->buffer->out_size_c = 0;
     master_ctx->sio_session = (master_worker_session_t *)oritlsf_calloc(__FILE__, __LINE__,
-                                                                        &master_ctx->oritlsf_pool,
-                                                                        MAX_SIO_WORKERS,
-                                                                        sizeof(master_worker_session_t)
-                                                                        );
+            &master_ctx->oritlsf_pool,
+            MAX_SIO_WORKERS,
+            sizeof(master_worker_session_t)
+            );
     master_ctx->logic_session = (master_worker_session_t *)oritlsf_calloc(__FILE__, __LINE__,
-                                                                          &master_ctx->oritlsf_pool,
-                                                                          MAX_LOGIC_WORKERS,
-                                                                          sizeof(master_worker_session_t)
-                                                                          );
+            &master_ctx->oritlsf_pool,
+            MAX_LOGIC_WORKERS,
+            sizeof(master_worker_session_t)
+            );
     master_ctx->cow_session = (master_worker_session_t *)oritlsf_calloc(__FILE__, __LINE__,
-                                                                        &master_ctx->oritlsf_pool,
-                                                                        MAX_COW_WORKERS,
-                                                                        sizeof(master_worker_session_t)
-                                                                        );
+            &master_ctx->oritlsf_pool,
+            MAX_COW_WORKERS,
+            sizeof(master_worker_session_t)
+            );
     master_ctx->dbr_session = (master_worker_session_t *)oritlsf_calloc(__FILE__, __LINE__,
-                                                                        &master_ctx->oritlsf_pool,
-                                                                        MAX_DBR_WORKERS,
-                                                                        sizeof(master_worker_session_t)
-                                                                        );
+            &master_ctx->oritlsf_pool,
+            MAX_DBR_WORKERS,
+            sizeof(master_worker_session_t)
+            );
     master_ctx->dbw_session = (master_worker_session_t *)oritlsf_calloc(__FILE__, __LINE__,
-                                                                        &master_ctx->oritlsf_pool,
-                                                                        MAX_DBW_WORKERS,
-                                                                        sizeof(master_worker_session_t)
-                                                                        );
+            &master_ctx->oritlsf_pool,
+            MAX_DBW_WORKERS,
+            sizeof(master_worker_session_t)
+            );
     master_ctx->sio_c_session = (master_sio_c_session_t *)oritlsf_calloc(__FILE__, __LINE__,
-                                                                         &master_ctx->oritlsf_pool,
-                                                                         MAX_MASTER_SIO_SESSIONS,
-                                                                         sizeof(master_sio_c_session_t)
-                                                                         );
+            &master_ctx->oritlsf_pool,
+            MAX_MASTER_SIO_SESSIONS,
+            sizeof(master_sio_c_session_t)
+            );
     master_ctx->cow_c_session = (master_cow_c_session_t *)oritlsf_calloc(__FILE__, __LINE__,
-                                                                         &master_ctx->oritlsf_pool,
-                                                                         MAX_MASTER_COW_SESSIONS,
-                                                                         sizeof(master_cow_c_session_t)
-                                                                         );
+            &master_ctx->oritlsf_pool,
+            MAX_MASTER_COW_SESSIONS,
+            sizeof(master_cow_c_session_t)
+            );
     for (uint8_t ixxxx=0;ixxxx<MAX_SIO_WORKERS;++ixxxx) {
-		master_ctx->sio_session[ixxxx].rekeying = (worker_rekeying_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                    &master_ctx->oritlsf_pool,
-			                                                                    1,
-			                                                                    sizeof(worker_rekeying_t)
-		                                                                        );
-		master_ctx->sio_session[ixxxx].healthy = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                 &master_ctx->oritlsf_pool,
-			                                                                 1,
-			                                                                 sizeof(oricle_double_t)
-		                                                                     );
-		master_ctx->sio_session[ixxxx].upp = (uds_pair_pid_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                            &master_ctx->oritlsf_pool,
-			                                                            1,
-			                                                            sizeof(uds_pair_pid_t)
-		                                                                );
-		master_ctx->sio_session[ixxxx].security = (worker_security_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                    &master_ctx->oritlsf_pool,
-			                                                                    1,
-			                                                                    sizeof(worker_security_t)
-		                                                                        );
-		master_ctx->sio_session[ixxxx].metrics = (worker_metrics_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                  &master_ctx->oritlsf_pool,
-			                                                                  1,
-			                                                                  sizeof(worker_metrics_t)
-		                                                                      );
-		master_ctx->sio_session[ixxxx].avgtt = (oricle_long_double_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                    &master_ctx->oritlsf_pool,
-			                                                                    1,
-			                                                                    sizeof(oricle_long_double_t)
-		                                                                        );
+        master_ctx->sio_session[ixxxx].rekeying = (worker_rekeying_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(worker_rekeying_t)
+                );
+        master_ctx->sio_session[ixxxx].healthy = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(oricle_double_t)
+                );
+        master_ctx->sio_session[ixxxx].upp = (uds_pair_pid_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(uds_pair_pid_t)
+                );
+        master_ctx->sio_session[ixxxx].security = (worker_security_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(worker_security_t)
+                );
+        master_ctx->sio_session[ixxxx].metrics = (worker_metrics_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(worker_metrics_t)
+                );
+        master_ctx->sio_session[ixxxx].avgtt = (oricle_long_double_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(oricle_long_double_t)
+                );
         master_ctx->sio_session[ixxxx].buffer = (et_buffer_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                  &master_ctx->oritlsf_pool,
-			                                                                  1,
-			                                                                  sizeof(et_buffer_t)
-		                                                                      );
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(et_buffer_t)
+                );
         et_buffer_t *buffer = master_ctx->sio_session[ixxxx].buffer;
         buffer->read_step = 0;
         buffer->buffer_in = NULL;
@@ -150,43 +153,43 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
         buffer->buffer_out = NULL;
         buffer->out_size_tb = 0;
         buffer->out_size_c = 0;
-	}
-	for (uint8_t ixxxx=0;ixxxx<MAX_LOGIC_WORKERS;++ixxxx) {
-		master_ctx->logic_session[ixxxx].rekeying = (worker_rekeying_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                      &master_ctx->oritlsf_pool,
-			                                                                      1,
-			                                                                      sizeof(worker_rekeying_t)
-		                                                                          );
-		master_ctx->logic_session[ixxxx].healthy = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                   &master_ctx->oritlsf_pool,
-			                                                                   1,
-			                                                                   sizeof(oricle_double_t)
-		                                                                       );
-		master_ctx->logic_session[ixxxx].upp = (uds_pair_pid_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                              &master_ctx->oritlsf_pool,
-			                                                              1,
-			                                                              sizeof(uds_pair_pid_t)
-		                                                                  );
-		master_ctx->logic_session[ixxxx].security = (worker_security_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                      &master_ctx->oritlsf_pool,
-			                                                                      1,
-			                                                                      sizeof(worker_security_t)
-		                                                                          );
-		master_ctx->logic_session[ixxxx].metrics = (worker_metrics_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                    &master_ctx->oritlsf_pool,
-			                                                                    1,
-			                                                                    sizeof(worker_metrics_t)
-		                                                                        );
-		master_ctx->logic_session[ixxxx].avgtt = (oricle_long_double_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                      &master_ctx->oritlsf_pool,
-			                                                                      1,
-			                                                                      sizeof(oricle_long_double_t)
-		                                                                          );
+    }
+    for (uint8_t ixxxx=0;ixxxx<MAX_LOGIC_WORKERS;++ixxxx) {
+        master_ctx->logic_session[ixxxx].rekeying = (worker_rekeying_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(worker_rekeying_t)
+                );
+        master_ctx->logic_session[ixxxx].healthy = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(oricle_double_t)
+                );
+        master_ctx->logic_session[ixxxx].upp = (uds_pair_pid_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(uds_pair_pid_t)
+                );
+        master_ctx->logic_session[ixxxx].security = (worker_security_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(worker_security_t)
+                );
+        master_ctx->logic_session[ixxxx].metrics = (worker_metrics_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(worker_metrics_t)
+                );
+        master_ctx->logic_session[ixxxx].avgtt = (oricle_long_double_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(oricle_long_double_t)
+                );
         master_ctx->logic_session[ixxxx].buffer = (et_buffer_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                    &master_ctx->oritlsf_pool,
-			                                                                    1,
-			                                                                    sizeof(et_buffer_t)
-		                                                                        );
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(et_buffer_t)
+                );
         et_buffer_t *buffer = master_ctx->logic_session[ixxxx].buffer;
         buffer->read_step = 0;
         buffer->buffer_in = NULL;
@@ -195,43 +198,43 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
         buffer->buffer_out = NULL;
         buffer->out_size_tb = 0;
         buffer->out_size_c = 0;
-	}
-	for (uint8_t ixxxx=0;ixxxx<MAX_COW_WORKERS;++ixxxx) {
-		master_ctx->cow_session[ixxxx].rekeying = (worker_rekeying_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                    &master_ctx->oritlsf_pool,
-			                                                                    1,
-			                                                                    sizeof(worker_rekeying_t)
-		                                                                        );
-		master_ctx->cow_session[ixxxx].healthy = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                 &master_ctx->oritlsf_pool,
-			                                                                 1,
-			                                                                 sizeof(oricle_double_t)
-		                                                                     );
-		master_ctx->cow_session[ixxxx].upp = (uds_pair_pid_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                            &master_ctx->oritlsf_pool,
-			                                                            1,
-			                                                            sizeof(uds_pair_pid_t)
-		                                                                );
-		master_ctx->cow_session[ixxxx].security = (worker_security_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                    &master_ctx->oritlsf_pool,
-			                                                                    1,
-			                                                                    sizeof(worker_security_t)
-		                                                                        );
-		master_ctx->cow_session[ixxxx].metrics = (worker_metrics_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                  &master_ctx->oritlsf_pool,
-			                                                                  1,
-			                                                                  sizeof(worker_metrics_t)
-		                                                                      );
-		master_ctx->cow_session[ixxxx].avgtt = (oricle_long_double_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                    &master_ctx->oritlsf_pool,
-			                                                                    1,
-			                                                                    sizeof(oricle_long_double_t)
-		                                                                        );
+    }
+    for (uint8_t ixxxx=0;ixxxx<MAX_COW_WORKERS;++ixxxx) {
+        master_ctx->cow_session[ixxxx].rekeying = (worker_rekeying_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(worker_rekeying_t)
+                );
+        master_ctx->cow_session[ixxxx].healthy = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(oricle_double_t)
+                );
+        master_ctx->cow_session[ixxxx].upp = (uds_pair_pid_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(uds_pair_pid_t)
+                );
+        master_ctx->cow_session[ixxxx].security = (worker_security_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(worker_security_t)
+                );
+        master_ctx->cow_session[ixxxx].metrics = (worker_metrics_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(worker_metrics_t)
+                );
+        master_ctx->cow_session[ixxxx].avgtt = (oricle_long_double_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(oricle_long_double_t)
+                );
         master_ctx->cow_session[ixxxx].buffer = (et_buffer_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                  &master_ctx->oritlsf_pool,
-			                                                                  1,
-			                                                                  sizeof(et_buffer_t)
-		                                                                      );
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(et_buffer_t)
+                );
         et_buffer_t *buffer = master_ctx->cow_session[ixxxx].buffer;
         buffer->read_step = 0;
         buffer->buffer_in = NULL;
@@ -240,43 +243,43 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
         buffer->buffer_out = NULL;
         buffer->out_size_tb = 0;
         buffer->out_size_c = 0;
-	}
-	for (uint8_t ixxxx=0;ixxxx<MAX_DBR_WORKERS;++ixxxx) {
-		master_ctx->dbr_session[ixxxx].rekeying = (worker_rekeying_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                    &master_ctx->oritlsf_pool,
-			                                                                    1,
-			                                                                    sizeof(worker_rekeying_t)
-		                                                                        );
-		master_ctx->dbr_session[ixxxx].healthy = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                 &master_ctx->oritlsf_pool,
-			                                                                 1,
-			                                                                 sizeof(oricle_double_t)
-		                                                                     );
-		master_ctx->dbr_session[ixxxx].upp = (uds_pair_pid_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                            &master_ctx->oritlsf_pool,
-			                                                            1,
-			                                                            sizeof(uds_pair_pid_t)
-		                                                                );
-		master_ctx->dbr_session[ixxxx].security = (worker_security_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                    &master_ctx->oritlsf_pool,
-			                                                                    1,
-			                                                                    sizeof(worker_security_t)
-		                                                                        );
-		master_ctx->dbr_session[ixxxx].metrics = (worker_metrics_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                  &master_ctx->oritlsf_pool,
-			                                                                  1,
-			                                                                  sizeof(worker_metrics_t)
-		                                                                      );
-		master_ctx->dbr_session[ixxxx].avgtt = (oricle_long_double_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                    &master_ctx->oritlsf_pool,
-			                                                                    1,
-			                                                                    sizeof(oricle_long_double_t)
-		                                                                        );
+    }
+    for (uint8_t ixxxx=0;ixxxx<MAX_DBR_WORKERS;++ixxxx) {
+        master_ctx->dbr_session[ixxxx].rekeying = (worker_rekeying_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(worker_rekeying_t)
+                );
+        master_ctx->dbr_session[ixxxx].healthy = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(oricle_double_t)
+                );
+        master_ctx->dbr_session[ixxxx].upp = (uds_pair_pid_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(uds_pair_pid_t)
+                );
+        master_ctx->dbr_session[ixxxx].security = (worker_security_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(worker_security_t)
+                );
+        master_ctx->dbr_session[ixxxx].metrics = (worker_metrics_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(worker_metrics_t)
+                );
+        master_ctx->dbr_session[ixxxx].avgtt = (oricle_long_double_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(oricle_long_double_t)
+                );
         master_ctx->dbr_session[ixxxx].buffer = (et_buffer_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                  &master_ctx->oritlsf_pool,
-			                                                                  1,
-			                                                                  sizeof(et_buffer_t)
-		                                                                      );
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(et_buffer_t)
+                );
         et_buffer_t *buffer = master_ctx->dbr_session[ixxxx].buffer;
         buffer->read_step = 0;
         buffer->buffer_in = NULL;
@@ -285,43 +288,43 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
         buffer->buffer_out = NULL;
         buffer->out_size_tb = 0;
         buffer->out_size_c = 0;
-	}
-	for (uint8_t ixxxx=0;ixxxx<MAX_DBW_WORKERS;++ixxxx) {
-		master_ctx->dbw_session[ixxxx].rekeying = (worker_rekeying_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                    &master_ctx->oritlsf_pool,
-			                                                                    1,
-			                                                                    sizeof(worker_rekeying_t)
-		                                                                        );
-		master_ctx->dbw_session[ixxxx].healthy = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                 &master_ctx->oritlsf_pool,
-			                                                                 1,
-			                                                                 sizeof(oricle_double_t)
-		                                                                     );
-		master_ctx->dbw_session[ixxxx].upp = (uds_pair_pid_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                            &master_ctx->oritlsf_pool,
-			                                                            1,
-			                                                            sizeof(uds_pair_pid_t)
-		                                                                );
-		master_ctx->dbw_session[ixxxx].security = (worker_security_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                    &master_ctx->oritlsf_pool,
-			                                                                    1,
-			                                                                    sizeof(worker_security_t)
-		                                                                        );
-		master_ctx->dbw_session[ixxxx].metrics = (worker_metrics_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                  &master_ctx->oritlsf_pool,
-			                                                                  1,
-			                                                                  sizeof(worker_metrics_t)
-		                                                                      );
-		master_ctx->dbw_session[ixxxx].avgtt = (oricle_long_double_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                    &master_ctx->oritlsf_pool,
-			                                                                    1,
-			                                                                    sizeof(oricle_long_double_t)
-		                                                                        );
+    }
+    for (uint8_t ixxxx=0;ixxxx<MAX_DBW_WORKERS;++ixxxx) {
+        master_ctx->dbw_session[ixxxx].rekeying = (worker_rekeying_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(worker_rekeying_t)
+                );
+        master_ctx->dbw_session[ixxxx].healthy = (oricle_double_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(oricle_double_t)
+                );
+        master_ctx->dbw_session[ixxxx].upp = (uds_pair_pid_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(uds_pair_pid_t)
+                );
+        master_ctx->dbw_session[ixxxx].security = (worker_security_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(worker_security_t)
+                );
+        master_ctx->dbw_session[ixxxx].metrics = (worker_metrics_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(worker_metrics_t)
+                );
+        master_ctx->dbw_session[ixxxx].avgtt = (oricle_long_double_t *)oritlsf_calloc(__FILE__, __LINE__,
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(oricle_long_double_t)
+                );
         master_ctx->dbw_session[ixxxx].buffer = (et_buffer_t *)oritlsf_calloc(__FILE__, __LINE__,
-			                                                                  &master_ctx->oritlsf_pool,
-			                                                                  1,
-			                                                                  sizeof(et_buffer_t)
-		                                                                      );
+                &master_ctx->oritlsf_pool,
+                1,
+                sizeof(et_buffer_t)
+                );
         et_buffer_t *buffer = master_ctx->dbw_session[ixxxx].buffer;
         buffer->read_step = 0;
         buffer->buffer_in = NULL;
@@ -330,7 +333,7 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
         buffer->buffer_out = NULL;
         buffer->out_size_tb = 0;
         buffer->out_size_c = 0;
-	}
+    }
     //----------------------------------------------------------------------
     for (uint8_t sio_worker_idx=0;sio_worker_idx<MAX_SIO_WORKERS; ++sio_worker_idx) {
         for(uint8_t i = 0; i < MAX_CONNECTION_PER_SIO_WORKER; ++i) {
@@ -359,7 +362,7 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
     master_ctx->last_cow_rr_idx = 0;
     master_ctx->last_dbr_rr_idx = 0;
     master_ctx->last_dbw_rr_idx = 0;
-	master_ctx->master_pid = 0;
+    master_ctx->master_pid = 0;
     master_ctx->ipv4_udp = -1;
     master_ctx->ipv6_udp = -1;
     //----------------------------------------------------------------------
@@ -373,67 +376,67 @@ status_t setup_master(const char *label, master_context_t *master_ctx) {
     //======================================================================
     // Master setup socket udp & timer heartbeat
     //======================================================================
-	if (async_create(label, &master_ctx->master_async) != SUCCESS) {
+    if (async_create(label, &master_ctx->master_async) != SUCCESS) {
         return FAILURE;
-	}
+    }
     master_async = &master_ctx->master_async;
-	if (async_create_event(label, &master_ctx->shutdown_event_fd->event_id, master_ctx->shutdown_event_fd->event_type) != SUCCESS) {
+    if (async_create_event(label, &master_ctx->shutdown_event_fd->event_id, master_ctx->shutdown_event_fd->event_type) != SUCCESS) {
         return FAILURE;
-	}
-	if (async_create_inout_event(label, &master_ctx->master_async, &master_ctx->shutdown_event_fd->event_id, master_ctx->shutdown_event_fd->event_type) != SUCCESS) {
+    }
+    if (async_create_inout_event(label, &master_ctx->master_async, &master_ctx->shutdown_event_fd->event_id, master_ctx->shutdown_event_fd->event_type) != SUCCESS) {
         return FAILURE;
-	}
+    }
     shutdown_event_fd = master_ctx->shutdown_event_fd;
     if (oritw_setup(label, &master_ctx->oritlsf_pool, &master_ctx->master_async, &master_ctx->timer) != SUCCESS) return FAILURE;
     return SUCCESS;
 }
 
 void cleanup_master(const char *label, master_context_t *master_ctx) {
-	for (uint8_t ixxxx=0;ixxxx<MAX_SIO_WORKERS;++ixxxx) {
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_session[ixxxx].rekeying);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_session[ixxxx].healthy);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_session[ixxxx].upp);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_session[ixxxx].security);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_session[ixxxx].metrics);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_session[ixxxx].avgtt);
+    for (uint8_t ixxxx=0;ixxxx<MAX_SIO_WORKERS;++ixxxx) {
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_session[ixxxx].rekeying);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_session[ixxxx].healthy);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_session[ixxxx].upp);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_session[ixxxx].security);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_session[ixxxx].metrics);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_session[ixxxx].avgtt);
         CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &master_ctx->sio_session[ixxxx].buffer);
-	}
-	for (uint8_t ixxxx=0;ixxxx<MAX_LOGIC_WORKERS;++ixxxx) {
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session[ixxxx].rekeying);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session[ixxxx].healthy);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session[ixxxx].upp);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session[ixxxx].security);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session[ixxxx].metrics);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session[ixxxx].avgtt);
+    }
+    for (uint8_t ixxxx=0;ixxxx<MAX_LOGIC_WORKERS;++ixxxx) {
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session[ixxxx].rekeying);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session[ixxxx].healthy);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session[ixxxx].upp);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session[ixxxx].security);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session[ixxxx].metrics);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session[ixxxx].avgtt);
         CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &master_ctx->logic_session[ixxxx].buffer);
-	}
-	for (uint8_t ixxxx=0;ixxxx<MAX_COW_WORKERS;++ixxxx) {
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_session[ixxxx].rekeying);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_session[ixxxx].healthy);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_session[ixxxx].upp);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_session[ixxxx].security);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_session[ixxxx].metrics);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_session[ixxxx].avgtt);
+    }
+    for (uint8_t ixxxx=0;ixxxx<MAX_COW_WORKERS;++ixxxx) {
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_session[ixxxx].rekeying);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_session[ixxxx].healthy);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_session[ixxxx].upp);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_session[ixxxx].security);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_session[ixxxx].metrics);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_session[ixxxx].avgtt);
         CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &master_ctx->cow_session[ixxxx].buffer);
-	}
-	for (uint8_t ixxxx=0;ixxxx<MAX_DBR_WORKERS;++ixxxx) {
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbr_session[ixxxx].rekeying);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbr_session[ixxxx].healthy);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbr_session[ixxxx].upp);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbr_session[ixxxx].security);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbr_session[ixxxx].metrics);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbr_session[ixxxx].avgtt);
+    }
+    for (uint8_t ixxxx=0;ixxxx<MAX_DBR_WORKERS;++ixxxx) {
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbr_session[ixxxx].rekeying);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbr_session[ixxxx].healthy);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbr_session[ixxxx].upp);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbr_session[ixxxx].security);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbr_session[ixxxx].metrics);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbr_session[ixxxx].avgtt);
         CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &master_ctx->dbr_session[ixxxx].buffer);
-	}
-	for (uint8_t ixxxx=0;ixxxx<MAX_DBW_WORKERS;++ixxxx) {
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbw_session[ixxxx].rekeying);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbw_session[ixxxx].healthy);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbw_session[ixxxx].upp);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbw_session[ixxxx].security);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbw_session[ixxxx].metrics);
-		oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbw_session[ixxxx].avgtt);
+    }
+    for (uint8_t ixxxx=0;ixxxx<MAX_DBW_WORKERS;++ixxxx) {
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbw_session[ixxxx].rekeying);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbw_session[ixxxx].healthy);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbw_session[ixxxx].upp);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbw_session[ixxxx].security);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbw_session[ixxxx].metrics);
+        oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->dbw_session[ixxxx].avgtt);
         CLOSE_ET_BUFFER(&master_ctx->oritlsf_pool, &master_ctx->dbw_session[ixxxx].buffer);
-	}
+    }
     oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->sio_session);
     oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->logic_session);
     oritlsf_free(&master_ctx->oritlsf_pool, (void **)&master_ctx->cow_session);
@@ -493,6 +496,8 @@ void cleanup_master(const char *label, master_context_t *master_ctx) {
     database_close(g_database_env, g_database_pkhash);
     database_close(g_database_env, g_database_era);
     database_deinit_env(label, &g_database_env);
+    database_close(g_dataab_env, g_dataab_metrics);
+    database_deinit_env(label, &g_dataab_env);
     database_close(g_nodekeys_env, g_nodekeys_keys);
     database_deinit_env(label, &g_nodekeys_env);
 }
@@ -501,24 +506,24 @@ void run_master(const char *label, master_context_t *master_ctx) {
     if (setup_workers(label, master_ctx) != SUCCESS) goto exit;
     master_workers_info(label, master_ctx, IT_READY);
     while (!master_ctx->shutdown_requested) {
-		int_status_t snfds = async_wait(label, &master_ctx->master_async);
-		if (snfds.status != SUCCESS) {
+        int_status_t snfds = async_wait(label, &master_ctx->master_async);
+        if (snfds.status != SUCCESS) {
             if (snfds.status == FAILURE_EBADF) {
                 master_ctx->shutdown_requested = 1;
             }
             continue;
         }
-		for (int n = 0; n < snfds.r_int; ++n) {
-			if (master_ctx->shutdown_requested) {
-				break;
-			}
-			int_status_t fd_status = async_getfd(label, &master_ctx->master_async, n);
-			if (fd_status.status != SUCCESS) continue;
-			int current_fd = fd_status.r_int;
-			uint32_t_status_t events_status = async_getevents(label, &master_ctx->master_async, n);
-			if (events_status.status != SUCCESS) continue;
-			uint32_t current_events = events_status.r_uint32_t;
-			if (current_fd == master_ctx->shutdown_event_fd->event_id) {
+        for (int n = 0; n < snfds.r_int; ++n) {
+            if (master_ctx->shutdown_requested) {
+                break;
+            }
+            int_status_t fd_status = async_getfd(label, &master_ctx->master_async, n);
+            if (fd_status.status != SUCCESS) continue;
+            int current_fd = fd_status.r_int;
+            uint32_t_status_t events_status = async_getevents(label, &master_ctx->master_async, n);
+            if (events_status.status != SUCCESS) continue;
+            uint32_t current_events = events_status.r_uint32_t;
+            if (current_fd == master_ctx->shutdown_event_fd->event_id) {
                 if (async_event_is_IN(current_events)) {
                     et_result_t retr;
                     retr.failure = false;
@@ -551,8 +556,8 @@ void run_master(const char *label, master_context_t *master_ctx) {
                         }
                     }
                 }
-				continue;
-			} else if (current_fd == master_ctx->ipv4_udp) {
+                continue;
+            } else if (current_fd == master_ctx->ipv4_udp) {
                 if (async_event_is_ERR(current_events)) {
                     CLOSE_FD(&master_ctx->ipv4_udp);
                 } else {
@@ -658,8 +663,8 @@ void run_master(const char *label, master_context_t *master_ctx) {
                 }
                 if (event_founded_in_uds) {
                     if (async_event_is_HUP(current_events) ||
-                        async_event_is_ERR(current_events) ||
-                        async_event_is_RDHUP(current_events))
+                            async_event_is_ERR(current_events) ||
+                            async_event_is_RDHUP(current_events))
                     {
                         if (handle_master_ipc_closed_event(label, master_ctx, wot, index, file_descriptor) != SUCCESS) {
                             continue;
@@ -722,80 +727,80 @@ void run_master(const char *label, master_context_t *master_ctx) {
                                         continue;
                                     }
                                     uint8_t worker_index = select_best_worker(label, master_ctx, LOGIC);
-									if (worker_index == 0xff) {
-										LOG_ERROR("%sFailed to select an LOGIC worker for new task. Initiating graceful shutdown...", label);
-										master_ctx->shutdown_requested = 1;
-										master_workers_info(label, master_ctx, IT_SHUTDOWN);
-										continue;
-									}
-									if (new_task_metrics(label, master_ctx, LOGIC, worker_index) != SUCCESS) {
-										LOG_ERROR("%sFailed to input new task in LOGIC %d metrics. Initiating graceful shutdown...", label, worker_index);
-										master_ctx->shutdown_requested = 1;
-										master_workers_info(label, master_ctx, IT_SHUTDOWN);
-										continue;
-									}
-									if (master_worker_info(label, master_ctx, LOGIC, worker_index, IT_AWKSRDY) != SUCCESS) {
-										LOG_ERROR("%sFailed to infoing AWKSRDY to LOGIC %d. Initiating graceful shutdown...", label, worker_index);
-										master_ctx->shutdown_requested = 1;
-										master_workers_info(label, master_ctx, IT_SHUTDOWN);
-										continue;
-									}
+                                    if (worker_index == 0xff) {
+                                        LOG_ERROR("%sFailed to select an LOGIC worker for new task. Initiating graceful shutdown...", label);
+                                        master_ctx->shutdown_requested = 1;
+                                        master_workers_info(label, master_ctx, IT_SHUTDOWN);
+                                        continue;
+                                    }
+                                    if (new_task_metrics(label, master_ctx, LOGIC, worker_index) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to input new task in LOGIC %d metrics. Initiating graceful shutdown...", label, worker_index);
+                                        master_ctx->shutdown_requested = 1;
+                                        master_workers_info(label, master_ctx, IT_SHUTDOWN);
+                                        continue;
+                                    }
+                                    if (master_worker_info(label, master_ctx, LOGIC, worker_index, IT_AWKSRDY) != SUCCESS) {
+                                        LOG_ERROR("%sFailed to infoing AWKSRDY to LOGIC %d. Initiating graceful shutdown...", label, worker_index);
+                                        master_ctx->shutdown_requested = 1;
+                                        master_workers_info(label, master_ctx, IT_SHUTDOWN);
+                                        continue;
+                                    }
                                     /*
-                                    for (int ic = 0; ic < master_ctx->bootstrap_nodes.len; ic++) {
-                                        uint8_t worker_index = select_best_worker(label, master_ctx, COW);
-                                        if (worker_index == 0xff) {
-                                            LOG_ERROR("%sFailed to select an COW worker for new task. Initiating graceful shutdown...", label);
-                                            master_ctx->shutdown_requested = 1;
-                                            master_workers_info(label, master_ctx, IT_SHUTDOWN);
-                                            continue;
-                                        }
-                                        uint8_t slot_found = 0xff;
-                                        for(uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
-                                            if(!master_ctx->cow_c_session[(worker_index * MAX_CONNECTION_PER_COW_WORKER) + i].in_use) {
-                                                master_ctx->cow_c_session[(worker_index * MAX_CONNECTION_PER_COW_WORKER) + i].cow_index = worker_index;
-                                                master_ctx->cow_c_session[(worker_index * MAX_CONNECTION_PER_COW_WORKER) + i].in_use = true;
-                                                slot_found = i;
-                                                break;
-                                            }
-                                        }
-                                        if (slot_found == 0xff) {
-                                            LOG_ERROR("%sWARNING: No free session slots in cow-%d sessions. Initiating graceful shutdown...", label, worker_index);
-                                            master_ctx->shutdown_requested = 1;
-                                            master_workers_info(label, master_ctx, IT_SHUTDOWN);
-                                            continue;
-                                        }
-                                        if (new_task_metrics(label, master_ctx, COW, worker_index) != SUCCESS) {
-                                            LOG_ERROR("%sFailed to input new task in COW %d metrics. Initiating graceful shutdown...", label, worker_index);
-                                            master_ctx->shutdown_requested = 1;
-                                            master_workers_info(label, master_ctx, IT_SHUTDOWN);
-                                            continue;
-                                        }
-                                        uint64_t *id_connection = &master_ctx->cow_c_session[(worker_index * MAX_CONNECTION_PER_COW_WORKER) + slot_found].id_connection;
-                                        struct sockaddr_in6 *remote_addr = &master_ctx->cow_c_session[(worker_index * MAX_CONNECTION_PER_COW_WORKER) + slot_found].remote_addr;
-                                        if (generate_uint64_t_id(label, id_connection) != SUCCESS) goto exit;
-                                        memcpy(remote_addr, &master_ctx->bootstrap_nodes.addr[ic], sizeof(struct sockaddr_in6));
-                                        if (master_cow_connect(label, master_ctx, remote_addr, worker_index, slot_found, *id_connection) != SUCCESS) goto exit;
-                                    }
-                                    if (setup_master_socket_udp(label, master_ctx) != SUCCESS) {
-                                        LOG_ERROR("%sFailed to setup_master_socket_udp. Initiating graceful shutdown...", label);
-                                        master_ctx->shutdown_requested = 1;
-                                        master_workers_info(label, master_ctx, IT_SHUTDOWN);
-                                        continue;
-                                    }
-                                    if (async_create_in_event(label, &master_ctx->master_async, &master_ctx->ipv4_udp) != SUCCESS) {
-                                        LOG_ERROR("%sFailed to async_create_inout_event socket_udp. Initiating graceful shutdown...", label);
-                                        master_ctx->shutdown_requested = 1;
-                                        master_workers_info(label, master_ctx, IT_SHUTDOWN);
-                                        continue;
-                                    }
-                                    if (async_create_in_event(label, &master_ctx->master_async, &master_ctx->ipv6_udp) != SUCCESS) {
-                                        LOG_ERROR("%sFailed to async_create_inout_event socket_udp. Initiating graceful shutdown...", label);
-                                        master_ctx->shutdown_requested = 1;
-                                        master_workers_info(label, master_ctx, IT_SHUTDOWN);
-                                        continue;
-                                    }
-                                    LOG_INFO("%sPID %d UDP Server listening on port %d.", label, master_ctx->master_pid, master_ctx->listen_port);
-                                    */
+                                       for (int ic = 0; ic < master_ctx->bootstrap_nodes.len; ic++) {
+                                       uint8_t worker_index = select_best_worker(label, master_ctx, COW);
+                                       if (worker_index == 0xff) {
+                                       LOG_ERROR("%sFailed to select an COW worker for new task. Initiating graceful shutdown...", label);
+                                       master_ctx->shutdown_requested = 1;
+                                       master_workers_info(label, master_ctx, IT_SHUTDOWN);
+                                       continue;
+                                       }
+                                       uint8_t slot_found = 0xff;
+                                       for(uint8_t i = 0; i < MAX_CONNECTION_PER_COW_WORKER; ++i) {
+                                       if(!master_ctx->cow_c_session[(worker_index * MAX_CONNECTION_PER_COW_WORKER) + i].in_use) {
+                                       master_ctx->cow_c_session[(worker_index * MAX_CONNECTION_PER_COW_WORKER) + i].cow_index = worker_index;
+                                       master_ctx->cow_c_session[(worker_index * MAX_CONNECTION_PER_COW_WORKER) + i].in_use = true;
+                                       slot_found = i;
+                                       break;
+                                       }
+                                       }
+                                       if (slot_found == 0xff) {
+                                       LOG_ERROR("%sWARNING: No free session slots in cow-%d sessions. Initiating graceful shutdown...", label, worker_index);
+                                       master_ctx->shutdown_requested = 1;
+                                       master_workers_info(label, master_ctx, IT_SHUTDOWN);
+                                       continue;
+                                       }
+                                       if (new_task_metrics(label, master_ctx, COW, worker_index) != SUCCESS) {
+                                       LOG_ERROR("%sFailed to input new task in COW %d metrics. Initiating graceful shutdown...", label, worker_index);
+                                       master_ctx->shutdown_requested = 1;
+                                       master_workers_info(label, master_ctx, IT_SHUTDOWN);
+                                       continue;
+                                       }
+                                       uint64_t *id_connection = &master_ctx->cow_c_session[(worker_index * MAX_CONNECTION_PER_COW_WORKER) + slot_found].id_connection;
+                                       struct sockaddr_in6 *remote_addr = &master_ctx->cow_c_session[(worker_index * MAX_CONNECTION_PER_COW_WORKER) + slot_found].remote_addr;
+                                       if (generate_uint64_t_id(label, id_connection) != SUCCESS) goto exit;
+                                       memcpy(remote_addr, &master_ctx->bootstrap_nodes.addr[ic], sizeof(struct sockaddr_in6));
+                                       if (master_cow_connect(label, master_ctx, remote_addr, worker_index, slot_found, *id_connection) != SUCCESS) goto exit;
+                                       }
+                                       if (setup_master_socket_udp(label, master_ctx) != SUCCESS) {
+                                       LOG_ERROR("%sFailed to setup_master_socket_udp. Initiating graceful shutdown...", label);
+                                       master_ctx->shutdown_requested = 1;
+                                       master_workers_info(label, master_ctx, IT_SHUTDOWN);
+                                       continue;
+                                       }
+                                       if (async_create_in_event(label, &master_ctx->master_async, &master_ctx->ipv4_udp) != SUCCESS) {
+                                       LOG_ERROR("%sFailed to async_create_inout_event socket_udp. Initiating graceful shutdown...", label);
+                                       master_ctx->shutdown_requested = 1;
+                                       master_workers_info(label, master_ctx, IT_SHUTDOWN);
+                                       continue;
+                                       }
+                                       if (async_create_in_event(label, &master_ctx->master_async, &master_ctx->ipv6_udp) != SUCCESS) {
+                                       LOG_ERROR("%sFailed to async_create_inout_event socket_udp. Initiating graceful shutdown...", label);
+                                       master_ctx->shutdown_requested = 1;
+                                       master_workers_info(label, master_ctx, IT_SHUTDOWN);
+                                       continue;
+                                       }
+                                       LOG_INFO("%sPID %d UDP Server listening on port %d.", label, master_ctx->master_pid, master_ctx->listen_port);
+                                       */
                                 } else {
                                     master_ctx->is_rekeying = false;
                                 }
@@ -806,13 +811,13 @@ void run_master(const char *label, master_context_t *master_ctx) {
                         }
                         if (async_event_is_OUT(current_events)) {
                             et_result_t wetr = write_ipc_protocol_message(
-                                &master_ctx->oritlsf_pool,
-                                file_descriptor,
-                                buffer,
-                                0,
-                                NULL,
-                                true
-                            );
+                                    &master_ctx->oritlsf_pool,
+                                    file_descriptor,
+                                    buffer,
+                                    0,
+                                    NULL,
+                                    true
+                                    );
                             if (!wetr.failure) {
                                 if (!wetr.partial) {
                                     oritlsf_free(&master_ctx->oritlsf_pool, (void **)&buffer->buffer_out);

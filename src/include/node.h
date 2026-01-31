@@ -9,6 +9,7 @@
 #include "types.h"
 #include "utilities.h"
 #include <stdint.h>
+#include <sys/endian.h>
 
 typedef struct {
 	uint64_t no;
@@ -165,6 +166,7 @@ static inline int nodekeys_keys_get_last(
 
 static inline int nodekeys_keys_append(
         const char *label,
+        oritlsf_pool_t *pool,
         MDB_env *env,
         MDB_dbi dbi,
         const nodekeys_t *keys
@@ -195,15 +197,29 @@ static inline int nodekeys_keys_append(
         return rc;
     }
     database_cursor_close(&cur);
-    uint8_t k_buf[NODEKEYS_KEYS_KEY_SIZE];
-    uint8_t v_buf[NODEKEYS_KEYS_DATA_SIZE];
+    uint8_t *k_buf = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, NODEKEYS_KEYS_KEY_SIZE);
+    if (!k_buf) {
+        database_cursor_close(&cur);
+        database_txn_abort(&txn);
+        return ENOMEM;
+    }
+    uint8_t *v_buf = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, NODEKEYS_KEYS_DATA_SIZE);
+    if (!v_buf) {
+        database_cursor_close(&cur);
+        database_txn_abort(&txn);
+        return ENOMEM;
+    }
     nodekeys_t tmp = *keys;
     tmp.no = next_no;
-    if (nodekeys_serialize(label, &tmp, k_buf, sizeof(k_buf), v_buf, sizeof(v_buf)) != SUCCESS) {
+    if (nodekeys_serialize(label, &tmp, k_buf, NODEKEYS_KEYS_KEY_SIZE, v_buf, NODEKEYS_KEYS_DATA_SIZE) != SUCCESS) {
         database_txn_abort(&txn);
         return FAILURE;
     }
-    rc = database_txn_put(label, txn, dbi, k_buf, sizeof(k_buf), v_buf, sizeof(v_buf), 0);
+    rc = database_txn_put(label, txn, dbi, k_buf, NODEKEYS_KEYS_KEY_SIZE, v_buf, NODEKEYS_KEYS_DATA_SIZE, 0);
+    memset(k_buf, 0, NODEKEYS_KEYS_KEY_SIZE);
+    memset(v_buf, 0, NODEKEYS_KEYS_DATA_SIZE);
+    oritlsf_free(pool, (void **)&k_buf);
+    oritlsf_free(pool, (void **)&v_buf);
     if (rc == MDB_SUCCESS) {
         return database_txn_commit(label, &txn);
     } else {
@@ -211,6 +227,167 @@ static inline int nodekeys_keys_append(
         return rc;
     }
 }
+
+typedef struct {
+	uint64_t no;
+    uint8_t pkhash[HASHES_BYTES];
+	uint8_t vermaj;
+	uint8_t vermin;
+    uint64_t updateno;
+    double hb_interval;
+    double sum_hb_interval;
+    double count_ack;
+    uint64_t last_ack;
+    uint64_t last_checkhealthy;
+    uint64_t last_task_started;
+    uint64_t last_task_finished;
+    uint64_t longest_task_time;
+    uint8_t ipstatic;
+    double healthy;
+    long double avgtt;
+    uint8_t prevhash[HASHES_BYTES];
+    uint8_t hash[HASHES_BYTES];
+    uint8_t signature[SIGN_GENERATE_SIGNATURE_BBYTES];
+} metrics_t;
+
+static inline status_t metrics_serialize(const char *label, const metrics_t *src, uint8_t *key, size_t key_len, uint8_t *value, size_t value_len) {
+    if (!src || !key || !value) {
+        LOG_ERROR("%sInvalid src pointers.", label);
+        return FAILURE;
+    }
+    size_t current_offset = 0;
+    if (CHECK_BUFFER_BOUNDS(current_offset, sizeof(uint64_t), key_len) != SUCCESS) return FAILURE_OOBUF;
+    uint64_t key_be = htobe64(src->no);
+    memcpy(key + current_offset, &key_be, sizeof(uint64_t));
+    current_offset += sizeof(uint64_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset, HASHES_BYTES, key_len) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(key + current_offset, src->pkhash, HASHES_BYTES);
+    current_offset += HASHES_BYTES;
+    current_offset = 0;
+    if (CHECK_BUFFER_BOUNDS(current_offset, sizeof(uint8_t), value_len) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(value + current_offset, &src->vermaj, sizeof(uint8_t));
+    current_offset += sizeof(uint8_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset, sizeof(uint8_t), value_len) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(value + current_offset, &src->vermin, sizeof(uint8_t));
+    current_offset += sizeof(uint8_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset, sizeof(uint64_t), value_len) != SUCCESS) return FAILURE_OOBUF;
+    uint64_t updateno_be = htobe64(src->updateno);
+    memcpy(value + current_offset, &updateno_be, sizeof(uint64_t));
+    current_offset += sizeof(uint64_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset, DOUBLE_ARRAY_SIZE, value_len) != SUCCESS) return FAILURE_OOBUF;
+    uint8_t hbinterval_be[DOUBLE_ARRAY_SIZE];
+    double_to_uint8_be(src->hb_interval, hbinterval_be);
+    memcpy(value + current_offset, hbinterval_be, DOUBLE_ARRAY_SIZE);
+    current_offset += DOUBLE_ARRAY_SIZE;
+    if (CHECK_BUFFER_BOUNDS(current_offset, DOUBLE_ARRAY_SIZE, value_len) != SUCCESS) return FAILURE_OOBUF;
+    uint8_t sum_hbinterval_be[DOUBLE_ARRAY_SIZE];
+    double_to_uint8_be(src->sum_hb_interval, sum_hbinterval_be);
+    memcpy(value + current_offset, sum_hbinterval_be, DOUBLE_ARRAY_SIZE);
+    current_offset += DOUBLE_ARRAY_SIZE;
+    if (CHECK_BUFFER_BOUNDS(current_offset, DOUBLE_ARRAY_SIZE, value_len) != SUCCESS) return FAILURE_OOBUF;
+    uint8_t count_ack_be[DOUBLE_ARRAY_SIZE];
+    double_to_uint8_be(src->count_ack, count_ack_be);
+    memcpy(value + current_offset, count_ack_be, DOUBLE_ARRAY_SIZE);
+    current_offset += DOUBLE_ARRAY_SIZE;
+    if (CHECK_BUFFER_BOUNDS(current_offset, sizeof(uint64_t), value_len) != SUCCESS) return FAILURE_OOBUF;
+    uint64_t last_ack_be = htobe64(src->last_ack);
+    memcpy(value + current_offset, &last_ack_be, sizeof(uint64_t));
+    current_offset += sizeof(uint64_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset, sizeof(uint64_t), value_len) != SUCCESS) return FAILURE_OOBUF;
+    uint64_t last_checkhealthy_be = htobe64(src->last_checkhealthy);
+    memcpy(value + current_offset, &last_checkhealthy_be, sizeof(uint64_t));
+    current_offset += sizeof(uint64_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset, sizeof(uint64_t), value_len) != SUCCESS) return FAILURE_OOBUF;
+    uint64_t last_task_started_be = htobe64(src->last_task_started);
+    memcpy(value + current_offset, &last_task_started_be, sizeof(uint64_t));
+    current_offset += sizeof(uint64_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset, sizeof(uint64_t), value_len) != SUCCESS) return FAILURE_OOBUF;
+    uint64_t last_task_finished_be = htobe64(src->last_task_finished);
+    memcpy(value + current_offset, &last_task_finished_be, sizeof(uint64_t));
+    current_offset += sizeof(uint64_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset, sizeof(uint64_t), value_len) != SUCCESS) return FAILURE_OOBUF;
+    uint64_t longest_task_time_be = htobe64(src->longest_task_time);
+    memcpy(value + current_offset, &longest_task_time_be, sizeof(uint64_t));
+    current_offset += sizeof(uint64_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset, sizeof(uint8_t), value_len) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(value + current_offset, &src->ipstatic, sizeof(uint8_t));
+    current_offset += sizeof(uint8_t);
+    if (CHECK_BUFFER_BOUNDS(current_offset, DOUBLE_ARRAY_SIZE, value_len) != SUCCESS) return FAILURE_OOBUF;
+    uint8_t healthy_be[DOUBLE_ARRAY_SIZE];
+    double_to_uint8_be(src->healthy, healthy_be);
+    memcpy(value + current_offset, healthy_be, DOUBLE_ARRAY_SIZE);
+    current_offset += DOUBLE_ARRAY_SIZE;
+    if (CHECK_BUFFER_BOUNDS(current_offset, LONG_DOUBLE_ARRAY_SIZE, value_len) != SUCCESS) return FAILURE_OOBUF;
+    uint8_t avgtt_be[LONG_DOUBLE_ARRAY_SIZE];
+    long_double_to_uint8_be(src->avgtt, avgtt_be);
+    memcpy(value + current_offset, avgtt_be, LONG_DOUBLE_ARRAY_SIZE);
+    current_offset += LONG_DOUBLE_ARRAY_SIZE;
+    if (CHECK_BUFFER_BOUNDS(current_offset, HASHES_BYTES, value_len) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(value + current_offset, src->prevhash, HASHES_BYTES);
+    current_offset += HASHES_BYTES;
+    if (CHECK_BUFFER_BOUNDS(current_offset, HASHES_BYTES, value_len) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(value + current_offset, src->hash, HASHES_BYTES);
+    current_offset += HASHES_BYTES;
+    if (CHECK_BUFFER_BOUNDS(current_offset, SIGN_GENERATE_SIGNATURE_BBYTES, value_len) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(value + current_offset, src->signature, SIGN_GENERATE_SIGNATURE_BBYTES);
+    current_offset += SIGN_GENERATE_SIGNATURE_BBYTES;
+    return SUCCESS;
+}
+
+static inline status_t metrics_deserialize(const char *label, const uint8_t *key, size_t key_len, const uint8_t *value, size_t value_len, metrics_t *dst) {
+    if (!dst || !key || !value) {
+        LOG_ERROR("%sInvalid input pointers.", label);
+        return FAILURE;
+    }
+    size_t current_offset = 0;
+    size_t total_buffer_len = key_len;
+    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading key.", label);
+        return FAILURE_OOBUF;
+    }
+    uint64_t key_be;
+    memcpy(&key_be, key + current_offset, sizeof(uint64_t));
+    dst->no = be64toh(key_be);
+    current_offset += sizeof(uint64_t);
+    if (current_offset + HASHES_BYTES > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading pkhash.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(dst->pkhash, key + current_offset, HASHES_BYTES);
+    current_offset += HASHES_BYTES;
+    current_offset = 0;
+    total_buffer_len = value_len;
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading vermaj.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&dst->vermaj, value + current_offset, sizeof(uint8_t));
+    current_offset += sizeof(uint8_t);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading vermin.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&dst->vermin, value + current_offset, sizeof(uint8_t));
+    current_offset += sizeof(uint8_t);
+    return SUCCESS;
+}
+
+#define DATAAB_METRICS_KEY_SIZE ( \
+        sizeof(uint64_t) + \
+        HASHES_BYTES \
+        )
+
+#define DATAAB_METRICS_DATA_SIZE ( \
+        (2 * sizeof(uint8_t)) + \
+        sizeof(uint64_t) + \
+        (3 * DOUBLE_ARRAY_SIZE) + \
+        (5 * sizeof(uint64_t)) + \
+        sizeof(uint8_t) + \
+        DOUBLE_ARRAY_SIZE + \
+        LONG_DOUBLE_ARRAY_SIZE + \
+        (2 * HASHES_BYTES) + \
+        SIGN_GENERATE_SIGNATURE_BBYTES \
+        )
 
 typedef struct {
 	uint8_t hash[HASHES_BYTES];
@@ -405,6 +582,7 @@ static inline int database_pkhash_find(
 
 static inline int database_pkhash_append(
         const char *label,
+        oritlsf_pool_t *pool,
         MDB_env *env,
         MDB_dbi dbi,
         const pkhash_t *pkhash
@@ -414,13 +592,25 @@ static inline int database_pkhash_append(
     int rc;
     rc = database_txn_begin(label, env, &txn);
     if (rc != MDB_SUCCESS) return rc;
-    uint8_t k_buf[DATABASE_PKHASH_KEY_SIZE];
-    uint8_t v_buf[DATABASE_PKHASH_DATA_SIZE];
-    if (pkhash_serialize(label, pkhash, k_buf, sizeof(k_buf), v_buf, sizeof(v_buf)) != SUCCESS) {
+    uint8_t *k_buf = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, DATABASE_PKHASH_KEY_SIZE);
+    if (!k_buf) {
+        database_txn_abort(&txn);
+        return ENOMEM;
+    }
+    uint8_t *v_buf = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, DATABASE_PKHASH_DATA_SIZE);
+    if (!v_buf) {
+        database_txn_abort(&txn);
+        return ENOMEM;
+    }
+    if (pkhash_serialize(label, pkhash, k_buf, DATABASE_PKHASH_KEY_SIZE, v_buf, DATABASE_PKHASH_DATA_SIZE) != SUCCESS) {
         database_txn_abort(&txn);
         return FAILURE;
     }
-    rc = database_txn_put(label, txn, dbi, k_buf, sizeof(k_buf), v_buf, sizeof(v_buf), 0);
+    rc = database_txn_put(label, txn, dbi, k_buf, DATABASE_PKHASH_KEY_SIZE, v_buf, DATABASE_PKHASH_DATA_SIZE, 0);
+    memset(k_buf, 0, DATABASE_PKHASH_KEY_SIZE);
+    memset(v_buf, 0, DATABASE_PKHASH_DATA_SIZE);
+    oritlsf_free(pool, (void **)&k_buf);
+    oritlsf_free(pool, (void **)&v_buf);
     if (rc == MDB_SUCCESS) {
         return database_txn_commit(label, &txn);
     } else {
@@ -429,54 +619,41 @@ static inline int database_pkhash_append(
     }
 }
 
-typedef struct {
-	uint8_t sgn_publickey[SIGN_PUBLICKEY_BYTES];
-	uint8_t kem_publickey[KEM_PUBLICKEY_BYTES];
-} node_publickeys_t;
-
-static inline status_t serialize_node_publickeys(const char *label, const node_publickeys_t *src, uint8_t *current_buffer, size_t buffer_size, size_t *offset) {
+static inline status_t serialize_node_pkhash(const char *label, const uint8_t *src, uint8_t *current_buffer, size_t buffer_size, size_t *offset) {
     if (!src || !current_buffer || !offset) {
         LOG_ERROR("%sInvalid input pointers.", label);
         return FAILURE;
     }
     size_t current_offset_local = *offset;
-    if (CHECK_BUFFER_BOUNDS(current_offset_local, SIGN_PUBLICKEY_BYTES, buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    memcpy(current_buffer + current_offset_local, src->sgn_publickey, SIGN_PUBLICKEY_BYTES);
-    current_offset_local += SIGN_PUBLICKEY_BYTES;
-    if (CHECK_BUFFER_BOUNDS(current_offset_local, KEM_PUBLICKEY_BYTES, buffer_size) != SUCCESS) return FAILURE_OOBUF;
-    memcpy(current_buffer + current_offset_local, src->kem_publickey, KEM_PUBLICKEY_BYTES);
-    current_offset_local += KEM_PUBLICKEY_BYTES;
+    if (CHECK_BUFFER_BOUNDS(current_offset_local, HASHES_BYTES, buffer_size) != SUCCESS) return FAILURE_OOBUF;
+    memcpy(current_buffer + current_offset_local, src, HASHES_BYTES);
+    current_offset_local += HASHES_BYTES;
+    *offset = current_offset_local;
     return SUCCESS;
 }
 
-static inline status_t deserialize_node_publickeys(const char *label, node_publickeys_t *dst, const uint8_t *buffer, size_t total_buffer_len, size_t *offset_ptr) {
+static inline status_t deserialize_node_pkhash(const char *label, uint8_t *dst, const uint8_t *buffer, size_t total_buffer_len, size_t *offset_ptr) {
     if (!dst || !buffer || !offset_ptr) {
         LOG_ERROR("%sInvalid input pointers.", label);
         return FAILURE;
     }
     size_t current_offset = *offset_ptr;
     const uint8_t *cursor = buffer + current_offset;
-    if (current_offset + SIGN_PUBLICKEY_BYTES > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading sgnpbkey.", label);
+    if (current_offset + HASHES_BYTES > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading pkhash.", label);
         return FAILURE_OOBUF;
     }
-    memcpy(dst->sgn_publickey, cursor, SIGN_PUBLICKEY_BYTES);
-    cursor += SIGN_PUBLICKEY_BYTES;
-    current_offset += SIGN_PUBLICKEY_BYTES;
-    if (current_offset + KEM_PUBLICKEY_BYTES > total_buffer_len) {
-        LOG_ERROR("%sOut of bounds reading kempbkey.", label);
-        return FAILURE_OOBUF;
-    }
-    memcpy(dst->kem_publickey, cursor, KEM_PUBLICKEY_BYTES);
-    cursor += KEM_PUBLICKEY_BYTES;
-    current_offset += KEM_PUBLICKEY_BYTES;
+    memcpy(dst, cursor, HASHES_BYTES);
+    cursor += HASHES_BYTES;
+    current_offset += HASHES_BYTES;
+    *offset_ptr = current_offset;
     return SUCCESS;
 }
 
 typedef struct {
-	node_publickeys_t men;
-	node_publickeys_t wamen;
-	node_publickeys_t dprkemen[DPR_COUNT];
+	uint8_t men[HASHES_BYTES];
+	uint8_t wamen[HASHES_BYTES];
+	uint8_t dprkemen[HASHES_BYTES][DPR_COUNT];
 } node_men_t;
 
 static inline status_t serialize_node_men(const char *label, const node_men_t *src, uint8_t *current_buffer, size_t buffer_size, size_t *offset) {
@@ -484,10 +661,10 @@ static inline status_t serialize_node_men(const char *label, const node_men_t *s
         LOG_ERROR("%sInvalid input pointers.", label);
         return FAILURE;
     }
-    if (serialize_node_publickeys(label, &src->men, current_buffer, buffer_size, offset) != SUCCESS) return FAILURE;
-    if (serialize_node_publickeys(label, &src->wamen, current_buffer, buffer_size, offset) != SUCCESS) return FAILURE;
+    if (serialize_node_pkhash(label, src->men, current_buffer, buffer_size, offset) != SUCCESS) return FAILURE;
+    if (serialize_node_pkhash(label, src->wamen, current_buffer, buffer_size, offset) != SUCCESS) return FAILURE;
     for (uint8_t iii=0;iii<DPR_COUNT;++iii) {
-        if (serialize_node_publickeys(label, &src->dprkemen[iii], current_buffer, buffer_size, offset) != SUCCESS) return FAILURE;
+        if (serialize_node_pkhash(label, src->dprkemen[iii], current_buffer, buffer_size, offset) != SUCCESS) return FAILURE;
     }
     return SUCCESS;
 }
@@ -497,10 +674,10 @@ static inline status_t deserialize_node_men(const char *label, node_men_t *dst, 
         LOG_ERROR("%sInvalid input pointers.", label);
         return FAILURE;
     }
-    if (deserialize_node_publickeys(label, &dst->men, buffer, total_buffer_len, offset_ptr) != SUCCESS) return FAILURE;
-    if (deserialize_node_publickeys(label, &dst->wamen, buffer, total_buffer_len, offset_ptr) != SUCCESS) return FAILURE;
+    if (deserialize_node_pkhash(label, dst->men, buffer, total_buffer_len, offset_ptr) != SUCCESS) return FAILURE;
+    if (deserialize_node_pkhash(label, dst->wamen, buffer, total_buffer_len, offset_ptr) != SUCCESS) return FAILURE;
     for (uint8_t iii=0;iii<DPR_COUNT;++iii) {
-        if (deserialize_node_publickeys(label, &dst->dprkemen[iii], buffer, total_buffer_len, offset_ptr) != SUCCESS) return FAILURE;
+        if (deserialize_node_pkhash(label, dst->dprkemen[iii], buffer, total_buffer_len, offset_ptr) != SUCCESS) return FAILURE;
     }
     return SUCCESS;
 }
@@ -509,8 +686,9 @@ typedef struct {
 	uint64_t no;
 	uint8_t vermaj;
 	uint8_t vermin;
-	node_publickeys_t presiden;
-	node_publickeys_t wapres;
+    uint64_t updateno;
+	uint8_t presiden[HASHES_BYTES];
+	uint8_t wapres[HASHES_BYTES];
 	node_men_t mendagri;
 	node_men_t menlu;
 	node_men_t menhan;
@@ -523,9 +701,7 @@ typedef struct {
 	node_men_t menristek;
 	node_men_t menpanrb;
 	node_men_t menag;
-	node_publickeys_t irjen1;
-	node_publickeys_t irjen2;
-	node_publickeys_t irjen3;
+	uint8_t irjen[HASHES_BYTES];
 	uint8_t ab[IPV6_ADDRESS_LEN][AB_COUNT];
 	uint8_t prevhash[HASHES_BYTES];
 	uint8_t hash[HASHES_BYTES];
@@ -549,8 +725,12 @@ static inline status_t era_serialize(const char *label, const era_t *src, uint8_
     if (CHECK_BUFFER_BOUNDS(current_offset, sizeof(uint8_t), value_len) != SUCCESS) return FAILURE_OOBUF;
     memcpy(value + current_offset, &src->vermin, sizeof(uint8_t));
     current_offset += sizeof(uint8_t);
-    if (serialize_node_publickeys(label, &src->presiden, value, value_len, &current_offset) != SUCCESS) return FAILURE;
-    if (serialize_node_publickeys(label, &src->wapres, value, value_len, &current_offset) != SUCCESS) return FAILURE;
+    if (CHECK_BUFFER_BOUNDS(current_offset, sizeof(uint64_t), value_len) != SUCCESS) return FAILURE_OOBUF;
+    uint64_t updateno_be = htobe64(src->updateno);
+    memcpy(value + current_offset, &updateno_be, sizeof(uint64_t));
+    current_offset += sizeof(uint64_t);
+    if (serialize_node_pkhash(label, src->presiden, value, value_len, &current_offset) != SUCCESS) return FAILURE;
+    if (serialize_node_pkhash(label, src->wapres, value, value_len, &current_offset) != SUCCESS) return FAILURE;
     if (serialize_node_men(label, &src->mendagri, value, value_len, &current_offset) != SUCCESS) return FAILURE;
     if (serialize_node_men(label, &src->menlu, value, value_len, &current_offset) != SUCCESS) return FAILURE;
     if (serialize_node_men(label, &src->menhan, value, value_len, &current_offset) != SUCCESS) return FAILURE;
@@ -563,9 +743,7 @@ static inline status_t era_serialize(const char *label, const era_t *src, uint8_
     if (serialize_node_men(label, &src->menristek, value, value_len, &current_offset) != SUCCESS) return FAILURE;
     if (serialize_node_men(label, &src->menpanrb, value, value_len, &current_offset) != SUCCESS) return FAILURE;
     if (serialize_node_men(label, &src->menag, value, value_len, &current_offset) != SUCCESS) return FAILURE;
-    if (serialize_node_publickeys(label, &src->irjen1, value, value_len, &current_offset) != SUCCESS) return FAILURE;
-    if (serialize_node_publickeys(label, &src->irjen2, value, value_len, &current_offset) != SUCCESS) return FAILURE;
-    if (serialize_node_publickeys(label, &src->irjen3, value, value_len, &current_offset) != SUCCESS) return FAILURE;
+    if (serialize_node_pkhash(label, src->irjen, value, value_len, &current_offset) != SUCCESS) return FAILURE;
     for (uint8_t iii=0;iii<AB_COUNT;++iii) {
         if (CHECK_BUFFER_BOUNDS(current_offset, IPV6_ADDRESS_LEN, value_len) != SUCCESS) return FAILURE_OOBUF;
         memcpy(value + current_offset, src->ab[iii], IPV6_ADDRESS_LEN);
@@ -612,8 +790,16 @@ static inline status_t era_deserialize(const char *label, const uint8_t *key, si
     }
     memcpy(&dst->vermin, value + current_offset, sizeof(uint8_t));
     current_offset += sizeof(uint8_t);
-    if (deserialize_node_publickeys(label, &dst->presiden, value, total_buffer_len, &current_offset) != SUCCESS) return FAILURE;
-    if (deserialize_node_publickeys(label, &dst->wapres, value, total_buffer_len, &current_offset) != SUCCESS) return FAILURE;
+    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading updateno.", label);
+        return FAILURE_OOBUF;
+    }
+    uint64_t updateno_be;
+    memcpy(&updateno_be, value + current_offset, sizeof(uint64_t));
+    dst->updateno = be64toh(updateno_be);
+    current_offset += sizeof(uint64_t);
+    if (deserialize_node_pkhash(label, dst->presiden, value, total_buffer_len, &current_offset) != SUCCESS) return FAILURE;
+    if (deserialize_node_pkhash(label, dst->wapres, value, total_buffer_len, &current_offset) != SUCCESS) return FAILURE;
     if (deserialize_node_men(label, &dst->mendagri, value, total_buffer_len, &current_offset) != SUCCESS) return FAILURE;
     if (deserialize_node_men(label, &dst->menlu, value, total_buffer_len, &current_offset) != SUCCESS) return FAILURE;
     if (deserialize_node_men(label, &dst->menhan, value, total_buffer_len, &current_offset) != SUCCESS) return FAILURE;
@@ -626,9 +812,7 @@ static inline status_t era_deserialize(const char *label, const uint8_t *key, si
     if (deserialize_node_men(label, &dst->menristek, value, total_buffer_len, &current_offset) != SUCCESS) return FAILURE;
     if (deserialize_node_men(label, &dst->menpanrb, value, total_buffer_len, &current_offset) != SUCCESS) return FAILURE;
     if (deserialize_node_men(label, &dst->menag, value, total_buffer_len, &current_offset) != SUCCESS) return FAILURE;
-    if (deserialize_node_publickeys(label, &dst->irjen1, value, total_buffer_len, &current_offset) != SUCCESS) return FAILURE;
-    if (deserialize_node_publickeys(label, &dst->irjen2, value, total_buffer_len, &current_offset) != SUCCESS) return FAILURE;
-    if (deserialize_node_publickeys(label, &dst->irjen3, value, total_buffer_len, &current_offset) != SUCCESS) return FAILURE;
+    if (deserialize_node_pkhash(label, dst->irjen, value, total_buffer_len, &current_offset) != SUCCESS) return FAILURE;
     for (uint8_t iii=0;iii<AB_COUNT;++iii) {
         if (current_offset + IPV6_ADDRESS_LEN > total_buffer_len) {
             LOG_ERROR("%sOut of bounds reading ab[%d].", label, iii);
@@ -664,8 +848,11 @@ static inline status_t era_deserialize(const char *label, const uint8_t *key, si
 
 #define DATABASE_ERA_DATA_SIZE ( \
         (2 * sizeof(uint8_t)) + \
-        (29 * (SIGN_PUBLICKEY_BYTES + KEM_PUBLICKEY_BYTES)) + \
-        (12 * DPR_COUNT * (SIGN_PUBLICKEY_BYTES + KEM_PUBLICKEY_BYTES)) + \
+        sizeof(uint64_t) + \
+        (2 * HASHES_BYTES)  + \
+        (2 * 12 * HASHES_BYTES) + \
+        (DPR_COUNT * 12 * HASHES_BYTES) + \
+        (1 * HASHES_BYTES) + \
         (AB_COUNT * IPV6_ADDRESS_LEN) + \
         (2 * HASHES_BYTES) + \
         SIGN_GENERATE_SIGNATURE_BBYTES \
@@ -716,6 +903,7 @@ static inline int database_era_get_last(
 
 static inline int database_era_append(
         const char *label,
+        oritlsf_pool_t *pool,
         MDB_env *env,
         MDB_dbi dbi,
         const era_t *era
@@ -746,15 +934,29 @@ static inline int database_era_append(
         return rc;
     }
     database_cursor_close(&cur);
-    uint8_t k_buf[DATABASE_ERA_KEY_SIZE];
-    uint8_t v_buf[DATABASE_ERA_DATA_SIZE];
+    uint8_t *k_buf = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, DATABASE_ERA_KEY_SIZE);
+    if (!k_buf) {
+        database_cursor_close(&cur);
+        database_txn_abort(&txn);
+        return ENOMEM;
+    }
+    uint8_t *v_buf = (uint8_t *)oritlsf_calloc(__FILE__, __LINE__, pool, 1, DATABASE_ERA_DATA_SIZE);
+    if (!v_buf) {
+        database_cursor_close(&cur);
+        database_txn_abort(&txn);
+        return ENOMEM;
+    }
     era_t tmp = *era;
     tmp.no = next_no;
-    if (era_serialize(label, &tmp, k_buf, sizeof(k_buf), v_buf, sizeof(v_buf)) != SUCCESS) {
+    if (era_serialize(label, &tmp, k_buf, DATABASE_ERA_KEY_SIZE, v_buf, DATABASE_ERA_DATA_SIZE) != SUCCESS) {
         database_txn_abort(&txn);
         return FAILURE;
     }
-    rc = database_txn_put(label, txn, dbi, k_buf, sizeof(k_buf), v_buf, sizeof(v_buf), 0);
+    rc = database_txn_put(label, txn, dbi, k_buf, DATABASE_ERA_KEY_SIZE, v_buf, DATABASE_ERA_DATA_SIZE, 0);
+    memset(k_buf, 0, DATABASE_ERA_KEY_SIZE);
+    memset(v_buf, 0, DATABASE_ERA_DATA_SIZE);
+    oritlsf_free(pool, (void **)&k_buf);
+    oritlsf_free(pool, (void **)&v_buf);
     if (rc == MDB_SUCCESS) {
         return database_txn_commit(label, &txn);
     } else {

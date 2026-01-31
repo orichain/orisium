@@ -17,13 +17,22 @@ static inline int database_error(const char *label, int rc) {
     return rc;
 }
 
-static inline size_t detect_disk_80percent(const char *path) {
+static inline size_t detect_disk_60percent(const char *path) {
     struct statfs sf;
     if (statfs(path, &sf) != 0) {
         return (size_t)1 << 40;
     }
     uint64_t total_bytes = (uint64_t)sf.f_blocks * sf.f_bsize;
-    return (size_t)(total_bytes * 8 / 10);
+    return (size_t)(total_bytes * 6 / 10);
+}
+
+static inline size_t detect_disk_30percent(const char *path) {
+    struct statfs sf;
+    if (statfs(path, &sf) != 0) {
+        return (size_t)1 << 40;
+    }
+    uint64_t total_bytes = (uint64_t)sf.f_blocks * sf.f_bsize;
+    return (size_t)(total_bytes * 3 / 10);
 }
 
 static inline int database_init_env(
@@ -38,8 +47,11 @@ static inline int database_init_env(
     rc = mdb_env_create(env);
     if (database_error(label, rc)) return rc;
     size_t final_mapsize = mapsize;
+    if (final_mapsize == (size_t)-2) {
+        final_mapsize = detect_disk_60percent(path);
+    }
     if (final_mapsize == (size_t)-1) {
-        final_mapsize = detect_disk_80percent(path);
+        final_mapsize = detect_disk_30percent(path);
     }
     rc = mdb_env_set_mapsize(*env, final_mapsize);
     if (database_error(label, rc)) return rc;
