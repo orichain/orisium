@@ -150,6 +150,118 @@ static inline status_t metrics_deserialize(const char *label, const uint8_t *key
     }
     memcpy(&dst->vermin, value + current_offset, sizeof(uint8_t));
     current_offset += sizeof(uint8_t);
+    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading updateno.", label);
+        return FAILURE_OOBUF;
+    }
+    uint64_t updateno_be;
+    memcpy(&updateno_be, value + current_offset, sizeof(uint64_t));
+    dst->updateno = be64toh(updateno_be);
+    current_offset += sizeof(uint64_t);
+    if (current_offset + DOUBLE_ARRAY_SIZE > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading hbinterval.", label);
+        return FAILURE_OOBUF;
+    }
+    uint8_t hbinterval_be[DOUBLE_ARRAY_SIZE];
+    memcpy(hbinterval_be, value + current_offset, DOUBLE_ARRAY_SIZE);
+    dst->hb_interval = uint8_be_to_double(hbinterval_be);
+    current_offset += DOUBLE_ARRAY_SIZE;
+    if (current_offset + DOUBLE_ARRAY_SIZE > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading sum_hb_interval.", label);
+        return FAILURE_OOBUF;
+    }
+    uint8_t sum_hbinterval_be[DOUBLE_ARRAY_SIZE];
+    memcpy(sum_hbinterval_be, value + current_offset, DOUBLE_ARRAY_SIZE);
+    dst->sum_hb_interval = uint8_be_to_double(sum_hbinterval_be);
+    current_offset += DOUBLE_ARRAY_SIZE;
+    if (current_offset + DOUBLE_ARRAY_SIZE > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading count_ack.", label);
+        return FAILURE_OOBUF;
+    }
+    uint8_t count_ack_be[DOUBLE_ARRAY_SIZE];
+    memcpy(count_ack_be, value + current_offset, DOUBLE_ARRAY_SIZE);
+    dst->count_ack = uint8_be_to_double(count_ack_be);
+    current_offset += DOUBLE_ARRAY_SIZE;
+    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading last_ack.", label);
+        return FAILURE_OOBUF;
+    }
+    uint64_t last_ack_be;
+    memcpy(&last_ack_be, value + current_offset, sizeof(uint64_t));
+    dst->last_ack = be64toh(last_ack_be);
+    current_offset += sizeof(uint64_t);
+    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading last_checkhealthy.", label);
+        return FAILURE_OOBUF;
+    }
+    uint64_t last_checkhealthy_be;
+    memcpy(&last_checkhealthy_be, value + current_offset, sizeof(uint64_t));
+    dst->last_checkhealthy = be64toh(last_checkhealthy_be);
+    current_offset += sizeof(uint64_t);
+    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading last_task_started.", label);
+        return FAILURE_OOBUF;
+    }
+    uint64_t last_task_started_be;
+    memcpy(&last_task_started_be, value + current_offset, sizeof(uint64_t));
+    dst->last_task_started = be64toh(last_task_started_be);
+    current_offset += sizeof(uint64_t);
+    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading last_task_finished.", label);
+        return FAILURE_OOBUF;
+    }
+    uint64_t last_task_finished_be;
+    memcpy(&last_task_finished_be, value + current_offset, sizeof(uint64_t));
+    dst->last_task_finished = be64toh(last_task_finished_be);
+    current_offset += sizeof(uint64_t);
+    if (current_offset + sizeof(uint64_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading longest_task_time.", label);
+        return FAILURE_OOBUF;
+    }
+    uint64_t longest_task_time_be;
+    memcpy(&longest_task_time_be, value + current_offset, sizeof(uint64_t));
+    dst->longest_task_time = be64toh(longest_task_time_be);
+    current_offset += sizeof(uint64_t);
+    if (current_offset + sizeof(uint8_t) > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading ipstatic.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(&dst->ipstatic, value + current_offset, sizeof(uint8_t));
+    current_offset += sizeof(uint8_t);
+    if (current_offset + DOUBLE_ARRAY_SIZE > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading healthy.", label);
+        return FAILURE_OOBUF;
+    }
+    uint8_t healthy_be[DOUBLE_ARRAY_SIZE];
+    memcpy(healthy_be, value + current_offset, DOUBLE_ARRAY_SIZE);
+    dst->healthy = uint8_be_to_double(healthy_be);
+    current_offset += DOUBLE_ARRAY_SIZE;
+    if (current_offset + LONG_DOUBLE_ARRAY_SIZE > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading avgtt.", label);
+        return FAILURE_OOBUF;
+    }
+    uint8_t avgtt_be[LONG_DOUBLE_ARRAY_SIZE];
+    memcpy(avgtt_be, value + current_offset, LONG_DOUBLE_ARRAY_SIZE);
+    dst->avgtt = uint8_be_to_long_double(avgtt_be);
+    current_offset += LONG_DOUBLE_ARRAY_SIZE;
+    if (current_offset + HASHES_BYTES > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading prevhash.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(dst->prevhash, value + current_offset, HASHES_BYTES);
+    current_offset += HASHES_BYTES;
+    if (current_offset + HASHES_BYTES > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading hash.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(dst->hash, value + current_offset, HASHES_BYTES);
+    current_offset += HASHES_BYTES;
+    if (current_offset + SIGN_GENERATE_SIGNATURE_BBYTES > total_buffer_len) {
+        LOG_ERROR("%sOut of bounds reading signature.", label);
+        return FAILURE_OOBUF;
+    }
+    memcpy(dst->signature, value + current_offset, SIGN_GENERATE_SIGNATURE_BBYTES);
+    current_offset += SIGN_GENERATE_SIGNATURE_BBYTES;
     return SUCCESS;
 }
 
